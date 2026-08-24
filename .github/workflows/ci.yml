@@ -67,10 +67,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
 
     services:
       postgres:
-        image: postgres
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -106,10 +111,15 @@ jobs:
 
   system-test:
     runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
 
     services:
       postgres:
-        image: postgres
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -124,18 +134,39 @@ jobs:
       #   options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-      - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
-
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Check for system tests
+        id: system_tests
+        shell: bash
+        run: |
+          system_test=""
+          if [[ -d test/system ]]; then
+            system_test=$(find test/system -type f -name '*_test.rb' -print -quit)
+          fi
+
+          if [[ -n "$system_test" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "System tests found."
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No system tests found; skipping system-test setup and execution."
+          fi
+
+      - name: Install packages
+        if: steps.system_tests.outputs.found == 'true'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+
       - name: Set up Ruby
+        if: steps.system_tests.outputs.found == 'true'
         uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
 
       - name: Run System Tests
+        id: run_system_tests
+        if: steps.system_tests.outputs.found == 'true'
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
@@ -145,7 +176,7 @@ jobs:
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: failure() && steps.run_system_tests.outcome == 'failure'
         with:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots

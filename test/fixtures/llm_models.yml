@@ -1,0 +1,13 @@
+openrouter_claude:
+  gateway: openrouter
+  provider: anthropic
+  model_identifier: anthropic/claude-test
+  display_name: Claude Test
+  active: true
+
+openrouter_gpt:
+  gateway: openrouter
+  provider: openai
+  model_identifier: openai/gpt-test
+  display_name: GPT Test
+  active: true
