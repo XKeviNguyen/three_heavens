@@ -11,4 +11,5 @@ class Experiment < ApplicationRecord
   }, validate: true
 
   validates :name, length: { maximum: 150 }, allow_blank: true
+  validates :instruction_prompt, presence: true
 end
