@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_064807) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_090001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -26,6 +26,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_064807) do
   create_table "experiments", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "document_id", null: false
+    t.text "instruction_prompt", null: false
     t.string "name"
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
@@ -53,12 +54,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_064807) do
   end
 
   create_table "translation_runs", force: :cascade do |t|
+    t.bigint "cached_tokens"
+    t.datetime "completed_at"
+    t.bigint "completion_tokens"
+    t.decimal "cost", precision: 20, scale: 10
     t.datetime "created_at", null: false
+    t.string "error_code"
+    t.text "error_message"
     t.bigint "experiment_id", null: false
     t.bigint "llm_model_id", null: false
+    t.bigint "prompt_tokens"
+    t.string "provider_response_id"
+    t.bigint "reasoning_tokens"
+    t.string "resolved_model_identifier"
+    t.datetime "started_at"
     t.string "status", default: "pending", null: false
+    t.bigint "total_tokens"
     t.text "translated_text"
     t.datetime "updated_at", null: false
+    t.index ["experiment_id", "llm_model_id"], name: "index_translation_runs_on_experiment_id_and_llm_model_id", unique: true
     t.index ["experiment_id"], name: "index_translation_runs_on_experiment_id"
     t.index ["llm_model_id"], name: "index_translation_runs_on_llm_model_id"
   end

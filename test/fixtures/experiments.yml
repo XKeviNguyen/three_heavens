@@ -3,9 +3,11 @@
 one:
   document: one
   name: MyString
-  status: MyString
+  instruction_prompt: Translate faithfully into the target language.
+  status: pending
 
 two:
   document: two
   name: MyString
-  status: MyString
+  instruction_prompt: Preserve terminology and formatting.
+  status: completed
