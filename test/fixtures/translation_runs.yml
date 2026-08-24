@@ -1,0 +1,11 @@
+one:
+  experiment: one
+  llm_model: openrouter_claude
+  status: pending
+  translated_text:
+
+two:
+  experiment: two
+  llm_model: openrouter_gpt
+  status: completed
+  translated_text: Test translation
