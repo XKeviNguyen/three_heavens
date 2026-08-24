@@ -67,6 +67,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
 
     services:
       postgres:
@@ -106,6 +111,11 @@ jobs:
 
   system-test:
     runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
 
     services:
       postgres:
