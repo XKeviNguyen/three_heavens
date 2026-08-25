@@ -23,8 +23,19 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+  <body class="min-h-screen bg-slate-50 text-slate-900">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <%= link_to "Three Heavens", root_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
+        <%= link_to "New experiment", new_translation_workspace_path, class: "text-sm font-medium text-blue-700 hover:text-blue-900" %>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl px-5 py-10">
+      <% if notice.present? %>
+        <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status"><%= notice %></div>
+      <% end %>
+
       <%= yield %>
     </main>
   </body>

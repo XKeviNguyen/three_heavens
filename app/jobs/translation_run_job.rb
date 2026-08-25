@@ -1,5 +1,6 @@
 class TranslationRunJob < ApplicationJob
   queue_as :default
+  self.enqueue_after_transaction_commit = true
 
   class_attribute :client_factory,
                   instance_writer: false,
