@@ -1,0 +1,137 @@
+<% content_for :title, "Blind review · Three Heavens" %>
+<% unless @review_round.terminal? %>
+  <% content_for :head do %>
+    <meta http-equiv="refresh" content="5">
+  <% end %>
+<% end %>
+
+<div class="space-y-8">
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Blind cross-review</p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @review_round.experiment.name.presence || @review_round.experiment.document.title %></h1>
+      <p class="mt-2 text-sm text-slate-600"><%= @review_round.experiment.document.project.name %> · <%= @review_round.experiment.document.project.source_language %> → <%= @review_round.experiment.document.project.target_language %></p>
+    </div>
+    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@review_round.status) %>"><%= @review_round.status.humanize %></span>
+  </header>
+
+  <% unless @review_round.terminal? %>
+    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
+      Reviewers are still evaluating the translations. This page refreshes automatically every 5 seconds.
+    </div>
+  <% end %>
+
+  <div class="flex">
+    <%= link_to "Back to translation experiment", @review_round.experiment, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+  </div>
+
+  <section class="space-y-6">
+    <h2 class="text-xl font-semibold text-slate-950">Reviewer runs</h2>
+
+    <% @review_round.review_runs.sort_by { |run| [run.reviewer_llm_model.display_name, run.id] }.each do |review_run| %>
+      <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Reviewer</p>
+            <h3 class="mt-1 text-lg font-semibold text-slate-950"><%= review_run.reviewer_llm_model.display_name %></h3>
+            <p class="mt-1 break-all font-mono text-xs text-slate-600"><%= review_run.reviewer_llm_model.model_identifier %></p>
+          </div>
+          <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(review_run.status) %>"><%= review_run.status.humanize %></span>
+        </div>
+
+        <% if review_run.failed? %>
+          <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p class="font-semibold">Reviewer failed</p>
+            <% if review_run.error_code.present? %>
+              <p class="mt-1">Error code: <span class="font-mono"><%= review_run.error_code %></span></p>
+            <% end %>
+            <% if review_run.error_message.present? %>
+              <p class="mt-1 break-words"><%= safe_provider_error(review_run.error_message) %></p>
+            <% end %>
+          </div>
+        <% elsif !review_run.completed? %>
+          <p class="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+            <%= review_run.running? ? "This reviewer is evaluating the anonymous candidates now." : "This review is queued and waiting to start." %>
+          </p>
+        <% end %>
+
+        <% if review_run.completed? %>
+          <div class="mt-6 space-y-5">
+            <% review_run.review_evaluations.sort_by(&:anonymous_label).each do |evaluation| %>
+              <section class="rounded-lg border border-slate-200 p-5">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 class="font-semibold text-slate-950"><%= evaluation.anonymous_label %></h4>
+                    <p class="mt-1 text-sm text-slate-600">
+                      Human-only mapping: <span class="font-semibold text-slate-800"><%= evaluation.translation_run.llm_model.display_name %></span>
+                      · <span class="font-mono text-xs"><%= evaluation.translation_run.llm_model.model_identifier %></span>
+                    </p>
+                  </div>
+                  <span class="text-lg font-bold text-blue-800"><%= evaluation.overall_score %>/10 overall</span>
+                </div>
+
+                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <% {
+                       "Faithfulness" => evaluation.faithfulness_score,
+                       "Naturalness" => evaluation.naturalness_score,
+                       "Terminology" => evaluation.terminology_score,
+                       "Instruction adherence" => evaluation.instruction_adherence_score
+                     }.each do |label, score| %>
+                    <div class="rounded-md bg-slate-50 px-3 py-2">
+                      <dt class="text-slate-500"><%= label %></dt>
+                      <dd class="font-semibold text-slate-900"><%= score %>/10</dd>
+                    </div>
+                  <% end %>
+                </dl>
+
+                <div class="mt-5 grid gap-4 lg:grid-cols-3">
+                  <div>
+                    <h5 class="text-sm font-semibold text-emerald-800">Strengths</h5>
+                    <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.strengths %></p>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-red-800">Issues</h5>
+                    <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.issues %></p>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-blue-800">Recommended corrections</h5>
+                    <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.recommended_corrections %></p>
+                  </div>
+                </div>
+
+                <details class="mt-5 rounded-lg bg-slate-50 p-4">
+                  <summary class="cursor-pointer text-sm font-semibold text-slate-800">Candidate translation</summary>
+                  <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= evaluation.translation_run.translated_text %></div>
+                </details>
+
+                <% if evaluation.suggested_translation.present? %>
+                  <details class="mt-3 rounded-lg bg-blue-50 p-4">
+                    <summary class="cursor-pointer text-sm font-semibold text-blue-900">Suggested improved translation</summary>
+                    <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= evaluation.suggested_translation %></div>
+                  </details>
+                <% end %>
+              </section>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% telemetry = {
+             "Prompt tokens" => review_run.prompt_tokens,
+             "Completion tokens" => review_run.completion_tokens,
+             "Total tokens" => review_run.total_tokens,
+             "Cost" => (number_to_currency(review_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless review_run.cost.nil?)
+           }.compact %>
+        <% if telemetry.any? %>
+          <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
+            <% telemetry.each do |label, value| %>
+              <div>
+                <dt class="text-slate-500"><%= label %></dt>
+                <dd class="font-medium text-slate-900"><%= value %></dd>
+              </div>
+            <% end %>
+          </dl>
+        <% end %>
+      </article>
+    <% end %>
+  </section>
+</div>

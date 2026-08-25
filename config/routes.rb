@@ -2,7 +2,10 @@ Rails.application.routes.draw do
   root "translation_workspaces#new"
 
   resource :translation_workspace, only: %i[new create]
-  resources :experiments, only: :show
+  resources :experiments, only: :show do
+    resources :review_rounds, only: :create
+  end
+  resources :review_rounds, only: :show
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
