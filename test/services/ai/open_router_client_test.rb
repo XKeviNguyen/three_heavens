@@ -97,6 +97,47 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal BigDecimal("0.0012345678"), result.cost
   end
 
+  test "sends strict structured review requests without changing translation calls" do
+    http = fake_http(
+      status: 200,
+      body: {
+        choices: [ { message: { content: '{"evaluations":[]}' } } ]
+      }
+    )
+    client = build_client(http)
+    schema = {
+      type: "object",
+      properties: { evaluations: { type: "array" } },
+      required: [ "evaluations" ],
+      additionalProperties: false
+    }
+
+    result = client.review_completion(
+      model_identifier: "reviewer/model",
+      system_prompt: "Review anonymous candidates.",
+      user_prompt: "Candidate A: translated text",
+      response_schema: schema
+    )
+
+    payload = JSON.parse(http.last_request.body)
+    assert_equal "reviewer/model", payload["model"]
+    assert_equal({ "require_parameters" => true }, payload["provider"])
+    assert_equal "json_schema", payload.dig("response_format", "type")
+    assert_equal "blind_translation_review",
+                 payload.dig("response_format", "json_schema", "name")
+    assert_equal true, payload.dig("response_format", "json_schema", "strict")
+    assert_equal JSON.parse(JSON.generate(schema)),
+                 payload.dig("response_format", "json_schema", "schema")
+    assert_equal(
+      [
+        { "role" => "system", "content" => "Review anonymous candidates." },
+        { "role" => "user", "content" => "Candidate A: translated text" }
+      ],
+      payload["messages"]
+    )
+    assert_equal '{"evaluations":[]}', result.content
+  end
+
   test "classifies rate limits and server errors as retryable" do
     [ 429, 500, 503 ].each do |status|
       client = build_client(

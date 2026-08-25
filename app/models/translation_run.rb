@@ -4,6 +4,8 @@ class TranslationRun < ApplicationRecord
   belongs_to :experiment
   belongs_to :llm_model
 
+  has_many :review_evaluations, dependent: :restrict_with_error
+
   enum :status, {
     pending: "pending",
     running: "running",

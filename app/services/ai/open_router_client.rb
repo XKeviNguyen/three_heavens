@@ -55,8 +55,31 @@ module Ai
     def chat_completion(model_identifier:, instruction_prompt:, source_text:)
       response = perform_request(
         model_identifier: model_identifier,
-        instruction_prompt: instruction_prompt,
-        source_text: source_text
+        messages: [
+          { role: "system", content: instruction_prompt },
+          { role: "user", content: source_text }
+        ]
+      )
+
+      parse_response(response)
+    end
+
+    def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+      response = perform_request(
+        model_identifier: model_identifier,
+        messages: [
+          { role: "system", content: system_prompt },
+          { role: "user", content: user_prompt }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "blind_translation_review",
+            strict: true,
+            schema: response_schema
+          }
+        },
+        provider: { require_parameters: true }
       )
 
       parse_response(response)
@@ -64,17 +87,15 @@ module Ai
 
     private
 
-    def perform_request(model_identifier:, instruction_prompt:, source_text:)
+    def perform_request(model_identifier:, messages:, **options)
       request = Net::HTTP::Post.new(ENDPOINT)
       request["Authorization"] = "Bearer #{@api_key}"
       request["Content-Type"] = "application/json"
       request.body = JSON.generate(
         model: model_identifier,
-        messages: [
-          { role: "system", content: instruction_prompt },
-          { role: "user", content: source_text }
-        ],
-        usage: { include: true }
+        messages: messages,
+        usage: { include: true },
+        **options
       )
 
       http = @http_factory.call(ENDPOINT)

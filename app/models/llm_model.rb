@@ -1,5 +1,9 @@
 class LlmModel < ApplicationRecord
   has_many :translation_runs, dependent: :restrict_with_error
+  has_many :review_runs,
+           foreign_key: :reviewer_llm_model_id,
+           inverse_of: :reviewer_llm_model,
+           dependent: :restrict_with_error
 
   scope :active_openrouter, -> { where(active: true, gateway: "openrouter") }
 

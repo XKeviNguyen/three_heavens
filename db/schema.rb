@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_090001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -53,6 +53,72 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090001) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "review_evaluations", force: :cascade do |t|
+    t.string "anonymous_label", null: false
+    t.datetime "created_at", null: false
+    t.integer "faithfulness_score"
+    t.integer "instruction_adherence_score"
+    t.text "issues"
+    t.integer "naturalness_score"
+    t.integer "overall_score"
+    t.text "recommended_corrections"
+    t.bigint "review_run_id", null: false
+    t.text "strengths"
+    t.text "suggested_translation"
+    t.integer "terminology_score"
+    t.bigint "translation_run_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["review_run_id", "anonymous_label"], name: "index_review_evaluations_on_run_and_label", unique: true
+    t.index ["review_run_id", "translation_run_id"], name: "index_review_evaluations_on_run_and_translation", unique: true
+    t.index ["review_run_id"], name: "index_review_evaluations_on_review_run_id"
+    t.index ["translation_run_id"], name: "index_review_evaluations_on_translation_run_id"
+    t.check_constraint "anonymous_label::text ~ '^Candidate [A-Z]+$'::text", name: "review_evaluations_label_check"
+    t.check_constraint "faithfulness_score IS NULL OR faithfulness_score >= 1 AND faithfulness_score <= 10", name: "review_evaluations_faithfulness_score_check"
+    t.check_constraint "instruction_adherence_score IS NULL OR instruction_adherence_score >= 1 AND instruction_adherence_score <= 10", name: "review_evaluations_instruction_adherence_score_check"
+    t.check_constraint "naturalness_score IS NULL OR naturalness_score >= 1 AND naturalness_score <= 10", name: "review_evaluations_naturalness_score_check"
+    t.check_constraint "overall_score IS NULL OR overall_score >= 1 AND overall_score <= 10", name: "review_evaluations_overall_score_check"
+    t.check_constraint "terminology_score IS NULL OR terminology_score >= 1 AND terminology_score <= 10", name: "review_evaluations_terminology_score_check"
+  end
+
+  create_table "review_rounds", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "experiment_id", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["experiment_id"], name: "index_review_rounds_on_experiment_id", unique: true
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "review_rounds_status_check"
+  end
+
+  create_table "review_runs", force: :cascade do |t|
+    t.bigint "cached_tokens"
+    t.datetime "completed_at"
+    t.bigint "completion_tokens"
+    t.decimal "cost", precision: 20, scale: 10
+    t.datetime "created_at", null: false
+    t.string "error_code"
+    t.text "error_message"
+    t.bigint "prompt_tokens"
+    t.string "provider_response_id"
+    t.bigint "reasoning_tokens"
+    t.string "resolved_model_identifier"
+    t.bigint "review_round_id", null: false
+    t.bigint "reviewer_llm_model_id", null: false
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.bigint "total_tokens"
+    t.datetime "updated_at", null: false
+    t.index ["review_round_id", "reviewer_llm_model_id"], name: "index_review_runs_on_review_round_id_and_reviewer_llm_model_id", unique: true
+    t.index ["review_round_id"], name: "index_review_runs_on_review_round_id"
+    t.index ["reviewer_llm_model_id"], name: "index_review_runs_on_reviewer_llm_model_id"
+    t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "review_runs_cached_tokens_check"
+    t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "review_runs_completion_tokens_check"
+    t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "review_runs_cost_check"
+    t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "review_runs_prompt_tokens_check"
+    t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "review_runs_reasoning_tokens_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "review_runs_status_check"
+    t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "review_runs_total_tokens_check"
+  end
+
   create_table "translation_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
     t.datetime "completed_at"
@@ -79,6 +145,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090001) do
 
   add_foreign_key "documents", "projects"
   add_foreign_key "experiments", "documents"
+  add_foreign_key "review_evaluations", "review_runs"
+  add_foreign_key "review_evaluations", "translation_runs"
+  add_foreign_key "review_rounds", "experiments"
+  add_foreign_key "review_runs", "llm_models", column: "reviewer_llm_model_id"
+  add_foreign_key "review_runs", "review_rounds"
   add_foreign_key "translation_runs", "experiments"
   add_foreign_key "translation_runs", "llm_models"
 end
