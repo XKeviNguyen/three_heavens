@@ -20,6 +20,10 @@ class TranslationRunJobTest < ActiveJob::TestCase
     @llm_model = llm_models(:openrouter_claude)
   end
 
+  test "defers enqueueing until the surrounding transaction commits" do
+    assert TranslationRunJob.enqueue_after_transaction_commit
+  end
+
   test "completes a run and persists translation telemetry" do
     run = @experiment.translation_runs.create!(llm_model: @llm_model)
     client = successful_client

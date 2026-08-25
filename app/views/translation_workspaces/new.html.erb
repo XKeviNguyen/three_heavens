@@ -1,0 +1,93 @@
+<% content_for :title, "Translation workspace · Three Heavens" %>
+
+<div class="mx-auto max-w-4xl">
+  <div class="mb-8">
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation workspace</p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Start a translation experiment</h1>
+    <p class="mt-3 max-w-2xl text-slate-600">Create a source document and compare translations from one or more active OpenRouter models.</p>
+  </div>
+
+  <%= form_with model: @translation_workspace, url: translation_workspace_path, class: "space-y-8" do |form| %>
+    <% if @translation_workspace.errors.any? %>
+      <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="form-errors-heading">
+        <h2 id="form-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
+        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
+          <% @translation_workspace.errors.each do |error| %>
+            <li><%= error.full_message %></li>
+          <% end %>
+        </ul>
+      </section>
+    <% end %>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-950">Project and languages</h2>
+      <div class="mt-5 grid gap-5 md:grid-cols-2">
+        <div class="md:col-span-2">
+          <%= form.label :project_name, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_field :project_name, required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+        <div>
+          <%= form.label :source_language, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_field :source_language, required: true, placeholder: "e.g. Vietnamese", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+        <div>
+          <%= form.label :target_language, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_field :target_language, required: true, placeholder: "e.g. Japanese", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-950">Source document</h2>
+      <div class="mt-5 space-y-5">
+        <div>
+          <%= form.label :document_title, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_field :document_title, required: true, maxlength: 255, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+        <div>
+          <%= form.label :source_text, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_area :source_text, required: true, rows: 10, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-950">Experiment</h2>
+      <div class="mt-5 space-y-5">
+        <div>
+          <%= form.label :experiment_name, "Experiment name (optional)", class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_field :experiment_name, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+        <div>
+          <%= form.label :instruction_prompt, "Translation instruction", class: "block text-sm font-medium text-slate-700" %>
+          <%= form.text_area :instruction_prompt, required: true, rows: 5, placeholder: "Describe tone, terminology, formatting, and other translation requirements.", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        </div>
+      </div>
+    </section>
+
+    <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <legend class="px-1 text-lg font-semibold text-slate-950">OpenRouter models</legend>
+      <p class="mt-1 text-sm text-slate-600">Select at least one model. Each model creates an independent translation run.</p>
+
+      <% if @available_models.any? %>
+        <div class="mt-5 grid gap-3 md:grid-cols-2">
+          <% @available_models.each do |llm_model| %>
+            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40">
+              <%= check_box_tag "translation_workspace[model_ids][]", llm_model.id, @translation_workspace.model_ids.map(&:to_s).include?(llm_model.id.to_s), id: "translation_workspace_model_ids_#{llm_model.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
+              <span>
+                <span class="block font-medium text-slate-900"><%= llm_model.display_name %></span>
+                <span class="mt-1 block text-xs text-slate-500"><%= llm_model.provider %> · <%= llm_model.model_identifier %></span>
+              </span>
+            </label>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active OpenRouter models are currently available.</p>
+      <% end %>
+    </fieldset>
+
+    <div class="flex justify-end">
+      <%= form.submit "Start translation runs", disabled: @available_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400" %>
+    </div>
+  <% end %>
+</div>
