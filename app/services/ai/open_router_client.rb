@@ -65,6 +65,28 @@ module Ai
     end
 
     def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+      structured_completion(
+        model_identifier: model_identifier,
+        system_prompt: system_prompt,
+        user_prompt: user_prompt,
+        response_schema: response_schema,
+        schema_name: "blind_translation_review"
+      )
+    end
+
+    def judge_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+      structured_completion(
+        model_identifier: model_identifier,
+        system_prompt: system_prompt,
+        user_prompt: user_prompt,
+        response_schema: response_schema,
+        schema_name: "blind_translation_judgment"
+      )
+    end
+
+    private
+
+    def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:)
       response = perform_request(
         model_identifier: model_identifier,
         messages: [
@@ -74,7 +96,7 @@ module Ai
         response_format: {
           type: "json_schema",
           json_schema: {
-            name: "blind_translation_review",
+            name: schema_name,
             strict: true,
             schema: response_schema
           }
@@ -84,8 +106,6 @@ module Ai
 
       parse_response(response)
     end
-
-    private
 
     def perform_request(model_identifier:, messages:, **options)
       request = Net::HTTP::Post.new(ENDPOINT)

@@ -5,6 +5,17 @@ class TranslationRun < ApplicationRecord
   belongs_to :llm_model
 
   has_many :review_evaluations, dependent: :restrict_with_error
+  has_many :judge_evaluations, dependent: :restrict_with_error
+  has_many :winning_judge_runs,
+           class_name: "JudgeRun",
+           foreign_key: :winner_translation_run_id,
+           inverse_of: :winner_translation_run,
+           dependent: :restrict_with_error
+  has_many :winning_judge_rounds,
+           class_name: "JudgeRound",
+           foreign_key: :winner_translation_run_id,
+           inverse_of: :winner_translation_run,
+           dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",
