@@ -1,0 +1,11 @@
+<% content_for :title, "Edit #{@llm_model.display_name} · Three Heavens" %>
+
+<div class="mx-auto max-w-3xl">
+  <header class="mb-8">
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Settings / Models</p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Edit model metadata</h1>
+    <p class="mt-2 text-sm leading-6 text-slate-600">Gateway: <span class="font-semibold">openrouter</span>. Use the catalog list’s explicit action to change active state.</p>
+  </header>
+
+  <%= render "form", llm_model: @llm_model %>
+</div>

@@ -1,0 +1,43 @@
+<%= form_with model: llm_model,
+              url: llm_model.new_record? ? settings_models_path : settings_model_path(llm_model),
+              class: "space-y-6" do |form| %>
+  <% if llm_model.errors.any? %>
+    <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="model-form-errors-heading">
+      <h2 id="model-form-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
+        <% llm_model.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="grid gap-5 md:grid-cols-2">
+      <div>
+        <%= form.label :provider, class: "block text-sm font-medium text-slate-700" %>
+        <%= form.text_field :provider, required: true, maxlength: LlmModel::PROVIDER_MAX_LENGTH, autocomplete: "off", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        <p class="mt-2 text-xs text-slate-500">Catalog metadata only; do not enter a key or credential.</p>
+      </div>
+      <div>
+        <%= form.label :display_name, class: "block text-sm font-medium text-slate-700" %>
+        <%= form.text_field :display_name, required: true, maxlength: LlmModel::DISPLAY_NAME_MAX_LENGTH, autocomplete: "off", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+      </div>
+      <div class="md:col-span-2">
+        <%= form.label :model_identifier, class: "block text-sm font-medium text-slate-700" %>
+        <% if llm_model.persisted? && llm_model.historical_usage? %>
+          <p class="mt-2 break-all rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700"><%= llm_model.model_identifier %></p>
+          <p class="mt-2 text-xs text-slate-500">Locked because this model has historical translation, review, or judge usage.</p>
+        <% else %>
+          <%= form.text_field :model_identifier, required: true, maxlength: LlmModel::MODEL_IDENTIFIER_MAX_LENGTH, placeholder: "provider/model", autocomplete: "off", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+          <p class="mt-2 text-xs text-slate-500">Use the OpenRouter catalog identifier. It becomes immutable after first historical use.</p>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <%= link_to "Cancel", settings_models_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %>
+    <%= form.submit llm_model.new_record? ? "Add active model" : "Save metadata", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
+  </div>
+<% end %>
