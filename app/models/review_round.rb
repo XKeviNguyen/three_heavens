@@ -4,6 +4,7 @@ class ReviewRound < ApplicationRecord
   belongs_to :experiment
 
   has_many :review_runs, dependent: :restrict_with_error
+  has_one :judge_round, dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",

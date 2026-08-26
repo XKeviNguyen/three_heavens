@@ -3,6 +3,7 @@ class Experiment < ApplicationRecord
 
   has_many :translation_runs, dependent: :restrict_with_error
   has_one :review_round, dependent: :restrict_with_error
+  has_one :judge_round, through: :review_round
 
   enum :status, {
     pending: "pending",

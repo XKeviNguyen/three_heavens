@@ -138,6 +138,37 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal '{"evaluations":[]}', result.content
   end
 
+  test "sends judge requests through the strict structured output boundary" do
+    http = fake_http(
+      status: 200,
+      body: {
+        choices: [ { message: { content: '{"rankings":[]}' } } ]
+      }
+    )
+    client = build_client(http)
+    schema = {
+      type: "object",
+      properties: { rankings: { type: "array" } },
+      required: [ "rankings" ],
+      additionalProperties: false
+    }
+
+    result = client.judge_completion(
+      model_identifier: "judge/model",
+      system_prompt: "Judge anonymous candidates.",
+      user_prompt: "Candidate A: translated text",
+      response_schema: schema
+    )
+
+    payload = JSON.parse(http.last_request.body)
+    assert_equal "judge/model", payload["model"]
+    assert_equal({ "require_parameters" => true }, payload["provider"])
+    assert_equal "blind_translation_judgment",
+                 payload.dig("response_format", "json_schema", "name")
+    assert_equal true, payload.dig("response_format", "json_schema", "strict")
+    assert_equal '{"rankings":[]}', result.content
+  end
+
   test "classifies rate limits and server errors as retryable" do
     [ 429, 500, 503 ].each do |status|
       client = build_client(

@@ -5,7 +5,10 @@ Rails.application.routes.draw do
   resources :experiments, only: :show do
     resources :review_rounds, only: :create
   end
-  resources :review_rounds, only: :show
+  resources :review_rounds, only: :show do
+    resources :judge_rounds, only: :create
+  end
+  resources :judge_rounds, only: :show
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

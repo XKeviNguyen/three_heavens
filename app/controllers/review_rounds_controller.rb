@@ -16,12 +16,14 @@ class ReviewRoundsController < ApplicationController
 
   def show
     @review_round = ReviewRound.includes(
+      :judge_round,
       experiment: { document: :project },
       review_runs: [
         :reviewer_llm_model,
         { review_evaluations: { translation_run: :llm_model } }
       ]
     ).find(params[:id])
+    @judge_models = LlmModel.active_openrouter.order(:display_name, :id)
   end
 
   private
