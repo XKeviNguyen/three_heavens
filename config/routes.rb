@@ -5,6 +5,15 @@ Rails.application.routes.draw do
   resources :benchmarks, only: :index
   get "benchmarks/models/:id", to: "benchmarks#show", as: :benchmark_model
 
+  namespace :settings do
+    resources :models, except: %i[show destroy] do
+      member do
+        patch :activate
+        patch :deactivate
+      end
+    end
+  end
+
   resource :translation_workspace, only: %i[new create]
   resources :experiments, only: :show do
     resources :review_rounds, only: :create
