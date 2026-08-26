@@ -1,0 +1,113 @@
+<% content_for :title, "#{@model.display_name} benchmark · Three Heavens" %>
+
+<div class="space-y-10">
+  <header>
+    <%= link_to "← All benchmarks", benchmarks_path, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Requested catalog model</p>
+        <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @model.display_name %></h1>
+        <p class="mt-2 text-sm text-slate-600"><%= @model.gateway %> · <%= @model.provider %></p>
+        <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= @model.model_identifier %></p>
+      </div>
+      <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= @model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= @model.active? ? "Active" : "Inactive" %></span>
+    </div>
+  </header>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="mb-5 text-xl font-semibold text-slate-950">Summary</h2>
+    <%= render "summary", stats: @stats %>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Role diagnostics</h2>
+    <p class="mt-2 text-sm leading-6 text-slate-600">Reviewer identity comparisons use the requested catalog model, not the provider-resolved identifier. Differences are descriptive and do not establish causation. Judge agreement is agreement with the aggregate outcome, not objective correctness.</p>
+
+    <div class="mt-5 grid gap-5 md:grid-cols-2">
+      <% reviewer = @stats.reviewer_diagnostics %>
+      <article class="rounded-lg border border-slate-200 p-5">
+        <h3 class="font-semibold text-slate-950">Potential self-review scoring difference</h3>
+        <% if reviewer %>
+          <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
+            <div><dt class="text-slate-500">Self</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_average_score) %> (n=<%= reviewer.self_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500">Other</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.other_average_score) %> (n=<%= reviewer.other_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500">Difference</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_score_difference) %></dd></div>
+          </dl>
+        <% else %>
+          <p class="mt-3 text-sm text-slate-600">N/A · no completed review-run scores.</p>
+        <% end %>
+      </article>
+
+      <% judge = @stats.judge_diagnostics %>
+      <article class="rounded-lg border border-slate-200 p-5">
+        <h3 class="font-semibold text-slate-950">Agreement with aggregate winner</h3>
+        <% if judge %>
+          <p class="mt-4 text-2xl font-bold text-slate-950"><%= analytics_percent(judge.agreement_rate) %></p>
+          <p class="mt-1 text-sm text-slate-600"><%= judge.agreement_count %> agreements across <%= judge.eligible_run_count %> eligible completed judge run(s)</p>
+        <% else %>
+          <p class="mt-3 text-sm text-slate-600">N/A · no eligible completed judge runs.</p>
+        <% end %>
+      </article>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Resolved-model history</h2>
+    <p class="mt-2 text-sm leading-6 text-slate-600">OpenRouter may serve a different resolved identifier than the requested catalog model. Unknown/unreported values are kept explicit. Cost totals below include completed translations with reported cost.</p>
+    <div class="mt-5 overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-3 py-3">Resolved identifier</th><th class="px-3 py-3">Runs</th><th class="px-3 py-3">Completed</th><th class="px-3 py-3">Wins</th><th class="px-3 py-3">Judge score</th><th class="px-3 py-3">Known cost</th></tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          <% @history.resolved_models.each do |resolved| %>
+            <tr>
+              <th class="px-3 py-4 font-mono text-xs text-slate-800"><%= resolved.resolved_model_identifier || "Unknown/unreported" %></th>
+              <td class="px-3 py-4"><%= resolved.sample_count %></td>
+              <td class="px-3 py-4"><%= resolved.completed_count %></td>
+              <td class="px-3 py-4"><%= resolved.official_wins %></td>
+              <td class="px-3 py-4"><%= analytics_number(resolved.judge_average_score) %> (n=<%= resolved.judge_score_sample_count %>)</td>
+              <td class="px-3 py-4"><%= analytics_money(resolved.total_known_cost) %> (n=<%= resolved.cost_sample_count %>)</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="text-xl font-semibold text-slate-950">Recent translation history</h2>
+    <p class="mt-2 text-sm text-slate-600">The 25 most recent requested runs for this model.</p>
+    <div class="mt-5 space-y-4">
+      <% @history.entries.each do |entry| %>
+        <% run = entry.translation_run %>
+        <% experiment = run.experiment %>
+        <% project = experiment.document.project %>
+        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= l run.created_at, format: :long %></p>
+              <h3 class="mt-2 text-lg font-semibold text-slate-950"><%= experiment.name.presence || experiment.document.title %></h3>
+              <p class="mt-1 text-sm text-slate-600"><%= project.source_language %> → <%= project.target_language %></p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span class="rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(run.status) %>"><%= run.status.humanize %></span>
+              <% if entry.official_winner %><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">Official winner</span><% end %>
+            </div>
+          </div>
+          <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-6">
+            <div><dt class="text-slate-500">Resolved model</dt><dd class="mt-1 break-all font-mono text-xs"><%= run.resolved_model_identifier.presence || "Unknown/unreported" %></dd></div>
+            <div><dt class="text-slate-500">Cost</dt><dd class="mt-1 font-semibold"><%= analytics_money(run.cost) %></dd></div>
+            <div><dt class="text-slate-500">Total tokens</dt><dd class="mt-1 font-semibold"><%= run.total_tokens || "N/A" %></dd></div>
+            <div><dt class="text-slate-500">Latency</dt><dd class="mt-1 font-semibold"><%= analytics_duration(entry.latency_seconds) %></dd></div>
+            <div><dt class="text-slate-500">Blind-review score</dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.review_average_score) %> (n=<%= entry.review_score_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500">Judge score</dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.judge_average_score) %> (n=<%= entry.judge_score_sample_count %>)</dd></div>
+          </dl>
+          <div class="mt-5 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
+            <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
+            <% if experiment.review_round %><%= link_to "Blind review", review_round_path(experiment.review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if experiment.judge_round %><%= link_to "Judge results", judge_round_path(experiment.judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+          </div>
+        </article>
+      <% end %>
+    </div>
+  </section>
+</div>
