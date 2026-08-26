@@ -1,6 +1,10 @@
 Rails.application.routes.draw do
   root "translation_workspaces#new"
 
+  get "history", to: "history#index", as: :history
+  resources :benchmarks, only: :index
+  get "benchmarks/models/:id", to: "benchmarks#show", as: :benchmark_model
+
   resource :translation_workspace, only: %i[new create]
   resources :experiments, only: :show do
     resources :review_rounds, only: :create

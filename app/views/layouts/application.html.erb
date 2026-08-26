@@ -25,9 +25,13 @@
 
   <body class="min-h-screen bg-slate-50 text-slate-900">
     <header class="border-b border-slate-200 bg-white">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+      <div class="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <%= link_to "Three Heavens", root_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
-        <%= link_to "New experiment", new_translation_workspace_path, class: "text-sm font-medium text-blue-700 hover:text-blue-900" %>
+        <nav class="flex flex-wrap items-center gap-4 text-sm font-medium" aria-label="Primary navigation">
+          <%= link_to "History", history_path, class: "text-slate-600 hover:text-slate-950" %>
+          <%= link_to "Benchmarks", benchmarks_path, class: "text-slate-600 hover:text-slate-950" %>
+          <%= link_to "New experiment", new_translation_workspace_path, class: "text-blue-700 hover:text-blue-900" %>
+        </nav>
       </div>
     </header>
 

@@ -1,0 +1,41 @@
+<dl class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Completed translations</dt>
+    <dd class="mt-1 text-xl font-bold text-slate-950"><%= stats.completed_translation_count %></dd>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Official wins</dt>
+    <dd class="mt-1 text-xl font-bold text-slate-950"><%= stats.official_wins %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= analytics_percent(stats.official_win_rate) %> across <%= stats.completed_judged_experiment_count %> eligible completed round(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Blind-review score</dt>
+    <dd class="mt-1 text-xl font-bold text-slate-950"><%= analytics_number(stats.review_average_score) %><%= "/10" if stats.review_average_score %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.review_score_sample_count %> score sample(s) · <%= stats.reviewed_candidate_count %> candidate(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Judge score</dt>
+    <dd class="mt-1 text-xl font-bold text-slate-950"><%= analytics_number(stats.judge_average_score) %><%= "/100" if stats.judge_average_score %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.judge_score_sample_count %> score sample(s) · <%= stats.judged_candidate_count %> candidate(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Known translation cost</dt>
+    <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_money(stats.total_translation_cost) %> total</dd>
+    <p class="mt-1 text-xs text-slate-500"><%= analytics_money(stats.average_translation_cost) %> average · <%= stats.cost_sample_count %> completed run sample(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Average latency</dt>
+    <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_duration(stats.average_latency_seconds) %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.latency_sample_count %> completed run sample(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Average total tokens</dt>
+    <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_number(stats.average_total_tokens, precision: 1) %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.token_sample_count %> completed run sample(s)</p>
+  </div>
+  <div class="rounded-lg bg-slate-50 p-4">
+    <dt class="text-slate-500">Avg cost per judge-score point</dt>
+    <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_money(stats.average_cost_per_judge_score_point) %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.cost_quality_sample_count %> positive-cost judged run sample(s) · lower is better</p>
+  </div>
+</dl>
