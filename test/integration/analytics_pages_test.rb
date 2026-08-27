@@ -5,6 +5,7 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
   include AnalyticsTestHelper
 
   setup do
+    sign_in_as users(:normal)
     @candidate = create_analytics_model(name: "<script>Candidate model</script>")
     @other = create_analytics_model(name: "Page opponent")
     @reviewer = @candidate
@@ -79,7 +80,7 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     assert LlmModel.exists?(@candidate.id)
   end
 
-  test "model detail renders summary recent history resolved model role metrics and links" do
+  test "model detail renders scoped aggregate history without project identities or workflow links" do
     get benchmark_model_path(@candidate)
 
     assert_response :success
@@ -92,12 +93,12 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     assert_select "article", text: /Blind-review score.*9 \(n=1\)/m
     assert_select "article", text: /Judge score.*90 \(n=1\)/m
     assert_select "article", text: /Latency.*3 s/m
-    assert_select "a[href='#{experiment_path(@experiment)}']", "Experiment"
-    assert_select "a[href='#{review_round_path(@review_round)}']", "Blind review"
-    assert_select "a[href='#{judge_round_path(@judge_round)}']", "Judge results"
+    assert_select "a[href='#{experiment_path(@experiment)}']", count: 0
+    assert_select "a[href='#{review_round_path(@review_round)}']", count: 0
+    assert_select "a[href='#{judge_round_path(@judge_round)}']", count: 0
     assert_select "article", text: /Difference.*3/m
     assert_select "article", text: /100%.*1 agreements across 1 eligible/m
-    assert_includes response.body, "&lt;img src=x onerror=history()&gt;"
+    assert_not_includes response.body, "&lt;img src=x onerror=history()&gt;"
   end
 
   test "unknown model detail returns not found" do

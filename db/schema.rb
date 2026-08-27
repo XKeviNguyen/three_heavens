@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -48,7 +48,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.index ["source_finalization_run_id"], name: "index_final_versions_on_unique_source_run", unique: true, where: "(source_finalization_run_id IS NOT NULL)"
     t.check_constraint "change_note IS NULL OR char_length(change_note::text) <= 500", name: "final_translation_versions_change_note_check"
     t.check_constraint "char_length(btrim(content)) > 0 AND char_length(content) <= 100000", name: "final_translation_versions_content_check"
-    t.check_constraint "origin::text = ANY (ARRAY['seed'::character varying, 'manual'::character varying, 'ai_applied'::character varying, 'restored'::character varying]::text[])", name: "final_translation_versions_origin_check"
+    t.check_constraint "origin::text = ANY (ARRAY['seed'::character varying::text, 'manual'::character varying::text, 'ai_applied'::character varying::text, 'restored'::character varying::text])", name: "final_translation_versions_origin_check"
     t.check_constraint "version_number > 0", name: "final_translation_versions_number_check"
   end
 
@@ -67,7 +67,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.index ["judge_round_id"], name: "index_final_translations_on_judge_round_id", unique: true
     t.index ["source_winner_translation_run_id"], name: "index_final_translations_on_source_winner_translation_run_id"
     t.check_constraint "(status::text = 'finalized'::text) = (finalized_at IS NOT NULL)", name: "final_translations_finalized_at_check"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'finalized'::character varying]::text[])", name: "final_translations_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'finalized'::character varying::text])", name: "final_translations_status_check"
   end
 
   create_table "finalization_rounds", force: :cascade do |t|
@@ -82,7 +82,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.index ["final_translation_id"], name: "index_finalization_rounds_on_final_translation_id"
     t.index ["final_translation_id"], name: "index_finalization_rounds_one_running", unique: true, where: "((status)::text = 'running'::text)"
     t.check_constraint "char_length(selection_key::text) = 64", name: "finalization_rounds_selection_key_check"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "finalization_rounds_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "finalization_rounds_status_check"
   end
 
   create_table "finalization_runs", force: :cascade do |t|
@@ -119,7 +119,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "finalization_runs_prompt_tokens_check"
     t.check_constraint "proposed_translation IS NULL OR char_length(proposed_translation) <= 100000", name: "finalization_runs_proposal_length_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "finalization_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "finalization_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "finalization_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "finalization_runs_total_tokens_check"
   end
 
@@ -157,7 +157,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.index ["winner_translation_run_id"], name: "index_judge_rounds_on_winner_translation_run_id"
     t.check_constraint "(status::text = 'completed'::text) = (winner_translation_run_id IS NOT NULL)", name: "judge_rounds_completed_winner_check"
     t.check_constraint "jsonb_typeof(aggregate_rankings) = 'array'::text", name: "judge_rounds_aggregate_rankings_array_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "judge_rounds_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "judge_rounds_status_check"
   end
 
   create_table "judge_runs", force: :cascade do |t|
@@ -191,7 +191,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "judge_runs_cost_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "judge_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "judge_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "judge_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "judge_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "judge_runs_total_tokens_check"
     t.check_constraint "winner_translation_run_id IS NULL OR status::text = 'completed'::text", name: "judge_runs_winner_status_check"
   end
@@ -214,6 +214,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.string "source_language", null: false
     t.string "target_language", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id"], name: "index_projects_on_user_id"
   end
 
   create_table "review_evaluations", force: :cascade do |t|
@@ -249,7 +251,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["experiment_id"], name: "index_review_rounds_on_experiment_id", unique: true
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "review_rounds_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "review_rounds_status_check"
   end
 
   create_table "review_runs", force: :cascade do |t|
@@ -278,7 +280,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "review_runs_cost_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "review_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "review_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "review_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "review_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "review_runs_total_tokens_check"
   end
 
@@ -307,6 +309,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
     t.index ["llm_model_id"], name: "index_translation_runs_on_llm_model_id"
   end
 
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.string "role", default: "user", null: false
+    t.string "status", default: "active", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((email)::text)", name: "index_users_on_lower_email", unique: true
+    t.check_constraint "email::text = lower(btrim(email::text)) AND char_length(email::text) >= 3 AND char_length(email::text) <= 254", name: "users_normalized_email_check"
+    t.check_constraint "role::text = ANY (ARRAY['user'::character varying::text, 'admin'::character varying::text])", name: "users_role_check"
+    t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'disabled'::character varying::text])", name: "users_status_check"
+  end
+
   add_foreign_key "documents", "projects"
   add_foreign_key "experiments", "documents"
   add_foreign_key "final_translation_versions", "final_translations"
@@ -329,6 +344,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
   add_foreign_key "judge_runs", "judge_rounds"
   add_foreign_key "judge_runs", "llm_models", column: "judge_llm_model_id"
   add_foreign_key "judge_runs", "translation_runs", column: "winner_translation_run_id"
+  add_foreign_key "projects", "users", on_delete: :restrict
   add_foreign_key "review_evaluations", "review_runs"
   add_foreign_key "review_evaluations", "translation_runs"
   add_foreign_key "review_rounds", "experiments"

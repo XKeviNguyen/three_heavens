@@ -7,6 +7,11 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
   include FinalTranslationTestHelper
 
+  setup do
+    @current_test_user = users(:admin)
+    sign_in_as @current_test_user
+  end
+
   test "catalog lists model metadata usage actions and only valid benchmark links" do
     used_model = llm_models(:openrouter_claude)
     unused_model = create_model("unused-list")

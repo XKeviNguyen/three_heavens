@@ -6,6 +6,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
   include FinalTranslationTestHelper
 
   setup do
+    sign_in_as users(:normal)
     @final_translation = create_final_translation_workspace
     @finalizer = create_finalizer
   end

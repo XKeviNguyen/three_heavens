@@ -28,12 +28,13 @@ module History
       end
     end
 
-    def initialize(page: nil)
+    def initialize(experiment_scope:, page: nil)
+      @ownership_scope = experiment_scope
       @requested_page = parse_page(page)
     end
 
     def call
-      total_count = Experiment.count
+      total_count = ownership_scope.count
       total_pages = [ (total_count.to_f / PER_PAGE).ceil, 1 ].max
       current_page = [ @requested_page, total_pages ].min
       experiments = experiment_scope.offset((current_page - 1) * PER_PAGE).limit(PER_PAGE).to_a
@@ -50,13 +51,15 @@ module History
 
     private
 
+    attr_reader :ownership_scope
+
     def parse_page(value)
       parsed = Integer(value, exception: false)
       parsed&.positive? ? parsed : 1
     end
 
     def experiment_scope
-      Experiment.includes(
+      ownership_scope.includes(
         { document: :project },
         :translation_runs,
         :final_translation,

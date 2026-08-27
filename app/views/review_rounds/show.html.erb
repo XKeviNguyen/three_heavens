@@ -149,7 +149,7 @@
     <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-950">Start judge selection</h2>
       <p class="mt-2 max-w-3xl text-sm text-slate-600">
-        Select one or more judge models. Judges receive anonymously labeled translations and anonymous blind-review feedback; candidate and reviewer model identities remain private from them.
+        Select 1–<%= Ai::UsageLimits::MAX_JUDGES %> judge models. Judges receive anonymously labeled translations and anonymous blind-review feedback; candidate and reviewer model identities remain private from them.
       </p>
 
       <%= form_with url: review_round_judge_rounds_path(@review_round), scope: :judge_round, class: "mt-5 space-y-5" do |form| %>

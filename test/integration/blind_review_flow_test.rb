@@ -4,7 +4,9 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   setup do
+    sign_in_as users(:normal)
     project = Project.create!(
+      user: users(:normal),
       name: "Browser blind review",
       source_language: "Vietnamese",
       target_language: "Japanese"
@@ -94,7 +96,7 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
       end
 
       assert_response :unprocessable_content
-      assert_select "[role='alert']", text: /valid reviewer|active OpenRouter/
+      assert_select "[role='alert']", text: /reviewer|active OpenRouter/i
     end
   end
 
@@ -105,7 +107,7 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_select "[role='alert']", text: /Select at least one valid reviewer/
+    assert_select "[role='alert']", text: /reviewer/i
   end
 
   test "pending round page refreshes automatically and identifies reviewers to the human" do

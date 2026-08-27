@@ -36,7 +36,7 @@ class Benchmarking::JudgeDiagnosticsTest < ActiveSupport::TestCase
       status: :failed
     )
 
-    result = Benchmarking::JudgeDiagnostics.call.fetch(judge.id)
+    result = Benchmarking::JudgeDiagnostics.call(experiment_scope: Experiment.all).fetch(judge.id)
 
     assert_equal 2, result.eligible_run_count
     assert_equal 1, result.agreement_count

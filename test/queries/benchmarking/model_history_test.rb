@@ -46,7 +46,7 @@ class Benchmarking::ModelHistoryTest < ActiveSupport::TestCase
       winner: second_runs[other]
     )
 
-    result = Benchmarking::ModelHistory.new(model: requested).call
+    result = Benchmarking::ModelHistory.new(model: requested, experiment_scope: Experiment.all).call
     served = result.resolved_models.find { |row| row.resolved_model_identifier == "served/model-v2" }
     unknown = result.resolved_models.find { |row| row.resolved_model_identifier.nil? }
 

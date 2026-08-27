@@ -10,9 +10,11 @@ module AnalyticsTestHelper
     )
   end
 
-  def create_analytics_experiment(name:, models:, run_attributes: {})
+  def create_analytics_experiment(name:, models:, run_attributes: {}, user: nil)
+    user ||= (defined?(@current_test_user) && @current_test_user) || users(:normal)
     suffix = SecureRandom.hex(6)
     project = Project.create!(
+      user: user,
       name: "Analytics project #{suffix}",
       source_language: "Vietnamese",
       target_language: "English"

@@ -5,6 +5,7 @@ class BlindReviews::StartTest < ActiveSupport::TestCase
 
   setup do
     project = Project.create!(
+      user: users(:normal),
       name: "Blind review start tests",
       source_language: "Vietnamese",
       target_language: "Japanese"

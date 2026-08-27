@@ -5,6 +5,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
 
   setup do
     project = Project.create!(
+      user: users(:normal),
       name: "Review job tests",
       source_language: "Vietnamese",
       target_language: "Japanese"

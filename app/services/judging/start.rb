@@ -13,7 +13,7 @@ module Judging
 
     def initialize(review_round:, judge_ids:, randomizer: nil)
       @review_round = review_round
-      @judge_ids = Array(judge_ids)
+      @judge_ids = judge_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
     end
 
@@ -57,13 +57,11 @@ module Judging
     end
 
     def resolve_judges!
-      submitted = judge_ids.map(&:to_s).reject(&:blank?)
-      if submitted.empty? || submitted.any? { |id| !id.match?(/\A[1-9]\d*\z/) }
-        raise InvalidJudgeSelectionError,
-              "Select at least one valid judge model"
-      end
-
-      ids = submitted.map(&:to_i).uniq.sort
+      ids = Ai::UsageLimits.normalize_model_ids(
+        judge_ids,
+        maximum: Ai::UsageLimits::MAX_JUDGES,
+        label: "Judges"
+      )
       judges = LlmModel.where(id: ids).order(:id).to_a
       eligible = judges.map(&:id) == ids && judges.all? do |model|
         model.active? && model.gateway == "openrouter"
@@ -74,6 +72,8 @@ module Judging
       end
 
       judges
+    rescue Ai::UsageLimits::InvalidSelection => error
+      raise InvalidJudgeSelectionError, error.message
     end
 
     def eligible_candidates

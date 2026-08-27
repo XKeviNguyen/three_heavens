@@ -1,6 +1,6 @@
 class JudgeRoundsController < ApplicationController
   def create
-    review_round = ReviewRound.find(params[:review_round_id])
+    review_round = current_user.review_rounds.find(params[:review_round_id])
     judge_round = Judging::Start.call(
       review_round: review_round,
       judge_ids: judge_round_params[:judge_ids]
@@ -15,7 +15,7 @@ class JudgeRoundsController < ApplicationController
   end
 
   def show
-    @judge_round = JudgeRound.includes(
+    @judge_round = current_user.judge_rounds.includes(
       :winner_translation_run,
       :final_translation,
       review_round: { experiment: { document: :project } },
@@ -36,7 +36,7 @@ class JudgeRoundsController < ApplicationController
   end
 
   def load_review_round_page
-    @review_round = ReviewRound.includes(
+    @review_round = current_user.review_rounds.includes(
       :judge_round,
       experiment: { document: :project },
       review_runs: [

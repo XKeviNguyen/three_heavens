@@ -52,7 +52,7 @@ class Benchmarking::ReviewerDiagnosticsTest < ActiveSupport::TestCase
       status: :failed
     )
 
-    diagnostics = Benchmarking::ReviewerDiagnostics.call
+    diagnostics = Benchmarking::ReviewerDiagnostics.call(experiment_scope: Experiment.all)
 
     assert_diagnostic diagnostics.fetch(positive.id), self_count: 1, self_average: 9, other_count: 3, other_average: 5, difference: 4
     assert_diagnostic diagnostics.fetch(negative.id), self_count: 1, self_average: 3, other_count: 3, other_average: 7, difference: -4

@@ -5,6 +5,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
 
   setup do
     project = Project.create!(
+      user: users(:normal),
       name: "Vietnamese to Japanese Sermons",
       source_language: "vi",
       target_language: "ja"

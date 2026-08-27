@@ -4,6 +4,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   setup do
+    sign_in_as users(:normal)
     @first_model = llm_models(:openrouter_claude)
     @second_model = llm_models(:openrouter_gpt)
   end
@@ -73,7 +74,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_select "li", text: /Model.*select at least one active OpenRouter model/
+    assert_select "li", text: /Model.*Select at least one valid translation model/i
     assert_select "input[name='translation_workspace[project_name]'][value='Vietnamese Sermons']"
   end
 
@@ -206,9 +207,11 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
   end
 
   test "completed experiment page renders results model identifiers and telemetry" do
-    experiment = experiments(:two)
-    run = translation_runs(:two)
+    experiment = experiments(:one)
+    experiment.update!(status: :completed)
+    run = translation_runs(:one)
     run.update!(
+      status: :completed,
       translated_text: "Translated result\nSecond line",
       resolved_model_identifier: "openai/gpt-resolved",
       prompt_tokens: 120,
@@ -274,6 +277,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
 
   def valid_attributes
     {
+      user: users(:normal),
       project_name: "Vietnamese Sermons",
       source_language: "Vietnamese",
       target_language: "Japanese",

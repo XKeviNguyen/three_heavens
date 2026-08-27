@@ -1,5 +1,5 @@
 class FinalTranslationVersion < ApplicationRecord
-  MAX_CONTENT_LENGTH = 100_000
+  MAX_CONTENT_LENGTH = Ai::UsageLimits::MAX_SOURCE_CHARACTERS
   MAX_CHANGE_NOTE_LENGTH = 500
 
   belongs_to :final_translation, inverse_of: :versions

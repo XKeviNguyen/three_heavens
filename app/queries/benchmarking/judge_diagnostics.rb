@@ -8,8 +8,12 @@ module Benchmarking
       end
     end
 
-    def self.call
-      new.call
+    def self.call(experiment_scope:)
+      new(experiment_scope: experiment_scope).call
+    end
+
+    def initialize(experiment_scope:)
+      @experiment_scope = experiment_scope
     end
 
     def call
@@ -18,9 +22,15 @@ module Benchmarking
 
     private
 
+    attr_reader :experiment_scope
+
     def rows
-      JudgeRun.joins(:judge_round)
-        .where(status: "completed", judge_rounds: { status: "completed" })
+      JudgeRun.joins(judge_round: :review_round)
+        .where(
+          status: "completed",
+          judge_rounds: { status: "completed" },
+          review_rounds: { experiment_id: experiment_scope.select(:id) }
+        )
         .group(:judge_llm_model_id)
         .pluck(
           :judge_llm_model_id,

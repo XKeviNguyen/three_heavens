@@ -2,7 +2,7 @@ class FinalTranslationsController < ApplicationController
   before_action :set_final_translation, except: :create
 
   def create
-    judge_round = JudgeRound.find(params[:judge_round_id])
+    judge_round = current_user.judge_rounds.find(params[:judge_round_id])
     final_translation = FinalTranslations::Create.call(judge_round: judge_round)
     redirect_to final_translation, notice: "Final translation workspace is ready."
   rescue FinalTranslations::EligibilityError => error
@@ -101,11 +101,11 @@ class FinalTranslationsController < ApplicationController
   private
 
   def set_final_translation
-    @final_translation = FinalTranslation.find(params[:id])
+    @final_translation = current_user.final_translations.find(params[:id])
   end
 
   def load_workspace
-    @final_translation = FinalTranslation.includes(
+    @final_translation = current_user.final_translations.includes(
       :current_version,
       :source_winner_translation_run,
       experiment: { document: :project },

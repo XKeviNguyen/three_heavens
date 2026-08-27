@@ -112,7 +112,7 @@
     <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-950">Start blind cross-review</h2>
       <p class="mt-2 max-w-3xl text-sm text-slate-600">
-        Select one or more reviewer models. Each reviewer receives the source, instruction, rubric, and anonymously labeled translations. Candidate model identities remain private from the reviewer.
+        Select 1–<%= Ai::UsageLimits::MAX_REVIEWERS %> reviewer models. Each reviewer receives the source, instruction, rubric, and anonymously labeled translations. Candidate model identities remain private from the reviewer.
       </p>
 
       <%= form_with url: experiment_review_rounds_path(@experiment), scope: :review_round, class: "mt-5 space-y-5" do |form| %>
