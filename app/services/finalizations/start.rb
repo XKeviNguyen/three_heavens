@@ -1,0 +1,81 @@
+require "digest"
+
+module Finalizations
+  class Start
+    def self.call(final_translation:, finalizer_ids:)
+      new(final_translation: final_translation, finalizer_ids: finalizer_ids).call
+    end
+
+    def initialize(final_translation:, finalizer_ids:, job_class: FinalizationRunJob)
+      @final_translation = final_translation
+      @finalizer_ids = Array(finalizer_ids)
+      @job_class = job_class
+    end
+
+    def call
+      raise ActiveRecord::RecordNotSaved, "Final translation must be persisted" unless final_translation.persisted?
+      submitted_ids = normalized_ids!
+
+      FinalizationRound.transaction do
+        final_translation.lock!
+        finalizers = resolve_finalizers!(submitted_ids)
+        key = selection_key(finalizers)
+        raise FinalTranslations::InvalidStateError, "Reopen the final translation before requesting refinement" unless final_translation.draft?
+        raise FinalTranslations::InvalidStateError, "Final translation has no current version" unless final_translation.current_version
+
+        active = final_translation.finalization_rounds.running.includes(:finalization_runs).first
+        return active if active && active.base_version == final_translation.current_version && active.selection_key == key
+        if active
+          raise FinalTranslations::ActiveRoundError,
+                "Another refinement round is still active for this final translation"
+        end
+
+        create_round!(finalizers, key)
+      end
+    end
+
+    private
+
+    attr_reader :final_translation, :finalizer_ids, :job_class
+
+    def normalized_ids!
+      submitted = finalizer_ids.map(&:to_s).reject(&:blank?)
+      if submitted.empty? || submitted.any? { |id| !id.match?(/\A[1-9]\d*\z/) }
+        raise FinalTranslations::InvalidSelectionError,
+              "Select at least one valid finalizer model"
+      end
+
+      submitted.map(&:to_i).uniq.sort
+    end
+
+    def resolve_finalizers!(ids)
+      finalizers = LlmModel.lock.where(id: ids).order(:id).to_a
+      eligible = finalizers.map(&:id) == ids && finalizers.all? do |model|
+        model.active? && model.gateway == "openrouter"
+      end
+      unless eligible
+        raise FinalTranslations::InvalidSelectionError,
+              "Every finalizer must be an active OpenRouter model"
+      end
+
+      finalizers
+    end
+
+    def selection_key(finalizers)
+      Digest::SHA256.hexdigest(finalizers.map(&:id).join(","))
+    end
+
+    def create_round!(finalizers, key)
+      round = final_translation.finalization_rounds.create!(
+        base_version: final_translation.current_version,
+        selection_key: key,
+        status: :running
+      )
+      finalizers.each do |finalizer|
+        run = round.finalization_runs.create!(finalizer_llm_model: finalizer)
+        job_class.perform_later(run.id)
+      end
+      round
+    end
+  end
+end

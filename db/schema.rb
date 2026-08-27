@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_090001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -31,6 +31,96 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["document_id"], name: "index_experiments_on_document_id"
+  end
+
+  create_table "final_translation_versions", force: :cascade do |t|
+    t.string "change_note"
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.bigint "final_translation_id", null: false
+    t.string "origin", null: false
+    t.bigint "source_finalization_run_id"
+    t.datetime "updated_at", null: false
+    t.integer "version_number", null: false
+    t.index ["final_translation_id", "id"], name: "index_final_versions_on_translation_and_id", unique: true
+    t.index ["final_translation_id", "version_number"], name: "index_final_versions_on_translation_and_number", unique: true
+    t.index ["final_translation_id"], name: "index_final_translation_versions_on_final_translation_id"
+    t.index ["source_finalization_run_id"], name: "index_final_versions_on_unique_source_run", unique: true, where: "(source_finalization_run_id IS NOT NULL)"
+    t.check_constraint "change_note IS NULL OR char_length(change_note::text) <= 500", name: "final_translation_versions_change_note_check"
+    t.check_constraint "char_length(btrim(content)) > 0 AND char_length(content) <= 100000", name: "final_translation_versions_content_check"
+    t.check_constraint "origin::text = ANY (ARRAY['seed'::character varying, 'manual'::character varying, 'ai_applied'::character varying, 'restored'::character varying]::text[])", name: "final_translation_versions_origin_check"
+    t.check_constraint "version_number > 0", name: "final_translation_versions_number_check"
+  end
+
+  create_table "final_translations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_version_id"
+    t.bigint "experiment_id", null: false
+    t.datetime "finalized_at"
+    t.bigint "judge_round_id", null: false
+    t.integer "lock_version", default: 0, null: false
+    t.bigint "source_winner_translation_run_id", null: false
+    t.string "status", default: "draft", null: false
+    t.datetime "updated_at", null: false
+    t.index ["experiment_id"], name: "index_final_translations_on_experiment_id"
+    t.index ["id", "experiment_id"], name: "index_final_translations_on_id_and_experiment_id", unique: true
+    t.index ["judge_round_id"], name: "index_final_translations_on_judge_round_id", unique: true
+    t.index ["source_winner_translation_run_id"], name: "index_final_translations_on_source_winner_translation_run_id"
+    t.check_constraint "(status::text = 'finalized'::text) = (finalized_at IS NOT NULL)", name: "final_translations_finalized_at_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'finalized'::character varying]::text[])", name: "final_translations_status_check"
+  end
+
+  create_table "finalization_rounds", force: :cascade do |t|
+    t.bigint "base_final_translation_version_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "final_translation_id", null: false
+    t.string "selection_key", null: false
+    t.string "status", default: "running", null: false
+    t.datetime "updated_at", null: false
+    t.index ["base_final_translation_version_id"], name: "index_finalization_rounds_on_base_final_translation_version_id"
+    t.index ["final_translation_id", "base_final_translation_version_id"], name: "index_finalization_rounds_on_translation_and_base"
+    t.index ["final_translation_id"], name: "index_finalization_rounds_on_final_translation_id"
+    t.index ["final_translation_id"], name: "index_finalization_rounds_one_running", unique: true, where: "((status)::text = 'running'::text)"
+    t.check_constraint "char_length(selection_key::text) = 64", name: "finalization_rounds_selection_key_check"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "finalization_rounds_status_check"
+  end
+
+  create_table "finalization_runs", force: :cascade do |t|
+    t.bigint "cached_tokens"
+    t.jsonb "change_summary", default: [], null: false
+    t.datetime "completed_at"
+    t.bigint "completion_tokens"
+    t.decimal "cost", precision: 20, scale: 10
+    t.datetime "created_at", null: false
+    t.string "error_code"
+    t.text "error_message"
+    t.bigint "finalization_round_id", null: false
+    t.bigint "finalizer_llm_model_id", null: false
+    t.bigint "prompt_tokens"
+    t.text "proposed_translation"
+    t.string "provider_response_id"
+    t.bigint "reasoning_tokens"
+    t.string "resolved_model_identifier"
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.jsonb "terminology_notes", default: [], null: false
+    t.bigint "total_tokens"
+    t.datetime "updated_at", null: false
+    t.jsonb "warnings", default: [], null: false
+    t.index ["finalization_round_id", "finalizer_llm_model_id"], name: "index_finalization_runs_on_round_and_model", unique: true
+    t.index ["finalization_round_id"], name: "index_finalization_runs_on_finalization_round_id"
+    t.index ["finalizer_llm_model_id"], name: "index_finalization_runs_on_finalizer_llm_model_id"
+    t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "finalization_runs_cached_tokens_check"
+    t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "finalization_runs_completion_tokens_check"
+    t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "finalization_runs_cost_check"
+    t.check_constraint "jsonb_typeof(change_summary) = 'array'::text", name: "finalization_runs_change_summary_array_check"
+    t.check_constraint "jsonb_typeof(terminology_notes) = 'array'::text", name: "finalization_runs_terminology_notes_array_check"
+    t.check_constraint "jsonb_typeof(warnings) = 'array'::text", name: "finalization_runs_warnings_array_check"
+    t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "finalization_runs_prompt_tokens_check"
+    t.check_constraint "proposed_translation IS NULL OR char_length(proposed_translation) <= 100000", name: "finalization_runs_proposal_length_check"
+    t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "finalization_runs_reasoning_tokens_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "finalization_runs_status_check"
+    t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "finalization_runs_total_tokens_check"
   end
 
   create_table "judge_evaluations", force: :cascade do |t|
@@ -62,6 +152,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.bigint "winner_translation_run_id"
+    t.index ["id", "winner_translation_run_id"], name: "index_judge_rounds_on_id_and_winner", unique: true
     t.index ["review_round_id"], name: "index_judge_rounds_on_review_round_id", unique: true
     t.index ["winner_translation_run_id"], name: "index_judge_rounds_on_winner_translation_run_id"
     t.check_constraint "(status::text = 'completed'::text) = (winner_translation_run_id IS NOT NULL)", name: "judge_rounds_completed_winner_check"
@@ -210,6 +301,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
     t.bigint "total_tokens"
     t.text "translated_text"
     t.datetime "updated_at", null: false
+    t.index ["experiment_id", "id"], name: "index_translation_runs_on_experiment_and_id", unique: true
     t.index ["experiment_id", "llm_model_id"], name: "index_translation_runs_on_experiment_id_and_llm_model_id", unique: true
     t.index ["experiment_id"], name: "index_translation_runs_on_experiment_id"
     t.index ["llm_model_id"], name: "index_translation_runs_on_llm_model_id"
@@ -217,6 +309,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
 
   add_foreign_key "documents", "projects"
   add_foreign_key "experiments", "documents"
+  add_foreign_key "final_translation_versions", "final_translations"
+  add_foreign_key "final_translation_versions", "finalization_runs", column: "source_finalization_run_id"
+  add_foreign_key "final_translations", "experiments"
+  add_foreign_key "final_translations", "final_translation_versions", column: ["id", "current_version_id"], primary_key: ["final_translation_id", "id"], name: "fk_final_translations_current_owned_version"
+  add_foreign_key "final_translations", "judge_rounds"
+  add_foreign_key "final_translations", "judge_rounds", column: ["judge_round_id", "source_winner_translation_run_id"], primary_key: ["id", "winner_translation_run_id"], name: "fk_final_translations_official_judge_winner"
+  add_foreign_key "final_translations", "translation_runs", column: "source_winner_translation_run_id"
+  add_foreign_key "final_translations", "translation_runs", column: ["experiment_id", "source_winner_translation_run_id"], primary_key: ["experiment_id", "id"], name: "fk_final_translations_winner_in_experiment"
+  add_foreign_key "finalization_rounds", "final_translation_versions", column: "base_final_translation_version_id"
+  add_foreign_key "finalization_rounds", "final_translation_versions", column: ["final_translation_id", "base_final_translation_version_id"], primary_key: ["final_translation_id", "id"], name: "fk_finalization_rounds_owned_base_version"
+  add_foreign_key "finalization_rounds", "final_translations"
+  add_foreign_key "finalization_runs", "finalization_rounds"
+  add_foreign_key "finalization_runs", "llm_models", column: "finalizer_llm_model_id"
   add_foreign_key "judge_evaluations", "judge_runs"
   add_foreign_key "judge_evaluations", "translation_runs"
   add_foreign_key "judge_rounds", "review_rounds"

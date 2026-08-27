@@ -16,6 +16,11 @@ class TranslationRun < ApplicationRecord
            foreign_key: :winner_translation_run_id,
            inverse_of: :winner_translation_run,
            dependent: :restrict_with_error
+  has_many :seeded_final_translations,
+           class_name: "FinalTranslation",
+           foreign_key: :source_winner_translation_run_id,
+           inverse_of: :source_winner_translation_run,
+           dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",

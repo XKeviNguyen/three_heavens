@@ -84,6 +84,16 @@ module Ai
       )
     end
 
+    def finalization_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+      structured_completion(
+        model_identifier: model_identifier,
+        system_prompt: system_prompt,
+        user_prompt: user_prompt,
+        response_schema: response_schema,
+        schema_name: "final_translation_refinement"
+      )
+    end
+
     private
 
     def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:)

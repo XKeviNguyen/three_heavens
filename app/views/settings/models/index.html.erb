@@ -5,13 +5,13 @@
     <div>
       <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Settings</p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">OpenRouter model catalog</h1>
-      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the catalog used by translation, review, and judging workflows. Provider API keys remain environment-only and are never managed here.</p>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the catalog used by translation, review, judging, and finalization workflows. Provider API keys remain environment-only and are never managed here.</p>
     </div>
     <%= link_to "Add model", new_settings_model_path, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>
   </header>
 
   <aside class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-    Models are never deleted from this area. Deactivation removes a model from future active selectors while preserving all translation, review, judge, and benchmark history.
+    Models are never deleted from this area. Deactivation removes a model from future active selectors while preserving all translation, review, judge, finalization, and benchmark history.
   </aside>
 
   <% if @llm_models.empty? %>
@@ -51,6 +51,7 @@
                   <p>Translations: <strong><%= usage.translation_run_count %></strong></p>
                   <p>Reviews as reviewer: <strong><%= usage.review_run_count %></strong></p>
                   <p>Judgments as judge: <strong><%= usage.judge_run_count %></strong></p>
+                  <p>Finalizations as finalizer: <strong><%= usage.finalization_run_count %></strong></p>
                   <p>Official wins: <strong><%= usage.official_win_count %></strong></p>
                 </td>
                 <td class="px-4 py-4">

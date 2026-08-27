@@ -1,0 +1,110 @@
+class FinalizationRunJob < ApplicationJob
+  queue_as :default
+  self.enqueue_after_transaction_commit = true
+
+  class_attribute :client_factory,
+                  instance_writer: false,
+                  default: -> { Ai::OpenRouterClient.new }
+
+  retry_on Ai::OpenRouterClient::RetryableError,
+           wait: :polynomially_longer,
+           attempts: 5 do |job, error|
+    job.send(:persist_failure_by_id, error)
+  end
+
+  def perform(finalization_run_id)
+    finalization_run = FinalizationRun.find(finalization_run_id)
+    claim_result = claim(finalization_run)
+
+    if claim_result == :terminal
+      Finalizations::ReconcileRound.call(finalization_run.finalization_round)
+      return
+    end
+    return if claim_result == :duplicate_running
+
+    prompt = Finalizations::Prompt.build(finalization_run)
+    result = client_for(finalization_run.finalizer_llm_model).finalization_completion(
+      model_identifier: finalization_run.finalizer_llm_model.model_identifier,
+      **prompt
+    )
+    proposal = Finalizations::ResponseValidator.call(content: result.content)
+    persist_success(finalization_run, result, proposal)
+  rescue Ai::OpenRouterClient::RetryableError
+    raise
+  rescue Ai::OpenRouterClient::PermanentError => error
+    persist_failure(finalization_run, error) if finalization_run
+  end
+
+  private
+
+  def claim(finalization_run)
+    finalization_run.with_lock do
+      return :terminal if finalization_run.terminal?
+      return :duplicate_running if finalization_run.running? && executions <= 1
+
+      finalization_run.update!(
+        status: :running,
+        started_at: finalization_run.started_at || Time.current,
+        completed_at: nil,
+        error_code: nil,
+        error_message: nil
+      )
+    end
+    :claimed
+  end
+
+  def client_for(llm_model)
+    unless llm_model.gateway == "openrouter"
+      raise Ai::OpenRouterClient::PermanentError.new(
+        "Unsupported AI gateway: #{llm_model.gateway}",
+        code: "unsupported_gateway"
+      )
+    end
+    client_factory.call
+  end
+
+  def persist_success(finalization_run, result, proposal)
+    finalization_run.with_lock do
+      return if finalization_run.terminal?
+
+      finalization_run.update!(
+        status: :completed,
+        proposed_translation: proposal.fetch("proposed_translation"),
+        change_summary: proposal.fetch("change_summary"),
+        terminology_notes: proposal.fetch("terminology_notes"),
+        warnings: proposal.fetch("warnings"),
+        provider_response_id: result.provider_response_id,
+        resolved_model_identifier: result.resolved_model_identifier,
+        prompt_tokens: result.prompt_tokens,
+        completion_tokens: result.completion_tokens,
+        total_tokens: result.total_tokens,
+        cached_tokens: result.cached_tokens,
+        reasoning_tokens: result.reasoning_tokens,
+        cost: result.cost,
+        completed_at: Time.current,
+        error_code: nil,
+        error_message: nil
+      )
+    end
+    Finalizations::ReconcileRound.call(finalization_run.finalization_round)
+  end
+
+  def persist_failure_by_id(error)
+    finalization_run = FinalizationRun.find_by(id: arguments.first)
+    persist_failure(finalization_run, error) if finalization_run
+  end
+
+  def persist_failure(finalization_run, error)
+    finalization_run.with_lock do
+      return if finalization_run.terminal?
+
+      finalization_run.update!(
+        status: :failed,
+        completed_at: Time.current,
+        error_code: error.code.to_s.first(255),
+        error_message: Ai::ErrorSanitizer.call(error.message)
+      )
+    end
+    Finalizations::ReconcileRound.call(finalization_run.finalization_round)
+  end
+end

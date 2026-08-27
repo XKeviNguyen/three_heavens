@@ -14,6 +14,10 @@ class LlmModel < ApplicationRecord
            foreign_key: :judge_llm_model_id,
            inverse_of: :judge_llm_model,
            dependent: :restrict_with_error
+  has_many :finalization_runs,
+           foreign_key: :finalizer_llm_model_id,
+           inverse_of: :finalizer_llm_model,
+           dependent: :restrict_with_error
 
   scope :active_openrouter, -> { where(active: true, gateway: "openrouter") }
 
@@ -34,7 +38,7 @@ class LlmModel < ApplicationRecord
   validate :model_identifier_is_immutable_after_historical_usage, on: :update
 
   def historical_usage?
-    translation_runs.exists? || review_runs.exists? || judge_runs.exists?
+    translation_runs.exists? || review_runs.exists? || judge_runs.exists? || finalization_runs.exists?
   end
 
   private
