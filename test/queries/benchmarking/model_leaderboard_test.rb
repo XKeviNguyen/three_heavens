@@ -176,7 +176,7 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
 
   test "includes inactive models with translation history and omits models without it" do
     no_history = create_analytics_model(name: "No translation history")
-    model_ids = Benchmarking::ModelLeaderboard.new.call.map { |stats| stats.model.id }
+    model_ids = Benchmarking::ModelLeaderboard.new(experiment_scope: Experiment.all).call.map { |stats| stats.model.id }
 
     assert_includes model_ids, @candidate.id
     assert_not_includes model_ids, no_history.id
@@ -184,7 +184,7 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
 
   test "all sort options are whitelisted ordered and deterministic" do
     Benchmarking::ModelLeaderboard::SORTS.each do |sort|
-      leaderboard = Benchmarking::ModelLeaderboard.new(sort: sort)
+      leaderboard = Benchmarking::ModelLeaderboard.new(experiment_scope: Experiment.all, sort: sort)
       first = leaderboard.call
       second = leaderboard.call
 
@@ -193,7 +193,7 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
       assert_sorted(first, sort)
     end
 
-    malicious = Benchmarking::ModelLeaderboard.new(sort: "wins; DROP TABLE llm_models")
+    malicious = Benchmarking::ModelLeaderboard.new(experiment_scope: Experiment.all, sort: "wins; DROP TABLE llm_models")
     assert_equal Benchmarking::ModelLeaderboard::DEFAULT_SORT, malicious.sort
     assert LlmModel.exists?(@candidate.id)
   end
@@ -201,7 +201,7 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
   private
 
   def stats_for(model)
-    Benchmarking::ModelLeaderboard.new.call.find { |stats| stats.model.id == model.id }
+    Benchmarking::ModelLeaderboard.new(experiment_scope: Experiment.all).call.find { |stats| stats.model.id == model.id }
   end
 
   def assert_sorted(stats, sort)

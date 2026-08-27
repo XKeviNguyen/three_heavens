@@ -12,7 +12,7 @@ module BlindReviews
 
     def initialize(experiment:, reviewer_ids:, randomizer: nil)
       @experiment = experiment
-      @reviewer_ids = Array(reviewer_ids)
+      @reviewer_ids = reviewer_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
     end
 
@@ -52,13 +52,11 @@ module BlindReviews
     end
 
     def resolve_reviewers!
-      submitted = reviewer_ids.map(&:to_s).reject(&:blank?)
-      if submitted.empty? || submitted.any? { |id| !id.match?(/\A[1-9]\d*\z/) }
-        raise InvalidReviewerSelectionError,
-              "Select at least one valid reviewer model"
-      end
-
-      ids = submitted.map(&:to_i).uniq.sort
+      ids = Ai::UsageLimits.normalize_model_ids(
+        reviewer_ids,
+        maximum: Ai::UsageLimits::MAX_REVIEWERS,
+        label: "Reviewers"
+      )
       reviewers = LlmModel.where(id: ids).order(:id).to_a
 
       unless reviewers.map(&:id) == ids && reviewers.all? { |model| model.active? && model.gateway == "openrouter" }
@@ -67,6 +65,8 @@ module BlindReviews
       end
 
       reviewers
+    rescue Ai::UsageLimits::InvalidSelection => error
+      raise InvalidReviewerSelectionError, error.message
     end
 
     def eligible_candidates

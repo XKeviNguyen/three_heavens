@@ -26,13 +26,23 @@
   <body class="min-h-screen bg-slate-50 text-slate-900">
     <header class="border-b border-slate-200 bg-white">
       <div class="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <%= link_to "Three Heavens", root_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
-        <nav class="flex flex-wrap items-center gap-4 text-sm font-medium" aria-label="Primary navigation">
-          <%= link_to "History", history_path, class: "text-slate-600 hover:text-slate-950" %>
-          <%= link_to "Benchmarks", benchmarks_path, class: "text-slate-600 hover:text-slate-950" %>
-          <%= link_to "Settings / Models", settings_models_path, class: "text-slate-600 hover:text-slate-950" %>
-          <%= link_to "New experiment", new_translation_workspace_path, class: "text-blue-700 hover:text-blue-900" %>
-        </nav>
+        <%= link_to "Three Heavens", authenticated? ? root_path : login_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
+        <% if authenticated? %>
+          <div class="flex flex-wrap items-center gap-5">
+            <nav class="flex flex-wrap items-center gap-4 text-sm font-medium" aria-label="Primary navigation">
+              <%= link_to "History", history_path, class: "text-slate-600 hover:text-slate-950" %>
+              <%= link_to "Benchmarks", benchmarks_path, class: "text-slate-600 hover:text-slate-950" %>
+              <% if current_user.admin? %>
+                <%= link_to "Settings / Models", settings_models_path, class: "text-slate-600 hover:text-slate-950" %>
+              <% end %>
+              <%= link_to "New experiment", new_translation_workspace_path, class: "text-blue-700 hover:text-blue-900" %>
+            </nav>
+            <div class="flex items-center gap-3 border-l border-slate-200 pl-5 text-sm">
+              <span class="max-w-64 truncate text-slate-600" title="<%= current_user.email %>"><%= current_user.email %></span>
+              <%= button_to "Log out", session_path, method: :delete, class: "font-semibold text-slate-700 hover:text-slate-950" %>
+            </div>
+          </div>
+        <% end %>
       </div>
     </header>
 

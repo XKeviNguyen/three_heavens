@@ -139,7 +139,7 @@
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">AI refinement proposals</h2>
-    <p class="mt-2 text-sm text-slate-600">Each model proposes against the exact current version. Proposals never alter your draft until you explicitly apply one.</p>
+    <p class="mt-2 text-sm text-slate-600">Select up to <%= Ai::UsageLimits::MAX_FINALIZERS %> models. Each proposes against the exact current version, and proposals never alter your draft until you explicitly apply one.</p>
 
     <% if @final_translation.draft? %>
       <%= form_with url: refine_final_translation_path(@final_translation), method: :post, scope: :refinement, class: "mt-5 space-y-4" do |form| %>

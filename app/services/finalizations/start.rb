@@ -8,7 +8,7 @@ module Finalizations
 
     def initialize(final_translation:, finalizer_ids:, job_class: FinalizationRunJob)
       @final_translation = final_translation
-      @finalizer_ids = Array(finalizer_ids)
+      @finalizer_ids = finalizer_ids
       @job_class = job_class
     end
 
@@ -39,13 +39,13 @@ module Finalizations
     attr_reader :final_translation, :finalizer_ids, :job_class
 
     def normalized_ids!
-      submitted = finalizer_ids.map(&:to_s).reject(&:blank?)
-      if submitted.empty? || submitted.any? { |id| !id.match?(/\A[1-9]\d*\z/) }
-        raise FinalTranslations::InvalidSelectionError,
-              "Select at least one valid finalizer model"
-      end
-
-      submitted.map(&:to_i).uniq.sort
+      Ai::UsageLimits.normalize_model_ids(
+        finalizer_ids,
+        maximum: Ai::UsageLimits::MAX_FINALIZERS,
+        label: "Finalizers"
+      )
+    rescue Ai::UsageLimits::InvalidSelection => error
+      raise FinalTranslations::InvalidSelectionError, error.message
     end
 
     def resolve_finalizers!(ids)

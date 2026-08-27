@@ -37,8 +37,9 @@ module Benchmarking
 
     Result = Data.define(:entries, :resolved_models)
 
-    def initialize(model:, limit: DEFAULT_LIMIT)
+    def initialize(model:, experiment_scope:, limit: DEFAULT_LIMIT)
       @model = model
+      @experiment_scope = experiment_scope
       @limit = limit
     end
 
@@ -48,11 +49,11 @@ module Benchmarking
 
     private
 
-    attr_reader :model, :limit
+    attr_reader :experiment_scope, :model, :limit
 
     def recent_runs
       @recent_runs ||= model.translation_runs
-        .includes(experiment: [ { document: :project }, :review_round, :judge_round ])
+        .where(experiment_id: experiment_scope.select(:id))
         .order(created_at: :desc, id: :desc)
         .limit(limit)
         .to_a
@@ -121,6 +122,7 @@ module Benchmarking
 
     def resolved_translation_aggregates
       model.translation_runs
+        .where(experiment_id: experiment_scope.select(:id))
         .group(Arel.sql(RESOLVED_MODEL_SQL))
         .pluck(
           Arel.sql(RESOLVED_MODEL_SQL),
@@ -143,7 +145,13 @@ module Benchmarking
 
     def resolved_judge_aggregates
       JudgeEvaluation.joins(:judge_run, :translation_run)
-        .where(judge_runs: { status: "completed" }, translation_runs: { llm_model_id: model.id })
+        .where(
+          judge_runs: { status: "completed" },
+          translation_runs: {
+            llm_model_id: model.id,
+            experiment_id: experiment_scope.select(:id)
+          }
+        )
         .group(Arel.sql(RESOLVED_MODEL_SQL))
         .pluck(
           Arel.sql(RESOLVED_MODEL_SQL),
@@ -156,7 +164,12 @@ module Benchmarking
 
     def resolved_win_aggregates
       JudgeRound.completed.joins(:winner_translation_run)
-        .where(translation_runs: { llm_model_id: model.id })
+        .where(
+          translation_runs: {
+            llm_model_id: model.id,
+            experiment_id: experiment_scope.select(:id)
+          }
+        )
         .group(Arel.sql(RESOLVED_MODEL_SQL))
         .pluck(Arel.sql(RESOLVED_MODEL_SQL), Arel.sql("COUNT(DISTINCT judge_rounds.id)"))
         .to_h

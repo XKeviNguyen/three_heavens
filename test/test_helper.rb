@@ -1,3 +1,5 @@
+require "digest"
+
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
@@ -13,3 +15,37 @@ module ActiveSupport
     # Add more helper methods to be used by all tests here...
   end
 end
+
+module AuthenticationTestHelper
+  def sign_in_as(user, password: nil)
+    post session_path, params: {
+      session: {
+        email: user.email,
+        password: password || password_for(user)
+      }
+    }, headers: login_rate_limit_headers
+    follow_redirect! if response.redirect?
+  end
+
+  def sign_out
+    delete session_path
+  end
+
+  private
+
+  def login_rate_limit_headers
+    digest = Digest::SHA256.hexdigest("#{self.class.name}:#{name}")
+    address_groups = digest.first(24).scan(/.{4}/)
+    { "REMOTE_ADDR" => "2001:db8:#{address_groups.join(':')}" }
+  end
+
+  def password_for(user)
+    {
+      "user@example.test" => "correct horse battery staple",
+      "other@example.test" => "other secure password value",
+      "admin@example.test" => "admin secure password value"
+    }.fetch(user.email)
+  end
+end
+
+ActionDispatch::IntegrationTest.include(AuthenticationTestHelper)

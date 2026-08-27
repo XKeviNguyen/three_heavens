@@ -2,6 +2,7 @@ class TranslationWorkspace
   include ActiveModel::Model
 
   attr_accessor :project_name,
+                :user,
                 :source_language,
                 :target_language,
                 :document_title,
@@ -18,7 +19,7 @@ class TranslationWorkspace
   def initialize(attributes = {}, start_service: TranslationExperiments::Start)
     @start_service = start_service
     super(attributes)
-    self.model_ids = Array(model_ids)
+    self.model_ids = [] if model_ids.nil?
   end
 
   def submit
@@ -61,6 +62,7 @@ class TranslationWorkspace
 
   def build_workspace_records
     @project = Project.new(
+      user: user,
       name: project_name,
       source_language: source_language,
       target_language: target_language
@@ -90,26 +92,17 @@ class TranslationWorkspace
   end
 
   def validate_model_selection
-    submitted_ids = model_ids.filter_map do |model_id|
-      value = model_id.to_s
-      value if value.present?
-    end
-
-    if submitted_ids.empty?
-      errors.add(:model_ids, "select at least one active OpenRouter model")
-      return
-    end
-
-    unless submitted_ids.all? { |model_id| model_id.match?(/\A[1-9]\d*\z/) }
-      errors.add(:model_ids, "contain an invalid model selection")
-      return
-    end
-
-    selected_ids = submitted_ids.map(&:to_i).uniq
+    selected_ids = Ai::UsageLimits.normalize_model_ids(
+      model_ids,
+      maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
+      label: "Translation models"
+    )
     @llm_models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
 
     return if @llm_models.map(&:id) == selected_ids.sort
 
     errors.add(:model_ids, "contain an inactive or unsupported model")
+  rescue Ai::UsageLimits::InvalidSelection => error
+    errors.add(:model_ids, error.message)
   end
 end

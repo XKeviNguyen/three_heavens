@@ -1,0 +1,17 @@
+normal:
+  email: user@example.test
+  password_digest: <%= BCrypt::Password.create("correct horse battery staple", cost: BCrypt::Engine::MIN_COST) %>
+  role: user
+  status: active
+
+other:
+  email: other@example.test
+  password_digest: <%= BCrypt::Password.create("other secure password value", cost: BCrypt::Engine::MIN_COST) %>
+  role: user
+  status: active
+
+admin:
+  email: admin@example.test
+  password_digest: <%= BCrypt::Password.create("admin secure password value", cost: BCrypt::Engine::MIN_COST) %>
+  role: admin
+  status: active

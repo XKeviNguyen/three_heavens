@@ -1,12 +1,14 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
 one:
+  user: normal
   name: MyString
   description: MyText
   source_language: MyString
   target_language: MyString
 
 two:
+  user: other
   name: MyString
   description: MyText
   source_language: MyString

@@ -4,5 +4,7 @@ class Document < ApplicationRecord
   has_many :experiments, dependent: :restrict_with_error
 
   validates :title, presence: true, length: { maximum: 255 }
-  validates :source_text, presence: true
+  validates :source_text,
+            presence: true,
+            length: { maximum: Ai::UsageLimits::MAX_SOURCE_CHARACTERS }
 end

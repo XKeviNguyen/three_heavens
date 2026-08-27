@@ -3,6 +3,7 @@ require "test_helper"
 class BlindReviewModelsTest < ActiveSupport::TestCase
   setup do
     project = Project.create!(
+      user: users(:normal),
       name: "Review model tests",
       source_language: "Vietnamese",
       target_language: "Japanese"

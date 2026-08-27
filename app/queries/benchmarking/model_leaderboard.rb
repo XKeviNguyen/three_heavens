@@ -13,12 +13,15 @@ module Benchmarking
 
     attr_reader :sort
 
-    def initialize(sort: nil)
+    def initialize(experiment_scope:, sort: nil)
+      @experiment_scope = experiment_scope
       @sort = SORTS.include?(sort.to_s) ? sort.to_s : DEFAULT_SORT
     end
 
     def call
-      models = LlmModel.where(id: TranslationRun.select(:llm_model_id)).to_a
+      models = LlmModel.where(
+        id: TranslationRun.where(experiment_id: experiment_scope.select(:id)).select(:llm_model_id)
+      ).to_a
       aggregates = aggregate_sets
       stats = models.map { |model| build_stats(model, aggregates) }
 
@@ -26,6 +29,8 @@ module Benchmarking
     end
 
     private
+
+    attr_reader :experiment_scope
 
     def aggregate_sets
       {
@@ -35,8 +40,8 @@ module Benchmarking
         participation: participation_aggregates,
         wins: win_aggregates,
         efficiency: efficiency_aggregates,
-        reviewers: ReviewerDiagnostics.call,
-        judging: JudgeDiagnostics.call
+        reviewers: ReviewerDiagnostics.call(experiment_scope: experiment_scope),
+        judging: JudgeDiagnostics.call(experiment_scope: experiment_scope)
       }
     end
 
@@ -61,6 +66,7 @@ module Benchmarking
                ) AS average_latency_seconds
           FROM translation_runs
          WHERE status = 'completed'
+           AND experiment_id IN (#{experiment_ids_sql})
          GROUP BY llm_model_id
       SQL
     end
@@ -75,6 +81,7 @@ module Benchmarking
           JOIN review_runs ON review_runs.id = review_evaluations.review_run_id
           JOIN translation_runs ON translation_runs.id = review_evaluations.translation_run_id
          WHERE review_runs.status = 'completed'
+           AND translation_runs.experiment_id IN (#{experiment_ids_sql})
          GROUP BY translation_runs.llm_model_id
       SQL
     end
@@ -89,6 +96,7 @@ module Benchmarking
           JOIN judge_runs ON judge_runs.id = judge_evaluations.judge_run_id
           JOIN translation_runs ON translation_runs.id = judge_evaluations.translation_run_id
          WHERE judge_runs.status = 'completed'
+           AND translation_runs.experiment_id IN (#{experiment_ids_sql})
          GROUP BY translation_runs.llm_model_id
       SQL
     end
@@ -101,8 +109,10 @@ module Benchmarking
           JOIN judge_runs ON judge_runs.judge_round_id = judge_rounds.id
           JOIN judge_evaluations ON judge_evaluations.judge_run_id = judge_runs.id
           JOIN translation_runs ON translation_runs.id = judge_evaluations.translation_run_id
+          JOIN review_rounds ON review_rounds.id = judge_rounds.review_round_id
          WHERE judge_rounds.status = 'completed'
            AND judge_runs.status = 'completed'
+           AND review_rounds.experiment_id IN (#{experiment_ids_sql})
          GROUP BY translation_runs.llm_model_id
       SQL
     end
@@ -114,6 +124,7 @@ module Benchmarking
           FROM judge_rounds
           JOIN translation_runs ON translation_runs.id = judge_rounds.winner_translation_run_id
          WHERE judge_rounds.status = 'completed'
+           AND translation_runs.experiment_id IN (#{experiment_ids_sql})
          GROUP BY translation_runs.llm_model_id
       SQL
     end
@@ -134,6 +145,7 @@ module Benchmarking
               JOIN judge_runs ON judge_runs.id = judge_evaluations.judge_run_id
              WHERE translation_runs.status = 'completed'
                AND translation_runs.cost > 0
+               AND translation_runs.experiment_id IN (#{experiment_ids_sql})
                AND judge_runs.status = 'completed'
                AND judge_evaluations.overall_score IS NOT NULL
              GROUP BY translation_runs.id
@@ -146,6 +158,10 @@ module Benchmarking
       ApplicationRecord.connection.select_all(sql.squish).index_by do |row|
         row.fetch("model_id").to_i
       end
+    end
+
+    def experiment_ids_sql
+      @experiment_ids_sql ||= experiment_scope.reselect(:id).to_sql
     end
 
     def build_stats(model, sets)

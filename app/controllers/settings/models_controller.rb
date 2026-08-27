@@ -2,6 +2,7 @@ module Settings
   class ModelsController < ApplicationController
     ALLOWED_MODEL_ATTRIBUTES = %w[provider model_identifier display_name].freeze
 
+    before_action :require_admin
     before_action :set_llm_model, only: %i[edit update activate deactivate]
 
     def index

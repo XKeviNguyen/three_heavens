@@ -1,6 +1,9 @@
 Rails.application.routes.draw do
   root "translation_workspaces#new"
 
+  resource :session, only: %i[new create destroy]
+  get "login", to: "sessions#new", as: :login
+
   get "history", to: "history#index", as: :history
   resources :benchmarks, only: :index
   get "benchmarks/models/:id", to: "benchmarks#show", as: :benchmark_model

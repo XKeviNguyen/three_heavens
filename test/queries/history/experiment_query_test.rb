@@ -12,9 +12,9 @@ class History::ExperimentQueryTest < ActiveSupport::TestCase
       experiment
     end
 
-    first_page = History::ExperimentQuery.new(page: "not-a-number").call
-    second_page = History::ExperimentQuery.new(page: 2).call
-    oversized_page = History::ExperimentQuery.new(page: 99_999).call
+    first_page = History::ExperimentQuery.new(experiment_scope: Experiment.all, page: "not-a-number").call
+    second_page = History::ExperimentQuery.new(experiment_scope: Experiment.all, page: 2).call
+    oversized_page = History::ExperimentQuery.new(experiment_scope: Experiment.all, page: 99_999).call
 
     assert_equal 1, first_page.current_page
     assert_equal 25, first_page.entries.size
@@ -229,7 +229,7 @@ class History::ExperimentQueryTest < ActiveSupport::TestCase
   private
 
   def query_entry(experiment)
-    History::ExperimentQuery.new.call.entries.find do |entry|
+    History::ExperimentQuery.new(experiment_scope: Experiment.all).call.entries.find do |entry|
       entry.experiment.id == experiment.id
     end
   end

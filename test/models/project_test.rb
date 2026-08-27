@@ -3,6 +3,7 @@ require "test_helper"
 class ProjectTest < ActiveSupport::TestCase
   test "is valid with required attributes" do
     project = Project.new(
+      user: users(:normal),
       name: "Vietnamese to Japanese Sermons",
       source_language: "vi",
       target_language: "ja"
@@ -13,6 +14,7 @@ class ProjectTest < ActiveSupport::TestCase
 
   test "requires a name" do
     project = Project.new(
+      user: users(:normal),
       source_language: "vi",
       target_language: "ja"
     )
@@ -23,6 +25,7 @@ class ProjectTest < ActiveSupport::TestCase
 
   test "requires source language" do
     project = Project.new(
+      user: users(:normal),
       name: "Sermons",
       target_language: "ja"
     )
@@ -32,6 +35,7 @@ class ProjectTest < ActiveSupport::TestCase
 
   test "requires target language" do
     project = Project.new(
+      user: users(:normal),
       name: "Sermons",
       source_language: "vi"
     )

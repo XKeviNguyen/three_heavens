@@ -11,7 +11,7 @@ module TranslationExperiments
 
     def initialize(experiment:, llm_models:)
       @experiment = experiment
-      @llm_models = Array(llm_models).uniq
+      @llm_models = llm_models
     end
 
     def call
@@ -29,7 +29,15 @@ module TranslationExperiments
     def validate_request!
       raise ActiveRecord::RecordNotSaved, "Experiment must be persisted" unless experiment.persisted?
       raise ActiveRecord::RecordInvalid, experiment unless experiment.valid?
-      raise ArgumentError, "Select at least one language model" if llm_models.empty?
+      unless llm_models.is_a?(Array) && llm_models.any?
+        raise ArgumentError, "Select at least one language model"
+      end
+      if llm_models.length > Ai::UsageLimits::MAX_TRANSLATION_MODELS
+        raise ArgumentError, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models"
+      end
+      if llm_models.uniq.length != llm_models.length
+        raise ArgumentError, "Translation models cannot contain duplicates"
+      end
 
       llm_models.each do |llm_model|
         unless llm_model.persisted? && llm_model.active?

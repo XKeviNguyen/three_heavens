@@ -2,11 +2,13 @@ class TranslationWorkspacesController < ApplicationController
   before_action :load_available_models
 
   def new
-    @translation_workspace = TranslationWorkspace.new
+    @translation_workspace = TranslationWorkspace.new({ user: current_user })
   end
 
   def create
-    @translation_workspace = TranslationWorkspace.new(translation_workspace_params)
+    @translation_workspace = TranslationWorkspace.new(
+      translation_workspace_params.merge(user: current_user)
+    )
 
     if @translation_workspace.submit
       redirect_to @translation_workspace.experiment,

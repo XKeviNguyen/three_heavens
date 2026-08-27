@@ -26,21 +26,23 @@ class Finalizations::StartAndApplyTest < ActiveSupport::TestCase
     assert FinalizationRunJob.enqueue_after_transaction_commit
   end
 
-  test "normalizes duplicate IDs and is idempotent only for the same active selection" do
-    first = Finalizations::Start.call(
-      final_translation: @final_translation,
-      finalizer_ids: [ @finalizers.first.id, @finalizers.first.id ]
-    )
-    clear_enqueued_jobs
-
+  test "rejects duplicate IDs instead of silently changing the selection" do
     assert_no_difference [ -> { FinalizationRound.count }, -> { FinalizationRun.count } ] do
       assert_no_enqueued_jobs only: FinalizationRunJob do
-        assert_equal first, Finalizations::Start.call(
-          final_translation: @final_translation,
-          finalizer_ids: [ @finalizers.first.id ]
-        )
+        assert_raises FinalTranslations::InvalidSelectionError do
+          Finalizations::Start.call(
+            final_translation: @final_translation,
+            finalizer_ids: [ @finalizers.first.id, @finalizers.first.id ]
+          )
+        end
       end
     end
+
+    round = Finalizations::Start.call(
+      final_translation: @final_translation,
+      finalizer_ids: [ @finalizers.first.id ]
+    )
+    assert round.running?
     assert_raises FinalTranslations::ActiveRoundError do
       Finalizations::Start.call(
         final_translation: @final_translation,

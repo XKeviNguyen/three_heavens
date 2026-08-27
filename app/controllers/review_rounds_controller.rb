@@ -1,6 +1,6 @@
 class ReviewRoundsController < ApplicationController
   def create
-    experiment = Experiment.find(params[:experiment_id])
+    experiment = current_user.experiments.find(params[:experiment_id])
     review_round = BlindReviews::Start.call(
       experiment: experiment,
       reviewer_ids: review_round_params[:reviewer_ids]
@@ -15,7 +15,7 @@ class ReviewRoundsController < ApplicationController
   end
 
   def show
-    @review_round = ReviewRound.includes(
+    @review_round = current_user.review_rounds.includes(
       :judge_round,
       experiment: { document: :project },
       review_runs: [
@@ -35,7 +35,7 @@ class ReviewRoundsController < ApplicationController
   end
 
   def load_experiment_page
-    @experiment = Experiment.includes(
+    @experiment = current_user.experiments.includes(
       document: :project,
       translation_runs: :llm_model,
       review_round: { review_runs: :reviewer_llm_model }

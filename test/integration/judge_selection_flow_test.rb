@@ -6,6 +6,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
   include JudgingTestHelper
 
   setup do
+    sign_in_as users(:normal)
     @review_round = create_completed_review_round
     @judge = create_judge_model
   end
@@ -49,7 +50,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
              params: { judge_round: { judge_ids: ids } }
       end
       assert_response :unprocessable_content
-      assert_select "[role='alert']", text: /valid judge|active OpenRouter/
+      assert_select "[role='alert']", text: /judge|active OpenRouter/i
     end
   end
 

@@ -1,6 +1,7 @@
 module JudgingTestHelper
   def create_completed_review_round(candidate_texts: [ "First translation", "Second translation" ])
     project = Project.create!(
+      user: (defined?(@current_test_user) && @current_test_user) || users(:normal),
       name: "Judging tests",
       source_language: "Vietnamese",
       target_language: "Japanese"
