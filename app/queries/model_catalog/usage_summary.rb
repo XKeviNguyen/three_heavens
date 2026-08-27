@@ -4,6 +4,7 @@ module ModelCatalog
       :translation_run_count,
       :review_run_count,
       :judge_run_count,
+      :finalization_run_count,
       :official_win_count
     )
 
@@ -21,6 +22,8 @@ module ModelCatalog
       translations = TranslationRun.where(llm_model_id: model_ids).group(:llm_model_id).count
       reviews = ReviewRun.where(reviewer_llm_model_id: model_ids).group(:reviewer_llm_model_id).count
       judges = JudgeRun.where(judge_llm_model_id: model_ids).group(:judge_llm_model_id).count
+      finalizations = FinalizationRun.where(finalizer_llm_model_id: model_ids)
+        .group(:finalizer_llm_model_id).count
       wins = official_wins
 
       model_ids.index_with do |model_id|
@@ -28,6 +31,7 @@ module ModelCatalog
           translation_run_count: translations.fetch(model_id, 0),
           review_run_count: reviews.fetch(model_id, 0),
           judge_run_count: judges.fetch(model_id, 0),
+          finalization_run_count: finalizations.fetch(model_id, 0),
           official_win_count: wins.fetch(model_id, 0)
         )
       end

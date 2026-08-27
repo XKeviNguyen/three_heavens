@@ -52,6 +52,7 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "Experiment history"
+    assert_select "header", text: /each translation, review, judge, and finalization run once/
     assert_select "article", text: /Completed.*Completed.*Completed/m
     assert_select "article", text: /Official winner.*Candidate model/m
     assert_select "article", text: /Known total · incomplete telemetry \(3\/4 runs\)/

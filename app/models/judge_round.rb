@@ -5,6 +5,7 @@ class JudgeRound < ApplicationRecord
   belongs_to :winner_translation_run, class_name: "TranslationRun", optional: true
 
   has_many :judge_runs, dependent: :restrict_with_error
+  has_one :final_translation, dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",

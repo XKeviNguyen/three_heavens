@@ -59,6 +59,7 @@ module History
       Experiment.includes(
         { document: :project },
         :translation_runs,
+        :final_translation,
         review_round: { judge_round: { winner_translation_run: :llm_model } }
       ).order(created_at: :desc, id: :desc)
     end
@@ -72,6 +73,7 @@ module History
       merge_cost_rows(totals, translation_cost_rows(experiment_ids))
       merge_cost_rows(totals, review_cost_rows(experiment_ids))
       merge_cost_rows(totals, judge_cost_rows(experiment_ids))
+      merge_cost_rows(totals, finalization_cost_rows(experiment_ids))
       totals
     end
 
@@ -101,6 +103,18 @@ module History
           "review_rounds.experiment_id",
           Arel.sql("SUM(judge_runs.cost)"),
           Arel.sql("COUNT(judge_runs.cost)"),
+          Arel.sql("COUNT(*)")
+        )
+    end
+
+    def finalization_cost_rows(experiment_ids)
+      FinalizationRun.joins(finalization_round: :final_translation)
+        .where(final_translations: { experiment_id: experiment_ids })
+        .group("final_translations.experiment_id")
+        .pluck(
+          "final_translations.experiment_id",
+          Arel.sql("SUM(finalization_runs.cost)"),
+          Arel.sql("COUNT(finalization_runs.cost)"),
           Arel.sql("COUNT(*)")
         )
     end

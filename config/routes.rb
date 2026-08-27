@@ -21,7 +21,20 @@ Rails.application.routes.draw do
   resources :review_rounds, only: :show do
     resources :judge_rounds, only: :create
   end
-  resources :judge_rounds, only: :show
+  resources :judge_rounds, only: :show do
+    resource :final_translation, only: :create
+  end
+  resources :final_translations, only: :show do
+    member do
+      patch :save_revision
+      post :restore_revision
+      post :refine
+      post :apply_proposal
+      patch :finalize
+      patch :reopen
+      get :download
+    end
+  end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

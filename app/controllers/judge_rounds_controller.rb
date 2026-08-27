@@ -17,6 +17,7 @@ class JudgeRoundsController < ApplicationController
   def show
     @judge_round = JudgeRound.includes(
       :winner_translation_run,
+      :final_translation,
       review_round: { experiment: { document: :project } },
       judge_runs: [
         :judge_llm_model,

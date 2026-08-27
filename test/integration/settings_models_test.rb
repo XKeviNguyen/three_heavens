@@ -1,8 +1,11 @@
 require "test_helper"
 require_relative "../support/analytics_test_helper"
+require_relative "../support/final_translation_test_helper"
 
 class SettingsModelsTest < ActionDispatch::IntegrationTest
   include AnalyticsTestHelper
+  include ActiveJob::TestHelper
+  include FinalTranslationTestHelper
 
   test "catalog lists model metadata usage actions and only valid benchmark links" do
     used_model = llm_models(:openrouter_claude)
@@ -20,10 +23,41 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Translations:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Reviews as reviewer:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Judgments as judge:\s*1/m
+    assert_select "tr[data-model-id='#{used_model.id}']", text: /Finalizations as finalizer:\s*0/m
     assert_select "tr[data-model-id='#{used_model.id}'] a[href='#{benchmark_model_path(used_model)}']", "Benchmark"
     assert_select "tr[data-model-id='#{unused_model.id}'] a[href='#{benchmark_model_path(unused_model)}']", count: 0
     assert_select "a", text: "Delete", count: 0
     assert_select "form[action='#{deactivate_settings_model_path(used_model)}']"
+  end
+
+  test "inactive finalizer-only model visibly reports history and keeps identifier immutable" do
+    final_translation = create_final_translation_workspace
+    finalizer = create_model("finalizer-only-usage")
+    round = final_translation.finalization_rounds.create!(
+      base_version: final_translation.current_version,
+      selection_key: "f" * 64
+    )
+    complete_finalization_run(
+      round.finalization_runs.create!(finalizer_llm_model: finalizer)
+    )
+    finalizer.update!(active: false)
+
+    get settings_models_path
+
+    assert_response :success
+    assert_select "tr[data-model-id='#{finalizer.id}']", text: /Inactive/
+    assert_select "tr[data-model-id='#{finalizer.id}']", text: /Translations:\s*0/m
+    assert_select "tr[data-model-id='#{finalizer.id}']", text: /Reviews as reviewer:\s*0/m
+    assert_select "tr[data-model-id='#{finalizer.id}']", text: /Judgments as judge:\s*0/m
+    assert_select "tr[data-model-id='#{finalizer.id}']", text: /Finalizations as finalizer:\s*1/m
+
+    patch settings_model_path(finalizer), params: {
+      llm_model: { model_identifier: "test/finalizer-history-rewrite" }
+    }
+
+    assert_response :unprocessable_content
+    assert_select "li", text: /Model identifier cannot be changed after the model has historical usage/
+    assert_equal "test/finalizer-only-usage", finalizer.reload.model_identifier
   end
 
   test "creates a trimmed active OpenRouter model" do

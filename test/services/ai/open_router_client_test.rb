@@ -169,6 +169,37 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal '{"rankings":[]}', result.content
   end
 
+  test "sends finalization requests through a separate strict structured output contract" do
+    http = fake_http(
+      status: 200,
+      body: {
+        choices: [ { message: { content: '{"proposed_translation":"Final"}' } } ]
+      }
+    )
+    client = build_client(http)
+    schema = {
+      type: "object",
+      properties: { proposed_translation: { type: "string" } },
+      required: [ "proposed_translation" ],
+      additionalProperties: false
+    }
+
+    result = client.finalization_completion(
+      model_identifier: "finalizer/model",
+      system_prompt: "Refine the translation.",
+      user_prompt: "Untrusted draft data",
+      response_schema: schema
+    )
+
+    payload = JSON.parse(http.last_request.body)
+    assert_equal "finalizer/model", payload["model"]
+    assert_equal({ "require_parameters" => true }, payload["provider"])
+    assert_equal "final_translation_refinement",
+                 payload.dig("response_format", "json_schema", "name")
+    assert_equal true, payload.dig("response_format", "json_schema", "strict")
+    assert_equal '{"proposed_translation":"Final"}', result.content
+  end
+
   test "classifies rate limits and server errors as retryable" do
     [ 429, 500, 503 ].each do |status|
       client = build_client(

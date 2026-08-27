@@ -35,6 +35,14 @@
       <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-white/70 p-4 text-sm leading-6 text-slate-900"><%= winner.translated_text %></div>
       <p class="mt-4 text-sm text-slate-700"><%= @judge_round.aggregation_explanation %></p>
 
+      <div class="mt-5">
+        <% if @judge_round.final_translation %>
+          <%= link_to "Open final translation workspace", @judge_round.final_translation, class: "inline-flex rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800" %>
+        <% else %>
+          <%= button_to "Create final translation workspace", judge_round_final_translation_path(@judge_round), method: :post, class: "rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800" %>
+        <% end %>
+      </div>
+
       <ol class="mt-5 space-y-3">
         <% @judge_round.aggregate_rankings.sort_by { |ranking| ranking.fetch("aggregate_rank") }.each do |ranking| %>
           <% translation = experiment.translation_runs.find { |run| run.id == ranking.fetch("translation_run_id") } %>

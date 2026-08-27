@@ -5,7 +5,7 @@
     <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Analytics</p>
     <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Experiment history</h1>
     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-      Newest first. System cost adds each translation, review, and judge run once. A partial total is labeled whenever any run lacks cost telemetry.
+      Newest first. System cost adds each translation, review, judge, and finalization run once. A partial total is labeled whenever any run lacks cost telemetry.
     </p>
   </header>
 
@@ -54,6 +54,7 @@
             <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
             <% if review_round %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
             <% if judge_round %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if experiment.final_translation %><%= link_to "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
           </div>
         </article>
       <% end %>
