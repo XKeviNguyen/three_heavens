@@ -7,6 +7,7 @@ class User < ApplicationRecord
   has_secure_password
 
   has_many :projects, dependent: :restrict_with_error
+  has_many :source_imports, dependent: :restrict_with_error
   has_many :documents, through: :projects
   has_many :experiments, through: :documents
   has_many :review_rounds, through: :experiments

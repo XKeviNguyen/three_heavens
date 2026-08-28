@@ -10,17 +10,58 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename", null: false
+    t.string "key", null: false
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
   create_table "documents", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "detected_content_type"
+    t.string "extraction_version"
+    t.bigint "original_byte_size"
+    t.string "original_filename"
     t.bigint "project_id", null: false
+    t.string "source_format"
+    t.string "source_kind", default: "pasted_text", null: false
+    t.string "source_sha256"
     t.text "source_text", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.index ["project_id"], name: "index_documents_on_project_id"
+    t.check_constraint "original_byte_size IS NULL OR original_byte_size >= 0 AND original_byte_size <= 10485760", name: "documents_original_byte_size_check"
+    t.check_constraint "source_format IS NULL OR (source_format::text = ANY (ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying]::text[]))", name: "documents_source_format_check"
+    t.check_constraint "source_kind::text = ANY (ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying]::text[])", name: "documents_source_kind_check"
+    t.check_constraint "source_sha256 IS NULL OR char_length(source_sha256::text) = 64", name: "documents_source_sha256_check"
   end
 
   create_table "experiments", force: :cascade do |t|
@@ -311,6 +352,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_100000) do
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "review_runs_total_tokens_check"
   end
 
+  create_table "source_imports", force: :cascade do |t|
+    t.bigint "byte_size"
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.string "detected_content_type"
+    t.datetime "expires_at", null: false
+    t.text "extracted_text"
+    t.string "extraction_version"
+    t.string "failure_code"
+    t.string "failure_message"
+    t.string "imported_format"
+    t.string "original_filename", null: false
+    t.bigint "resulting_document_id"
+    t.string "sha256"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["resulting_document_id"], name: "index_source_imports_on_resulting_document_id", unique: true, where: "(resulting_document_id IS NOT NULL)"
+    t.index ["status", "expires_at"], name: "index_source_imports_on_status_and_expires_at"
+    t.index ["user_id", "status"], name: "index_source_imports_on_user_id_and_status"
+    t.index ["user_id"], name: "index_source_imports_on_user_id"
+    t.check_constraint "(status::text = 'consumed'::text) = (consumed_at IS NOT NULL)", name: "source_imports_consumed_at_check"
+    t.check_constraint "byte_size IS NULL OR byte_size >= 0 AND byte_size <= 10485760", name: "source_imports_byte_size_check"
+    t.check_constraint "imported_format IS NULL OR (imported_format::text = ANY (ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying]::text[]))", name: "source_imports_format_check"
+    t.check_constraint "sha256 IS NULL OR char_length(sha256::text) = 64", name: "source_imports_sha256_check"
+    t.check_constraint "status::text <> 'consumed'::text OR resulting_document_id IS NOT NULL", name: "source_imports_consumed_document_check"
+    t.check_constraint "status::text <> 'ready'::text OR extracted_text IS NOT NULL", name: "source_imports_ready_text_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying]::text[])", name: "source_imports_status_check"
+  end
+
   create_table "translation_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
     t.integer "claimed_job_execution", default: 0, null: false
@@ -358,6 +429,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_100000) do
     t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'disabled'::character varying::text])", name: "users_status_check"
   end
 
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "documents", "projects"
   add_foreign_key "experiments", "documents"
   add_foreign_key "final_translation_versions", "final_translations"
@@ -386,6 +459,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_100000) do
   add_foreign_key "review_rounds", "experiments"
   add_foreign_key "review_runs", "llm_models", column: "reviewer_llm_model_id"
   add_foreign_key "review_runs", "review_rounds"
+  add_foreign_key "source_imports", "documents", column: "resulting_document_id", on_delete: :restrict
+  add_foreign_key "source_imports", "users", on_delete: :restrict
   add_foreign_key "translation_runs", "experiments"
   add_foreign_key "translation_runs", "llm_models"
 end

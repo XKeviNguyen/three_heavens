@@ -17,6 +17,21 @@ class DocumentTest < ActiveSupport::TestCase
     )
 
     assert document.valid?
+    assert document.pasted_text?
+    assert_not document.source_file.attached?
+  end
+
+  test "uploaded provenance must be complete and attached" do
+    document = @project.documents.build(
+      title: "Imported",
+      source_text: "Reviewed",
+      source_kind: :uploaded_file,
+      source_format: "txt"
+    )
+
+    assert_not document.valid?
+    assert_includes document.errors[:original_filename], "must be present for an uploaded source"
+    assert_includes document.errors[:source_file], "must be attached for an uploaded source"
   end
 
   test "requires title" do

@@ -159,6 +159,26 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[project_name]'][value='Vietnamese Sermons']"
   end
 
+  test "malformed workspace and model ID parameter shapes are rejected without side effects" do
+    payloads = [
+      {},
+      { translation_workspace: "malformed" },
+      { translation_workspace: [ "malformed" ] },
+      { translation_workspace: valid_attributes.merge(model_ids: "1") },
+      { translation_workspace: valid_attributes.merge(model_ids: { nested: "1" }) }
+    ]
+
+    payloads.each_with_index do |payload, index|
+      assert_no_workspace_records_created do
+        assert_no_enqueued_jobs only: TranslationRunJob do
+          post translation_workspace_path, params: payload
+        end
+      end
+      assert_response :bad_request, "malformed payload #{index} was not rejected at the parameter boundary"
+      assert_empty response.body
+    end
+  end
+
   test "inactive and non-OpenRouter model IDs are rejected server-side" do
     inactive_model = LlmModel.create!(
       gateway: "openrouter",

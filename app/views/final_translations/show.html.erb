@@ -54,7 +54,10 @@
         <h2 class="text-xl font-semibold text-slate-950">Current final draft</h2>
         <p class="mt-1 text-sm text-slate-600">Version <%= current.version_number %> · <%= current.origin.humanize %></p>
       </div>
-      <%= link_to "Download UTF-8 text", download_final_translation_path(@final_translation), class: "inline-flex w-fit rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+      <div class="flex flex-wrap gap-3">
+        <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "inline-flex w-fit rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+        <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "inline-flex w-fit rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+      </div>
     </div>
 
     <% if @final_translation.draft? %>

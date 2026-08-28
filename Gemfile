@@ -40,7 +40,11 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+gem "image_processing", "~> 2.0.3"
+gem "ruby-vips", "~> 2.3"
+
+# Read and write bounded Office Open XML packages without shelling out.
+gem "rubyzip", "~> 3.5"
 
 group :development, :test do
   gem "dotenv-rails"

@@ -1,7 +1,10 @@
 require "application_system_test_case"
+require "tempfile"
+require_relative "../support/final_translation_test_helper"
 
 class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
+  include FinalTranslationTestHelper
 
   test "unauthenticated visitor is taken to sign in" do
     visit root_path
@@ -43,6 +46,78 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     end
     assert failed_run.reload.pending?
     assert_equal 1, experiment.translation_runs.count
+  end
+
+  test "owner uploads previews edits and consumes a TXT source without AI during preview" do
+    sign_in_in_browser(users(:normal), "correct horse battery staple")
+    click_link "Upload source file"
+    assert_text "Upload a source file"
+
+    source = Tempfile.new([ "browser-source", ".txt" ])
+    source.binmode
+    source.write("Browser upload\r\n日本語")
+    source.flush
+
+    assert_no_enqueued_jobs only: TranslationRunJob do
+      attach_file "Source file", source.path
+      click_button "Upload and preview"
+      assert_text "Uploaded source ready for review"
+      assert_field "Reviewed source text", with: "Browser upload\n日本語"
+    end
+
+    fill_in "Reviewed source text", with: "Reviewed browser source\n日本語"
+    fill_in "Project name", with: "Browser import"
+    fill_in "Source language", with: "Vietnamese"
+    fill_in "Target language", with: "Japanese"
+    fill_in "Document title", with: "Browser source"
+    fill_in "Experiment name", with: "Browser secure import"
+    fill_in "Translation instruction", with: "Translate faithfully."
+    check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
+
+    assert_enqueued_jobs 1, only: TranslationRunJob do
+      click_button "Start translation runs"
+      assert_text "Translation experiment"
+      assert_text "Reviewed browser source"
+      assert_link "Original source file"
+    end
+
+    document = Document.order(:id).last
+    assert document.uploaded_file?
+    assert_equal "Reviewed browser source\n日本語", document.source_text
+  ensure
+    source&.close!
+  end
+
+  test "normal pasted source workflow still starts an experiment" do
+    sign_in_in_browser(users(:normal), "correct horse battery staple")
+    fill_in "Project name", with: "Pasted browser project"
+    fill_in "Source language", with: "Vietnamese"
+    fill_in "Target language", with: "Japanese"
+    fill_in "Document title", with: "Pasted source"
+    fill_in "Source text", with: "Pasted text remains supported"
+    fill_in "Experiment name", with: "Pasted browser experiment"
+    fill_in "Translation instruction", with: "Translate faithfully."
+    check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
+
+    assert_enqueued_jobs 1, only: TranslationRunJob do
+      click_button "Start translation runs"
+      assert_text "Translation experiment"
+      assert_text "Pasted text remains supported"
+    end
+
+    assert Document.order(:id).last.pasted_text?
+  end
+
+  test "final translation workspace exposes owner TXT and DOCX downloads" do
+    final_translation = create_final_translation_workspace
+    clear_enqueued_jobs
+    sign_in_in_browser(users(:normal), "correct horse battery staple")
+
+    visit final_translation_path(final_translation)
+
+    assert_link "Download TXT", href: download_final_translation_path(final_translation, format: :txt)
+    assert_link "Download DOCX", href: download_final_translation_path(final_translation, format: :docx)
+    assert_no_enqueued_jobs
   end
 
   private

@@ -46,6 +46,24 @@ bin/rails ai:reconcile_stale
 
 With `SOLID_QUEUE_IN_PUMA=true`, the production Puma process supervises Solid Queue and its recurring schedule. Larger installations should use a dedicated `bin/jobs` role while keeping exactly one deliberate recurring-job topology.
 
+## Secure document import and export
+
+Authenticated owners may paste source text or upload `.txt`, `.md`, and `.docx` source files. Legacy `.doc`, `.docm`, RTF, HTML, ODT, PDF, images, and directly supplied archives are intentionally unsupported. PDF parsing and OCR require a separate security and product design.
+
+Uploads are limited by the application to 10 MiB, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). Kamal Proxy accepts request bodies up to 12 MiB so a 10 MiB upload plus multipart framing can reach the authoritative application check. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
+
+DOCX processing uses a bounded ZIP reader in memory. It requires the normal OOXML package entries, rejects encrypted or macro-enabled packages, traversal-style names, excessive entry counts, excessive declared expansion, large relevant XML, and suspicious compression ratios. XML parsing is strict and network-disabled; V1 reads visible body paragraphs, runs, tabs, explicit breaks, and tables. It does not recreate Word layout, fetch relationships, extract images, execute macros, or perform OCR.
+
+Upload and extraction create an owner-scoped `SourceImport` staging record. The owner reviews and may edit extracted text in the normal translation workspace. Upload, parsing, preview, cancellation, cleanup, and export never enqueue or call an AI provider. A successful workspace submission locks and consumes an import once, atomically creates the normal Project/Document/Experiment graph, records immutable source text and provenance, and reuses the Active Storage blob for the Document without copying file bytes.
+
+Original uploads are private. Downloads pass application owner authorization, use attachment disposition, and never expose a permanent blob URL. Abandoned imports expire after 24 hours; production runs bounded cleanup hourly. Destroying an abandoned import synchronously purges its bounded local file after the database transaction commits, without relying on a purge-job enqueue. A blob shared by a consumed Document remains protected by its attachment. An operator may safely process one bounded batch manually:
+
+```sh
+bin/rails source_imports:cleanup
+```
+
+Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or a minimal real macro-free OOXML DOCX. Exports are generated on demand and are not stored.
+
 ## Health endpoints
 
 - `/up` is lightweight process liveness: Rails successfully booted.
@@ -82,6 +100,8 @@ The four database URLs must point to distinct PostgreSQL databases or otherwise 
 Production assumes TLS terminates at the trusted Kamal proxy, forces HTTPS for browser traffic, uses secure cookies and HSTS, and authorizes only `APP_HOST` for normal requests. Kamal-proxy checks the target container with its internal target-style Host, so only the lightweight `/up` liveness endpoint is excluded from Host Authorization. `/ready` remains Host-authorized. Both health endpoints may be checked directly inside the private container network without an HTTPS redirect. Do not expose PostgreSQL publicly; place it on a private network or bind any accessory port to loopback only.
 
 Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and does not require real secrets or a live database. That build-only flag must not be used for a running production server.
+
+Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery plans must cover both all PostgreSQL databases and the persistent storage volume; a database-only backup cannot restore original source files.
 
 ## Kamal prerequisites
 

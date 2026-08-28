@@ -87,15 +87,24 @@ class FinalTranslationsController < ApplicationController
   end
 
   def download
-    content = @final_translation.current_version.content.encode(
-      Encoding::UTF_8,
-      invalid: :replace,
-      undef: :replace
-    )
-    send_data content,
-              type: "text/plain; charset=utf-8",
-              disposition: "attachment",
-              filename: "three-heavens-final-translation-#{@final_translation.id}.txt"
+    current = @final_translation.current_version
+    document = @final_translation.experiment.document
+    state = @final_translation.finalized? ? "final" : "draft"
+
+    case params[:format]
+    when "txt"
+      send_data current.content.encode(Encoding::UTF_8),
+                type: "text/plain; charset=utf-8",
+                disposition: "attachment",
+                filename: SourceImports::Filename.export(document.title, suffix: state, extension: "txt")
+    when "docx"
+      send_data DocumentExports::Docx.call(title: document.title, content: current.content),
+                type: DocumentExports::Docx::CONTENT_TYPE,
+                disposition: "attachment",
+                filename: SourceImports::Filename.export(document.title, suffix: state, extension: "docx")
+    else
+      head :not_acceptable
+    end
   end
 
   private

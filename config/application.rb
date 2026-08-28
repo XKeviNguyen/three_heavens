@@ -16,6 +16,10 @@ module ThreeHeavens
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # Files are served only through owner-authorized application controllers.
+    # This application does not use direct uploads or signed public blob routes.
+    config.active_storage.draw_routes = false
+
     config.action_dispatch.default_headers.merge!(
       "Referrer-Policy" => "strict-origin-when-cross-origin",
       "X-Content-Type-Options" => "nosniff",
