@@ -1,7 +1,9 @@
 require "test_helper"
+require_relative "../support/authorized_ai_job_helper"
 
 class ReviewRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
+  include AuthorizedAiJobHelper
 
   setup do
     project = Project.create!(
@@ -41,7 +43,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     expected_mapping = @review_run.review_evaluations.index_by(&:anonymous_label)
     client = successful_client
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     @review_run.reload
     assert @review_run.completed?
@@ -109,7 +111,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
       end)
     end
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     assert_equal @review_run.reviewer_llm_model.model_identifier,
                  captured[:model_identifier]
@@ -129,7 +131,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     client = client_returning("not-json")
 
     assert_enqueued_with(job: ReviewRunJob, args: [ @review_run.id ]) do
-      with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+      with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
     end
 
     assert @review_run.reload.running?
@@ -142,7 +144,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
 
     assert_enqueued_with(job: ReviewRunJob, args: [ @review_run.id ]) do
       with_client(client_returning(partial)) do
-        ReviewRunJob.perform_now(@review_run.id)
+        perform_authorized_ai_job(ReviewRunJob, @review_run)
       end
     end
 
@@ -159,7 +161,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
       )
     end
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     assert @review_run.reload.failed?
     assert @review_round.reload.failed?
@@ -178,7 +180,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     end
 
     assert_enqueued_with(job: ReviewRunJob, args: [ @review_run.id ]) do
-      with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+      with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
     end
 
     assert @review_run.reload.running?
@@ -191,7 +193,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     @review_run.update!(status: :running, started_at: Time.current)
     client, provider_calls = counting_client
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     assert @review_run.reload.running?
     assert_equal 0, provider_calls.call
@@ -202,7 +204,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     @review_round.update_column(:status, "running")
     client, provider_calls = counting_client
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     assert @review_run.reload.completed?
     assert @review_round.reload.completed?
@@ -216,7 +218,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     @review_round.update_column(:status, "running")
     client, provider_calls = counting_client
 
-    with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
     assert @review_run.reload.completed?
     assert second_run.reload.failed?
@@ -236,7 +238,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
       )
       @review_round.update_column(:status, "running")
 
-      with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+      with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
 
       assert second_run.reload.public_send("#{status}?")
       assert @review_round.reload.running?
@@ -257,14 +259,14 @@ class ReviewRunJobTest < ActiveJob::TestCase
       )
     end
 
-    with_client(successful_client) { ReviewRunJob.perform_now(@review_run.id) }
+    with_client(successful_client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
     assert @review_round.reload.running?
 
     failing_client = Object.new
     failing_client.define_singleton_method(:review_completion) do |**|
       raise Ai::OpenRouterClient::PermanentError.new("Rejected", code: "rejected")
     end
-    with_client(failing_client) { ReviewRunJob.perform_now(second_run.id) }
+    with_client(failing_client) { perform_authorized_ai_job(ReviewRunJob, second_run) }
 
     assert @review_run.reload.completed?
     assert second_run.reload.failed?
@@ -279,7 +281,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
     end
 
     error = assert_raises ActiveRecord::StatementInvalid do
-      with_client(client) { ReviewRunJob.perform_now(@review_run.id) }
+      with_client(client) { perform_authorized_ai_job(ReviewRunJob, @review_run) }
     end
 
     assert_equal "SQL failed", error.message

@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/judging_test_helper"
+require_relative "../support/authorized_ai_job_helper"
 
 class JudgeRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include JudgingTestHelper
+  include AuthorizedAiJobHelper
 
   setup do
     @review_round = create_completed_review_round
@@ -20,7 +22,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
     assert JudgeRunJob.enqueue_after_transaction_commit
 
     with_client(client_returning(valid_content)) do
-      JudgeRunJob.perform_now(@judge_run.id)
+      perform_authorized_ai_job(JudgeRunJob, @judge_run)
     end
 
     @judge_run.reload
@@ -48,7 +50,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
       result
     end
 
-    with_client(client) { JudgeRunJob.perform_now(@judge_run.id) }
+    with_client(client) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
 
     assert_equal @judge.model_identifier, captured.fetch(:model_identifier)
     messages = captured.values_at(:system_prompt, :user_prompt).join("\n")
@@ -74,7 +76,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
 
     assert_enqueued_with(job: JudgeRunJob, args: [ @judge_run.id ]) do
       with_client(client_returning(partial)) do
-        JudgeRunJob.perform_now(@judge_run.id)
+        perform_authorized_ai_job(JudgeRunJob, @judge_run)
       end
     end
 
@@ -90,7 +92,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
       raise Ai::OpenRouterClient::RetryableError.new("Busy", code: "busy")
     end
     assert_enqueued_with(job: JudgeRunJob, args: [ @judge_run.id ]) do
-      with_client(retrying) { JudgeRunJob.perform_now(@judge_run.id) }
+      with_client(retrying) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
     end
     assert @judge_run.reload.running?
 
@@ -102,7 +104,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
         code: "rejected"
       )
     end
-    with_client(failing) { JudgeRunJob.perform_now(@judge_run.id) }
+    with_client(failing) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
 
     assert @judge_run.reload.failed?
     assert @judge_round.reload.failed?
@@ -123,7 +125,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
 
     assert_performed_jobs 5, only: JudgeRunJob do
       with_client(exhausted_client) do
-        JudgeRunJob.perform_later(@judge_run.id)
+        enqueue_authorized_ai_job(JudgeRunJob, @judge_run)
       end
     end
 
@@ -144,7 +146,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
     @judge_run.update!(status: :running, started_at: Time.current)
     client, calls = counting_client
 
-    with_client(client) { JudgeRunJob.perform_now(@judge_run.id) }
+    with_client(client) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
 
     assert_equal 0, calls.call
     assert @judge_run.reload.running?
@@ -155,7 +157,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
     @judge_round.update_column(:status, "running")
     client, calls = counting_client
 
-    with_client(client) { JudgeRunJob.perform_now(@judge_run.id) }
+    with_client(client) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
 
     assert_equal 0, calls.call
     assert @judge_round.reload.completed?
@@ -182,7 +184,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
     @judge_round.update_column(:status, "running")
     client, calls = counting_client
 
-    with_client(client) { JudgeRunJob.perform_now(@judge_run.id) }
+    with_client(client) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
 
     assert_equal 0, calls.call
     assert @judge_run.reload.completed?
@@ -198,7 +200,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
       raise ActiveRecord::StatementInvalid, "SQL failed"
     end
     error = assert_raises ActiveRecord::StatementInvalid do
-      with_client(client) { JudgeRunJob.perform_now(@judge_run.id) }
+      with_client(client) { perform_authorized_ai_job(JudgeRunJob, @judge_run) }
     end
 
     assert_equal "SQL failed", error.message

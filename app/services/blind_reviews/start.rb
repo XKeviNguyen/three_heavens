@@ -20,7 +20,7 @@ module BlindReviews
       validate_experiment!
       reviewers = resolve_reviewers!
 
-      ReviewRound.transaction do
+      review_round, schedules = ReviewRound.transaction do
         experiment.lock!
         validate_completed_experiment!
         candidates = eligible_candidates
@@ -28,11 +28,13 @@ module BlindReviews
         experiment.association(:review_round).reset
 
         if experiment.review_round
-          return existing_round_for!(reviewers)
+          [ existing_round_for!(reviewers), [] ]
+        else
+          create_round!(reviewers, candidates)
         end
-
-        create_round!(reviewers, candidates)
       end
+      Ai::RunScheduler.enqueue_all(schedules)
+      review_round
     end
 
     private
@@ -93,6 +95,7 @@ module BlindReviews
 
     def create_round!(reviewers, candidates)
       review_round = experiment.create_review_round!(status: :running)
+      schedules = []
 
       reviewers.each do |reviewer|
         review_run = review_round.review_runs.create!(reviewer_llm_model: reviewer)
@@ -102,10 +105,10 @@ module BlindReviews
             anonymous_label: CandidateLabel.for(index)
           )
         end
-        ReviewRunJob.perform_later(review_run.id)
+        schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob)
       end
 
-      review_round
+      [ review_round, schedules ]
     end
 
     def randomized_candidates(candidates)

@@ -1,7 +1,9 @@
 require "test_helper"
+require_relative "../support/authorized_ai_job_helper"
 
 class TranslationRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
+  include AuthorizedAiJobHelper
 
   setup do
     project = Project.create!(
@@ -30,7 +32,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
     client = successful_client
 
     with_client(client) do
-      TranslationRunJob.perform_now(run.id)
+      perform_authorized_ai_job(TranslationRunJob, run)
     end
 
     run.reload
@@ -74,7 +76,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
     end
 
     with_client(client) do
-      TranslationRunJob.perform_now(run.id)
+      perform_authorized_ai_job(TranslationRunJob, run)
     end
 
     assert_equal @llm_model.model_identifier,
@@ -96,7 +98,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
     end
 
     with_client(client) do
-      TranslationRunJob.perform_now(run.id)
+      perform_authorized_ai_job(TranslationRunJob, run)
     end
 
     run.reload
@@ -121,7 +123,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
 
     assert_enqueued_with(job: TranslationRunJob, args: [ run.id ]) do
       with_client(client) do
-        TranslationRunJob.perform_now(run.id)
+        perform_authorized_ai_job(TranslationRunJob, run)
       end
     end
 
@@ -142,7 +144,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
     end
 
     with_client(client) do
-      TranslationRunJob.perform_now(run.id)
+      perform_authorized_ai_job(TranslationRunJob, run)
     end
 
     assert run.reload.running?
@@ -156,10 +158,10 @@ class TranslationRunJobTest < ActiveJob::TestCase
     client = successful_client
 
     with_client(client) do
-      TranslationRunJob.perform_now(first_run.id)
+      perform_authorized_ai_job(TranslationRunJob, first_run)
       assert @experiment.reload.running?
 
-      TranslationRunJob.perform_now(second_run.id)
+      perform_authorized_ai_job(TranslationRunJob, second_run)
     end
 
     assert @experiment.reload.completed?

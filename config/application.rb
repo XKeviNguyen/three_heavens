@@ -16,6 +16,13 @@ module ThreeHeavens
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    config.action_dispatch.default_headers.merge!(
+      "Referrer-Policy" => "strict-origin-when-cross-origin",
+      "X-Content-Type-Options" => "nosniff",
+      "X-Frame-Options" => "DENY",
+      "Permissions-Policy" => "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    )
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

@@ -1,0 +1,54 @@
+<% content_for :title, "Operations · Three Heavens" %>
+
+<div class="space-y-8">
+  <header>
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Admin settings</p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">AI workflow operations</h1>
+    <p class="mt-2 max-w-3xl text-sm text-slate-600">Aggregate operational health only. This page does not expose source text, translations, prompts, proposals, or provider response bodies.</p>
+  </header>
+
+  <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-200 px-6 py-5">
+      <h2 class="text-xl font-semibold text-slate-950">Current work</h2>
+      <p class="mt-1 text-sm text-slate-600">Pending work is stale when it does not begin, and running work is stale without a fresh execution claim, after <%= @health.stale_threshold_minutes %> minutes.</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <tr><th class="px-6 py-3">Workflow</th><th class="px-6 py-3">Pending</th><th class="px-6 py-3">Running</th><th class="px-6 py-3">Failed</th><th class="px-6 py-3">Stale pending</th><th class="px-6 py-3">Stale running</th><th class="px-6 py-3">Oldest active</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <% @health.workflows.each do |workflow| %>
+            <tr>
+              <th class="px-6 py-4 text-left font-semibold text-slate-900"><%= workflow.fetch(:label) %></th>
+              <% %w[pending running failed].each do |status| %><td class="px-6 py-4 text-slate-700"><%= workflow.dig(:counts, status) %></td><% end %>
+              <td class="px-6 py-4 font-semibold <%= workflow.fetch(:stale_pending_count).positive? ? 'text-red-700' : 'text-slate-700' %>"><%= workflow.fetch(:stale_pending_count) %></td>
+              <td class="px-6 py-4 font-semibold <%= workflow.fetch(:stale_running_count).positive? ? 'text-red-700' : 'text-slate-700' %>"><%= workflow.fetch(:stale_running_count) %></td>
+              <td class="px-6 py-4 text-slate-700"><%= workflow.fetch(:oldest_active_at) ? time_ago_in_words(workflow.fetch(:oldest_active_at)) + " ago" : "—" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Stale reconciliation</h2>
+    <p class="mt-2 text-sm text-slate-600">This marks stale pending and running records failed and reconciles parent workflows. It is idempotent and never starts a provider request; owners decide whether to retry afterward.</p>
+    <%= button_to "Reconcile stale work now", reconcile_stale_settings_operations_path, method: :post, class: "mt-4 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800" %>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Recent failure codes</h2>
+    <p class="mt-1 text-sm text-slate-600">Sanitized aggregate codes from the last seven days.</p>
+    <% if @health.failure_codes.any? %>
+      <ul class="mt-4 divide-y divide-slate-100">
+        <% @health.failure_codes.each do |failure| %>
+          <li class="flex flex-wrap justify-between gap-3 py-3 text-sm"><span class="text-slate-700"><%= failure.fetch(:workflow) %> · <span class="font-mono"><%= failure.fetch(:code) %></span></span><span class="font-semibold text-slate-900"><%= failure.fetch(:count) %></span></li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="mt-4 text-sm text-slate-600">No coded failures in this window.</p>
+    <% end %>
+  </section>
+</div>

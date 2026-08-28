@@ -16,7 +16,7 @@ module Finalizations
       raise ActiveRecord::RecordNotSaved, "Final translation must be persisted" unless final_translation.persisted?
       submitted_ids = normalized_ids!
 
-      FinalizationRound.transaction do
+      round, schedules = FinalizationRound.transaction do
         final_translation.lock!
         finalizers = resolve_finalizers!(submitted_ids)
         key = selection_key(finalizers)
@@ -24,14 +24,17 @@ module Finalizations
         raise FinalTranslations::InvalidStateError, "Final translation has no current version" unless final_translation.current_version
 
         active = final_translation.finalization_rounds.running.includes(:finalization_runs).first
-        return active if active && active.base_version == final_translation.current_version && active.selection_key == key
-        if active
+        if active && active.base_version == final_translation.current_version && active.selection_key == key
+          [ active, [] ]
+        elsif active
           raise FinalTranslations::ActiveRoundError,
                 "Another refinement round is still active for this final translation"
+        else
+          create_round!(finalizers, key)
         end
-
-        create_round!(finalizers, key)
       end
+      Ai::RunScheduler.enqueue_all(schedules)
+      round
     end
 
     private
@@ -71,11 +74,12 @@ module Finalizations
         selection_key: key,
         status: :running
       )
+      schedules = []
       finalizers.each do |finalizer|
         run = round.finalization_runs.create!(finalizer_llm_model: finalizer)
-        job_class.perform_later(run.id)
+        schedules << Ai::RunScheduler.prepare(run: run, job_class: job_class)
       end
-      round
+      [ round, schedules ]
     end
   end
 end

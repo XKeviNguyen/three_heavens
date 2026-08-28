@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -88,19 +88,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
   create_table "finalization_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
     t.jsonb "change_summary", default: [], null: false
+    t.integer "claimed_job_execution", default: 0, null: false
     t.datetime "completed_at"
     t.bigint "completion_tokens"
     t.decimal "cost", precision: 20, scale: 10
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
+    t.integer "execution_attempt", default: 0, null: false
     t.bigint "finalization_round_id", null: false
     t.bigint "finalizer_llm_model_id", null: false
+    t.datetime "last_claimed_at"
+    t.datetime "pending_since"
     t.bigint "prompt_tokens"
     t.text "proposed_translation"
     t.string "provider_response_id"
     t.bigint "reasoning_tokens"
     t.string "resolved_model_identifier"
+    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
     t.jsonb "terminology_notes", default: [], null: false
@@ -110,9 +115,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
     t.index ["finalization_round_id", "finalizer_llm_model_id"], name: "index_finalization_runs_on_round_and_model", unique: true
     t.index ["finalization_round_id"], name: "index_finalization_runs_on_finalization_round_id"
     t.index ["finalizer_llm_model_id"], name: "index_finalization_runs_on_finalizer_llm_model_id"
+    t.index ["last_claimed_at"], name: "index_finalization_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
+    t.index ["pending_since"], name: "index_finalization_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "finalization_runs_cached_tokens_check"
+    t.check_constraint "claimed_job_execution >= 0", name: "finalization_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "finalization_runs_completion_tokens_check"
     t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "finalization_runs_cost_check"
+    t.check_constraint "execution_attempt >= 0", name: "finalization_runs_execution_attempt_check"
     t.check_constraint "jsonb_typeof(change_summary) = 'array'::text", name: "finalization_runs_change_summary_array_check"
     t.check_constraint "jsonb_typeof(terminology_notes) = 'array'::text", name: "finalization_runs_terminology_notes_array_check"
     t.check_constraint "jsonb_typeof(warnings) = 'array'::text", name: "finalization_runs_warnings_array_check"
@@ -162,6 +171,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
 
   create_table "judge_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
+    t.integer "claimed_job_execution", default: 0, null: false
     t.datetime "completed_at"
     t.bigint "completion_tokens"
     t.integer "confidence_score"
@@ -169,12 +179,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
+    t.integer "execution_attempt", default: 0, null: false
     t.bigint "judge_llm_model_id", null: false
     t.bigint "judge_round_id", null: false
+    t.datetime "last_claimed_at"
+    t.datetime "pending_since"
     t.bigint "prompt_tokens"
     t.string "provider_response_id"
     t.bigint "reasoning_tokens"
     t.string "resolved_model_identifier"
+    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
     t.bigint "total_tokens"
@@ -184,11 +198,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
     t.index ["judge_llm_model_id"], name: "index_judge_runs_on_judge_llm_model_id"
     t.index ["judge_round_id", "judge_llm_model_id"], name: "index_judge_runs_on_judge_round_id_and_judge_llm_model_id", unique: true
     t.index ["judge_round_id"], name: "index_judge_runs_on_judge_round_id"
+    t.index ["last_claimed_at"], name: "index_judge_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
+    t.index ["pending_since"], name: "index_judge_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
     t.index ["winner_translation_run_id"], name: "index_judge_runs_on_winner_translation_run_id"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "judge_runs_cached_tokens_check"
+    t.check_constraint "claimed_job_execution >= 0", name: "judge_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "judge_runs_completion_tokens_check"
     t.check_constraint "confidence_score IS NULL OR confidence_score >= 1 AND confidence_score <= 100", name: "judge_runs_confidence_score_check"
     t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "judge_runs_cost_check"
+    t.check_constraint "execution_attempt >= 0", name: "judge_runs_execution_attempt_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "judge_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "judge_runs_reasoning_tokens_check"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "judge_runs_status_check"
@@ -256,28 +274,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
 
   create_table "review_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
+    t.integer "claimed_job_execution", default: 0, null: false
     t.datetime "completed_at"
     t.bigint "completion_tokens"
     t.decimal "cost", precision: 20, scale: 10
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
+    t.integer "execution_attempt", default: 0, null: false
+    t.datetime "last_claimed_at"
+    t.datetime "pending_since"
     t.bigint "prompt_tokens"
     t.string "provider_response_id"
     t.bigint "reasoning_tokens"
     t.string "resolved_model_identifier"
     t.bigint "review_round_id", null: false
     t.bigint "reviewer_llm_model_id", null: false
+    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
     t.bigint "total_tokens"
     t.datetime "updated_at", null: false
+    t.index ["last_claimed_at"], name: "index_review_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
+    t.index ["pending_since"], name: "index_review_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
     t.index ["review_round_id", "reviewer_llm_model_id"], name: "index_review_runs_on_review_round_id_and_reviewer_llm_model_id", unique: true
     t.index ["review_round_id"], name: "index_review_runs_on_review_round_id"
     t.index ["reviewer_llm_model_id"], name: "index_review_runs_on_reviewer_llm_model_id"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "review_runs_cached_tokens_check"
+    t.check_constraint "claimed_job_execution >= 0", name: "review_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "review_runs_completion_tokens_check"
     t.check_constraint "cost IS NULL OR cost >= 0::numeric", name: "review_runs_cost_check"
+    t.check_constraint "execution_attempt >= 0", name: "review_runs_execution_attempt_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "review_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "review_runs_reasoning_tokens_check"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "review_runs_status_check"
@@ -286,18 +313,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
 
   create_table "translation_runs", force: :cascade do |t|
     t.bigint "cached_tokens"
+    t.integer "claimed_job_execution", default: 0, null: false
     t.datetime "completed_at"
     t.bigint "completion_tokens"
     t.decimal "cost", precision: 20, scale: 10
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
+    t.integer "execution_attempt", default: 0, null: false
     t.bigint "experiment_id", null: false
+    t.datetime "last_claimed_at"
     t.bigint "llm_model_id", null: false
+    t.datetime "pending_since"
     t.bigint "prompt_tokens"
     t.string "provider_response_id"
     t.bigint "reasoning_tokens"
     t.string "resolved_model_identifier"
+    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
     t.bigint "total_tokens"
@@ -306,7 +338,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_100001) do
     t.index ["experiment_id", "id"], name: "index_translation_runs_on_experiment_and_id", unique: true
     t.index ["experiment_id", "llm_model_id"], name: "index_translation_runs_on_experiment_id_and_llm_model_id", unique: true
     t.index ["experiment_id"], name: "index_translation_runs_on_experiment_id"
+    t.index ["last_claimed_at"], name: "index_translation_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
     t.index ["llm_model_id"], name: "index_translation_runs_on_llm_model_id"
+    t.index ["pending_since"], name: "index_translation_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
+    t.check_constraint "claimed_job_execution >= 0", name: "translation_runs_claimed_job_execution_check"
+    t.check_constraint "execution_attempt >= 0", name: "translation_runs_execution_attempt_check"
   end
 
   create_table "users", force: :cascade do |t|

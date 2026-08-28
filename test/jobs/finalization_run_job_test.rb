@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/final_translation_test_helper"
+require_relative "../support/authorized_ai_job_helper"
 
 class FinalizationRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include FinalTranslationTestHelper
+  include AuthorizedAiJobHelper
 
   setup do
     @final_translation = create_final_translation_workspace
@@ -20,7 +22,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     assert FinalizationRunJob.enqueue_after_transaction_commit
 
     with_client(client_returning(valid_content)) do
-      FinalizationRunJob.perform_now(@run.id)
+      perform_authorized_ai_job(FinalizationRunJob, @run)
     end
 
     @run.reload
@@ -46,7 +48,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
       result
     end
 
-    with_client(client) { FinalizationRunJob.perform_now(@run.id) }
+    with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 
     assert_equal @finalizer.model_identifier, captured.fetch(:model_identifier)
     messages = captured.values_at(:system_prompt, :user_prompt).join("\n")
@@ -67,7 +69,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     )
     assert_enqueued_with(job: FinalizationRunJob, args: [ @run.id ]) do
       with_client(client_returning(invalid)) do
-        FinalizationRunJob.perform_now(@run.id)
+        perform_authorized_ai_job(FinalizationRunJob, @run)
       end
     end
 
@@ -83,7 +85,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
       raise Ai::OpenRouterClient::RetryableError.new("Busy", code: "busy")
     end
     assert_enqueued_with(job: FinalizationRunJob, args: [ @run.id ]) do
-      with_client(retrying) { FinalizationRunJob.perform_now(@run.id) }
+      with_client(retrying) { perform_authorized_ai_job(FinalizationRunJob, @run) }
     end
     assert @run.reload.running?
 
@@ -95,7 +97,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
         code: "rejected"
       )
     end
-    with_client(failing) { FinalizationRunJob.perform_now(@run.id) }
+    with_client(failing) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 
     assert @run.reload.failed?
     assert @round.reload.failed?
@@ -114,7 +116,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     end
 
     assert_performed_jobs 5, only: FinalizationRunJob do
-      with_client(client) { FinalizationRunJob.perform_later(@run.id) }
+      with_client(client) { enqueue_authorized_ai_job(FinalizationRunJob, @run) }
     end
 
     assert @run.reload.failed?
@@ -127,7 +129,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
   test "skips duplicate running delivery" do
     @run.update!(status: :running, started_at: Time.current)
     client, calls = counting_client
-    with_client(client) { FinalizationRunJob.perform_now(@run.id) }
+    with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 
     assert_equal 0, calls.call
     assert @run.reload.running?
@@ -137,7 +139,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     complete_finalization_run(@run)
     @round.update_column(:status, "running")
     client, calls = counting_client
-    with_client(client) { FinalizationRunJob.perform_now(@run.id) }
+    with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 
     assert_equal 0, calls.call
     assert @round.reload.completed?
@@ -154,7 +156,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     )
     @round.update_column(:status, "running")
     client, calls = counting_client
-    with_client(client) { FinalizationRunJob.perform_now(@run.id) }
+    with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 
     assert_equal 0, calls.call
     assert @run.reload.completed?
@@ -169,7 +171,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
       raise ActiveRecord::StatementInvalid, "SQL failed"
     end
     error = assert_raises ActiveRecord::StatementInvalid do
-      with_client(client) { FinalizationRunJob.perform_now(@run.id) }
+      with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
     end
     assert_equal "SQL failed", error.message
     assert @run.reload.running?
