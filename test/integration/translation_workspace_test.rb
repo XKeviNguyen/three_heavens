@@ -3,6 +3,34 @@ require "test_helper"
 class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
+  class RecordingQueueAdapter
+    attr_reader :job_ids, :transaction_depths
+
+    def initialize(failure: nil)
+      @failure = failure
+      @job_ids = []
+      @transaction_depths = []
+    end
+
+    def enqueue(job)
+      record(job)
+      raise failure if failure
+    end
+
+    def enqueue_at(job, _timestamp)
+      enqueue(job)
+    end
+
+    private
+
+    attr_reader :failure
+
+    def record(job)
+      job_ids << job.job_id
+      transaction_depths << ActiveRecord::Base.connection.open_transactions
+    end
+  end
+
   setup do
     sign_in_as users(:normal)
     @first_model = llm_models(:openrouter_claude)
@@ -63,6 +91,59 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_equal "Japanese", project.target_language
     assert_equal [ @first_model.id, @second_model.id ].sort,
                  experiment.translation_runs.pluck(:llm_model_id).sort
+  end
+
+  test "outer transaction catches actual expected enqueue failure after commit" do
+    queue_error = SolidQueue::Job::EnqueueError.new("private queue detail")
+    adapter = RecordingQueueAdapter.new(failure: queue_error)
+    workspace = TranslationWorkspace.new(
+      valid_attributes.merge(model_ids: [ @first_model.id ])
+    )
+    baseline_transaction_depth = ActiveRecord::Base.connection.open_transactions
+    provider_factory_calls = 0
+
+    with_translation_job_boundaries(
+      adapter: adapter,
+      client_factory: -> { provider_factory_calls += 1 }
+    ) do
+      assert workspace.submit
+    end
+
+    experiment = workspace.experiment.reload
+    run = experiment.translation_runs.sole.reload
+    assert_equal [ baseline_transaction_depth ], adapter.transaction_depths
+    assert_equal [ run.scheduled_job_id ], adapter.job_ids
+    assert run.failed?
+    assert_equal "enqueue_failed", run.error_code
+    assert_equal Ai::RunScheduler::ERROR_MESSAGE, run.error_message
+    assert_not_includes run.error_message, "private queue detail"
+    assert experiment.failed?
+    assert_equal 0, provider_factory_calls
+  end
+
+  test "outer transaction performs successful enqueue only after commit" do
+    adapter = RecordingQueueAdapter.new
+    workspace = TranslationWorkspace.new(
+      valid_attributes.merge(model_ids: [ @first_model.id ])
+    )
+    baseline_transaction_depth = ActiveRecord::Base.connection.open_transactions
+    provider_factory_calls = 0
+
+    with_translation_job_boundaries(
+      adapter: adapter,
+      client_factory: -> { provider_factory_calls += 1 }
+    ) do
+      assert workspace.submit
+    end
+
+    experiment = workspace.experiment.reload
+    run = experiment.translation_runs.sole.reload
+    assert_equal [ baseline_transaction_depth ], adapter.transaction_depths
+    assert_equal [ run.scheduled_job_id ], adapter.job_ids
+    assert run.pending?
+    assert run.pending_since
+    assert experiment.running?
+    assert_equal 0, provider_factory_calls
   end
 
   test "submission without a model renders a useful error and creates nothing" do
@@ -287,5 +368,16 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
       instruction_prompt: "Translate faithfully and preserve paragraph breaks.",
       model_ids: [ @first_model.id, @second_model.id ]
     }
+  end
+
+  def with_translation_job_boundaries(adapter:, client_factory:)
+    original_adapter = TranslationRunJob.queue_adapter
+    original_client_factory = TranslationRunJob.client_factory
+    TranslationRunJob.queue_adapter = adapter
+    TranslationRunJob.client_factory = client_factory
+    yield
+  ensure
+    TranslationRunJob.queue_adapter = original_adapter
+    TranslationRunJob.client_factory = original_client_factory
   end
 end

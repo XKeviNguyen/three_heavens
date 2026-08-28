@@ -169,6 +169,20 @@
             <h3 class="font-semibold text-slate-950">Refinement from version <%= round.base_version.version_number %></h3>
             <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(round.status) %>"><%= round.status.humanize %></span>
           </div>
+          <% failed_runs = round.finalization_runs.select(&:failed?) %>
+          <% retry_valid = @final_translation.draft? && current.id == round.base_final_translation_version_id && failed_runs.all? { |run| run.finalizer_llm_model.active? && run.finalizer_llm_model.gateway == "openrouter" } %>
+          <% if failed_runs.any? %>
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+              <p><%= pluralize(failed_runs.size, "failed refinement") %>. Completed proposals remain immutable. Retrying may make another provider request and incur additional cost.</p>
+              <% if retry_valid %>
+                <%= button_to "Retry failed refinements", retry_failed_final_translation_finalization_round_path(@final_translation, round), method: :post, class: "mt-3 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+              <% elsif current.id != round.base_final_translation_version_id %>
+                <p class="mt-2 font-semibold text-amber-900">This round targets an older draft version and cannot be retried.</p>
+              <% else %>
+                <p class="mt-2 font-semibold text-amber-900">Retry is unavailable because the draft is finalized or a historical model is inactive or unsupported.</p>
+              <% end %>
+            </div>
+          <% end %>
           <div class="mt-4 space-y-4">
             <% round.finalization_runs.sort_by { |run| [run.finalizer_llm_model.display_name, run.id] }.each do |run| %>
               <section class="rounded-lg bg-slate-50 p-4">

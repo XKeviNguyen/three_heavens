@@ -1,24 +1,117 @@
-# README
+# Three Heavens
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Three Heavens is a Rails 8.1 application for authenticated, owner-scoped AI translation experiments, blind review, judge aggregation, and final translation refinement. PostgreSQL 17 is the source of truth; Solid Queue, Solid Cache, and Solid Cable use dedicated PostgreSQL databases in production.
 
-Things you may want to cover:
+## Local development
 
-* Ruby version
+Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. The included `compose.yml` runs PostgreSQL on the loopback interface. Local Rails configuration expects these environment variable names:
 
-* System dependencies
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
+- optional `DB_HOST`
+- `OPENROUTER_API_KEY` only when a person explicitly starts real AI work
 
-* Configuration
+Create and migrate the databases with:
 
-* Database creation
+```sh
+bin/rails db:prepare
+```
 
-* Database initialization
+The PostgreSQL Docker volume contains persistent development data. Never run `docker compose down -v` unless intentionally destroying that local database.
 
-* How to run the test suite
+Create or promote the first administrator without placing a password in shell history:
 
-* Services (job queues, cache servers, search engines, etc.)
+```sh
+bin/rails accounts:bootstrap_admin
+```
 
-* Deployment instructions
+The task prompts securely for the required account data.
 
-* ...
+## Recoverable AI workflows
+
+Every scheduling cycle persists the intended Active Job `job_id`, a pending timestamp, and the last claimed execution number before the job is enqueued. The first execution and strictly newer built-in retries from that same job lineage may claim; duplicate executions, different jobs, and obsolete retries from an earlier manual-recovery cycle are harmless. Every accepted claim records a new execution attempt and refreshes `last_claimed_at`; the original `started_at` remains the first-start analytics timestamp. A late result can only update the exact attempt that claimed the run.
+
+Provider-run state commits to the primary database before enqueueing against the separate queue database. The actual adapter enqueue runs inside an `after_all_transactions_commit` callback, including when a workflow service is nested inside a wider application transaction; with no open transaction, that callback runs synchronously. A definite Solid Queue enqueue failure or Active Job false result is converted to the generic `enqueue_failed` state and reconciled; unexpected programming exceptions propagate, and raw queue/database errors are never stored. Successfully queued siblings remain valid.
+
+Production schedules `StaleAiWorkReconciliationJob` every 15 minutes through Solid Queue. Pending work that has not begun, or running work without a fresh claim, for 120 minutes is marked failed with the generic `stale_pending` or `stale_execution` code and its parent is reconciled. This closes the crash window between the primary commit and queue enqueue. A delayed job arriving after recovery is obsolete and cannot issue a provider request. Set `AI_STALE_EXECUTION_THRESHOLD_MINUTES` to an operator-chosen value from 15 through 1440 minutes. This server setting is never browser input.
+
+The watchdog never issues a provider request. Owners explicitly retry failed work from the workflow page, where the additional request/cost warning is shown. Completed siblings, stable run identities, anonymous mappings, and finalization base versions are preserved.
+
+An operator can run the same bounded, idempotent reconciliation manually:
+
+```sh
+bin/rails ai:reconcile_stale
+```
+
+With `SOLID_QUEUE_IN_PUMA=true`, the production Puma process supervises Solid Queue and its recurring schedule. Larger installations should use a dedicated `bin/jobs` role while keeping exactly one deliberate recurring-job topology.
+
+## Health endpoints
+
+- `/up` is lightweight process liveness: Rails successfully booted.
+- `/ready` is web readiness: the primary database accepts a minimal `SELECT 1`.
+
+Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or exposes database errors. The primary database is the readiness contract because every authenticated web workflow depends on it, while queue/cache/cable degradation is separately visible to operators and does not necessarily make basic web serving unsafe.
+
+## Production configuration
+
+Production fails fast when its public host or database URLs are missing. Required runtime secret variable names are:
+
+- `RAILS_MASTER_KEY`
+- `DATABASE_URL`
+- `CACHE_DATABASE_URL`
+- `QUEUE_DATABASE_URL`
+- `CABLE_DATABASE_URL`
+- `OPENROUTER_API_KEY`
+
+Required non-secret runtime variable names are:
+
+- `APP_HOST`
+- optional `RAILS_LOG_LEVEL`
+- optional `RAILS_MAX_THREADS`
+- optional `JOB_CONCURRENCY`
+- optional `AI_STALE_EXECUTION_THRESHOLD_MINUTES`
+
+The four database URLs must point to distinct PostgreSQL databases or otherwise deliberately isolated databases for these roles:
+
+- primary application records and migrations;
+- Solid Cache (`db/cache_schema.rb`, migrations path `db/cache_migrate`);
+- Solid Queue (`db/queue_schema.rb`, migrations path `db/queue_migrate`);
+- Solid Cable (`db/cable_schema.rb`, migrations path `db/cable_migrate`).
+
+Production assumes TLS terminates at the trusted Kamal proxy, forces HTTPS for browser traffic, uses secure cookies and HSTS, and authorizes only `APP_HOST` for normal requests. Kamal-proxy checks the target container with its internal target-style Host, so only the lightweight `/up` liveness endpoint is excluded from Host Authorization. `/ready` remains Host-authorized. Both health endpoints may be checked directly inside the private container network without an HTTPS redirect. Do not expose PostgreSQL publicly; place it on a private network or bind any accessory port to loopback only.
+
+Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and does not require real secrets or a live database. That build-only flag must not be used for a running production server.
+
+## Kamal prerequisites
+
+`config/deploy.yml` contains no example destination and fails fast until operators supply:
+
+- `KAMAL_WEB_HOST`
+- `APP_HOST`
+- `KAMAL_IMAGE` (the repository name/path within the registry, without the registry hostname)
+- `KAMAL_REGISTRY_SERVER`
+- `KAMAL_REGISTRY_USERNAME`
+- secret `KAMAL_REGISTRY_PASSWORD`
+- every runtime secret name listed above
+
+Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
+
+## Validation
+
+The complete local quality gate is:
+
+```sh
+bin/rails db:migrate
+bin/rails db:migrate:status
+bin/rails test
+bin/rails test:system
+bin/rubocop
+bin/brakeman --no-pager
+bin/bundler-audit
+bin/importmap audit
+git diff --check
+bin/rails zeitwerk:check
+```
+
+Tests use deterministic fakes and Active Job's test adapter. They require PostgreSQL and a local Chrome/Chromium browser for system tests, but never require `OPENROUTER_API_KEY` and never make a real provider request.

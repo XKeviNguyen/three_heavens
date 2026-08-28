@@ -17,8 +17,8 @@ module TranslationExperiments
     def call
       validate_request!
 
-      runs, created_runs = create_runs
-      created_runs.each { |run| TranslationRunJob.perform_later(run.id) }
+      runs, schedules = create_runs
+      Ai::RunScheduler.enqueue_all(schedules)
       runs
     end
 
@@ -53,7 +53,7 @@ module TranslationExperiments
 
     def create_runs
       runs = []
-      created_runs = []
+      schedules = []
 
       Experiment.transaction do
         experiment.lock!
@@ -65,13 +65,15 @@ module TranslationExperiments
         llm_models.each do |llm_model|
           run = experiment.translation_runs.find_or_create_by!(llm_model: llm_model)
           runs << run
-          created_runs << run if run.previously_new_record?
+          if run.previously_new_record?
+            schedules << Ai::RunScheduler.prepare(run: run, job_class: TranslationRunJob)
+          end
         end
 
         experiment.running! if experiment.pending?
       end
 
-      [ runs, created_runs ]
+      [ runs, schedules ]
     end
   end
 end

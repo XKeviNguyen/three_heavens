@@ -110,7 +110,7 @@ class Finalizations::StartAndApplyTest < ActiveSupport::TestCase
     end
   end
 
-  test "finalized workspace rejects refinement and transaction failures roll back jobs" do
+  test "finalized workspace rejects refinement and enqueue failures become retryable failures" do
     FinalTranslations::ChangeStatus.finalize(final_translation: @final_translation)
     assert_raises FinalTranslations::InvalidStateError do
       Finalizations::Start.call(
@@ -120,21 +120,31 @@ class Finalizations::StartAndApplyTest < ActiveSupport::TestCase
     end
     FinalTranslations::ChangeStatus.reopen(final_translation: @final_translation)
 
-    failing_job = Object.new
-    failing_job.define_singleton_method(:perform_later) do |*|
-      raise ActiveRecord::StatementInvalid, "queue failed"
+    failing_job = Class.new do
+      attr_reader :job_id
+
+      def initialize(*)
+        @job_id = SecureRandom.uuid
+      end
+
+      def enqueue
+        raise SolidQueue::Job::EnqueueError, "private queue database detail"
+      end
     end
     assert_no_enqueued_jobs only: FinalizationRunJob do
-      error = assert_raises ActiveRecord::StatementInvalid do
-        Finalizations::Start.new(
-          final_translation: @final_translation,
-          finalizer_ids: [ @finalizers.first.id ],
-          job_class: failing_job
-        ).call
-      end
-      assert_equal "queue failed", error.message
+      round = Finalizations::Start.new(
+        final_translation: @final_translation,
+        finalizer_ids: [ @finalizers.first.id ],
+        job_class: failing_job
+      ).call
+      run = round.finalization_runs.first
+
+      assert round.reload.failed?
+      assert run.reload.failed?
+      assert_equal "enqueue_failed", run.error_code
+      assert_equal Ai::RunScheduler::ERROR_MESSAGE, run.error_message
+      assert_not_includes run.error_message, "private queue database detail"
     end
-    assert_empty @final_translation.finalization_rounds.reload
   end
 
   test "applies completed proposal explicitly as one audited immutable version" do

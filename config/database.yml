@@ -12,18 +12,30 @@
 # Configure Using Gemfile
 # gem "pg"
 #
+<%
+  local_database_credential = lambda do |name|
+    if ENV.fetch("RAILS_ENV", "development") == "production"
+      ENV.fetch(name, "unused-in-production")
+    else
+      ENV.fetch(name)
+    end
+  end
+%>
 default: &default
   adapter: postgresql
   encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+local: &local
+  <<: *default
   host: <%= ENV.fetch("DB_HOST", "127.0.0.1") %>
   port: <%= ENV.fetch("POSTGRES_PORT", 5432) %>
-  username: <%= ENV.fetch("POSTGRES_USER") %>
-  password: <%= ENV.fetch("POSTGRES_PASSWORD") %>
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  username: <%= local_database_credential.call("POSTGRES_USER") %>
+  password: <%= local_database_credential.call("POSTGRES_PASSWORD") %>
 
 
 development:
-  <<: *default
+  <<: *local
   database: three_heavens_development
 
   # The specified database role being used to connect to PostgreSQL.
@@ -57,7 +69,7 @@ development:
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
-  <<: *default
+  <<: *local
   database: three_heavens_test
 
 # As with config/credentials.yml, you never want to store sensitive information,
@@ -86,21 +98,29 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
+<%
+  production_runtime = ENV.fetch("RAILS_ENV", "development") == "production" && ENV["SECRET_KEY_BASE_DUMMY"].blank?
+  production_database_url = lambda do |name|
+    if production_runtime
+      ENV.fetch(name)
+    else
+      ENV.fetch(name, "postgresql://localhost/three_heavens_build")
+    end
+  end
+%>
 production:
-  primary: &primary_production
+  primary:
     <<: *default
-    database: three_heavens_production
-    username: three_heavens
-    password: <%= ENV["THREE_HEAVENS_DATABASE_PASSWORD"] %>
+    url: <%= production_database_url.call("DATABASE_URL") %>
   cache:
-    <<: *primary_production
-    database: three_heavens_production_cache
+    <<: *default
+    url: <%= production_database_url.call("CACHE_DATABASE_URL") %>
     migrations_paths: db/cache_migrate
   queue:
-    <<: *primary_production
-    database: three_heavens_production_queue
+    <<: *default
+    url: <%= production_database_url.call("QUEUE_DATABASE_URL") %>
     migrations_paths: db/queue_migrate
   cable:
-    <<: *primary_production
-    database: three_heavens_production_cable
+    <<: *default
+    url: <%= production_database_url.call("CABLE_DATABASE_URL") %>
     migrations_paths: db/cable_migrate

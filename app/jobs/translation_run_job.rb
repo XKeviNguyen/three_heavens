@@ -1,6 +1,9 @@
 class TranslationRunJob < ApplicationJob
+  include Ai::RetryEnqueueGuard
+
   queue_as :default
   self.enqueue_after_transaction_commit = true
+  self.ai_run_class = TranslationRun
 
   class_attribute :client_factory,
                   instance_writer: false,
@@ -9,12 +12,23 @@ class TranslationRunJob < ApplicationJob
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
            attempts: 5 do |job, error|
-    job.send(:persist_failure_by_id, error)
+    job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 
   def perform(translation_run_id)
     translation_run = TranslationRun.find(translation_run_id)
-    return unless claim(translation_run)
+    claim = Ai::ExecutionClaim.call(
+      translation_run,
+      active_job_id: job_id,
+      active_job_execution: executions
+    )
+    if claim.state == :terminal
+      TranslationExperiments::ReconcileExperiment.call(translation_run.experiment)
+      return
+    end
+    return unless claim.state == :claimed
+
+    @claimed_attempt = claim.attempt
 
     result = client_for(translation_run.llm_model).chat_completion(
       model_identifier: translation_run.llm_model.model_identifier,
@@ -22,46 +36,33 @@ class TranslationRunJob < ApplicationJob
       source_text: translation_run.experiment.document.source_text
     )
 
-    persist_success(translation_run, result)
+    persist_success(translation_run, result, @claimed_attempt)
   rescue Ai::OpenRouterClient::RetryableError
     raise
   rescue Ai::OpenRouterClient::PermanentError => error
-    persist_failure(translation_run, error) if translation_run
+    persist_failure(translation_run, error, @claimed_attempt) if translation_run
   end
 
   private
 
-  def claim(translation_run)
-    translation_run.with_lock do
-      return false if translation_run.terminal?
-      return false if translation_run.running? && executions <= 1
-
-      translation_run.update!(
-        status: :running,
-        started_at: translation_run.started_at || Time.current,
-        completed_at: nil,
-        error_code: nil,
-        error_message: nil
-      )
-    end
-
-    true
+  def claimed_attempt
+    @claimed_attempt
   end
 
   def client_for(llm_model)
-    unless llm_model.gateway == "openrouter"
+    unless llm_model.active? && llm_model.gateway == "openrouter"
       raise Ai::OpenRouterClient::PermanentError.new(
-        "Unsupported AI gateway: #{llm_model.gateway}",
-        code: "unsupported_gateway"
+        "The historical model is inactive or unsupported",
+        code: "model_unavailable"
       )
     end
 
     client_factory.call
   end
 
-  def persist_success(translation_run, result)
+  def persist_success(translation_run, result, attempt)
     translation_run.with_lock do
-      return if translation_run.terminal?
+      return unless translation_run.running? && translation_run.execution_attempt == attempt
 
       translation_run.update!(
         status: :completed,
@@ -80,37 +81,17 @@ class TranslationRunJob < ApplicationJob
       )
     end
 
-    update_experiment_status(translation_run.experiment)
+    TranslationExperiments::ReconcileExperiment.call(translation_run.experiment)
   end
 
-  def persist_failure_by_id(error)
+  def persist_failure_by_id(error, attempt)
     translation_run_id = arguments.first
     translation_run = TranslationRun.find_by(id: translation_run_id)
-    persist_failure(translation_run, error) if translation_run
+    persist_failure(translation_run, error, attempt) if translation_run
   end
 
-  def persist_failure(translation_run, error)
-    translation_run.with_lock do
-      return if translation_run.completed?
-
-      translation_run.update!(
-        status: :failed,
-        completed_at: Time.current,
-        error_code: error.code.to_s.first(255),
-        error_message: Ai::ErrorSanitizer.call(error.message)
-      )
-    end
-
-    update_experiment_status(translation_run.experiment)
-  end
-
-  def update_experiment_status(experiment)
-    experiment.with_lock do
-      translation_runs = experiment.translation_runs.reload
-      return if translation_runs.empty? || translation_runs.any? { |run| !run.terminal? }
-
-      status = translation_runs.any?(&:failed?) ? :failed : :completed
-      experiment.update!(status: status)
-    end
+  def persist_failure(translation_run, error, attempt)
+    persisted = Ai::RunResult.persist_failure(translation_run, error: error, attempt: attempt)
+    TranslationExperiments::ReconcileExperiment.call(translation_run.experiment) if persisted
   end
 end

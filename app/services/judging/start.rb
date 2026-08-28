@@ -21,7 +21,7 @@ module Judging
       validate_review_round!
       judges = resolve_judges!
 
-      JudgeRound.transaction do
+      judge_round, schedules = JudgeRound.transaction do
         review_round.experiment.lock!
         review_round.lock!
         validate_eligibility!
@@ -31,11 +31,13 @@ module Judging
         review_round.association(:judge_round).reset
 
         if review_round.judge_round
-          return existing_round_for!(judges)
+          [ existing_round_for!(judges), [] ]
+        else
+          create_round!(judges, candidates)
         end
-
-        create_round!(judges, candidates)
       end
+      Ai::RunScheduler.enqueue_all(schedules)
+      judge_round
     end
 
     private
@@ -115,6 +117,7 @@ module Judging
 
     def create_round!(judges, candidates)
       judge_round = review_round.create_judge_round!(status: :running)
+      schedules = []
 
       judges.each do |judge|
         judge_run = judge_round.judge_runs.create!(judge_llm_model: judge)
@@ -124,10 +127,10 @@ module Judging
             anonymous_label: BlindReviews::CandidateLabel.for(index)
           )
         end
-        JudgeRunJob.perform_later(judge_run.id)
+        schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob)
       end
 
-      judge_round
+      [ judge_round, schedules ]
     end
 
     def randomized_candidates(candidates)

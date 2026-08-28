@@ -34,6 +34,7 @@
               <%= link_to "Benchmarks", benchmarks_path, class: "text-slate-600 hover:text-slate-950" %>
               <% if current_user.admin? %>
                 <%= link_to "Settings / Models", settings_models_path, class: "text-slate-600 hover:text-slate-950" %>
+                <%= link_to "Operations", settings_operations_path, class: "text-slate-600 hover:text-slate-950" %>
               <% end %>
               <%= link_to "New experiment", new_translation_workspace_path, class: "text-blue-700 hover:text-blue-900" %>
             </nav>

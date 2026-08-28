@@ -1,6 +1,9 @@
 class FinalizationRunJob < ApplicationJob
+  include Ai::RetryEnqueueGuard
+
   queue_as :default
   self.enqueue_after_transaction_commit = true
+  self.ai_run_class = FinalizationRun
 
   class_attribute :client_factory,
                   instance_writer: false,
@@ -9,18 +12,24 @@ class FinalizationRunJob < ApplicationJob
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
            attempts: 5 do |job, error|
-    job.send(:persist_failure_by_id, error)
+    job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 
   def perform(finalization_run_id)
     finalization_run = FinalizationRun.find(finalization_run_id)
-    claim_result = claim(finalization_run)
+    claim_result = Ai::ExecutionClaim.call(
+      finalization_run,
+      active_job_id: job_id,
+      active_job_execution: executions
+    )
 
-    if claim_result == :terminal
+    if claim_result.state == :terminal
       Finalizations::ReconcileRound.call(finalization_run.finalization_round)
       return
     end
-    return if claim_result == :duplicate_running
+    return unless claim_result.state == :claimed
+
+    @claimed_attempt = claim_result.attempt
 
     prompt = Finalizations::Prompt.build(finalization_run)
     result = client_for(finalization_run.finalizer_llm_model).finalization_completion(
@@ -28,44 +37,32 @@ class FinalizationRunJob < ApplicationJob
       **prompt
     )
     proposal = Finalizations::ResponseValidator.call(content: result.content)
-    persist_success(finalization_run, result, proposal)
+    persist_success(finalization_run, result, proposal, @claimed_attempt)
   rescue Ai::OpenRouterClient::RetryableError
     raise
   rescue Ai::OpenRouterClient::PermanentError => error
-    persist_failure(finalization_run, error) if finalization_run
+    persist_failure(finalization_run, error, @claimed_attempt) if finalization_run
   end
 
   private
 
-  def claim(finalization_run)
-    finalization_run.with_lock do
-      return :terminal if finalization_run.terminal?
-      return :duplicate_running if finalization_run.running? && executions <= 1
-
-      finalization_run.update!(
-        status: :running,
-        started_at: finalization_run.started_at || Time.current,
-        completed_at: nil,
-        error_code: nil,
-        error_message: nil
-      )
-    end
-    :claimed
+  def claimed_attempt
+    @claimed_attempt
   end
 
   def client_for(llm_model)
-    unless llm_model.gateway == "openrouter"
+    unless llm_model.active? && llm_model.gateway == "openrouter"
       raise Ai::OpenRouterClient::PermanentError.new(
-        "Unsupported AI gateway: #{llm_model.gateway}",
-        code: "unsupported_gateway"
+        "The historical model is inactive or unsupported",
+        code: "model_unavailable"
       )
     end
     client_factory.call
   end
 
-  def persist_success(finalization_run, result, proposal)
+  def persist_success(finalization_run, result, proposal, attempt)
     finalization_run.with_lock do
-      return if finalization_run.terminal?
+      return unless finalization_run.running? && finalization_run.execution_attempt == attempt
 
       finalization_run.update!(
         status: :completed,
@@ -89,22 +86,13 @@ class FinalizationRunJob < ApplicationJob
     Finalizations::ReconcileRound.call(finalization_run.finalization_round)
   end
 
-  def persist_failure_by_id(error)
+  def persist_failure_by_id(error, attempt)
     finalization_run = FinalizationRun.find_by(id: arguments.first)
-    persist_failure(finalization_run, error) if finalization_run
+    persist_failure(finalization_run, error, attempt) if finalization_run
   end
 
-  def persist_failure(finalization_run, error)
-    finalization_run.with_lock do
-      return if finalization_run.terminal?
-
-      finalization_run.update!(
-        status: :failed,
-        completed_at: Time.current,
-        error_code: error.code.to_s.first(255),
-        error_message: Ai::ErrorSanitizer.call(error.message)
-      )
-    end
-    Finalizations::ReconcileRound.call(finalization_run.finalization_round)
+  def persist_failure(finalization_run, error, attempt)
+    persisted = Ai::RunResult.persist_failure(finalization_run, error: error, attempt: attempt)
+    Finalizations::ReconcileRound.call(finalization_run.finalization_round) if persisted
   end
 end

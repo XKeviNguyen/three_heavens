@@ -32,7 +32,7 @@ class ApplicationController < ActionController::Base
   def require_admin
     return if current_user&.admin?
 
-    redirect_to root_path, alert: "You are not authorized to manage the model catalog."
+    redirect_to root_path, alert: "You are not authorized to access administration settings."
   end
 
   def start_authenticated_session!(user)

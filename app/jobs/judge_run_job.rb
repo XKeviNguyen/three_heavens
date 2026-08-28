@@ -1,6 +1,9 @@
 class JudgeRunJob < ApplicationJob
+  include Ai::RetryEnqueueGuard
+
   queue_as :default
   self.enqueue_after_transaction_commit = true
+  self.ai_run_class = JudgeRun
 
   class_attribute :client_factory,
                   instance_writer: false,
@@ -9,18 +12,24 @@ class JudgeRunJob < ApplicationJob
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
            attempts: 5 do |job, error|
-    job.send(:persist_failure_by_id, error)
+    job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 
   def perform(judge_run_id)
     judge_run = JudgeRun.find(judge_run_id)
-    claim_result = claim(judge_run)
+    claim_result = Ai::ExecutionClaim.call(
+      judge_run,
+      active_job_id: job_id,
+      active_job_execution: executions
+    )
 
-    if claim_result == :terminal
+    if claim_result.state == :terminal
       Judging::ReconcileRound.call(judge_run.judge_round)
       return
     end
-    return if claim_result == :duplicate_running
+    return unless claim_result.state == :claimed
+
+    @claimed_attempt = claim_result.attempt
 
     prompt = Judging::Prompt.build(judge_run)
     result = client_for(judge_run.judge_llm_model).judge_completion(
@@ -32,47 +41,34 @@ class JudgeRunJob < ApplicationJob
       expected_labels: judge_run.judge_evaluations.pluck(:anonymous_label)
     )
 
-    persist_success(judge_run, result, evaluation)
+    persist_success(judge_run, result, evaluation, @claimed_attempt)
   rescue Ai::OpenRouterClient::RetryableError
     raise
   rescue Ai::OpenRouterClient::PermanentError => error
-    persist_failure(judge_run, error) if judge_run
+    persist_failure(judge_run, error, @claimed_attempt) if judge_run
   end
 
   private
 
-  def claim(judge_run)
-    judge_run.with_lock do
-      return :terminal if judge_run.terminal?
-      return :duplicate_running if judge_run.running? && executions <= 1
-
-      judge_run.update!(
-        status: :running,
-        started_at: judge_run.started_at || Time.current,
-        completed_at: nil,
-        error_code: nil,
-        error_message: nil
-      )
-    end
-
-    :claimed
+  def claimed_attempt
+    @claimed_attempt
   end
 
   def client_for(llm_model)
-    unless llm_model.gateway == "openrouter"
+    unless llm_model.active? && llm_model.gateway == "openrouter"
       raise Ai::OpenRouterClient::PermanentError.new(
-        "Unsupported AI gateway: #{llm_model.gateway}",
-        code: "unsupported_gateway"
+        "The historical model is inactive or unsupported",
+        code: "model_unavailable"
       )
     end
 
     client_factory.call
   end
 
-  def persist_success(judge_run, result, evaluation)
+  def persist_success(judge_run, result, evaluation, attempt)
     JudgeRun.transaction do
       judge_run.lock!
-      return if judge_run.terminal?
+      return unless judge_run.running? && judge_run.execution_attempt == attempt
 
       stored_by_label = judge_run.judge_evaluations.lock.index_by(&:anonymous_label)
       evaluation.fetch("rankings").each do |ranking|
@@ -102,23 +98,13 @@ class JudgeRunJob < ApplicationJob
     Judging::ReconcileRound.call(judge_run.judge_round)
   end
 
-  def persist_failure_by_id(error)
+  def persist_failure_by_id(error, attempt)
     judge_run = JudgeRun.find_by(id: arguments.first)
-    persist_failure(judge_run, error) if judge_run
+    persist_failure(judge_run, error, attempt) if judge_run
   end
 
-  def persist_failure(judge_run, error)
-    judge_run.with_lock do
-      return if judge_run.completed?
-
-      judge_run.update!(
-        status: :failed,
-        completed_at: Time.current,
-        error_code: error.code.to_s.first(255),
-        error_message: Ai::ErrorSanitizer.call(error.message)
-      )
-    end
-
-    Judging::ReconcileRound.call(judge_run.judge_round)
+  def persist_failure(judge_run, error, attempt)
+    persisted = Ai::RunResult.persist_failure(judge_run, error: error, attempt: attempt)
+    Judging::ReconcileRound.call(judge_run.judge_round) if persisted
   end
 end
