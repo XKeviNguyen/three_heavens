@@ -16,6 +16,8 @@ servers:
 proxy:
   ssl: true
   host: <%= app_host %>
+  buffering:
+    max_request_body: 12_582_912
   healthcheck:
     path: /up
 

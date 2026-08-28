@@ -36,7 +36,7 @@ class OwnershipAuthorizationTest < ActionDispatch::IntegrationTest
       review_round_path(review_round),
       judge_round_path(judge_round),
       final_translation_path(@own_final_translation),
-      download_final_translation_path(@own_final_translation)
+      download_final_translation_path(@own_final_translation, format: :txt)
     ].each do |path|
       get path
       assert_response :success
@@ -53,7 +53,7 @@ class OwnershipAuthorizationTest < ActionDispatch::IntegrationTest
       review_round_path(review_round),
       judge_round_path(judge_round),
       final_translation_path(@foreign_final_translation),
-      download_final_translation_path(@foreign_final_translation)
+      download_final_translation_path(@foreign_final_translation, format: :docx)
     ].each do |path|
       get path
       assert_response :not_found

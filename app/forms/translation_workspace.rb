@@ -7,6 +7,8 @@ class TranslationWorkspace
                 :target_language,
                 :document_title,
                 :source_text,
+                :source_import,
+                :source_import_id,
                 :experiment_name,
                 :instruction_prompt,
                 :model_ids
@@ -15,11 +17,14 @@ class TranslationWorkspace
 
   validate :validate_workspace_records
   validate :validate_model_selection
+  validate :validate_source_import
 
-  def initialize(attributes = {}, start_service: TranslationExperiments::Start)
+  def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current })
     @start_service = start_service
+    @clock = clock
     super(attributes)
     self.model_ids = [] if model_ids.nil?
+    self.source_import_id ||= source_import&.id
   end
 
   def submit
@@ -27,8 +32,13 @@ class TranslationWorkspace
 
     ActiveRecord::Base.transaction do
       project.save!
+      locked_import = lock_source_import
+      if locked_import
+        SourceImports::Consume.apply!(source_import: locked_import, document: document, at: current_time)
+      end
       document.save!
       experiment.save!
+      SourceImports::Consume.finish!(source_import: locked_import, document: document) if locked_import
       @start_service.call(
         experiment: experiment,
         llm_models: @llm_models
@@ -37,7 +47,12 @@ class TranslationWorkspace
 
     true
   rescue ActiveRecord::RecordInvalid,
-         TranslationExperiments::Start::Error
+         TranslationExperiments::Start::Error,
+         SourceImports::Error => error
+    if error.is_a?(SourceImports::Error)
+      errors.add(:source_import_id, error.message)
+      return false
+    end
     errors.add(:base, "The translation experiment could not be started. Please review the form and try again.")
     false
   end
@@ -104,5 +119,25 @@ class TranslationWorkspace
     errors.add(:model_ids, "contain an inactive or unsupported model")
   rescue Ai::UsageLimits::InvalidSelection => error
     errors.add(:model_ids, error.message)
+  end
+
+  def validate_source_import
+    return if source_import_id.blank?
+
+    if source_import.nil? || source_import.user_id != user&.id
+      errors.add(:source_import_id, "is not available")
+    elsif !source_import.available?(at: current_time)
+      errors.add(:source_import_id, "is no longer available")
+    end
+  end
+
+  def lock_source_import
+    return if source_import_id.blank?
+
+    user.source_imports.lock.find(source_import_id)
+  end
+
+  def current_time
+    @clock.call
   end
 end

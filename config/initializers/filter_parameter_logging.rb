@@ -5,6 +5,7 @@
 # See the ActiveSupport::ParameterFilter documentation for supported notations and behaviors.
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc,
-  :source_text, :instruction_prompt, :translated_text, :suggested_translation, :proposed_translation,
+  :source_text, :extracted_text, :preview_text, :source_file, :instruction_prompt,
+  :translated_text, :translation_text, :suggested_translation, :proposed_translation,
   "final_translation.content", "final_translation.change_note"
 ]

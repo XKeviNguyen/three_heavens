@@ -7,6 +7,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     ).filter(
       "password" => "password-value",
       "source_text" => "source-value",
+      "extracted_text" => "extracted-value",
+      "preview_text" => "preview-value",
+      "source_file" => "binary-value",
       "instruction_prompt" => "instruction-value",
       "final_translation" => {
         "content" => "final-value",
@@ -17,6 +20,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
 
     assert_equal "[FILTERED]", filtered["password"]
     assert_equal "[FILTERED]", filtered["source_text"]
+    assert_equal "[FILTERED]", filtered["extracted_text"]
+    assert_equal "[FILTERED]", filtered["preview_text"]
+    assert_equal "[FILTERED]", filtered["source_file"]
     assert_equal "[FILTERED]", filtered["instruction_prompt"]
     assert_equal "[FILTERED]", filtered.dig("final_translation", "content")
     assert_equal "[FILTERED]", filtered.dig("final_translation", "change_note")

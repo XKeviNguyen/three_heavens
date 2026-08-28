@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/final_translation_test_helper"
+require_relative "../support/document_io_test_helper"
 
 class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
   include FinalTranslationTestHelper
+  include DocumentIoTestHelper
 
   setup do
     sign_in_as users(:normal)
@@ -196,28 +198,54 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_equal version_count, @final_translation.versions.count
   end
 
-  test "download is UTF-8 plain text with a safe deterministic attachment filename" do
+  test "TXT download preserves UTF-8 with a sanitized state-aware attachment filename" do
     unicode = "Bản dịch cuối cùng — 神学"
+    @final_translation.experiment.document.update!(title: "Sermon\r\nunsafe")
     FinalTranslations::SaveRevision.call(
       final_translation: @final_translation,
       content: unicode,
       expected_version_number: 1
     )
 
-    get download_final_translation_path(@final_translation)
+    get download_final_translation_path(@final_translation, format: :txt)
 
     assert_response :success
     assert_equal unicode, response.body.force_encoding(Encoding::UTF_8)
     assert_match(%r{\Atext/plain}, response.media_type)
     assert_includes response.headers.fetch("Content-Disposition"),
-                    "three-heavens-final-translation-#{@final_translation.id}.txt"
-    assert_not_includes response.headers.fetch("Content-Disposition"),
-                        @final_translation.experiment.document.title
+                    "Sermonunsafe-draft.txt"
+    refute_match(/[\r\n]/, response.headers.fetch("Content-Disposition"))
 
     FinalTranslations::ChangeStatus.finalize(final_translation: @final_translation)
-    get download_final_translation_path(@final_translation)
+    get download_final_translation_path(@final_translation, format: :txt)
     assert_response :success
     assert_equal unicode, response.body.force_encoding(Encoding::UTF_8)
+    assert_includes response.headers.fetch("Content-Disposition"), "Sermonunsafe-final.txt"
+  end
+
+  test "DOCX download is valid macro-free OOXML and round trips current Unicode" do
+    unicode = "神は愛です & <truth>\nĐức Chúa Trời — tình yêu"
+    FinalTranslations::SaveRevision.call(
+      final_translation: @final_translation,
+      content: unicode,
+      expected_version_number: 1
+    )
+
+    get download_final_translation_path(@final_translation, format: :docx)
+
+    assert_response :success
+    assert_equal DocumentExports::Docx::CONTENT_TYPE, response.media_type
+    assert_includes response.headers.fetch("Content-Disposition"), ".docx"
+    assert_equal unicode, SourceImports::TextExtractor.call(format: "docx", bytes: response.body.b)
+    Zip::File.open_buffer(StringIO.new(response.body.b)) do |archive|
+      assert_not archive.entries.any? { |entry| entry.name.downcase.include?("vbaproject") }
+    end
+  end
+
+  test "unsupported export format is controlled" do
+    get download_final_translation_path(@final_translation, format: :html)
+
+    assert_response :not_acceptable
   end
 
   test "history links to the final translation and reports lifecycle" do

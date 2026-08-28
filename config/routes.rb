@@ -21,6 +21,12 @@ Rails.application.routes.draw do
   end
 
   resource :translation_workspace, only: %i[new create]
+  resources :source_imports, only: %i[new create destroy]
+  resources :documents, only: [] do
+    member do
+      get :download_original
+    end
+  end
   resources :experiments, only: :show do
     member do
       post :retry_failed
