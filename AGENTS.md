@@ -50,12 +50,13 @@ For each assigned implementation task, Codex is authorized by default to:
 - write or update the Pull Request title and description, inspect its status and
   GitHub Actions logs, and diagnose failures;
 - fix task-caused implementation or CI failures, validate, commit, and push
-  corrective changes until all required checks pass;
-- after verifying the base is exactly `develop`, merge the green Pull Request
-  using the repository's normal non-force merge strategy and delete its remote
-  task branch;
+  corrective changes until the explicit CI gates below pass;
+- merge a normal task Pull Request only after its base, final head commit, and
+  explicit Pull Request CI gate have been verified;
+- after merging, verify the resulting `develop` head and its push-triggered CI
+  gate before deleting either temporary task branch;
 - switch back to `develop`, fetch/prune, fast-forward it, delete the merged local
-  task branch, verify the final state, and report the integration result.
+  task branch, verify the final green integration state, and report the result.
 
 The default lifecycle is one assigned mega-task, one focused task branch, and
 one Pull Request to `develop`. Tightly related subcomponents may share that
@@ -63,7 +64,48 @@ branch when they form one coherent architecture or product milestone.
 Corrective commits remain on the same branch and Pull Request. Do not create
 unrelated branches or begin the next product feature before the current Pull
 Request is integrated. Stop after completing the assigned integration
-milestone.
+milestone. The only exception is a focused corrective branch and Pull Request
+needed to restore a task-caused post-merge `develop` CI failure as described
+below; it remains part of the same integration milestone.
+
+### Explicit Pull Request CI merge gate
+
+Before Codex merges **any** normal task Pull Request into `develop`, Codex must
+verify all of the following for the Pull Request's final head commit SHA:
+
+1. The Pull Request base is exactly `develop`.
+2. Each of these five GitHub Actions jobs exists for that exact final head SHA:
+   `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`.
+3. Each of those five jobs has completed with an explicit `success` conclusion.
+
+This gate applies regardless of whether GitHub reports any checks as formally
+required or whether branch protection/rulesets are enforced. “No required checks
+configured” never permits a merge. An overall workflow badge, a result for an
+earlier commit, or a stale check is not sufficient evidence.
+
+Codex must not merge when any expected job is absent or has a status or
+conclusion of `queued`, `pending`, `in_progress`, `cancelled`, `skipped`,
+`timed_out`, `action_required`, `failure`, or anything other than explicit
+`success`. Only explicit success for all five named jobs permits autonomous merge
+into `develop`. Do not weaken CI to satisfy this gate.
+
+### Post-merge `develop` CI gate
+
+A task is not fully integrated merely because its Pull Request checks passed.
+After merging, Codex must identify the resulting `origin/develop` HEAD (the merge
+or integration commit SHA), wait for the push-triggered CI workflow for that
+exact SHA, and verify that `scan_ruby`, `scan_js`, `lint`, `test`, and
+`system-test` all exist and complete with explicit `success` conclusions.
+
+The final integration invariant is a green `origin/develop` HEAD. If its
+post-merge CI is absent, unfinished, or non-successful, do not touch `main` or
+begin unrelated feature work. Inspect the actual failure. If the just-integrated
+task caused it, create a focused corrective branch from current `develop`, fix,
+validate, commit, push, open a Pull Request back to `develop`, satisfy the exact
+five-job Pull Request gate, merge it, and repeat this post-merge verification.
+For a pre-existing or external failure, do not alter unrelated work. If it cannot
+safely be corrected within scope, preserve the state, stop, and report `develop`
+as unhealthy rather than claiming completion.
 
 Before editing, review `git status --short` and preserve all pre-existing or
 unrelated changes. Never use destructive Git commands to remove local work.
@@ -106,12 +148,12 @@ work that would have to be overwritten. Preserve state and report the blocker
 precisely.
 
 Codex owns failures caused by the task. After opening the Pull Request, inspect
-required checks and their actual logs; classify failures as task-caused,
+the exact job-level results and actual logs; classify failures as task-caused,
 pre-existing, or external/environmental. Fix task-caused failures, rerun relevant
-local validation, commit, push, and re-check CI until it is green. Never make CI
-green by weakening a quality gate: do not ignore scanner failures, disable jobs,
-remove legitimate tests, skip system tests, add `continue-on-error`, or suppress
-valid findings instead of correcting them.
+local validation, commit, push, and re-check the explicit CI gates until they are
+green. Never make CI green by weakening a quality gate: do not ignore scanner
+failures, disable jobs, remove legitimate tests, skip system tests, add
+`continue-on-error`, or suppress valid findings instead of correcting them.
 
 ## Secrets and secure development
 
@@ -193,15 +235,18 @@ valid findings instead of correcting them.
 
 ## Validation and quality gate
 
-Before declaring a coding task complete, run all of the following from the
-repository root:
+Before declaring a normal coding mega-task complete, run the complete local
+quality gate from the repository root:
 
 ```sh
 bin/rails test
+bin/rails test:system
 bin/rubocop
 bin/brakeman --no-pager
 bin/bundler-audit
+bin/importmap audit
 git diff --check
+bin/rails zeitwerk:check
 ```
 
 If the task creates one or more migrations, also run:
@@ -221,60 +266,20 @@ bin/rails db:migrate:status
 - A direct user instruction may add or narrow checks for a non-coding task; make
   that task-specific validation explicit in the final report.
 
-## Required review handoff
+## Terminal task report
 
-After every completed implementation task, automatically create two review
-files outside the Git repository under `~/Downloads`. Derive a filesystem-safe
-slug from the current branch by replacing path separators and unsafe characters
-with underscores.
+GitHub is the authoritative review artifact. Do not generate mandatory review
+or changes files in `~/Downloads`, and do not dump giant unified diffs there.
 
-Create exactly:
+After every completed task, provide a concise terminal report containing:
 
-1. `three_heavens_<branch_slug>_review.md`
-2. `three_heavens_<branch_slug>_changes.md`
-
-The review file must include:
-
-- current branch
-- scope
-- architecture summary
-- important design decisions
-- files created/modified
-- migrations/schema changes
-- security decisions
-- external API behavior when relevant
-- background jobs when relevant
-- retry/error handling when relevant
-- tests added/modified
-- exact quality-gate results
-- `git status --short`
-- `git diff --stat`
-- concerns
-- tradeoffs
-- assumptions
-- deferred follow-ups
-- manual smoke-test instructions when relevant
-- explicit confirmation whether `.env` or secrets were touched
-
-The changes file must include:
-
-- unified diffs for tracked, modified files relevant to the task
-- full contents of relevant newly created or untracked source files
-- full contents of new migrations
-- full contents of new tests
-
-Never include any of the following in either review file:
-
-- `.env` contents
-- credentials, API keys, tokens, passwords, or private keys
-- logs
-- `tmp` or cache files
-- vendor or dependency directories
-- irrelevant generated artifacts
-
-If secret-like content is unexpectedly encountered while generating the review
-files, redact it instead of copying it. Include only task-relevant changes; do
-not include unrelated worktree changes in the changes file.
-
-At the end of every completed task, print the exact absolute paths to both
-review files so the user can upload them to ChatGPT for independent review.
+- task summary;
+- task branch, Pull Request number and URL, and commits;
+- merge commit or final `develop` SHA;
+- migrations and important architecture or security decisions;
+- exact results for `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`
+  on both the final Pull Request head and the post-merge `develop` push;
+- remaining concerns and deferred follow-ups;
+- confirmation that `main` was not modified, `.env` was not inspected, no
+  unauthorized provider request occurred, and no persistent data or volume was
+  destroyed.
