@@ -50,8 +50,15 @@
             </div>
           </dl>
 
+          <% if experiment.pipeline_run %>
+            <p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900"><span class="font-semibold">Automatic pipeline</span> · <%= experiment.pipeline_run.workflow_profile_revision.name %> · revision <%= experiment.pipeline_run.workflow_profile_revision.version %> · <%= experiment.pipeline_run.completion_mode.humanize %> · <%= experiment.pipeline_run.status.humanize %></p>
+          <% else %>
+            <p class="mt-4 text-sm text-slate-500"><span class="font-semibold">Manual workflow</span></p>
+          <% end %>
+
           <div class="mt-5 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
             <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
+            <% if experiment.pipeline_run %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
             <% if review_round %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
             <% if judge_round %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
             <% if experiment.final_translation %><%= link_to "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>

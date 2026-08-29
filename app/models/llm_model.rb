@@ -18,6 +18,7 @@ class LlmModel < ApplicationRecord
            foreign_key: :finalizer_llm_model_id,
            inverse_of: :finalizer_llm_model,
            dependent: :restrict_with_error
+  has_many :workflow_profile_model_selections, dependent: :restrict_with_error
 
   scope :active_openrouter, -> { where(active: true, gateway: "openrouter") }
 

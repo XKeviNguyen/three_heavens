@@ -1,12 +1,17 @@
 module BlindReviews
   class ReconcileRound
     def self.call(review_round)
+      changed = false
       review_round.with_lock do
         review_runs = review_round.review_runs.lock.reload
         status = aggregate_status(review_runs)
-        review_round.update!(status: status) unless review_round.status == status.to_s
+        unless review_round.status == status.to_s
+          review_round.update!(status: status)
+          changed = true
+        end
       end
 
+      Pipelines::AdvancementScheduler.enqueue_for(review_round.experiment) if changed
       review_round
     end
 

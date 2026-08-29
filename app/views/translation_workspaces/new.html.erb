@@ -84,7 +84,36 @@
     </section>
 
     <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <legend class="px-1 text-lg font-semibold text-slate-950">OpenRouter models</legend>
+      <legend class="px-1 text-lg font-semibold text-slate-950">Workflow mode</legend>
+      <p class="mt-1 text-sm text-slate-600">Manual keeps every later stage under separate controls. Automatic uses one immutable profile and progresses only through its authorized initial provider work.</p>
+      <div class="mt-4 grid gap-3 md:grid-cols-2">
+        <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :workflow_mode, "manual", checked: @translation_workspace.workflow_mode == "manual" %> <span class="ml-2 font-semibold">Manual workflow</span><span class="mt-1 block text-sm text-slate-600">Select translators below and start later stages yourself.</span></label>
+        <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :workflow_mode, "automatic", checked: @translation_workspace.workflow_mode == "automatic" %> <span class="ml-2 font-semibold">Automatic pipeline</span><span class="mt-1 block text-sm text-slate-600">Select an exact profile revision and authorize its configured stages.</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <legend class="px-1 text-lg font-semibold text-slate-950">Automatic pipeline profile</legend>
+      <% if @workflow_profiles.any? %>
+        <div class="mt-4 space-y-3">
+          <% @workflow_profiles.each do |profile| %>
+            <% revision = profile.current_revision %>
+            <label class="block rounded-lg border border-slate-200 p-4">
+              <span class="flex items-start gap-3"><%= form.radio_button :workflow_profile_revision_id, revision.id, checked: @translation_workspace.workflow_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-1 block text-sm text-slate-600"><%= revision.completion_mode.humanize %> · <%= revision.role_count("translator") %> translators · <%= revision.role_count("reviewer") %> reviewers · <%= revision.role_count("judge") %> judges · <%= revision.role_count("finalizer") %> finalizers = <%= revision.authorized_initial_provider_run_count %> initial provider run slots</span></span></span>
+            </label>
+          <% end %>
+        </div>
+        <label class="mt-5 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <%= form.check_box :automatic_confirmation, { checked: @translation_workspace.automatic_confirmation == "1", class: "mt-1 size-4" }, "1", "0" %>
+          <span><span class="font-semibold">I authorize this profile's initial provider work for this launch.</span> Automatic progression causes provider usage and cost. Built-in bounded provider retries may add requests; terminal failures still require an explicit manual retry. Stopping cannot cancel work already queued or running.</span>
+        </label>
+      <% else %>
+        <p class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active workflow profile is available. <%= link_to "Create a Workflow Profile", new_workflow_profile_path, class: "font-semibold underline" %>.</p>
+      <% end %>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <legend class="px-1 text-lg font-semibold text-slate-950">Manual OpenRouter models</legend>
       <p class="mt-1 text-sm text-slate-600">Select 1–<%= Ai::UsageLimits::MAX_TRANSLATION_MODELS %> models. Each model creates an independent translation run.</p>
 
       <% if @available_models.any? %>

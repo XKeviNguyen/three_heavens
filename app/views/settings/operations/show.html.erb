@@ -33,6 +33,19 @@
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Automatic pipeline health</h2>
+    <p class="mt-1 text-sm text-slate-600">Aggregate counts only; no owner, profile, filename, source, or translation details are exposed.</p>
+    <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
+      <div><dt class="text-slate-500">Running</dt><dd class="mt-1 font-semibold"><%= @health.pipelines.fetch(:running_count) %></dd></div>
+      <div><dt class="text-slate-500">Blocked</dt><dd class="mt-1 font-semibold"><%= @health.pipelines.fetch(:blocked_count) %></dd></div>
+      <div><dt class="text-slate-500">Ready for editor</dt><dd class="mt-1 font-semibold"><%= @health.pipelines.fetch(:ready_for_editor_count) %></dd></div>
+      <div><dt class="text-slate-500">Configuration blocked</dt><dd class="mt-1 font-semibold"><%= @health.pipelines.fetch(:configuration_blocked_count) %></dd></div>
+      <div><dt class="text-slate-500">Oldest running</dt><dd class="mt-1 font-semibold"><%= @health.pipelines.fetch(:oldest_running_age_seconds)&.then { |seconds| distance_of_time_in_words(seconds) } || "—" %></dd></div>
+    </dl>
+    <% if @health.pipelines.fetch(:by_stage).any? %><p class="mt-4 text-sm text-slate-600">Active by stage: <%= @health.pipelines.fetch(:by_stage).map { |stage, count| "#{stage.humanize} #{count}" }.join(" · ") %></p><% end %>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">Stale reconciliation</h2>
     <p class="mt-2 text-sm text-slate-600">This marks stale pending and running records failed and reconciles parent workflows. It is idempotent and never starts a provider request; owners decide whether to retry afterward.</p>
     <%= button_to "Reconcile stale work now", reconcile_stale_settings_operations_path, method: :post, class: "mt-4 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800" %>
