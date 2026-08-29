@@ -13,6 +13,8 @@ class User < ApplicationRecord
   has_many :review_rounds, through: :experiments
   has_many :judge_rounds, through: :review_rounds
   has_many :final_translations, through: :experiments
+  has_many :workflow_profiles, dependent: :restrict_with_error
+  has_many :pipeline_runs, through: :experiments
 
   enum :role, { user: "user", admin: "admin" }, validate: true
   enum :status, { active: "active", disabled: "disabled" }, validate: true

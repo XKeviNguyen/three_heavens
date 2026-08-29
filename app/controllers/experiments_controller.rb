@@ -3,6 +3,7 @@ class ExperimentsController < ApplicationController
     @experiment = current_user.experiments.includes(
       document: :project,
       translation_runs: :llm_model,
+      pipeline_run: :workflow_profile_revision,
       review_round: { review_runs: :reviewer_llm_model }
     ).find(params[:id])
     @reviewer_models = LlmModel.active_openrouter.order(:display_name, :id)

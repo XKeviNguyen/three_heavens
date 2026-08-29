@@ -31,6 +31,7 @@
           <div class="flex flex-wrap items-center gap-5">
             <nav class="flex flex-wrap items-center gap-4 text-sm font-medium" aria-label="Primary navigation">
               <%= link_to "History", history_path, class: "text-slate-600 hover:text-slate-950" %>
+              <%= link_to "Workflow Profiles", workflow_profiles_path, class: "text-slate-600 hover:text-slate-950" %>
               <%= link_to "Benchmarks", benchmarks_path, class: "text-slate-600 hover:text-slate-950" %>
               <% if current_user.admin? %>
                 <%= link_to "Settings / Models", settings_models_path, class: "text-slate-600 hover:text-slate-950" %>

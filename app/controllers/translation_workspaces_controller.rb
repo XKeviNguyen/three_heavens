@@ -8,6 +8,9 @@ class TranslationWorkspacesController < ApplicationController
     source_import_id
     experiment_name
     instruction_prompt
+    workflow_mode
+    workflow_profile_revision_id
+    automatic_confirmation
   ].freeze
 
   before_action :load_available_models
@@ -35,8 +38,8 @@ class TranslationWorkspacesController < ApplicationController
     )
 
     if @translation_workspace.submit
-      redirect_to @translation_workspace.experiment,
-                  notice: "Translation experiment started."
+      destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
+      redirect_to destination, notice: @translation_workspace.pipeline_run ? "Automatic translation pipeline started." : "Translation experiment started."
     else
       render :new, status: :unprocessable_content
     end
@@ -48,6 +51,9 @@ class TranslationWorkspacesController < ApplicationController
 
   def load_available_models
     @available_models = LlmModel.active_openrouter.order(:display_name, :id)
+    @workflow_profiles = current_user.workflow_profiles.active.includes(
+      current_revision: { model_selections: :llm_model }
+    ).order(updated_at: :desc, id: :desc)
   end
 
   def translation_workspace_params
@@ -55,6 +61,10 @@ class TranslationWorkspacesController < ApplicationController
     unless submitted.is_a?(ActionController::Parameters)
       raise ActionController::BadRequest, "translation_workspace must be a parameter object"
     end
+    # The legacy form object exposes a virtual `user` attribute. Ignore it at
+    # this boundary and always inject current_user server-side.
+    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "user" ])
+    raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
 
     SCALAR_ATTRIBUTES.each do |attribute|
       value = submitted[attribute]

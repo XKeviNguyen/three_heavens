@@ -1,0 +1,5 @@
+<% content_for :title, "New Workflow Profile · Three Heavens" %>
+<div class="mx-auto max-w-4xl">
+  <header class="mb-8"><p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Automation</p><h1 class="mt-2 text-3xl font-bold">New Workflow Profile</h1><p class="mt-2 text-sm text-slate-600">Saving a profile does not authorize provider work. Every pipeline launch requires separate confirmation.</p></header>
+  <%= render "form", form_url: workflow_profiles_path, form_method: :post, submit_label: "Create workflow profile" %>
+</div>

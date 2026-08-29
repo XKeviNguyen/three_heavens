@@ -2,6 +2,16 @@
 
 Three Heavens is a Rails 8.1 application for authenticated, owner-scoped AI translation experiments, blind review, judge aggregation, and final translation refinement. PostgreSQL 17 is the source of truth; Solid Queue, Solid Cache, and Solid Cable use dedicated PostgreSQL databases in production.
 
+## Automatic translation pipelines
+
+Workflow Profiles are private, reusable configurations for translator, reviewer, judge, and optional finalizer models. Each edit appends an immutable revision with model-routing snapshots and a deterministic SHA-256 configuration digest; historical revisions are never rewritten.
+
+The translation workspace remains manual by default. In automatic mode, the owner selects the exact current profile revision and explicitly confirms the configured initial provider run slots for that launch. This authorization covers automatic translation, blind review, judging, creation of the official winner draft, and—only in `refinement_proposals` mode—creation of AI refinement proposals. `winner_draft` stops after creating the draft. Both modes stop at the human editorial checkpoint: proposals are never applied, draft content is never changed, and a translation is never finalized automatically.
+
+Automatic progression can incur provider cost, and built-in bounded provider retries may add requests. Terminal failures block the pipeline and retain the existing explicit owner retry controls; a successful retry lets the already-authorized pipeline continue. Stopping automation prevents future stages but cannot cancel provider work already queued or running, removes no history, and does not prevent manual continuation.
+
+`PipelineReconciliationJob` scans a bounded indexed batch every 10 minutes in production to recover missed advancement after queue failures, crashes, or restarts. It processes only running or blocked automatic pipelines and never manual, stopped, or ready-for-editor workflows. This is intentionally separate from the provider-free stale-AI watchdog. Operators may invoke the same safe bounded service with `bin/rails pipelines:reconcile`; output contains aggregate counts only.
+
 ## Development workflow
 
 `develop` is the default integration branch. Normal Codex work starts from

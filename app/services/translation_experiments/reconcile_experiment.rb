@@ -1,6 +1,7 @@
 module TranslationExperiments
   class ReconcileExperiment
     def self.call(experiment)
+      changed = false
       experiment.with_lock do
         runs = experiment.translation_runs.lock.reload
         status = if runs.empty? || runs.any? { |run| !run.terminal? }
@@ -10,8 +11,12 @@ module TranslationExperiments
         else
           :completed
         end
-        experiment.update!(status: status) unless experiment.public_send("#{status}?")
+        unless experiment.public_send("#{status}?")
+          experiment.update!(status: status)
+          changed = true
+        end
       end
+      Pipelines::AdvancementScheduler.enqueue_for(experiment) if changed
       experiment
     end
   end

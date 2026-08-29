@@ -5,6 +5,18 @@ Rails.application.routes.draw do
   get "login", to: "sessions#new", as: :login
 
   get "history", to: "history#index", as: :history
+  resources :workflow_profiles, except: :destroy do
+    member do
+      post :duplicate
+      patch :activate
+      patch :deactivate
+    end
+  end
+  resources :pipeline_runs, only: :show do
+    member do
+      patch :stop
+    end
+  end
   resources :benchmarks, only: :index
   get "benchmarks/models/:id", to: "benchmarks#show", as: :benchmark_model
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -266,6 +266,70 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
     t.index ["gateway", "model_identifier"], name: "index_llm_models_on_gateway_and_model_identifier", unique: true
   end
 
+  create_table "pipeline_events", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "event_key", null: false
+    t.string "event_type", null: false
+    t.string "from_stage"
+    t.jsonb "metadata", default: {}, null: false
+    t.bigint "pipeline_run_id", null: false
+    t.string "reason_code"
+    t.integer "sequence_number", null: false
+    t.string "to_stage"
+    t.index ["pipeline_run_id", "event_key"], name: "index_pipeline_events_on_run_and_key", unique: true
+    t.index ["pipeline_run_id", "sequence_number"], name: "index_pipeline_events_on_run_and_sequence", unique: true
+    t.index ["pipeline_run_id"], name: "index_pipeline_events_on_pipeline_run_id"
+    t.check_constraint "char_length(event_key::text) >= 1 AND char_length(event_key::text) <= 120", name: "pipeline_events_key_check"
+    t.check_constraint "char_length(event_type::text) >= 1 AND char_length(event_type::text) <= 80", name: "pipeline_events_type_check"
+    t.check_constraint "from_stage IS NULL OR (from_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[]))", name: "pipeline_events_from_stage_check"
+    t.check_constraint "jsonb_typeof(metadata) = 'object'::text AND octet_length(metadata::text) <= 2048", name: "pipeline_events_metadata_check"
+    t.check_constraint "reason_code IS NULL OR char_length(reason_code::text) <= 80", name: "pipeline_events_reason_check"
+    t.check_constraint "sequence_number > 0", name: "pipeline_events_sequence_check"
+    t.check_constraint "to_stage IS NULL OR (to_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[]))", name: "pipeline_events_to_stage_check"
+  end
+
+  create_table "pipeline_runs", force: :cascade do |t|
+    t.integer "authorized_initial_provider_run_count", null: false
+    t.string "blocked_message"
+    t.string "blocked_reason_code"
+    t.string "blocked_stage"
+    t.string "completion_mode", null: false
+    t.string "configuration_digest", null: false
+    t.datetime "confirmed_at", null: false
+    t.datetime "created_at", null: false
+    t.string "current_stage", default: "translation", null: false
+    t.bigint "experiment_id", null: false
+    t.bigint "finalization_round_id"
+    t.integer "finalizer_count", null: false
+    t.integer "judge_count", null: false
+    t.datetime "ready_for_editor_at"
+    t.integer "reviewer_count", null: false
+    t.datetime "started_at", null: false
+    t.string "status", default: "running", null: false
+    t.datetime "stopped_at"
+    t.integer "translator_count", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workflow_profile_revision_id", null: false
+    t.index ["current_stage", "status"], name: "index_pipeline_runs_on_current_stage_and_status"
+    t.index ["experiment_id"], name: "index_pipeline_runs_on_experiment_id", unique: true
+    t.index ["finalization_round_id"], name: "index_pipeline_runs_on_finalization_round_id", unique: true, where: "(finalization_round_id IS NOT NULL)"
+    t.index ["status", "updated_at", "id"], name: "index_pipeline_runs_for_reconciliation"
+    t.index ["workflow_profile_revision_id"], name: "index_pipeline_runs_on_profile_revision"
+    t.check_constraint "(status::text = 'blocked'::text) = (blocked_stage IS NOT NULL AND blocked_reason_code IS NOT NULL)", name: "pipeline_runs_blocked_state_check"
+    t.check_constraint "(status::text = 'ready_for_editor'::text) = (ready_for_editor_at IS NOT NULL)", name: "pipeline_runs_ready_timestamp_check"
+    t.check_constraint "(status::text = 'stopped'::text) = (stopped_at IS NOT NULL)", name: "pipeline_runs_stopped_timestamp_check"
+    t.check_constraint "authorized_initial_provider_run_count = (translator_count + reviewer_count + judge_count + finalizer_count)", name: "pipeline_runs_authorized_count_check"
+    t.check_constraint "blocked_message IS NULL OR char_length(blocked_message::text) <= 500", name: "pipeline_runs_blocked_message_check"
+    t.check_constraint "blocked_reason_code IS NULL OR char_length(blocked_reason_code::text) <= 80", name: "pipeline_runs_blocked_reason_check"
+    t.check_constraint "blocked_stage IS NULL OR (blocked_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying]::text[]))", name: "pipeline_runs_blocked_stage_check"
+    t.check_constraint "char_length(configuration_digest::text) = 64", name: "pipeline_runs_digest_check"
+    t.check_constraint "completion_mode::text = 'winner_draft'::text AND finalizer_count = 0 OR completion_mode::text = 'refinement_proposals'::text AND finalizer_count > 0", name: "pipeline_runs_completion_finalizer_check"
+    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying]::text[])", name: "pipeline_runs_completion_mode_check"
+    t.check_constraint "current_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[])", name: "pipeline_runs_current_stage_check"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'blocked'::character varying, 'ready_for_editor'::character varying, 'stopped'::character varying]::text[])", name: "pipeline_runs_status_check"
+    t.check_constraint "translator_count >= 2 AND translator_count <= 6 AND reviewer_count >= 1 AND reviewer_count <= 5 AND judge_count >= 1 AND judge_count <= 5 AND finalizer_count >= 0 AND finalizer_count <= 5", name: "pipeline_runs_role_counts_check"
+  end
+
   create_table "projects", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description"
@@ -429,6 +493,59 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
     t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'disabled'::character varying::text])", name: "users_status_check"
   end
 
+  create_table "workflow_profile_model_selections", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name_snapshot", null: false
+    t.string "gateway_snapshot", null: false
+    t.bigint "llm_model_id", null: false
+    t.string "model_identifier_snapshot", null: false
+    t.integer "position", null: false
+    t.string "provider_snapshot", null: false
+    t.string "role", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workflow_profile_revision_id", null: false
+    t.index ["llm_model_id"], name: "index_workflow_profile_model_selections_on_llm_model_id"
+    t.index ["workflow_profile_revision_id", "role", "llm_model_id"], name: "index_profile_selections_on_revision_role_model", unique: true
+    t.index ["workflow_profile_revision_id", "role", "position"], name: "index_profile_selections_on_revision_role_position", unique: true
+    t.index ["workflow_profile_revision_id"], name: "index_profile_model_selections_on_revision"
+    t.check_constraint "\"position\" > 0", name: "workflow_profile_model_selections_position_check"
+    t.check_constraint "char_length(display_name_snapshot::text) >= 1 AND char_length(display_name_snapshot::text) <= 150", name: "workflow_profile_selections_display_name_check"
+    t.check_constraint "char_length(gateway_snapshot::text) >= 1 AND char_length(gateway_snapshot::text) <= 50", name: "workflow_profile_selections_gateway_check"
+    t.check_constraint "char_length(model_identifier_snapshot::text) >= 1 AND char_length(model_identifier_snapshot::text) <= 255", name: "workflow_profile_selections_identifier_check"
+    t.check_constraint "char_length(provider_snapshot::text) >= 1 AND char_length(provider_snapshot::text) <= 100", name: "workflow_profile_selections_provider_check"
+    t.check_constraint "role::text = ANY (ARRAY['translator'::character varying, 'reviewer'::character varying, 'judge'::character varying, 'finalizer'::character varying]::text[])", name: "workflow_profile_model_selections_role_check"
+  end
+
+  create_table "workflow_profile_revisions", force: :cascade do |t|
+    t.string "completion_mode", null: false
+    t.string "configuration_digest", null: false
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.integer "version", null: false
+    t.bigint "workflow_profile_id", null: false
+    t.index ["configuration_digest"], name: "index_workflow_profile_revisions_on_configuration_digest"
+    t.index ["workflow_profile_id", "id"], name: "index_workflow_profile_revisions_on_profile_and_id", unique: true
+    t.index ["workflow_profile_id", "version"], name: "index_workflow_profile_revisions_on_profile_and_version", unique: true
+    t.index ["workflow_profile_id"], name: "index_workflow_profile_revisions_on_workflow_profile_id"
+    t.check_constraint "char_length(btrim(name::text)) >= 1 AND char_length(btrim(name::text)) <= 150", name: "workflow_profile_revisions_name_check"
+    t.check_constraint "char_length(configuration_digest::text) = 64", name: "workflow_profile_revisions_digest_check"
+    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying]::text[])", name: "workflow_profile_revisions_completion_mode_check"
+    t.check_constraint "description IS NULL OR char_length(description::text) <= 500", name: "workflow_profile_revisions_description_check"
+    t.check_constraint "version > 0", name: "workflow_profile_revisions_version_check"
+  end
+
+  create_table "workflow_profiles", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_revision_id"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "active"], name: "index_workflow_profiles_on_user_id_and_active"
+    t.index ["user_id"], name: "index_workflow_profiles_on_user_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "documents", "projects"
@@ -453,6 +570,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
   add_foreign_key "judge_runs", "judge_rounds"
   add_foreign_key "judge_runs", "llm_models", column: "judge_llm_model_id"
   add_foreign_key "judge_runs", "translation_runs", column: "winner_translation_run_id"
+  add_foreign_key "pipeline_events", "pipeline_runs", on_delete: :restrict
+  add_foreign_key "pipeline_runs", "experiments", on_delete: :restrict
+  add_foreign_key "pipeline_runs", "finalization_rounds", on_delete: :restrict
+  add_foreign_key "pipeline_runs", "workflow_profile_revisions", on_delete: :restrict
   add_foreign_key "projects", "users", on_delete: :restrict
   add_foreign_key "review_evaluations", "review_runs"
   add_foreign_key "review_evaluations", "translation_runs"
@@ -463,4 +584,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120002) do
   add_foreign_key "source_imports", "users", on_delete: :restrict
   add_foreign_key "translation_runs", "experiments"
   add_foreign_key "translation_runs", "llm_models"
+  add_foreign_key "workflow_profile_model_selections", "llm_models", on_delete: :restrict
+  add_foreign_key "workflow_profile_model_selections", "workflow_profile_revisions", on_delete: :restrict
+  add_foreign_key "workflow_profile_revisions", "workflow_profiles", on_delete: :restrict
+  add_foreign_key "workflow_profiles", "users", on_delete: :restrict
+  add_foreign_key "workflow_profiles", "workflow_profile_revisions", column: ["id", "current_revision_id"], primary_key: ["workflow_profile_id", "id"], name: "fk_workflow_profiles_owned_current_revision"
 end

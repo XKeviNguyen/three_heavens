@@ -11,9 +11,12 @@ class TranslationWorkspace
                 :source_import_id,
                 :experiment_name,
                 :instruction_prompt,
-                :model_ids
+                :model_ids,
+                :workflow_mode,
+                :workflow_profile_revision_id,
+                :automatic_confirmation
 
-  attr_reader :document, :experiment, :project
+  attr_reader :document, :experiment, :pipeline_run, :project
 
   validate :validate_workspace_records
   validate :validate_model_selection
@@ -24,6 +27,7 @@ class TranslationWorkspace
     @clock = clock
     super(attributes)
     self.model_ids = [] if model_ids.nil?
+    self.workflow_mode = "manual" if workflow_mode.blank?
     self.source_import_id ||= source_import&.id
   end
 
@@ -39,15 +43,22 @@ class TranslationWorkspace
       document.save!
       experiment.save!
       SourceImports::Consume.finish!(source_import: locked_import, document: document) if locked_import
-      @start_service.call(
-        experiment: experiment,
-        llm_models: @llm_models
-      )
+      if automatic_mode?
+        @pipeline_run = Pipelines::Start.call(
+          experiment: experiment,
+          user: user,
+          workflow_profile_revision: @workflow_profile_revision,
+          confirmation: automatic_confirmation
+        )
+      else
+        @start_service.call(experiment: experiment, llm_models: @llm_models)
+      end
     end
 
     true
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
+         Pipelines::Start::Error,
          SourceImports::Error => error
     if error.is_a?(SourceImports::Error)
       errors.add(:source_import_id, error.message)
@@ -107,6 +118,24 @@ class TranslationWorkspace
   end
 
   def validate_model_selection
+    unless workflow_mode.in?(%w[manual automatic])
+      errors.add(:workflow_mode, "must be manual or automatic")
+      return
+    end
+
+    if automatic_mode?
+      validate_automatic_selection
+    else
+      validate_manual_selection
+    end
+  end
+
+  def validate_manual_selection
+    if workflow_profile_revision_id.present? || automatic_confirmation == "1"
+      errors.add(:workflow_mode, "cannot mix manual models with automatic pipeline settings")
+      return
+    end
+
     selected_ids = Ai::UsageLimits.normalize_model_ids(
       model_ids,
       maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
@@ -119,6 +148,37 @@ class TranslationWorkspace
     errors.add(:model_ids, "contain an inactive or unsupported model")
   rescue Ai::UsageLimits::InvalidSelection => error
     errors.add(:model_ids, error.message)
+  end
+
+  def validate_automatic_selection
+    if model_ids.any?(&:present?)
+      errors.add(:workflow_mode, "cannot mix automatic pipeline settings with manual model IDs")
+      return
+    end
+    unless workflow_profile_revision_id.to_s.match?(/\A[1-9]\d*\z/)
+      errors.add(:workflow_profile_revision_id, "is not a valid profile revision")
+      return
+    end
+
+    @workflow_profile_revision = WorkflowProfileRevision.includes(
+      :workflow_profile,
+      model_selections: :llm_model
+    ).joins(:workflow_profile).where(workflow_profiles: { user_id: user.id }).find_by(id: workflow_profile_revision_id)
+    unless @workflow_profile_revision
+      errors.add(:workflow_profile_revision_id, "is not available")
+      return
+    end
+    profile = @workflow_profile_revision.workflow_profile
+    errors.add(:workflow_profile_revision_id, "is stale; review the latest profile revision") unless profile.current_revision_id == @workflow_profile_revision.id
+    errors.add(:workflow_profile_revision_id, "belongs to an inactive profile") unless profile.active?
+    errors.add(:automatic_confirmation, "must be accepted for each launch") unless automatic_confirmation == Pipelines::Start::CONFIRMATION_VALUE
+    unless @workflow_profile_revision.routing_eligible?
+      errors.add(:workflow_profile_revision_id, "references unavailable or changed model routing")
+    end
+  end
+
+  def automatic_mode?
+    workflow_mode == "automatic"
   end
 
   def validate_source_import
