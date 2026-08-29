@@ -14,7 +14,8 @@ class TranslationWorkspace
                 :model_ids,
                 :workflow_mode,
                 :workflow_profile_revision_id,
-                :automatic_confirmation
+                :automatic_confirmation,
+                :submission_token
 
   attr_reader :document, :experiment, :pipeline_run, :project
 
@@ -29,12 +30,19 @@ class TranslationWorkspace
     self.model_ids = [] if model_ids.nil?
     self.workflow_mode = "manual" if workflow_mode.blank?
     self.source_import_id ||= source_import&.id
+    issue_submission_token if submission_token.blank? && user&.persisted?
   end
 
   def submit
-    return false unless valid?
+    submission = TranslationWorkspaceSubmission.find_owned_by_token!(user: user, token: submission_token)
+    submission.with_lock do
+      next replay!(submission) if submission.consumed?
+      if submission.expired?
+        errors.add(:submission_token, "has expired. Reload the workspace and try again.")
+        next false
+      end
+      next false unless valid?
 
-    ActiveRecord::Base.transaction do
       project.save!
       locked_import = lock_source_import
       if locked_import
@@ -53,9 +61,13 @@ class TranslationWorkspace
       else
         @start_service.call(experiment: experiment, llm_models: @llm_models)
       end
+      submission.update!(
+        status: :consumed,
+        consumed_at: Time.current,
+        experiment: experiment
+      )
+      true
     end
-
-    true
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
          Pipelines::Start::Error,
@@ -66,6 +78,10 @@ class TranslationWorkspace
     end
     errors.add(:base, "The translation experiment could not be started. Please review the form and try again.")
     false
+  end
+
+  def replayed?
+    @replayed == true
   end
 
   private
@@ -199,5 +215,18 @@ class TranslationWorkspace
 
   def current_time
     @clock.call
+  end
+
+  def issue_submission_token
+    self.submission_token = TranslationWorkspaceSubmission.issue!(user: user).public_token
+  end
+
+  def replay!(submission)
+    @experiment = submission.experiment
+    @document = experiment.document
+    @project = document.project
+    @pipeline_run = experiment.pipeline_run
+    @replayed = true
+    true
   end
 end

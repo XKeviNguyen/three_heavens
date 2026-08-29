@@ -25,6 +25,9 @@ class PipelineJobsTest < ActiveJob::TestCase
     stopped_experiment = completed_experiment
     stopped = create_pipeline_run(experiment: stopped_experiment)
     Pipelines::Stop.call(pipeline_run: stopped)
+    ready_experiment = completed_experiment
+    ready = create_pipeline_run(experiment: ready_experiment)
+    ready.update!(status: :ready_for_editor, current_stage: :editor, ready_for_editor_at: Time.current)
     manual = completed_experiment
 
     result = Pipelines::Reconcile.call(batch_size: 100)
@@ -33,6 +36,9 @@ class PipelineJobsTest < ActiveJob::TestCase
     assert_operator result.examined_count, :>=, 1
     assert_equal "review", running.reload.current_stage
     assert_nil stopped_experiment.reload.review_round
+    assert_nil stopped.reload.last_reconciled_at
+    assert_nil ready_experiment.reload.review_round
+    assert_nil ready.reload.last_reconciled_at
     assert_nil manual.reload.review_round
   end
 
@@ -65,6 +71,33 @@ class PipelineJobsTest < ActiveJob::TestCase
     assert_kind_of Pipelines::Reconcile::Result, result
     assert_operator result.examined_count, :<=, 1
     assert_raises(ArgumentError) { Pipelines::Reconcile.call(batch_size: 0) }
+  end
+
+  test "least recently reconciled cursor prevents blocked rows from starving later recoverable work" do
+    blocked = 3.times.map do
+      experiment = completed_experiment
+      experiment.translation_runs.first.update!(status: :failed, translated_text: nil, completed_at: Time.current)
+      experiment.update!(status: :failed)
+      create_pipeline_run(experiment: experiment).tap do |pipeline|
+        Pipelines::Advance.call(pipeline_run: pipeline)
+      end
+    end
+    recoverable_experiment = completed_experiment
+    recoverable = create_pipeline_run(experiment: recoverable_experiment)
+    clear_enqueued_jobs
+
+    first = Pipelines::Reconcile.call(batch_size: 3, clock: -> { 2.minutes.ago })
+    assert_equal 3, first.examined_count
+    assert_nil recoverable.reload.last_reconciled_at
+    assert blocked.all? { |pipeline| pipeline.reload.last_reconciled_at.present? }
+    assert blocked.all?(&:blocked?)
+
+    second = Pipelines::Reconcile.call(batch_size: 3, clock: -> { 1.minute.ago })
+    clear_enqueued_jobs
+    assert_operator second.examined_count, :>=, 1
+    assert recoverable.reload.last_reconciled_at
+    assert recoverable.current_stage_review?
+    assert_equal 1, ReviewRound.where(experiment: recoverable_experiment).count
   end
 
   private

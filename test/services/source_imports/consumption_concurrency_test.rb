@@ -36,6 +36,7 @@ module SourceImports
       project_ids = Project.where(user_id: @user.id).pluck(:id)
       document_ids = Document.where(project_id: project_ids).pluck(:id)
       SourceImport.where(user_id: @user.id).destroy_all
+      TranslationWorkspaceSubmission.where(user_id: @user.id).delete_all
       Experiment.where(document_id: document_ids).delete_all
       ActiveStorage::Attachment.where(record_type: "Document", record_id: document_ids).delete_all
       Document.where(id: document_ids).delete_all

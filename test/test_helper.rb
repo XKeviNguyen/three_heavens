@@ -31,6 +31,10 @@ module AuthenticationTestHelper
     delete session_path
   end
 
+  def issue_translation_workspace_token(user: users(:normal), at: Time.current)
+    TranslationWorkspaceSubmission.issue!(user: user, at: at).public_token
+  end
+
   private
 
   def login_rate_limit_headers

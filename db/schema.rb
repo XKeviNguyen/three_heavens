@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_30_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -302,6 +302,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
     t.bigint "finalization_round_id"
     t.integer "finalizer_count", null: false
     t.integer "judge_count", null: false
+    t.datetime "last_reconciled_at"
     t.datetime "ready_for_editor_at"
     t.integer "reviewer_count", null: false
     t.datetime "started_at", null: false
@@ -313,6 +314,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
     t.index ["current_stage", "status"], name: "index_pipeline_runs_on_current_stage_and_status"
     t.index ["experiment_id"], name: "index_pipeline_runs_on_experiment_id", unique: true
     t.index ["finalization_round_id"], name: "index_pipeline_runs_on_finalization_round_id", unique: true, where: "(finalization_round_id IS NOT NULL)"
+    t.index ["status", "last_reconciled_at", "id"], name: "index_pipeline_runs_for_fair_reconciliation"
     t.index ["status", "updated_at", "id"], name: "index_pipeline_runs_for_reconciliation"
     t.index ["workflow_profile_revision_id"], name: "index_pipeline_runs_on_profile_revision"
     t.check_constraint "(status::text = 'blocked'::text) = (blocked_stage IS NOT NULL AND blocked_reason_code IS NOT NULL)", name: "pipeline_runs_blocked_state_check"
@@ -480,6 +482,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
     t.check_constraint "execution_attempt >= 0", name: "translation_runs_execution_attempt_check"
   end
 
+  create_table "translation_workspace_submissions", force: :cascade do |t|
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.bigint "experiment_id"
+    t.datetime "expires_at", null: false
+    t.string "status", default: "available", null: false
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["experiment_id"], name: "index_translation_workspace_submissions_on_experiment_id", unique: true, where: "(experiment_id IS NOT NULL)"
+    t.index ["status", "expires_at"], name: "idx_on_status_expires_at_ed9c9803ce"
+    t.index ["token_digest"], name: "index_translation_workspace_submissions_on_token_digest", unique: true
+    t.index ["user_id", "status"], name: "index_translation_workspace_submissions_on_user_id_and_status"
+    t.index ["user_id"], name: "index_translation_workspace_submissions_on_user_id"
+    t.check_constraint "char_length(token_digest::text) = 64", name: "translation_workspace_submissions_digest_check"
+    t.check_constraint "expires_at > created_at", name: "translation_workspace_submissions_expiry_check"
+    t.check_constraint "status::text = 'available'::text AND consumed_at IS NULL AND experiment_id IS NULL OR status::text = 'consumed'::text AND consumed_at IS NOT NULL AND experiment_id IS NOT NULL", name: "translation_workspace_submissions_lifecycle_check"
+    t.check_constraint "status::text = ANY (ARRAY['available'::character varying, 'consumed'::character varying]::text[])", name: "translation_workspace_submissions_status_check"
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
@@ -584,6 +606,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_090000) do
   add_foreign_key "source_imports", "users", on_delete: :restrict
   add_foreign_key "translation_runs", "experiments"
   add_foreign_key "translation_runs", "llm_models"
+  add_foreign_key "translation_workspace_submissions", "experiments", on_delete: :restrict
+  add_foreign_key "translation_workspace_submissions", "users", on_delete: :restrict
   add_foreign_key "workflow_profile_model_selections", "llm_models", on_delete: :restrict
   add_foreign_key "workflow_profile_model_selections", "workflow_profile_revisions", on_delete: :restrict
   add_foreign_key "workflow_profile_revisions", "workflow_profiles", on_delete: :restrict

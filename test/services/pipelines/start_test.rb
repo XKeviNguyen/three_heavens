@@ -82,6 +82,44 @@ class Pipelines::StartTest < ActiveSupport::TestCase
     assert_equal 0, @experiment.translation_runs.count
   end
 
+  test "experiment profile and supplied user ownership must all match without admin bypass" do
+    other_project = users(:other).projects.create!(
+      name: "Other private experiment",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    other_experiment = other_project.documents.create!(title: "Private", source_text: "Source").experiments.create!(
+      instruction_prompt: "Translate."
+    )
+
+    assert_no_difference [ -> { PipelineRun.count }, -> { TranslationRun.count } ] do
+      assert_no_enqueued_jobs only: TranslationRunJob do
+        assert_raises ActiveRecord::RecordNotFound do
+          Pipelines::Start.call(
+            experiment: other_experiment,
+            user: users(:normal),
+            workflow_profile_revision: @profile.current_revision,
+            confirmation: "1"
+          )
+        end
+      end
+    end
+
+    admin_profile = create_workflow_profile(user: users(:admin))
+    assert_no_difference [ -> { PipelineRun.count }, -> { TranslationRun.count } ] do
+      assert_no_enqueued_jobs only: TranslationRunJob do
+        assert_raises ActiveRecord::RecordNotFound do
+          Pipelines::Start.call(
+            experiment: other_experiment,
+            user: users(:admin),
+            workflow_profile_revision: admin_profile.current_revision,
+            confirmation: "1"
+          )
+        end
+      end
+    end
+  end
+
   private
 
   def start_pipeline(confirmation: "1", revision: @profile.current_revision)

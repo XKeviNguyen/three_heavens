@@ -6,6 +6,7 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
       Rails.application.config.filter_parameters
     ).filter(
       "password" => "password-value",
+      "submission_token" => "opaque-launch-value",
       "source_text" => "source-value",
       "extracted_text" => "extracted-value",
       "preview_text" => "preview-value",
@@ -19,6 +20,7 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     )
 
     assert_equal "[FILTERED]", filtered["password"]
+    assert_equal "[FILTERED]", filtered["submission_token"]
     assert_equal "[FILTERED]", filtered["source_text"]
     assert_equal "[FILTERED]", filtered["extracted_text"]
     assert_equal "[FILTERED]", filtered["preview_text"]

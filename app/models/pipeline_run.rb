@@ -28,7 +28,7 @@ class PipelineRun < ApplicationRecord
   validate :authorization_counts_match
   validate :terminal_timestamps_match
 
-  scope :reconcilable, -> { where(status: %w[running blocked]).order(:updated_at, :id) }
+  scope :reconcilable, -> { where(status: %w[running blocked]) }
 
   delegate :workflow_profile, to: :workflow_profile_revision
 

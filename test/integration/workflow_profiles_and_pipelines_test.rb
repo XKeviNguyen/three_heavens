@@ -219,7 +219,8 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       document_title: "Automatic source",
       source_text: "Source text",
       experiment_name: "Automatic experiment",
-      instruction_prompt: "Translate faithfully."
+      instruction_prompt: "Translate faithfully.",
+      submission_token: issue_translation_workspace_token
     }
   end
 

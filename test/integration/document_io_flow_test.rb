@@ -378,7 +378,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       source_text: "Imported source",
       experiment_name: "Secure import",
       instruction_prompt: "Translate faithfully.",
-      model_ids: [ @model.id ]
+      model_ids: [ @model.id ],
+      submission_token: issue_translation_workspace_token
     }
   end
 
