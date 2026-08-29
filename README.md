@@ -2,6 +2,15 @@
 
 Three Heavens is a Rails 8.1 application for authenticated, owner-scoped AI translation experiments, blind review, judge aggregation, and final translation refinement. PostgreSQL 17 is the source of truth; Solid Queue, Solid Cache, and Solid Cable use dedicated PostgreSQL databases in production.
 
+## Development workflow
+
+`develop` is the default integration branch. Normal Codex work starts from
+current `develop` on a focused task branch, and each task branch opens a Pull
+Request back to `develop`. Codex may autonomously merge a task Pull Request after
+its required checks pass. `main` is reserved for human-controlled releases:
+Codex never merges into `main`, and the final `develop` to `main` release occurs
+only after external and human audit.
+
 ## Local development
 
 Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. The included `compose.yml` runs PostgreSQL on the loopback interface. Local Rails configuration expects these environment variable names:

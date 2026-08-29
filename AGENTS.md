@@ -28,17 +28,90 @@ expense of security, correctness, maintainability, or production readiness.
 - Explain important architectural decisions and tradeoffs in the final report.
 - Do not claim that work is complete when required validation is failing.
 
-## Git and destructive-action safety
+## Autonomous Git and Pull Request workflow
 
-- Never stage, commit, push, merge, rebase, force-push, or delete branches unless
-  the user explicitly authorizes that exact action.
-- Do not switch branches or create additional branches unless explicitly asked.
-- Never delete or reset databases, schemas, Docker volumes, user data, or other
-  persistent data without explicit approval.
-- Do not use destructive Git commands to remove local changes.
-- Before editing, review `git status --short` and account for unrelated changes.
-- At handoff, report the current branch and the complete `git status --short` so
-  pre-existing and task-related changes remain visible.
+Every explicitly assigned implementation task authorizes its complete normal
+Git and Pull Request lifecycle. The user does not need to separately authorize
+routine branch creation, staging, commits, task-branch pushes, Pull Request
+operations, task-caused corrective commits, merging a green task Pull Request
+into `develop`, or deleting its successfully merged temporary branch.
+
+For each assigned implementation task, Codex is authorized by default to:
+
+- inspect repository state and fetch/prune `origin`;
+- switch to `develop`, fast-forward it from `origin/develop`, and create exactly
+  one focused `feature/*`, `fix/*`, or `chore/*` task branch from current
+  `develop`;
+- modify only files within the assigned scope, run required migrations, and run
+  appropriate tests and quality gates;
+- stage task-related files and create one or more sensible professional commits;
+- push the task branch and create a GitHub Pull Request whose base is exactly
+  `develop`;
+- write or update the Pull Request title and description, inspect its status and
+  GitHub Actions logs, and diagnose failures;
+- fix task-caused implementation or CI failures, validate, commit, and push
+  corrective changes until all required checks pass;
+- after verifying the base is exactly `develop`, merge the green Pull Request
+  using the repository's normal non-force merge strategy and delete its remote
+  task branch;
+- switch back to `develop`, fetch/prune, fast-forward it, delete the merged local
+  task branch, verify the final state, and report the integration result.
+
+The default lifecycle is one assigned mega-task, one focused task branch, and
+one Pull Request to `develop`. Tightly related subcomponents may share that
+branch when they form one coherent architecture or product milestone.
+Corrective commits remain on the same branch and Pull Request. Do not create
+unrelated branches or begin the next product feature before the current Pull
+Request is integrated. Stop after completing the assigned integration
+milestone.
+
+Before editing, review `git status --short` and preserve all pre-existing or
+unrelated changes. Never use destructive Git commands to remove local work.
+At handoff, report the current branch and complete `git status --short`.
+
+## Integration and release branch safety
+
+`develop` is the GitHub default and normal integration branch. All ordinary
+Codex task branches and Pull Requests target `develop`.
+
+`main` is the protected conceptual release/stable branch. Codex must never:
+
+- push directly to `main` or create a normal feature Pull Request targeting it;
+- merge a Pull Request into `main` or run `gh pr merge` when its base is `main`;
+- change `main` to point at `develop`, or reset, rebase, force-update, or delete
+  `main`;
+- alter `main` merely to make development more convenient.
+
+If a task unexpectedly targets `main`, stop instead of merging. The only
+intended path into `main` is a future human-controlled `develop` to `main`
+release after external audit, even when all CI checks are green.
+
+Never force-push or rewrite published shared history. Never delete or reset
+databases, schemas, Docker volumes, user data, or other persistent data without
+explicit approval.
+
+## Unattended execution and CI ownership
+
+Assume the user may leave an assigned mega-task unattended for several hours.
+Use the repository architecture, tests, these instructions, and professional
+engineering judgment for routine implementation and Rails design choices.
+Continue through validation, Pull Request creation, task-caused correction, and
+safe integration into `develop` without pausing for routine decisions.
+
+Stop early only for a genuine blocker, such as an unavailable required secret,
+an unauthorized paid provider request, a required destructive persistent-data
+operation, unavailable GitHub permission, an unsafe external infrastructure
+action, material ambiguity that risks data loss or security, or unrelated local
+work that would have to be overwritten. Preserve state and report the blocker
+precisely.
+
+Codex owns failures caused by the task. After opening the Pull Request, inspect
+required checks and their actual logs; classify failures as task-caused,
+pre-existing, or external/environmental. Fix task-caused failures, rerun relevant
+local validation, commit, push, and re-check CI until it is green. Never make CI
+green by weakening a quality gate: do not ignore scanner failures, disable jobs,
+remove legitimate tests, skip system tests, add `continue-on-error`, or suppress
+valid findings instead of correcting them.
 
 ## Secrets and secure development
 
