@@ -66,8 +66,12 @@ module Pipelines
 
     def validate_profile!
       raise ActiveRecord::RecordNotSaved, "Experiment must be persisted" unless experiment.persisted?
+      owner_id = user&.id
+      unless owner_id && experiment.document.project.user_id == owner_id && profile.user_id == owner_id
+        raise ActiveRecord::RecordNotFound, "Automatic workflow not found"
+      end
       raise InactiveProfileError, "The selected workflow profile is inactive" unless profile.active?
-      unless profile.user_id == user.id && revision.workflow_profile_id == profile.id
+      unless revision.workflow_profile_id == profile.id
         raise ActiveRecord::RecordNotFound, "Workflow profile not found"
       end
       unless profile.current_revision_id == revision.id

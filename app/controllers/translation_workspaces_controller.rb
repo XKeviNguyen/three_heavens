@@ -11,6 +11,7 @@ class TranslationWorkspacesController < ApplicationController
     workflow_mode
     workflow_profile_revision_id
     automatic_confirmation
+    submission_token
   ].freeze
 
   before_action :load_available_models
@@ -39,7 +40,14 @@ class TranslationWorkspacesController < ApplicationController
 
     if @translation_workspace.submit
       destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
-      redirect_to destination, notice: @translation_workspace.pipeline_run ? "Automatic translation pipeline started." : "Translation experiment started."
+      notice = if @translation_workspace.replayed?
+        "This translation launch was already completed; showing its existing result."
+      elsif @translation_workspace.pipeline_run
+        "Automatic translation pipeline started."
+      else
+        "Translation experiment started."
+      end
+      redirect_to destination, notice: notice
     else
       render :new, status: :unprocessable_content
     end
@@ -71,6 +79,10 @@ class TranslationWorkspacesController < ApplicationController
       unless value.nil? || value.is_a?(String)
         raise ActionController::BadRequest, "#{attribute} must be a scalar value"
       end
+    end
+
+    unless TranslationWorkspaceSubmission.valid_public_token?(submitted[:submission_token])
+      raise ActionController::BadRequest, "submission_token is invalid"
     end
 
     model_ids = submitted[:model_ids]

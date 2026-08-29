@@ -119,6 +119,14 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_not_includes run.error_message, "private queue detail"
     assert experiment.failed?
     assert_equal 0, provider_factory_calls
+
+    replay = TranslationWorkspace.new(valid_attributes.merge(submission_token: workspace.submission_token))
+    with_translation_job_boundaries(adapter: adapter, client_factory: -> { provider_factory_calls += 1 }) do
+      assert replay.submit
+    end
+    assert replay.replayed?
+    assert_equal experiment, replay.experiment
+    assert_equal 1, adapter.job_ids.size
   end
 
   test "outer transaction performs successful enqueue only after commit" do
@@ -250,6 +258,17 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     end
 
     assert_includes workspace.errors[:base].join, "could not be started"
+    submission = TranslationWorkspaceSubmission.find_owned_by_token!(
+      user: users(:normal),
+      token: workspace.submission_token
+    )
+    assert submission.available?
+
+    retry_workspace = TranslationWorkspace.new(valid_attributes.merge(submission_token: workspace.submission_token))
+    assert_enqueued_jobs 2, only: TranslationRunJob do
+      assert retry_workspace.submit
+    end
+    assert submission.reload.consumed?
   end
 
   test "an unexpected Active Record error propagates and rolls back every workspace record" do
@@ -386,7 +405,8 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
       source_text: "A source passage",
       experiment_name: "Translation comparison",
       instruction_prompt: "Translate faithfully and preserve paragraph breaks.",
-      model_ids: [ @first_model.id, @second_model.id ]
+      model_ids: [ @first_model.id, @second_model.id ],
+      submission_token: issue_translation_workspace_token
     }
   end
 

@@ -6,6 +6,7 @@ class Experiment < ApplicationRecord
   has_one :judge_round, through: :review_round
   has_one :final_translation, dependent: :restrict_with_error
   has_one :pipeline_run, dependent: :restrict_with_error
+  has_one :translation_workspace_submission, dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",

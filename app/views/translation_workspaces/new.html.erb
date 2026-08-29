@@ -11,6 +11,7 @@
   </div>
 
   <%= form_with model: @translation_workspace, url: translation_workspace_path, class: "space-y-8" do |form| %>
+    <%= form.hidden_field :submission_token %>
     <% if @translation_workspace.source_import %>
       <%= form.hidden_field :source_import_id, value: @translation_workspace.source_import.id %>
       <% if @translation_workspace.source_import.available? %>

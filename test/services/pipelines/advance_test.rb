@@ -87,7 +87,39 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     Pipelines::Advance.call(pipeline_run: pipeline)
     assert pipeline.reload.running?
     assert pipeline.current_stage_translation?
-    assert_equal 1, pipeline.events.where(event_key: "translation_blocked:stage_failed").count
+    assert_equal 1, pipeline.events.where(event_type: "translation_blocked", reason_code: "stage_failed").count
+  end
+
+  test "repeated block and resume episodes are distinct while unchanged reconciliation is deduplicated" do
+    experiment = create_failed_experiment
+    pipeline = create_pipeline_run(experiment: experiment)
+
+    results = concurrently(2) { Pipelines::Advance.call(pipeline_run: PipelineRun.find(pipeline.id)) }
+    assert_empty results.grep(Exception)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    assert_equal 1, pipeline.events.where(event_type: "translation_blocked").count
+
+    failed_run = experiment.translation_runs.failed.sole
+    failed_run.update!(status: :pending, completed_at: nil)
+    experiment.update!(status: :running)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+
+    failed_run.update!(status: :failed, completed_at: Time.current)
+    experiment.update!(status: :failed)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+
+    failed_run.update!(status: :pending, completed_at: nil)
+    experiment.update!(status: :running)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+
+    blocked = pipeline.events.where(event_type: "translation_blocked").order(:sequence_number)
+    resumed = pipeline.events.where(event_type: "translation_retry_resumed").order(:sequence_number)
+    assert_equal [ 1, 2 ], blocked.map { |event| event.metadata.fetch("episode") }
+    assert_equal [ 1, 2 ], resumed.map { |event| event.metadata.fetch("episode") }
+    assert_equal 2, blocked.pluck(:event_key).uniq.size
+    assert_equal 2, resumed.pluck(:event_key).uniq.size
+    assert_equal (1..pipeline.events.count).to_a, pipeline.events.pluck(:sequence_number)
   end
 
   test "review and judge terminal failures block then resume only after explicit recovery completes" do

@@ -1,0 +1,2 @@
+# Intentionally empty. Loading this fixture keeps non-transactional test cleanup
+# ordered with the table's restrictive experiment foreign key.

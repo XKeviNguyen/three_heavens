@@ -171,6 +171,11 @@ module Pipelines
 
     def block!(reason:)
       stage = pipeline_run.current_stage
+      return if pipeline_run.blocked? &&
+                pipeline_run.blocked_stage == stage &&
+                pipeline_run.blocked_reason_code == reason
+
+      episode = block_episode_events(stage).count + 1
       pipeline_run.update!(
         status: :blocked,
         blocked_stage: stage,
@@ -178,11 +183,12 @@ module Pipelines
         blocked_message: BLOCKED_MESSAGES.fetch(reason)
       )
       pipeline_run.append_event!(
-        event_key: "#{stage}_blocked:#{reason}",
+        event_key: "#{stage}_blocked:episode:#{episode}:#{reason}",
         event_type: reason == "configuration_unavailable" ? "configuration_blocked" : "#{stage}_blocked",
         from_stage: stage,
         to_stage: stage,
-        reason_code: reason
+        reason_code: reason,
+        metadata: { "episode" => episode }
       )
     end
 
@@ -190,6 +196,7 @@ module Pipelines
       return unless pipeline_run.blocked?
 
       stage = pipeline_run.current_stage
+      episode = current_block_episode(stage)
       pipeline_run.update!(
         status: :running,
         blocked_stage: nil,
@@ -197,11 +204,24 @@ module Pipelines
         blocked_message: nil
       )
       pipeline_run.append_event!(
-        event_key: "#{stage}_retry_resumed",
+        event_key: "#{stage}_retry_resumed:episode:#{episode}",
         event_type: "#{stage}_retry_resumed",
         from_stage: stage,
-        to_stage: stage
+        to_stage: stage,
+        metadata: { "episode" => episode }
       )
+    end
+
+    def block_episode_events(stage)
+      pipeline_run.events.where(
+        from_stage: stage,
+        event_type: [ "#{stage}_blocked", "configuration_blocked" ]
+      )
+    end
+
+    def current_block_episode(stage)
+      latest = block_episode_events(stage).order(:sequence_number).last
+      Integer(latest&.metadata&.fetch("episode", nil), exception: false) || [ block_episode_events(stage).count, 1 ].max
     end
 
     def ready_for_editor!(from:)
