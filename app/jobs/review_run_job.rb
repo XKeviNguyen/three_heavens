@@ -92,6 +92,7 @@ class ReviewRunJob < ApplicationJob
       )
     end
 
+    Ai::OperationalEvents.emit("ai_run_completed", review_run, active_job_id: job_id, status: "completed")
     BlindReviews::ReconcileRound.call(review_run.review_round)
   end
 

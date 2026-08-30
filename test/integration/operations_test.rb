@@ -36,12 +36,15 @@ class OperationsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "AI workflow operations"
+    assert_select "h2", "Production system diagnostics"
     assert_select "td", text: "1", minimum: 1
     assert_select "span.font-mono", text: "provider_failure"
     assert_not_includes response.body, "PRIVATE_SOURCE_MARKER"
     assert_not_includes response.body, "PRIVATE_PROMPT_MARKER"
     assert_not_includes response.body, "PRIVATE_ERROR_BODY_MARKER"
     assert_not_includes response.body, "PRIVATE_FAILURE_CODE_MARKER"
+    assert_not_includes response.body, "DATABASE_URL"
+    assert_not_includes response.body, "/rails/storage"
   end
 
   test "normal users are denied both visibility and reconciliation server side" do

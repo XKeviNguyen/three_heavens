@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+begin
+  ENV["RAILS_ENV"] ||= "production"
+  require_relative "../../config/environment"
+
+  destination = ARGV.fetch(0, "")
+  result = Operations::Backup::BundleCreator.call(destination_root: destination)
+  puts "Backup complete"
+  puts "Backup ID: #{result.backup_id}"
+  puts "Bundle path: #{result.path}"
+  exit 0
+rescue StandardError
+  warn "Backup failed safely; no completed bundle was created."
+  exit 1
+end

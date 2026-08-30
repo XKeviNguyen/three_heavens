@@ -1,6 +1,19 @@
 require "test_helper"
 
 class ReadinessAndSecurityHeadersTest < ActionDispatch::IntegrationTest
+  test "liveness remains independent from database readiness and providers" do
+    original_check = ReadinessController.database_check
+    ReadinessController.database_check = -> { raise "database must not be called" }
+    begin
+      get rails_health_check_path
+    ensure
+      ReadinessController.database_check = original_check
+    end
+
+    assert_response :success
+    assert_not_includes response.body, "database must not be called"
+  end
+
   test "readiness reports primary database availability without private details" do
     get readiness_check_path
 

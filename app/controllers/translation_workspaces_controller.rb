@@ -40,6 +40,14 @@ class TranslationWorkspacesController < ApplicationController
 
     if @translation_workspace.submit
       destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
+      Operations::EventLogger.emit(
+        @translation_workspace.replayed? ? "workspace_launch_replayed" : "workspace_launch_succeeded",
+        request_id: operational_request_id,
+        experiment_id: @translation_workspace.experiment.id,
+        pipeline_run_id: @translation_workspace.pipeline_run&.id,
+        run_type: @translation_workspace.pipeline_run ? "automatic" : "manual",
+        outcome: @translation_workspace.replayed? ? "replayed" : "success"
+      )
       notice = if @translation_workspace.replayed?
         "This translation launch was already completed; showing its existing result."
       elsif @translation_workspace.pipeline_run
@@ -56,6 +64,10 @@ class TranslationWorkspacesController < ApplicationController
   end
 
   private
+
+  def operational_request_id
+    request.request_id.to_s.gsub(/[^A-Za-z0-9_-]/, "").first(100).presence || SecureRandom.uuid
+  end
 
   def load_available_models
     @available_models = LlmModel.active_openrouter.order(:display_name, :id)
