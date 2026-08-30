@@ -21,8 +21,12 @@ module Operations
         new(archive_path: archive_path, destination: nil).validate
       end
 
+      def self.prepare_destination!(destination:)
+        new(archive_path: nil, destination: destination).send(:prepare_empty_destination!)
+      end
+
       def initialize(archive_path:, destination:)
-        @archive_path = Pathname.new(archive_path)
+        @archive_path = Pathname.new(archive_path) if archive_path
         @destination_value = destination
       end
 
@@ -82,8 +86,6 @@ module Operations
         path = Pathname.new(destination_value.to_s)
         raise UnsafeArchive, "restore storage destination is required" if destination_value.to_s.strip.empty?
         raise UnsafeArchive, "restore storage destination must be absolute" unless path.absolute?
-        raise UnsafeArchive, "live storage destination is not allowed" if live_storage_path && path.cleanpath == live_storage_path.cleanpath
-
         destination = Operations::PathSafety.prepare_root!(path, create: true, forbidden: [ Rails.root, live_storage_path ])
         raise UnsafeArchive, "restore storage destination must be empty" if destination.children.any?
 

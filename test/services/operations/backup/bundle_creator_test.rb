@@ -28,7 +28,9 @@ class Operations::Backup::BundleCreatorTest < ActiveSupport::TestCase
         assert_not_includes manifest_text, "opaque-key"
         assert_equal [ "pg_dump", "--format=custom", "--no-owner", "--no-privileges" ], runner.calls.first[:arguments].first(4)
         assert_not runner.calls.first[:arguments].join(" ").include?("postgresql://")
-        assert runner.calls.first[:environment].key?("PGDATABASE")
+        assert_equal "synthetic_database", runner.calls.first[:environment]["PGDATABASE"]
+        assert_equal "synthetic_user", runner.calls.first[:environment]["PGUSER"]
+        assert_equal "synthetic_password", runner.calls.first[:environment]["PGPASSWORD"]
       end
     end
   end
@@ -65,6 +67,19 @@ class Operations::Backup::BundleCreatorTest < ActiveSupport::TestCase
           create_test_bundle(root: root, storage_root: storage)
         end
       end
+    end
+  end
+
+  test "rejects a destination beneath live storage before pg_dump or bundle creation" do
+    Dir.mktmpdir("three-heavens-storage-") do |storage|
+      runner = FakeDumpRunner.new
+
+      assert_raises(Operations::PathSafety::UnsafePath) do
+        create_test_bundle(root: File.join(storage, "backups", "nested"), storage_root: storage, runner: runner)
+      end
+
+      assert_empty runner.calls || []
+      assert_not Pathname.new(storage).join("backups").exist?
     end
   end
 

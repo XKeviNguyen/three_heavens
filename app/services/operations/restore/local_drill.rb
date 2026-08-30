@@ -29,6 +29,7 @@ module Operations
         validate_intent!
         original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
         original_storage_service = ActiveStorage::Blob.service
+        original_storage_services = ActiveStorage::Blob.services
         admin = PG.connect(pg_options(original_configuration, database: "postgres"))
 
         Dir.mktmpdir("three-heavens-restore-drill-") do |temporary_root|
@@ -70,6 +71,7 @@ module Operations
         end
       ensure
         ActiveStorage::Blob.service = original_storage_service if defined?(original_storage_service) && original_storage_service
+        ActiveStorage::Blob.services = original_storage_services if defined?(original_storage_services) && original_storage_services
         restore_application_connection(original_configuration) if defined?(original_configuration) && original_configuration
         drop_databases!(admin) if defined?(admin) && admin
         admin&.close
@@ -103,11 +105,11 @@ module Operations
         ActiveRecord::Base.establish_connection(configuration.merge(database: database))
         ActiveRecord::Schema.verbose = false
         load Rails.root.join("db/schema.rb")
-        service = ActiveStorage::Service.configure(
-          :restore_drill,
+        services = ActiveStorage::Service::Registry.new(
           restore_drill: { service: "Disk", root: storage_root }
         )
-        ActiveStorage::Blob.service = service
+        ActiveStorage::Blob.services = services
+        ActiveStorage::Blob.service = services.fetch(:restore_drill)
       end
 
       def create_representative_data!
@@ -123,9 +125,16 @@ module Operations
           source_language: "Vietnamese",
           target_language: "Japanese"
         )
-        document = project.documents.build(
+        document = project.documents.create!(
           title: "Synthetic restore source",
-          source_text: "Synthetic source text",
+          source_text: "Synthetic source text"
+        )
+        document.source_file.attach(
+          io: StringIO.new(bytes),
+          filename: "synthetic-restore-source.txt",
+          content_type: "text/plain"
+        )
+        document.update!(
           source_kind: :uploaded_file,
           source_format: "txt",
           original_filename: "synthetic-restore-source.txt",
@@ -134,12 +143,6 @@ module Operations
           source_sha256: Digest::SHA256.hexdigest(bytes),
           extraction_version: "restore-drill-v1"
         )
-        document.source_file.attach(
-          io: StringIO.new(bytes),
-          filename: "synthetic-restore-source.txt",
-          content_type: "text/plain"
-        )
-        document.save!
         [ document.source_file.blob.key, bytes ]
       end
 

@@ -91,18 +91,18 @@ module Operations
       end
 
       def validate_storage_target_before_database_restore!
-        path = Pathname.new(storage_path.to_s)
-        raise RestoreFailed, "RESTORE_STORAGE_PATH is required" if storage_path.to_s.strip.empty?
-        raise RestoreFailed, "restore storage path must be absolute" unless path.absolute?
-        raise RestoreFailed, "restore storage path must be empty" if path.exist? && (!path.directory? || path.children.any?)
+        StorageExtractor.prepare_destination!(destination: storage_path)
+      rescue StorageExtractor::UnsafeArchive => error
+        raise RestoreFailed, error.message
       end
 
       def restore_database!(bundle)
+        database_environment = PostgresConnectionEnvironment.from_url(database_url)
         command_runner.call(
-          environment: { "PGDATABASE" => database_url },
+          environment: database_environment,
           arguments: [
             "pg_restore", "--exit-on-error", "--no-owner", "--no-privileges",
-            "--dbname=",
+            "--dbname=#{database_environment.fetch("PGDATABASE")}",
             bundle.path.join(Operations::Backup::Manifest::DATABASE_FILENAME).to_s
           ]
         )
