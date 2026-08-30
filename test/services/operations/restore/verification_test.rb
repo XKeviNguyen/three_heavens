@@ -47,11 +47,14 @@ class Operations::Restore::VerificationTest < ActiveSupport::TestCase
         command_calls = calls.grep(Hash)
         assert_equal "--list", command_calls.first[:arguments][1]
         assert_equal "pg_restore", command_calls.second[:arguments].first
+        assert_equal "--dbname=isolated_restore", command_calls.second[:arguments][4]
         command_calls.each do |call|
           assert_not call[:arguments].join(" ").include?("restore_password")
           assert_not call[:arguments].join(" ").include?("postgresql://")
         end
-        assert command_calls.second[:environment].key?("PGDATABASE")
+        assert_equal "isolated_restore", command_calls.second[:environment]["PGDATABASE"]
+        assert_equal "restore_user", command_calls.second[:environment]["PGUSER"]
+        assert_equal "restore_password", command_calls.second[:environment]["PGPASSWORD"]
       end
     end
   end
@@ -146,6 +149,39 @@ class Operations::Restore::VerificationTest < ActiveSupport::TestCase
         end
         assert_equal 0, restore_calls
         assert_equal "preserve", File.read(File.join(nonempty, "existing"))
+      end
+    end
+  end
+
+  test "refuses a destination beneath live storage before database restore or extraction" do
+    Dir.mktmpdir("three-heavens-backups-") do |root|
+      Dir.mktmpdir("three-heavens-storage-") do |storage|
+        bundle = create_test_bundle(root: root, storage_root: storage).path
+        restore_calls = 0
+        runner = lambda do |environment:, arguments:|
+          restore_calls += 1 unless arguments.include?("--list")
+          true
+        end
+        target = Object.new
+        target.define_singleton_method(:validate!) { true }
+        original_service = ActiveStorage::Blob.service
+        ActiveStorage::Blob.service = ActiveStorage::Service.configure(:restore_test, restore_test: { service: "Disk", root: storage })
+
+        assert_raises(Operations::Restore::Verification::RestoreFailed) do
+          Operations::Restore::Verification.call(
+            bundle_path: bundle,
+            database_url: "postgresql://restore/isolated",
+            storage_path: File.join(storage, "restore", "nested"),
+            command_runner: runner,
+            database_target_factory: ->(**) { target },
+            live_database_url: "postgresql://live/current"
+          )
+        end
+
+        assert_equal 0, restore_calls
+        assert_not Pathname.new(storage).join("restore").exist?
+      ensure
+        ActiveStorage::Blob.service = original_service
       end
     end
   end

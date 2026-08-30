@@ -17,11 +17,10 @@
 2. Select a completed off-host bundle and run `bin/ops/restore-verify` against disposable targets first. Do not proceed if the bundle, dump catalog, extraction, schema, or integrity audit fails.
 3. Provision fresh primary, cache, queue, and cable databases. Restore only the verified primary dump. Apply the repository's current cache, queue, and cable schemas to their empty databases through the normal Rails database preparation process for the exact restored release. Do not load an old queue snapshot.
 4. Restore the verified storage tree to a newly provisioned persistent volume and preserve ownership/writability for uid/gid 1000.
-5. Boot the exact compatible application release with provider egress still fenced. Boot alone must not enqueue provider work.
-6. Run `bin/ops/preflight`, `/up`, `/ready`, admin Operations diagnostics, and `bin/ops/post-deploy-smoke`. Inspect only privacy-safe structured events.
-7. Run `bin/rails ai:reconcile_stale` after the configured stale threshold, or with deliberate incident timing, to mark pre-disaster pending/running primary records failed. This operation is bounded, idempotent, uses generic reason codes, preserves lineage and completed results, and never calls OpenRouter.
-8. Review automatic pipelines. `bin/rails pipelines:reconcile` may advance already-authorized durable pipeline state, but only after old-environment fencing is confirmed. It does not create new launch authorization. Owners explicitly decide whether to retry failed runs and incur further provider cost.
-9. Promote through the organization's separate human-controlled infrastructure procedure only after verification. This repository performs no DNS, firewall, database promotion, or Kamal deploy automatically.
+5. Boot the exact compatible application release in a **quiescent verification state** with provider egress still fenced. Set `SOLID_QUEUE_IN_PUMA=false`, do not run a separate Solid Queue worker/supervisor, and do not start recurring scheduling. Boot alone must not enqueue provider work.
+6. While quiescent, run restore integrity verification, `/up`, `/ready`, safe system diagnostics, and primary-state inspection. `bin/rails ai:reconcile_stale` may be run only when deliberately chosen after the configured stale threshold; it is bounded, idempotent, uses generic reason codes, preserves lineage and completed results, and never calls OpenRouter.
+7. After operator review, enable the normal Solid Queue supervisor/worker and recurring topology. `bin/rails pipelines:reconcile` may advance already-authorized durable pipeline state, but only after old-environment fencing is confirmed. It does not create new launch authorization. Owners explicitly decide whether to retry failed runs and incur further provider cost.
+8. Promote through the organization's separate human-controlled infrastructure procedure only after verification. This repository performs no DNS, firewall, database promotion, or Kamal deploy automatically.
 
 ## Primary run states after queue loss
 

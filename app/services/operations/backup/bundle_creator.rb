@@ -109,7 +109,7 @@ module Operations
 
       def dump_primary!(path)
         command_runner.call(
-          environment: { "PGDATABASE" => database_url },
+          environment: PostgresConnectionEnvironment.from_url(database_url),
           arguments: [
             "pg_dump", "--format=custom", "--no-owner", "--no-privileges",
             "--file", path.to_s

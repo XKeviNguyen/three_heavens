@@ -30,7 +30,7 @@ Run from a production application container or an equivalent trusted operator en
 bin/ops/backup /absolute/path/to/backup-root
 ```
 
-The command rejects an empty/relative/dangerous destination, the application root, the live storage root, symlink path components, and collisions. It invokes `pg_dump` using `PGDATABASE` in the child environment, never a credential-bearing command argument. Normal output contains only the backup ID and completed bundle path.
+The command rejects an empty/relative/dangerous destination, the application root and every descendant, the live storage root and every descendant, symlink path components, and collisions. **Never store a backup bundle inside `/rails/storage` or a descendant.** A production local staging destination must be a separately mounted path or an equivalent trusted operator filesystem, followed by an encrypted off-host copy. It invokes `pg_dump` using `PGDATABASE` in the child environment, never a credential-bearing command argument. Normal output contains only the backup ID and completed bundle path.
 
 The database dump is taken before the storage archive. Active Storage writes object bytes before committing attachment metadata. Durable Document attachments are immutable in normal product behavior and Documents are not destructively deleted; consequently every durable file referenced by the database snapshot is present when the subsequent storage archive walks the tree. A concurrently abandoned SourceImport may leave an extra unreferenced object or may be absent; the integrity audit classifies temporary staging separately. Unreferenced extra files are recoverable warnings, while a missing durable Document source is critical.
 

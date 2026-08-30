@@ -61,11 +61,26 @@ module Operations
     private_class_method :absolute_path!
 
     def reject_dangerous!(path, forbidden:)
-      forbidden_paths = forbidden.compact.map { |entry| Pathname.new(entry.to_s).expand_path.cleanpath }
-      if DANGEROUS_ROOTS.include?(path) || forbidden_paths.include?(path)
+      forbidden_paths = forbidden.compact.map { |entry| canonical_path(entry) }
+      if DANGEROUS_ROOTS.include?(path) || forbidden_paths.any? { |root| contains_path?(root, path) }
         raise UnsafePath, "dangerous path is not allowed"
       end
     end
     private_class_method :reject_dangerous!
+
+    def canonical_path(value)
+      path = Pathname.new(value.to_s).expand_path.cleanpath
+      path.realpath
+    rescue Errno::ENOENT
+      path
+    end
+    private_class_method :canonical_path
+
+    def contains_path?(root, path)
+      root_parts = root.each_filename.to_a
+      path_parts = path.each_filename.to_a
+      path_parts.first(root_parts.length) == root_parts
+    end
+    private_class_method :contains_path?
   end
 end

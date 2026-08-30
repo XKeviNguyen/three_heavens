@@ -20,4 +20,26 @@ class Operations::PathSafetyTest < ActiveSupport::TestCase
       assert_raises(Operations::PathSafety::UnsafePath) { Operations::PathSafety.prepare_root!(link) }
     end
   end
+
+  test "rejects forbidden roots and their descendants by path component" do
+    Dir.mktmpdir("three-heavens-path-safety-") do |root|
+      live_storage = File.join(root, "storage")
+      FileUtils.mkdir_p(live_storage)
+
+      [ live_storage, File.join(live_storage, "backups"), File.join(live_storage, "restore", "nested") ].each do |path|
+        assert_raises(Operations::PathSafety::UnsafePath) do
+          Operations::PathSafety.prepare_root!(path, create: true, forbidden: [ live_storage ])
+        end
+      end
+
+      sibling = File.join(root, "storage-backups")
+      assert_equal Pathname.new(sibling), Operations::PathSafety.prepare_root!(sibling, create: true, forbidden: [ live_storage ])
+    end
+
+    [ Rails.root, Rails.root.join("tmp", "operations-path-safety") ].each do |path|
+      assert_raises(Operations::PathSafety::UnsafePath) do
+        Operations::PathSafety.prepare_root!(path, create: true, forbidden: [ Rails.root ])
+      end
+    end
+  end
 end
