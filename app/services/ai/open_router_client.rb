@@ -10,6 +10,10 @@ module Ai
     DEFAULT_READ_TIMEOUT = 60
     DEFAULT_WRITE_TIMEOUT = 10
     MAX_RESPONSE_BYTES = 1_048_576
+    CONTEXT_COMPRESSION_DISABLED = [
+      { id: "context-compression", enabled: false }.freeze
+    ].freeze
+    ACCEPTED_FINISH_REASON = "stop"
 
     BoundedResponse = Data.define(:code, :body)
 
@@ -38,12 +42,13 @@ module Ai
     class PermanentError < Error; end
 
     def self.serialize_request(model_identifier:, messages:, **options)
-      JSON.generate(
+      request = {
         model: model_identifier,
         messages: messages,
-        usage: { include: true },
-        **options
-      )
+        usage: { include: true }
+      }.merge(options)
+      request[:plugins] = CONTEXT_COMPRESSION_DISABLED
+      JSON.generate(request)
     end
 
     def initialize(
@@ -176,8 +181,9 @@ module Ai
       validate_content_length!(response)
       body = String.new(encoding: Encoding::BINARY)
       response.read_body do |chunk|
+        raise_response_too_large! if chunk.bytesize > MAX_RESPONSE_BYTES - body.bytesize
+
         body << chunk
-        raise_response_too_large! if body.bytesize > MAX_RESPONSE_BYTES
       end
       BoundedResponse.new(code: response.code, body: body)
     end
@@ -215,6 +221,13 @@ module Ai
       end
 
       choice = body.fetch("choices").first
+      unless choice&.fetch("finish_reason", nil) == ACCEPTED_FINISH_REASON
+        raise PermanentError.new(
+          "The AI response was incomplete",
+          code: "incomplete_response"
+        )
+      end
+
       content = choice&.dig("message", "content")
       raise invalid_response("assistant content is missing") unless content.is_a?(String)
 

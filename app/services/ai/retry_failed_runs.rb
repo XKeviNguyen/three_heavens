@@ -61,6 +61,7 @@ module Ai
       }
       attributes[:translated_text] = nil if run.is_a?(TranslationRun)
       attributes[:telemetry_complete] = false if run.respond_to?(:telemetry_complete)
+      attributes[:cost_complete] = false if run.respond_to?(:cost_complete)
       if run.is_a?(JudgeRun)
         attributes.merge!(
           winner_translation_run_id: nil,

@@ -29,7 +29,7 @@ module AnalyticsTestHelper
       status: :completed
     )
     runs = models.to_h do |model|
-      attributes = run_attributes.fetch(model, {})
+      attributes = with_cost_completeness(run_attributes.fetch(model, {}))
       run = experiment.translation_runs.create!(
         {
           llm_model: model,
@@ -48,7 +48,8 @@ module AnalyticsTestHelper
     specs.each do |spec|
       run = round.review_runs.create!(
         reviewer_llm_model: spec.fetch(:reviewer),
-        cost: spec[:cost]
+        cost: spec[:cost],
+        cost_complete: !spec[:cost].nil?
       )
       spec.fetch(:scores, {}).each_with_index do |(translation_run, score), index|
         run.review_evaluations.create!(
@@ -78,7 +79,8 @@ module AnalyticsTestHelper
     specs.each do |spec|
       run = round.judge_runs.create!(
         judge_llm_model: spec.fetch(:judge),
-        cost: spec[:cost]
+        cost: spec[:cost],
+        cost_complete: !spec[:cost].nil?
       )
       if spec.fetch(:status, :completed).to_s == "completed"
         scores = spec.fetch(:scores)
@@ -108,5 +110,14 @@ module AnalyticsTestHelper
     end
     round.update!(status: status, winner_translation_run: winner) unless status.to_s == "running"
     round
+  end
+
+  private
+
+  def with_cost_completeness(attributes)
+    return attributes unless attributes.key?(:cost)
+    return attributes if attributes.key?(:cost_complete)
+
+    attributes.merge(cost_complete: !attributes[:cost].nil?)
   end
 end

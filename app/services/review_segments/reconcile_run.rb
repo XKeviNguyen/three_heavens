@@ -63,7 +63,10 @@ module ReviewSegments
         end
         suggestions = segment_values.map { |_, item| item["suggested_translation"] }
         attributes["suggested_translation"] = if suggestions.all?(&:present?)
-          assembled = suggestions.join
+          parts = segment_values.map do |child, item|
+            [ child.experiment_segment, item.fetch("suggested_translation") ]
+          end
+          assembled = LongDocuments::SegmentReassembler.call(parts)
           assembled if assembled.length <= 50_000
         end
         stored.update!(attributes)

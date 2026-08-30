@@ -253,16 +253,17 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
   test "cost summary preserves unknown telemetry without join multiplication" do
     experiment = create_completed_experiment
     runs = experiment.translation_runs.order(:id)
-    runs.first.update!(cost: BigDecimal("0.25"))
-    runs.second.update!(cost: nil)
+    runs.first.update!(cost: BigDecimal("0.25"), cost_complete: true)
+    runs.second.update!(cost: nil, cost_complete: false)
 
     summary = Pipelines::CostSummary.call(experiment: experiment)
     assert_equal BigDecimal("0.25"), summary.known_cost
     assert_equal 1, summary.known_count
+    assert_equal 1, summary.complete_count
     assert_equal 2, summary.record_count
     assert summary.incomplete?
 
-    runs.update_all(cost: nil)
+    runs.update_all(cost: nil, cost_complete: false)
     all_unknown = Pipelines::CostSummary.call(experiment: experiment)
     assert_nil all_unknown.known_cost
     assert_equal 0, all_unknown.known_count

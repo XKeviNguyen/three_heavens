@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -177,6 +177,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.integer "context_safety_margin_tokens"
     t.integer "context_window_tokens_snapshot"
     t.decimal "cost", precision: 20, scale: 10
+    t.boolean "cost_complete", default: false, null: false
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
@@ -206,6 +207,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.index ["finalizer_llm_model_id"], name: "index_finalization_runs_on_finalizer_llm_model_id"
     t.index ["last_claimed_at"], name: "index_finalization_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
     t.index ["pending_since"], name: "index_finalization_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
+    t.check_constraint "NOT cost_complete OR cost IS NOT NULL", name: "finalization_runs_complete_cost_present_check"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "finalization_runs_cached_tokens_check"
     t.check_constraint "claimed_job_execution >= 0", name: "finalization_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "finalization_runs_completion_tokens_check"
@@ -328,6 +330,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.integer "context_safety_margin_tokens"
     t.integer "context_window_tokens_snapshot"
     t.decimal "cost", precision: 20, scale: 10
+    t.boolean "cost_complete", default: false, null: false
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
@@ -357,6 +360,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.index ["last_claimed_at"], name: "index_judge_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
     t.index ["pending_since"], name: "index_judge_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
     t.index ["winner_translation_run_id"], name: "index_judge_runs_on_winner_translation_run_id"
+    t.check_constraint "NOT cost_complete OR cost IS NOT NULL", name: "judge_runs_complete_cost_present_check"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "judge_runs_cached_tokens_check"
     t.check_constraint "claimed_job_execution >= 0", name: "judge_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "judge_runs_completion_tokens_check"
@@ -565,6 +569,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.integer "context_safety_margin_tokens"
     t.integer "context_window_tokens_snapshot"
     t.decimal "cost", precision: 20, scale: 10
+    t.boolean "cost_complete", default: false, null: false
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
@@ -591,6 +596,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.index ["review_round_id", "reviewer_llm_model_id"], name: "index_review_runs_on_review_round_id_and_reviewer_llm_model_id", unique: true
     t.index ["review_round_id"], name: "index_review_runs_on_review_round_id"
     t.index ["reviewer_llm_model_id"], name: "index_review_runs_on_reviewer_llm_model_id"
+    t.check_constraint "NOT cost_complete OR cost IS NOT NULL", name: "review_runs_complete_cost_present_check"
     t.check_constraint "cached_tokens IS NULL OR cached_tokens >= 0", name: "review_runs_cached_tokens_check"
     t.check_constraint "claimed_job_execution >= 0", name: "review_runs_claimed_job_execution_check"
     t.check_constraint "completion_tokens IS NULL OR completion_tokens >= 0", name: "review_runs_completion_tokens_check"
@@ -695,6 +701,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.integer "context_safety_margin_tokens"
     t.integer "context_window_tokens_snapshot"
     t.decimal "cost", precision: 20, scale: 10
+    t.boolean "cost_complete", default: false, null: false
     t.datetime "created_at", null: false
     t.string "error_code"
     t.text "error_message"
@@ -723,6 +730,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_30_170400) do
     t.index ["last_claimed_at"], name: "index_translation_runs_on_running_last_claimed_at", where: "((status)::text = 'running'::text)"
     t.index ["llm_model_id"], name: "index_translation_runs_on_llm_model_id"
     t.index ["pending_since"], name: "index_translation_runs_on_pending_since", where: "((status)::text = 'pending'::text)"
+    t.check_constraint "NOT cost_complete OR cost IS NOT NULL", name: "translation_runs_complete_cost_present_check"
     t.check_constraint "claimed_job_execution >= 0", name: "translation_runs_claimed_job_execution_check"
     t.check_constraint "context_window_tokens_snapshot IS NULL AND max_output_tokens_snapshot IS NULL AND estimated_input_tokens IS NULL AND reserved_output_tokens IS NULL AND context_safety_margin_tokens IS NULL AND budget_policy_version IS NULL OR context_window_tokens_snapshot IS NOT NULL AND max_output_tokens_snapshot IS NOT NULL AND estimated_input_tokens IS NOT NULL AND reserved_output_tokens IS NOT NULL AND context_safety_margin_tokens IS NOT NULL AND budget_policy_version IS NOT NULL AND char_length(budget_policy_version::text) >= 1 AND char_length(budget_policy_version::text) <= 100 AND max_output_tokens_snapshot < context_window_tokens_snapshot AND reserved_output_tokens <= max_output_tokens_snapshot AND (estimated_input_tokens + reserved_output_tokens + context_safety_margin_tokens) <= context_window_tokens_snapshot", name: "translation_runs_budget_snapshot_integrity_check"
     t.check_constraint "context_window_tokens_snapshot IS NULL OR context_window_tokens_snapshot >= 1024 AND context_window_tokens_snapshot <= 2000000", name: "translation_runs_context_snapshot_check"

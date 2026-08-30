@@ -102,6 +102,10 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal "anthropic/claude-requested", payload["model"]
     assert_equal({ "include" => true }, payload["usage"])
     assert_equal(
+      [ { "id" => "context-compression", "enabled" => false } ],
+      payload["plugins"]
+    )
+    assert_equal(
       [
         {
           "role" => "system",
@@ -130,6 +134,66 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     client.chat_completion(**request_attributes, max_tokens: 1_234)
 
     assert_equal 1_234, JSON.parse(http.last_request.body).fetch("max_tokens")
+  end
+
+  test "fails closed for truncated and unexpected completion termination" do
+    requests = [
+      ->(client) { client.chat_completion(**request_attributes) },
+      ->(client) do
+        client.review_completion(
+          model_identifier: "review/model",
+          system_prompt: "Review",
+          user_prompt: "Candidate",
+          response_schema: { type: "object" }
+        )
+      end,
+      ->(client) do
+        client.judge_completion(
+          model_identifier: "judge/model",
+          system_prompt: "Judge",
+          user_prompt: "Candidate",
+          response_schema: { type: "object" }
+        )
+      end,
+      ->(client) do
+        client.finalization_completion(
+          model_identifier: "finalizer/model",
+          system_prompt: "Refine",
+          user_prompt: "Draft",
+          response_schema: { type: "object" }
+        )
+      end
+    ]
+
+    %w[length tool_calls content_filter error].each_with_index do |finish_reason, index|
+      http = fake_http(
+        status: 200,
+        body: {
+          choices: [
+            { finish_reason: finish_reason, message: { content: "Valid-looking partial output" } }
+          ]
+        }
+      )
+
+      error = assert_raises(Ai::OpenRouterClient::PermanentError) do
+        requests.fetch(index).call(build_client(http))
+      end
+      assert_equal "incomplete_response", error.code
+      assert_not_includes error.message, finish_reason
+    end
+  end
+
+  test "fails closed when completion termination is missing" do
+    http = fake_http(
+      status: 200,
+      body: { choices: [ { finish_reason: nil, message: { content: "Partial" } } ] }
+    )
+
+    error = assert_raises(Ai::OpenRouterClient::PermanentError) do
+      build_client(http).chat_completion(**request_attributes)
+    end
+
+    assert_equal "incomplete_response", error.code
   end
 
   test "rejects a materialized response above the byte ceiling without exposing its body" do
@@ -367,6 +431,12 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
   private
 
   def fake_http(status:, body:)
+    body = body.deep_dup
+    if status.between?(200, 299)
+      body.fetch(:choices, []).each do |choice|
+        choice[:finish_reason] = "stop" unless choice.key?(:finish_reason)
+      end
+    end
     FakeHttp.new(
       response: FakeResponse.new(code: status.to_s, body: JSON.generate(body))
     )

@@ -3,6 +3,19 @@ require "test_helper"
 class TranslationExperiments::StartTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
 
+  class RequestCountingClient
+    attr_reader :request_count
+
+    def initialize
+      @request_count = 0
+    end
+
+    def chat_completion(**)
+      @request_count += 1
+      raise "Provider request must not occur"
+    end
+  end
+
   setup do
     project = Project.create!(
       user: users(:normal),
@@ -94,5 +107,26 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
 
     assert_includes error.message, "direct"
     assert @experiment.reload.pending?
+  end
+
+  test "rejects insufficient output capability before scheduling or provider work" do
+    model = llm_models(:openrouter_claude)
+    model.update!(context_window_tokens: 64_000, max_output_tokens: 4_095)
+    client = RequestCountingClient.new
+    original_factory = TranslationRunJob.client_factory
+    TranslationRunJob.client_factory = -> { client }
+
+    assert_no_enqueued_jobs do
+      error = assert_raises(TranslationExperiments::Start::ContextBudgetError) do
+        TranslationExperiments::Start.call(experiment: @experiment, llm_models: [ model ])
+      end
+      assert_includes error.message, "required translation output reserve"
+    end
+
+    assert_equal 0, client.request_count
+    assert_empty @experiment.reload.translation_runs
+    assert @experiment.pending?
+  ensure
+    TranslationRunJob.client_factory = original_factory if original_factory
   end
 end

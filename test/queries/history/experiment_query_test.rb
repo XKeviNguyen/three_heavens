@@ -244,7 +244,8 @@ class History::ExperimentQueryTest < ActiveSupport::TestCase
     runs = specs.map do |spec|
       run = round.finalization_runs.create!(
         finalizer_llm_model: spec.fetch(:finalizer),
-        cost: spec[:cost]
+        cost: spec[:cost],
+        cost_complete: !spec[:cost].nil?
       )
       if spec.fetch(:status).to_s == "completed"
         run.update!(

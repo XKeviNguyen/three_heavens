@@ -1,11 +1,13 @@
 require "test_helper"
 require_relative "../support/final_translation_test_helper"
 require_relative "../support/authorized_ai_job_helper"
+require_relative "../support/truncated_open_router_client_helper"
 
 class FinalizationRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include FinalTranslationTestHelper
   include AuthorizedAiJobHelper
+  include TruncatedOpenRouterClientHelper
 
   setup do
     @final_translation = create_final_translation_workspace
@@ -104,6 +106,17 @@ class FinalizationRunJobTest < ActiveJob::TestCase
     assert_equal "rejected", @run.error_code
     assert_includes @run.error_message, "[FILTERED]"
     assert_not_includes @run.error_message, "finalizer-secret"
+  end
+
+  test "does not persist valid-looking truncated finalization output" do
+    with_client(truncated_open_router_client(valid_content)) do
+      perform_authorized_ai_job(FinalizationRunJob, @run)
+    end
+
+    assert @run.reload.failed?
+    assert_equal "incomplete_response", @run.error_code
+    assert_nil @run.proposed_translation
+    assert_empty @run.change_summary
   end
 
   test "retry exhaustion persists failure once" do

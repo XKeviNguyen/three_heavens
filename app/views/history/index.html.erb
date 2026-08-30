@@ -42,7 +42,7 @@
               <dt class="text-slate-500">System cost</dt>
               <dd class="mt-1 font-semibold text-slate-950"><%= analytics_money(entry.known_system_cost) %></dd>
               <% if entry.cost_telemetry_incomplete? %>
-                <p class="mt-1 text-xs font-medium text-amber-700">Known total · incomplete telemetry (<%= entry.cost_sample_count %>/<%= entry.cost_record_count %> runs)</p>
+                <p class="mt-1 text-xs font-medium text-amber-700">Known total · incomplete cost telemetry (<%= entry.cost_complete_count %>/<%= entry.cost_record_count %> runs complete; <%= entry.cost_sample_count %> with known spend)</p>
               <% elsif entry.cost_telemetry_complete? %>
                 <p class="mt-1 text-xs text-slate-500"><%= entry.cost_sample_count %> run(s) reported cost</p>
               <% else %>

@@ -1,27 +1,29 @@
 module Ai
   module SegmentAggregation
     OMISSION_MARKER = "\n\n[Additional segment data omitted to preserve the stored field limit.]".freeze
-    TELEMETRY_FIELDS = %i[
-      prompt_tokens completion_tokens total_tokens cached_tokens reasoning_tokens cost
+    TOKEN_TELEMETRY_FIELDS = %i[
+      prompt_tokens completion_tokens total_tokens cached_tokens reasoning_tokens
     ].freeze
 
     module_function
 
     def telemetry_attributes(segment_runs)
-      attributes = TELEMETRY_FIELDS.excluding(:cost).to_h do |field|
+      attributes = TOKEN_TELEMETRY_FIELDS.to_h do |field|
         values = segment_runs.map { |run| run.public_send(field) }
-        [ field, values.all?(&:present?) ? values.sum : nil ]
+        [ field, values.none?(&:nil?) ? values.sum : nil ]
       end
-      costs = segment_runs.filter_map(&:cost)
+      costs = segment_runs.map(&:cost)
+      known_costs = costs.compact
       attributes.merge(
-        cost: costs.any? ? costs.sum : nil,
+        cost: known_costs.empty? ? nil : known_costs.sum,
+        cost_complete: costs.none?(&:nil?),
         telemetry_complete: telemetry_complete?(segment_runs)
       )
     end
 
     def telemetry_complete?(runs)
       runs.all? do |run|
-        TELEMETRY_FIELDS.all? { |field| run.public_send(field).present? }
+        TOKEN_TELEMETRY_FIELDS.none? { |field| run.public_send(field).nil? }
       end
     end
 

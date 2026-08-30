@@ -97,6 +97,7 @@ class JudgeRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        cost_complete: !result.cost.nil?,
         telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
