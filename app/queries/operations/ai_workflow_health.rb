@@ -4,14 +4,20 @@ module Operations
       "Translations" => TranslationRun,
       "Reviews" => ReviewRun,
       "Judgments" => JudgeRun,
-      "Finalizations" => FinalizationRun
+      "Finalizations" => FinalizationRun,
+      "Translation segments" => TranslationSegmentRun,
+      "Review segments" => ReviewSegmentRun,
+      "Judge segments" => JudgeSegmentRun,
+      "Finalization segments" => FinalizationSegmentRun
     }.freeze
     STATUSES = %w[pending running failed].freeze
     FAILURE_WINDOW = 7.days
     FAILURE_LIMIT = 20
     SAFE_FAILURE_CODES = %w[
-      enqueue_failed invalid_response malformed_json missing_api_key model_unavailable
-      network_error provider_failure stale_execution stale_pending
+      context_budget_exceeded enqueue_failed invalid_response malformed_json missing_api_key
+      model_capability_unconfigured model_unavailable network_error provider_failure
+      response_too_large segment_execution_failed stale_execution stale_pending
+      translated_document_too_large translated_segment_too_large
     ].freeze
     HTTP_FAILURE_CODE = /\A(?:http_)?([45]\d{2})\z/
 

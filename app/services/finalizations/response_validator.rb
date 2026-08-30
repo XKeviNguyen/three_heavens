@@ -14,12 +14,13 @@ module Finalizations
     ROOT_KEYS = Finalizations::Prompt::ROOT_FIELDS.sort.freeze
     LIST_FIELDS = %w[change_summary terminology_notes warnings].freeze
 
-    def self.call(content:)
-      new(content: content).call
+    def self.call(content:, max_translation_length: FinalTranslationVersion::MAX_CONTENT_LENGTH)
+      new(content: content, max_translation_length: max_translation_length).call
     end
 
-    def initialize(content:)
+    def initialize(content:, max_translation_length:)
       @content = content
+      @max_translation_length = max_translation_length
     end
 
     def call
@@ -31,7 +32,7 @@ module Finalizations
       unless proposal.is_a?(String) && proposal.present?
         invalid!("proposed_translation must be a nonblank string")
       end
-      if proposal.length > FinalTranslationVersion::MAX_CONTENT_LENGTH
+      if proposal.length > max_translation_length
         invalid!("proposed_translation is too long")
       end
 
@@ -43,7 +44,7 @@ module Finalizations
 
     private
 
-    attr_reader :content
+    attr_reader :content, :max_translation_length
 
     def validate_list!(value, field)
       invalid!("#{field} must be an array") unless value.is_a?(Array)

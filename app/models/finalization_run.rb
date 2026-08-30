@@ -1,9 +1,15 @@
 class FinalizationRun < ApplicationRecord
+  include Ai::BudgetSnapshot
+
   TERMINAL_STATUSES = %w[completed failed].freeze
   LIST_ATTRIBUTES = %i[change_summary terminology_notes warnings].freeze
 
   belongs_to :finalization_round
   belongs_to :finalizer_llm_model, class_name: "LlmModel"
+
+  has_many :finalization_segment_runs,
+           -> { joins(:experiment_segment).order("experiment_segments.position") },
+           dependent: :restrict_with_error
 
   has_many :applied_versions,
            class_name: "FinalTranslationVersion",
@@ -38,6 +44,10 @@ class FinalizationRun < ApplicationRecord
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def segmented?
+    finalization_segment_runs.exists?
   end
 
   private

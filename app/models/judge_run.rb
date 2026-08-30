@@ -1,4 +1,6 @@
 class JudgeRun < ApplicationRecord
+  include Ai::BudgetSnapshot
+
   TERMINAL_STATUSES = %w[completed failed].freeze
 
   belongs_to :judge_round
@@ -6,6 +8,9 @@ class JudgeRun < ApplicationRecord
   belongs_to :winner_translation_run, class_name: "TranslationRun", optional: true
 
   has_many :judge_evaluations, dependent: :restrict_with_error
+  has_many :judge_segment_runs,
+           -> { joins(:experiment_segment).order("experiment_segments.position") },
+           dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",
@@ -33,6 +38,10 @@ class JudgeRun < ApplicationRecord
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def segmented?
+    judge_segment_runs.exists?
   end
 
   private

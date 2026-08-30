@@ -8,21 +8,25 @@ module Pipelines
 
     CONFIRMATION_VALUE = "1"
 
-    def self.call(experiment:, user:, workflow_profile_revision:, confirmation:, clock: -> { Time.current })
+    def self.call(experiment:, user:, workflow_profile_revision:, confirmation:,
+                  expected_provider_work_plan_digest: nil, clock: -> { Time.current })
       new(
         experiment: experiment,
         user: user,
         workflow_profile_revision: workflow_profile_revision,
         confirmation: confirmation,
+        expected_provider_work_plan_digest: expected_provider_work_plan_digest,
         clock: clock
       ).call
     end
 
-    def initialize(experiment:, user:, workflow_profile_revision:, confirmation:, clock:)
+    def initialize(experiment:, user:, workflow_profile_revision:, confirmation:,
+                   expected_provider_work_plan_digest:, clock:)
       @experiment = experiment
       @user = user
       @revision = workflow_profile_revision
       @confirmation = confirmation
+      @expected_provider_work_plan_digest = expected_provider_work_plan_digest
       @clock = clock
     end
 
@@ -33,8 +37,15 @@ module Pipelines
         profile.lock!
         validate_profile!
         role_models = resolve_all_models!
+        execution_plan = LongDocuments::Planner.call(experiment)
+        provider_work_plan = LongDocuments::ProviderWorkPlan.call(
+          execution_plan: execution_plan,
+          role_models: role_models,
+          source_character_count: experiment.document.source_text.length
+        )
+        validate_segmented_authorization!(execution_plan, provider_work_plan)
         now = clock.call
-        pipeline_run = experiment.create_pipeline_run!(audit_attributes(role_models, now))
+        pipeline_run = experiment.create_pipeline_run!(audit_attributes(role_models, provider_work_plan, now))
         pipeline_run.append_event!(
           event_key: "pipeline_started",
           event_type: "pipeline_started",
@@ -48,17 +59,23 @@ module Pipelines
         )
         TranslationExperiments::Start.call(
           experiment: experiment,
-          llm_models: role_models.fetch("translator")
+          llm_models: role_models.fetch("translator"),
+          capability_snapshots: LongDocuments::ProviderWorkPlan.capability_snapshots(
+            provider_work_plan,
+            "translator"
+          )
         )
         pipeline_run
       end
     rescue WorkflowProfiles::RoutingModels::ConfigurationUnavailableError => error
       raise ConfigurationUnavailableError, error.message
+    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+      raise ConfigurationUnavailableError, error.message
     end
 
     private
 
-    attr_reader :clock, :confirmation, :experiment, :revision, :user
+    attr_reader :clock, :confirmation, :expected_provider_work_plan_digest, :experiment, :revision, :user
 
     def profile
       revision.workflow_profile
@@ -85,7 +102,19 @@ module Pipelines
       end
     end
 
-    def audit_attributes(role_models, now)
+    def validate_segmented_authorization!(execution_plan, provider_work_plan)
+      return unless execution_plan
+
+      expected = LongDocuments::ProviderWorkPlan.digest(provider_work_plan)
+      supplied = expected_provider_work_plan_digest.to_s
+      return if supplied.length == expected.length &&
+                ActiveSupport::SecurityUtils.secure_compare(supplied, expected)
+
+      raise ConfirmationRequiredError,
+            "Confirm the exact segmented provider-work plan for this launch"
+    end
+
+    def audit_attributes(role_models, provider_work_plan, now)
       counts = role_models.transform_values(&:size)
       {
         workflow_profile_revision: revision,
@@ -96,7 +125,8 @@ module Pipelines
         reviewer_count: counts.fetch("reviewer"),
         judge_count: counts.fetch("judge"),
         finalizer_count: counts.fetch("finalizer"),
-        authorized_initial_provider_run_count: counts.values.sum,
+        authorized_initial_provider_run_count: provider_work_plan.fetch("authorized_initial_provider_request_slots"),
+        provider_work_plan: provider_work_plan,
         configuration_digest: revision.configuration_digest,
         confirmed_at: now,
         started_at: now

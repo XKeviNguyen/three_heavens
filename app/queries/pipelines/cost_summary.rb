@@ -16,7 +16,13 @@ module Pipelines
         ReviewRun.joins(:review_round).where(review_rounds: { experiment_id: experiment.id }),
         JudgeRun.joins(judge_round: :review_round).where(review_rounds: { experiment_id: experiment.id }),
         FinalizationRun.joins(finalization_round: :final_translation).where(final_translations: { experiment_id: experiment.id })
-      ].map { |scope| scope.pick(Arel.sql("SUM(cost)"), Arel.sql("COUNT(cost)"), Arel.sql("COUNT(*)")) }
+      ].map do |scope|
+        scope.pick(
+          Arel.sql("SUM(cost)"),
+          Arel.sql("COUNT(*) FILTER (WHERE cost IS NOT NULL AND telemetry_complete)"),
+          Arel.sql("COUNT(*)")
+        )
+      end
 
       known_count = rows.sum { |row| row[1] }
       Result.new(

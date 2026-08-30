@@ -47,7 +47,11 @@ module Pipelines
       return mark_running! unless experiment.completed?
 
       models = routing_models("reviewer")
-      review_round = BlindReviews::Start.call(experiment: experiment, reviewer_ids: models.map(&:id))
+      review_round = BlindReviews::Start.call(
+        experiment: experiment,
+        reviewer_ids: models.map(&:id),
+        capability_snapshots: capability_snapshots("reviewer")
+      )
       transition!(
         from: "translation",
         to: "review",
@@ -66,7 +70,11 @@ module Pipelines
       return mark_running! unless round.completed?
 
       models = routing_models("judge")
-      Judging::Start.call(review_round: round, judge_ids: models.map(&:id))
+      Judging::Start.call(
+        review_round: round,
+        judge_ids: models.map(&:id),
+        capability_snapshots: capability_snapshots("judge")
+      )
       transition!(
         from: "review",
         to: "judge",
@@ -103,7 +111,8 @@ module Pipelines
         models = routing_models("finalizer")
         finalization_round = Finalizations::Start.call(
           final_translation: final_translation,
-          finalizer_ids: models.map(&:id)
+          finalizer_ids: models.map(&:id),
+          capability_snapshots: capability_snapshots("finalizer")
         )
         pipeline_run.update!(
           status: :running,
@@ -146,6 +155,12 @@ module Pipelines
 
     def routing_models(role)
       WorkflowProfiles::RoutingModels.call(revision: revision, role: role)
+    end
+
+    def capability_snapshots(role)
+      return {} if pipeline_run.provider_work_plan.blank?
+
+      LongDocuments::ProviderWorkPlan.capability_snapshots(pipeline_run.provider_work_plan, role)
     end
 
     def transition!(from:, to:, completed_event:, started_event:)

@@ -22,12 +22,13 @@ module Judging
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(judge_run, boundary_generator: nil)
-      new(judge_run, boundary_generator: boundary_generator).build
+    def self.build(judge_run, experiment_segment: nil, boundary_generator: nil)
+      new(judge_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
     end
 
-    def initialize(judge_run, boundary_generator: nil)
+    def initialize(judge_run, experiment_segment: nil, boundary_generator: nil)
       @judge_run = judge_run
+      @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
     end
 
@@ -44,7 +45,7 @@ module Judging
 
     private
 
-    attr_reader :boundary_generator, :judge_run
+    attr_reader :boundary_generator, :experiment_segment, :judge_run
 
     def untrusted_data
       experiment_id = judge_run.judge_round.review_round.experiment_id
@@ -54,16 +55,22 @@ module Judging
       {
         source_language: project.source_language,
         target_language: project.target_language,
-        source_text: experiment.document.source_text,
+        source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
         candidates: judge_run.judge_evaluations.order(:anonymous_label).map do |evaluation|
           {
             candidate_label: evaluation.anonymous_label,
-            translation: evaluation.translation_run.translated_text,
+            translation: candidate_translation(evaluation.translation_run),
             review_feedback: feedback_for(evaluation.translation_run)
           }
         end
       }
+    end
+
+    def candidate_translation(translation_run)
+      return translation_run.translated_text unless experiment_segment
+
+      translation_run.translation_segment_runs.find_by!(experiment_segment: experiment_segment).translated_text
     end
 
     def feedback_for(translation_run)
@@ -76,6 +83,29 @@ module Judging
           item.translation_run_id == translation_run.id
         end
         raise ActiveRecord::RecordNotFound, "Candidate review feedback is missing" unless evaluation
+
+        if experiment_segment
+          segment_run = review_run.review_segment_runs.find_by!(experiment_segment: experiment_segment)
+          segment_evaluation = segment_run.evaluations.find do |item|
+            item.fetch("candidate_label") == evaluation.anonymous_label
+          end
+          raise ActiveRecord::RecordNotFound, "Candidate segment review feedback is missing" unless segment_evaluation
+
+          next {
+            reviewer_label: reviewer_label(index),
+            scores: {
+              faithfulness: segment_evaluation.fetch("faithfulness_score"),
+              naturalness: segment_evaluation.fetch("naturalness_score"),
+              terminology: segment_evaluation.fetch("terminology_score"),
+              instruction_adherence: segment_evaluation.fetch("instruction_adherence_score"),
+              overall: segment_evaluation.fetch("overall_score")
+            },
+            strengths: segment_evaluation.fetch("strengths"),
+            issues: segment_evaluation.fetch("issues"),
+            recommended_corrections: segment_evaluation.fetch("recommended_corrections"),
+            suggested_translation: segment_evaluation["suggested_translation"]
+          }
+        end
 
         {
           reviewer_label: reviewer_label(index),

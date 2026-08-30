@@ -32,6 +32,44 @@ class Pipelines::StartTest < ActiveSupport::TestCase
     assert_equal %w[pipeline_started translation_started], @pipeline.events.pluck(:event_type)
   end
 
+  test "snapshots segmented provider-work multiplication before scheduling" do
+    source = "Long paragraph。\n\n" * 500
+    @experiment.document.update!(source_text: source)
+    @profile.current_revision.model_selections.each do |selection|
+      selection.llm_model.update!(context_window_tokens: 64_000, max_output_tokens: 4_096)
+    end
+
+    expected_translation_jobs = LongDocuments::Segmenter.call(source).size * 2
+    assert_enqueued_jobs expected_translation_jobs, only: TranslationSegmentRunJob do
+      @pipeline = start_pipeline
+    end
+
+    segment_count = @experiment.document_execution_plan.segment_count
+    expected = @profile.current_revision.model_selections.count * segment_count
+    assert_equal expected, @pipeline.authorized_initial_provider_run_count
+    assert_equal expected, @pipeline.provider_work_plan.fetch("authorized_initial_provider_request_slots")
+    assert_equal segment_count, @pipeline.provider_work_plan.fetch("segment_count")
+    assert_equal 2 * segment_count,
+                 @pipeline.provider_work_plan.dig("roles", "translator", "provider_request_slots")
+    assert_equal 2 * segment_count, @experiment.translation_runs.sum { |run| run.translation_segment_runs.count }
+  end
+
+  test "segmented launches require the exact provider-work plan digest" do
+    source = "Long paragraph。\n\n" * 500
+    @experiment.document.update!(source_text: source)
+    @profile.current_revision.model_selections.each do |selection|
+      selection.llm_model.update!(context_window_tokens: 64_000, max_output_tokens: 4_096)
+    end
+
+    assert_no_difference [ -> { PipelineRun.count }, -> { TranslationRun.count }, -> { DocumentExecutionPlan.count } ] do
+      assert_no_enqueued_jobs only: TranslationSegmentRunJob do
+        assert_raises(Pipelines::Start::ConfirmationRequiredError) do
+          start_pipeline(expected_provider_work_plan_digest: "0" * 64)
+        end
+      end
+    end
+  end
+
   test "confirmation inactive stale cross-owner and changed routing fail closed" do
     assert_raises Pipelines::Start::ConfirmationRequiredError do
       start_pipeline(confirmation: "0")
@@ -122,12 +160,31 @@ class Pipelines::StartTest < ActiveSupport::TestCase
 
   private
 
-  def start_pipeline(confirmation: "1", revision: @profile.current_revision)
+  def start_pipeline(confirmation: "1", revision: @profile.current_revision,
+                     expected_provider_work_plan_digest: segmented_plan_digest(revision))
     Pipelines::Start.call(
       experiment: @experiment,
       user: users(:normal),
       workflow_profile_revision: revision,
-      confirmation: confirmation
+      confirmation: confirmation,
+      expected_provider_work_plan_digest: expected_provider_work_plan_digest
     )
+  end
+
+  def segmented_plan_digest(revision)
+    source = @experiment.document.source_text
+    return if source.length <= LongDocuments::Segmenter::TARGET_CHARACTERS
+
+    role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
+      [ role, revision.selections_for(role).map(&:llm_model) ]
+    end
+    preview = LongDocuments::ProviderWorkPlan.call(
+      execution_plan: LongDocuments::ProviderWorkPlan::Preview.new(
+        segment_count: LongDocuments::Segmenter.call(source).size
+      ),
+      role_models: role_models,
+      source_character_count: source.length
+    )
+    LongDocuments::ProviderWorkPlan.digest(preview)
   end
 end

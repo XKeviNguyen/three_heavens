@@ -32,9 +32,17 @@ class FinalizationRunJob < ApplicationJob
     @claimed_attempt = claim_result.attempt
 
     prompt = Finalizations::Prompt.build(finalization_run)
+    budget = Ai::RunContextBudget.call(
+      run: finalization_run,
+      model: finalization_run.finalizer_llm_model,
+      prompt: prompt,
+      stage: :finalization,
+      source_character_count: finalization_run.finalization_round.final_translation.experiment.document.source_text.length
+    )
     result = client_for(finalization_run.finalizer_llm_model).finalization_completion(
       model_identifier: finalization_run.finalizer_llm_model.model_identifier,
-      **prompt
+      **prompt,
+      max_tokens: budget.reserved_output_tokens
     )
     proposal = Finalizations::ResponseValidator.call(content: result.content)
     persist_success(finalization_run, result, proposal, @claimed_attempt)
@@ -78,6 +86,7 @@ class FinalizationRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil

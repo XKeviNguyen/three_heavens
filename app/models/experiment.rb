@@ -2,6 +2,7 @@ class Experiment < ApplicationRecord
   belongs_to :document
 
   has_many :translation_runs, dependent: :restrict_with_error
+  has_one :document_execution_plan, dependent: :restrict_with_error
   has_one :review_round, dependent: :restrict_with_error
   has_one :judge_round, through: :review_round
   has_one :final_translation, dependent: :restrict_with_error

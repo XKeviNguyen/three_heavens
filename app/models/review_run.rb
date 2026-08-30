@@ -1,10 +1,15 @@
 class ReviewRun < ApplicationRecord
+  include Ai::BudgetSnapshot
+
   TERMINAL_STATUSES = %w[completed failed].freeze
 
   belongs_to :review_round
   belongs_to :reviewer_llm_model, class_name: "LlmModel"
 
   has_many :review_evaluations, dependent: :restrict_with_error
+  has_many :review_segment_runs,
+           -> { joins(:experiment_segment).order("experiment_segments.position") },
+           dependent: :restrict_with_error
 
   enum :status, {
     pending: "pending",
@@ -26,6 +31,10 @@ class ReviewRun < ApplicationRecord
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def segmented?
+    review_segment_runs.exists?
   end
 
   private

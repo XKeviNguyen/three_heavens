@@ -34,6 +34,7 @@
 
           <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
             <div><dt class="text-slate-500">Translation candidates</dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.translation_candidate_count %></dd></div>
+            <div><dt class="text-slate-500">Execution</dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.execution_segment_count > 1 ? "Segmented (#{entry.execution_segment_count} segments)" : "Single request per run" %></dd></div>
             <div><dt class="text-slate-500">Blind review</dt><dd class="mt-1 font-semibold text-slate-950"><%= review_round&.status&.humanize || "Not started" %></dd></div>
             <div><dt class="text-slate-500">Judge round</dt><dd class="mt-1 font-semibold text-slate-950"><%= judge_round&.status&.humanize || "Not started" %></dd></div>
             <div><dt class="text-slate-500">Official winner</dt><dd class="mt-1 font-semibold text-slate-950"><%= judge_round&.winner_translation_run&.llm_model&.display_name || "N/A" %></dd></div>

@@ -52,6 +52,8 @@
           <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(review_run.status) %>"><%= review_run.status.humanize %></span>
         </div>
 
+        <% if review_run.review_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">Segmented execution: <strong><%= review_run.review_segment_runs.count(&:completed?) %> / <%= review_run.review_segment_runs.size %></strong> provider requests complete.</p><% end %>
+
         <% if review_run.failed? %>
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p class="font-semibold">Reviewer failed</p>
@@ -164,6 +166,7 @@
       <p class="mt-2 max-w-3xl text-sm text-slate-600">
         Select 1–<%= Ai::UsageLimits::MAX_JUDGES %> judge models. Judges receive anonymously labeled translations and anonymous blind-review feedback; candidate and reviewer model identities remain private from them.
       </p>
+      <% if @review_round.experiment.document_execution_plan %><p class="mt-2 text-sm font-semibold text-amber-800">This document has <%= @review_round.experiment.document_execution_plan.segment_count %> segments. Each selected judge authorizes <%= @review_round.experiment.document_execution_plan.segment_count %> initial segment provider requests; built-in retries may add calls.</p><% end %>
 
       <%= form_with url: review_round_judge_rounds_path(@review_round), scope: :judge_round, class: "mt-5 space-y-5" do |form| %>
         <% if @judge_models.any? %>

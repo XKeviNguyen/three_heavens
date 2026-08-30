@@ -20,6 +20,7 @@ class ReviewRoundsController < ApplicationController
       experiment: { document: :project },
       review_runs: [
         :reviewer_llm_model,
+        :review_segment_runs,
         { review_evaluations: { translation_run: :llm_model } }
       ]
     ).find(params[:id])
@@ -58,7 +59,7 @@ class ReviewRoundsController < ApplicationController
   def load_experiment_page
     @experiment = current_user.experiments.includes(
       document: :project,
-      translation_runs: :llm_model,
+      translation_runs: [ :llm_model, :translation_segment_runs ],
       review_round: { review_runs: :reviewer_llm_model }
     ).find(@experiment.id)
     @reviewer_models = LlmModel.active_openrouter.order(:display_name, :id)

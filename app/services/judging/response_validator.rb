@@ -33,6 +33,7 @@ module Judging
       validate_winner!(payload, validated)
       validate_string!(payload["winner_rationale"], "winner_rationale")
       validate_score!(payload["confidence_score"], "confidence_score")
+      invalid!("judgment payload is too large") if JSON.generate(payload).bytesize > 100_000
 
       payload
     rescue JSON::ParserError => error

@@ -85,6 +85,14 @@ class TranslationRunJobTest < ActiveJob::TestCase
                  captured_arguments[:instruction_prompt]
     assert_equal @experiment.document.source_text,
                  captured_arguments[:source_text]
+    assert_equal Ai::ContextBudget::CONSERVATIVE_MAX_OUTPUT_TOKENS,
+                 captured_arguments[:max_tokens]
+    assert_equal Ai::ContextBudget::CONSERVATIVE_CONTEXT_TOKENS,
+                 run.reload.context_window_tokens_snapshot
+    assert_equal Ai::ContextBudget::CONSERVATIVE_MAX_OUTPUT_TOKENS,
+                 run.max_output_tokens_snapshot
+    assert_equal Ai::ContextBudget::POLICY_VERSION, run.budget_policy_version
+    assert_not run.telemetry_complete?
   end
 
   test "marks permanent failures and sanitizes their messages" do

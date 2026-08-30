@@ -72,7 +72,9 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
              llm_model: {
                provider: "  anthropic  ",
                model_identifier: "  anthropic/claude-created  ",
-               display_name: "  Claude Created  "
+               display_name: "  Claude Created  ",
+               context_window_tokens: "128000",
+               max_output_tokens: "8192"
              }
            }
     end
@@ -83,6 +85,8 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_equal "anthropic", model.provider
     assert_equal "anthropic/claude-created", model.model_identifier
     assert_equal "Claude Created", model.display_name
+    assert_equal 128_000, model.context_window_tokens
+    assert_equal 8_192, model.max_output_tokens
     assert model.active?
   end
 

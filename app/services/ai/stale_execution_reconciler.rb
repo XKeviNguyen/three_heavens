@@ -5,7 +5,10 @@ module Ai
     PENDING_ERROR_CODE = "stale_pending"
     PENDING_ERROR_MESSAGE = "Queued work did not begin in time. The owner may retry it explicitly."
     DEFAULT_BATCH_SIZE = 500
-    RUN_CLASSES = [ TranslationRun, ReviewRun, JudgeRun, FinalizationRun ].freeze
+    RUN_CLASSES = [
+      TranslationRun, ReviewRun, JudgeRun, FinalizationRun,
+      TranslationSegmentRun, ReviewSegmentRun, JudgeSegmentRun, FinalizationSegmentRun
+    ].freeze
 
     Result = Data.define(:running_failed_counts, :pending_failed_counts) do
       def failed_counts

@@ -1,8 +1,14 @@
 class TranslationRun < ApplicationRecord
+  include Ai::BudgetSnapshot
+
   TERMINAL_STATUSES = %w[completed failed].freeze
 
   belongs_to :experiment
   belongs_to :llm_model
+
+  has_many :translation_segment_runs,
+           -> { joins(:experiment_segment).order("experiment_segments.position") },
+           dependent: :restrict_with_error
 
   has_many :review_evaluations, dependent: :restrict_with_error
   has_many :judge_evaluations, dependent: :restrict_with_error
@@ -40,8 +46,15 @@ class TranslationRun < ApplicationRecord
   validates :cost,
             numericality: { greater_than_or_equal_to: 0 },
             allow_nil: true
+  validates :translated_text,
+            length: { maximum: Ai::UsageLimits::MAX_SOURCE_CHARACTERS },
+            allow_nil: true
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def segmented?
+    translation_segment_runs.exists?
   end
 end

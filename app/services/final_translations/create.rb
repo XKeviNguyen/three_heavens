@@ -58,8 +58,15 @@ module FinalTranslations
         version_number: 1,
         content: winner.translated_text,
         origin: :seed,
+        segment_alignment_valid: true,
         change_note: "Seeded from the official winning translation"
       )
+      winner.translation_segment_runs.includes(:experiment_segment).each do |segment_run|
+        seed_version.segments.create!(
+          experiment_segment: segment_run.experiment_segment,
+          content: segment_run.translated_text
+        )
+      end
       final_translation.update!(current_version: seed_version)
       final_translation
     end

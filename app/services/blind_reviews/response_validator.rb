@@ -13,13 +13,18 @@ module BlindReviews
     SCORE_FIELDS = BlindReviews::Prompt::SCORE_FIELDS.freeze
     FEEDBACK_FIELDS = %w[strengths issues recommended_corrections].freeze
 
-    def self.call(content:, expected_labels:)
-      new(content: content, expected_labels: expected_labels).call
+    def self.call(content:, expected_labels:, max_suggestion_length: 50_000)
+      new(
+        content: content,
+        expected_labels: expected_labels,
+        max_suggestion_length: max_suggestion_length
+      ).call
     end
 
-    def initialize(content:, expected_labels:)
+    def initialize(content:, expected_labels:, max_suggestion_length:)
       @content = content
       @expected_labels = expected_labels.sort
+      @max_suggestion_length = max_suggestion_length
     end
 
     def call
@@ -33,6 +38,7 @@ module BlindReviews
       validated = evaluations.map { |evaluation| validate_evaluation(evaluation) }
       labels = validated.map { |evaluation| evaluation.fetch("candidate_label") }
       invalid!("candidate labels must appear exactly once") unless labels.sort == expected_labels && labels.uniq.size == labels.size
+      invalid!("evaluations payload is too large") if JSON.generate(validated).bytesize > 100_000
 
       validated
     rescue JSON::ParserError => error
@@ -41,7 +47,7 @@ module BlindReviews
 
     private
 
-    attr_reader :content, :expected_labels
+    attr_reader :content, :expected_labels, :max_suggestion_length
 
     def validate_evaluation(evaluation)
       invalid!("each evaluation must be an object") unless evaluation.is_a?(Hash)
@@ -63,7 +69,7 @@ module BlindReviews
 
       suggestion = evaluation["suggested_translation"]
       invalid!("suggested_translation must be a string or null") unless suggestion.nil? || suggestion.is_a?(String)
-      invalid!("suggested_translation is too long") if suggestion&.length.to_i > 50_000
+      invalid!("suggested_translation is too long") if suggestion&.length.to_i > max_suggestion_length
 
       evaluation
     end
