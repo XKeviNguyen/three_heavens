@@ -283,3 +283,139 @@ After every completed task, provide a concise terminal report containing:
 - confirmation that `main` was not modified, `.env` was not inspected, no
   unauthorized provider request occurred, and no persistent data or volume was
   destroyed.
+
+## Engineering operating principles
+
+### Prefer the smallest sufficient solution
+
+Before adding code, abstractions, dependencies, configuration, state, or files,
+inspect whether the existing implementation can be reused, simplified, or
+corrected.
+
+Remove dead, duplicated, unreachable, obsolete, or superseded code when doing
+so is safe, directly related to the task, and reduces total complexity.
+
+Prefer improving an existing clear abstraction over creating a parallel one.
+
+Introduce a new abstraction only when it:
+
+- represents a real domain concept;
+- isolates a real external/infrastructure boundary;
+- removes meaningful duplication; or
+- makes an important invariant substantially easier to enforce or test.
+
+Do not create speculative extension points, placeholder services, unused
+configuration, generic frameworks for one concrete use case, or dependencies
+without a current product requirement.
+
+Prefer the smallest sufficient design, not merely the smallest textual diff.
+A larger root-cause fix is preferable to a smaller workaround when it reduces
+total complexity or prevents recurrence.
+
+### Model the domain before substantial implementation
+
+For non-trivial stateful behavior, determine before coding:
+
+- authoritative state versus derived state;
+- entities and ownership boundaries;
+- valid and invalid state transitions;
+- lifecycle and deletion rules;
+- concurrency and idempotency assumptions;
+- failure, retry, cancellation, and recovery semantics;
+- cost and boundedness requirements.
+
+In Rails, encode important invariants at the strongest practical layer:
+PostgreSQL constraints and indexes, model validations, enums, immutable records,
+value objects, and explicit service boundaries.
+
+Do not represent an unclear state machine as scattered conditionals.
+
+### Optimize the complete user flow
+
+For user-facing behavior reason through:
+
+user action
+→ durable state change
+→ asynchronous work if any
+→ visible feedback
+→ failure/retry behavior
+→ cancellation
+→ completion
+
+Prefer predictable behavior, useful feedback, safe recovery, and stable UI
+state over internal elegance that makes the actual product confusing or
+fragile.
+
+User experience never overrides correctness, privacy, security, data integrity,
+or explicit provider-cost authorization.
+
+### Preserve architectural boundaries
+
+Keep responsibilities explicit:
+
+- controllers: HTTP transport, authentication/authorization, parameter shape,
+  and response selection;
+- models and PostgreSQL: durable state and persistent invariants;
+- services/forms: domain workflows and application orchestration;
+- jobs: asynchronous execution, retries, and durable work boundaries;
+- queries: bounded read/analytics logic;
+- provider clients: external API behavior;
+- operations services: process, filesystem, backup, restore, and infrastructure
+  boundaries.
+
+Do not duplicate authoritative state across layers without a clear reason.
+Do not leak provider, queue, filesystem, or deployment implementation details
+into unrelated domain APIs.
+
+### Fix root causes and prove behavior
+
+For defects:
+
+1. reproduce or precisely reason about the failure;
+2. identify the violated invariant or root cause;
+3. fix it at the correct architectural boundary;
+4. add deterministic regression coverage;
+5. inspect adjacent paths that depend on the same invariant.
+
+Do not hide deterministic failures with sleeps, arbitrary retries, oversized
+queues, catch-all rescue blocks, disabled checks, or special-case bypasses.
+
+Distinguish evidence precisely:
+
+- implemented;
+- unit tested;
+- integration tested;
+- CI verified;
+- runtime verified;
+- production verified.
+
+Never claim a stronger level of verification than was actually performed.
+
+When the real runtime path cannot safely be exercised, state exactly what was
+tested and what remains unverified.
+
+### Minimize cognitive load
+
+Prefer straightforward control flow, descriptive domain names, local reasoning,
+explicit ownership, focused methods, limited mutation, and comments that
+explain why.
+
+Avoid clever code, premature genericization, unnecessary wrapper layers, hidden
+side effects, and abstractions that increase rather than reduce reader load.
+
+### Final simplification review
+
+Before finalizing a coding Pull Request, inspect the diff and ask:
+
+- Can newly added code be removed or simplified?
+- Did this change create duplicate concepts or state?
+- Is every new abstraction currently justified?
+- Is every new dependency/configuration currently consumed?
+- Is the root cause actually fixed?
+- Is the user flow correct?
+- Are important invariants encoded and regression-tested?
+- What exact evidence proves the behavior works?
+
+Do not refactor unrelated code merely for aesthetic cleanup.
+
+The objective is minimum necessary complexity, not minimum line count.
