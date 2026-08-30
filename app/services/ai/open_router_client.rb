@@ -9,6 +9,9 @@ module Ai
     DEFAULT_OPEN_TIMEOUT = 5
     DEFAULT_READ_TIMEOUT = 60
     DEFAULT_WRITE_TIMEOUT = 10
+    MAX_RESPONSE_BYTES = 1_048_576
+
+    BoundedResponse = Data.define(:code, :body)
 
     Result = Data.define(
       :content,
@@ -34,6 +37,15 @@ module Ai
     class RetryableError < Error; end
     class PermanentError < Error; end
 
+    def self.serialize_request(model_identifier:, messages:, **options)
+      JSON.generate(
+        model: model_identifier,
+        messages: messages,
+        usage: { include: true },
+        **options
+      )
+    end
+
     def initialize(
       http_factory: nil,
       open_timeout: DEFAULT_OPEN_TIMEOUT,
@@ -52,51 +64,55 @@ module Ai
       )
     end
 
-    def chat_completion(model_identifier:, instruction_prompt:, source_text:)
+    def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens: nil)
       response = perform_request(
         model_identifier: model_identifier,
         messages: [
           { role: "system", content: instruction_prompt },
           { role: "user", content: source_text }
-        ]
+        ],
+        **max_tokens_option(max_tokens)
       )
 
       parse_response(response)
     end
 
-    def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "blind_translation_review"
+        schema_name: "blind_translation_review",
+        max_tokens: max_tokens
       )
     end
 
-    def judge_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def judge_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "blind_translation_judgment"
+        schema_name: "blind_translation_judgment",
+        max_tokens: max_tokens
       )
     end
 
-    def finalization_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def finalization_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "final_translation_refinement"
+        schema_name: "final_translation_refinement",
+        max_tokens: max_tokens
       )
     end
 
     private
 
-    def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:)
+    def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:, max_tokens:)
       response = perform_request(
         model_identifier: model_identifier,
         messages: [
@@ -111,7 +127,8 @@ module Ai
             schema: response_schema
           }
         },
-        provider: { require_parameters: true }
+        provider: { require_parameters: true },
+        **max_tokens_option(max_tokens)
       )
 
       parse_response(response)
@@ -121,10 +138,9 @@ module Ai
       request = Net::HTTP::Post.new(ENDPOINT)
       request["Authorization"] = "Bearer #{@api_key}"
       request["Content-Type"] = "application/json"
-      request.body = JSON.generate(
-        model: model_identifier,
+      request.body = self.class.serialize_request(
+        model_identifier: model_identifier,
         messages: messages,
-        usage: { include: true },
         **options
       )
 
@@ -133,7 +149,13 @@ module Ai
       http.open_timeout = @open_timeout
       http.read_timeout = @read_timeout
       http.write_timeout = @write_timeout if http.respond_to?(:write_timeout=)
-      http.start { |connection| connection.request(request) }
+      bounded_response = nil
+      raw_response = http.start do |connection|
+        connection.request(request) do |response|
+          bounded_response = read_bounded_response(response)
+        end
+      end
+      bounded_response || read_materialized_response(raw_response)
     rescue Net::OpenTimeout,
            Net::ReadTimeout,
            Net::WriteTimeout,
@@ -148,6 +170,40 @@ module Ai
         "OpenRouter network request failed: #{error.class}",
         code: "network_error"
       )
+    end
+
+    def read_bounded_response(response)
+      validate_content_length!(response)
+      body = String.new(encoding: Encoding::BINARY)
+      response.read_body do |chunk|
+        body << chunk
+        raise_response_too_large! if body.bytesize > MAX_RESPONSE_BYTES
+      end
+      BoundedResponse.new(code: response.code, body: body)
+    end
+
+    def read_materialized_response(response)
+      body = response.body.to_s
+      raise_response_too_large! if body.bytesize > MAX_RESPONSE_BYTES
+      BoundedResponse.new(code: response.code, body: body)
+    end
+
+    def validate_content_length!(response)
+      return unless response.respond_to?(:[])
+
+      length = Integer(response["content-length"], exception: false)
+      raise_response_too_large! if length && length > MAX_RESPONSE_BYTES
+    end
+
+    def raise_response_too_large!
+      raise PermanentError.new(
+        "OpenRouter response exceeded the safe size limit",
+        code: "response_too_large"
+      )
+    end
+
+    def max_tokens_option(value)
+      value ? { max_tokens: Integer(value) } : {}
     end
 
     def parse_response(response)

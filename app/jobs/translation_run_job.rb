@@ -30,11 +30,32 @@ class TranslationRunJob < ApplicationJob
 
     @claimed_attempt = claim.attempt
 
+    prompt = {
+      system_prompt: translation_run.experiment.instruction_prompt,
+      user_prompt: translation_run.experiment.document.source_text
+    }
+    budget = Ai::RunContextBudget.call(
+      run: translation_run,
+      model: translation_run.llm_model,
+      prompt: prompt,
+      stage: :translation,
+      source_character_count: translation_run.experiment.document.source_text.length
+    )
+
     result = client_for(translation_run.llm_model).chat_completion(
       model_identifier: translation_run.llm_model.model_identifier,
-      instruction_prompt: translation_run.experiment.instruction_prompt,
-      source_text: translation_run.experiment.document.source_text
+      instruction_prompt: prompt.fetch(:system_prompt),
+      source_text: prompt.fetch(:user_prompt),
+      max_tokens: budget.reserved_output_tokens
     )
+
+    unless result.content.is_a?(String) && result.content.present? &&
+           result.content.length <= Ai::UsageLimits::MAX_SOURCE_CHARACTERS
+      raise Ai::OpenRouterClient::PermanentError.new(
+        "Translation output exceeded the safe document length",
+        code: "translated_document_too_large"
+      )
+    end
 
     persist_success(translation_run, result, @claimed_attempt)
   rescue Ai::OpenRouterClient::RetryableError
@@ -75,6 +96,7 @@ class TranslationRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil

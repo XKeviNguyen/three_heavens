@@ -11,6 +11,7 @@ class TranslationWorkspacesController < ApplicationController
     workflow_mode
     workflow_profile_revision_id
     automatic_confirmation
+    automatic_plan_digest
     submission_token
   ].freeze
 

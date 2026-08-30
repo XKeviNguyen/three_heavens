@@ -87,6 +87,8 @@
           <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(judge_run.status) %>"><%= judge_run.status.humanize %></span>
         </div>
 
+        <% if judge_run.judge_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">Segmented execution: <strong><%= judge_run.judge_segment_runs.count(&:completed?) %> / <%= judge_run.judge_segment_runs.size %></strong> provider requests complete.</p><% end %>
+
         <% if judge_run.failed? %>
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p class="font-semibold">Judge failed</p>

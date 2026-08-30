@@ -32,9 +32,17 @@ class ReviewRunJob < ApplicationJob
     @claimed_attempt = claim_result.attempt
 
     prompt = BlindReviews::Prompt.build(review_run)
+    budget = Ai::RunContextBudget.call(
+      run: review_run,
+      model: review_run.reviewer_llm_model,
+      prompt: prompt,
+      stage: :review,
+      source_character_count: review_run.review_round.experiment.document.source_text.length
+    )
     result = client_for(review_run.reviewer_llm_model).review_completion(
       model_identifier: review_run.reviewer_llm_model.model_identifier,
-      **prompt
+      **prompt,
+      max_tokens: budget.reserved_output_tokens
     )
     evaluations = BlindReviews::ResponseValidator.call(
       content: result.content,
@@ -86,6 +94,7 @@ class ReviewRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil

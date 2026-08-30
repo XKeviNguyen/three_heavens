@@ -25,6 +25,7 @@ class PipelineRun < ApplicationRecord
   validates :confirmed_at, :started_at, presence: true
   validates :blocked_message, length: { maximum: 500 }, allow_nil: true
   validates :blocked_reason_code, length: { maximum: 80 }, allow_nil: true
+  validate :provider_work_plan_is_bounded_object
   validate :authorization_counts_match
   validate :terminal_timestamps_match
 
@@ -49,7 +50,11 @@ class PipelineRun < ApplicationRecord
   private
 
   def authorization_counts_match
-    expected = translator_count.to_i + reviewer_count.to_i + judge_count.to_i + finalizer_count.to_i
+    expected = if provider_work_plan.present?
+      provider_work_plan["authorized_initial_provider_request_slots"]
+    else
+      translator_count.to_i + reviewer_count.to_i + judge_count.to_i + finalizer_count.to_i
+    end
     unless authorized_initial_provider_run_count == expected
       errors.add(:authorized_initial_provider_run_count, "must equal all configured initial provider run slots")
     end
@@ -66,5 +71,10 @@ class PipelineRun < ApplicationRecord
     if blocked? != (blocked_stage.present? && blocked_reason_code.present?)
       errors.add(:blocked_stage, "and reason must match blocked status")
     end
+  end
+
+  def provider_work_plan_is_bounded_object
+    errors.add(:provider_work_plan, "must be an object") unless provider_work_plan.is_a?(Hash)
+    errors.add(:provider_work_plan, "is too large") if provider_work_plan.to_json.bytesize > 16_384
   end
 end

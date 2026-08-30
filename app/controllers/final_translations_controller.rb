@@ -122,7 +122,7 @@ class FinalTranslationsController < ApplicationController
       versions: { source_finalization_run: :finalizer_llm_model },
       finalization_rounds: [
         :base_version,
-        { finalization_runs: :finalizer_llm_model }
+        { finalization_runs: [ :finalizer_llm_model, :finalization_segment_runs ] }
       ]
     ).find(@final_translation.id)
     @finalizer_models = LlmModel.active_openrouter.order(:display_name, :id)

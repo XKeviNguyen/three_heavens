@@ -27,6 +27,32 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     end
   end
 
+  class StreamingResponse
+    attr_reader :code
+
+    def initialize(code:, chunks:, content_length: nil)
+      @code = code.to_s
+      @chunks = chunks
+      @content_length = content_length
+    end
+
+    def [](name)
+      @content_length.to_s if name.downcase == "content-length" && @content_length
+    end
+
+    def read_body
+      @chunks.each { |chunk| yield chunk }
+    end
+  end
+
+  class StreamingHttp < FakeHttp
+    def request(request)
+      @last_request = request
+      yield @response
+      @response
+    end
+  end
+
   setup do
     @original_api_key = ENV["OPENROUTER_API_KEY"]
     ENV["OPENROUTER_API_KEY"] = "test-openrouter-key"
@@ -95,6 +121,47 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal 20, result.cached_tokens
     assert_equal 8, result.reasoning_tokens
     assert_equal BigDecimal("0.0012345678"), result.cost
+  end
+
+  test "sends an explicit completion limit when provided" do
+    http = fake_http(status: 200, body: { choices: [ { message: { content: "Translated" } } ] })
+    client = build_client(http)
+
+    client.chat_completion(**request_attributes, max_tokens: 1_234)
+
+    assert_equal 1_234, JSON.parse(http.last_request.body).fetch("max_tokens")
+  end
+
+  test "rejects a materialized response above the byte ceiling without exposing its body" do
+    response = FakeResponse.new(
+      code: "200",
+      body: "x" * (Ai::OpenRouterClient::MAX_RESPONSE_BYTES + 1)
+    )
+    error = assert_raises(Ai::OpenRouterClient::PermanentError) do
+      build_client(FakeHttp.new(response: response)).chat_completion(**request_attributes)
+    end
+
+    assert_equal "response_too_large", error.code
+    assert_not_includes error.message, "x" * 100
+  end
+
+  test "rejects content length and streamed chunks above the byte ceiling" do
+    oversized_length = StreamingResponse.new(
+      code: 200,
+      chunks: [],
+      content_length: Ai::OpenRouterClient::MAX_RESPONSE_BYTES + 1
+    )
+    streamed = StreamingResponse.new(
+      code: 200,
+      chunks: [ "語" * 200_000, "語" * 200_000 ]
+    )
+
+    [ oversized_length, streamed ].each do |response|
+      error = assert_raises(Ai::OpenRouterClient::PermanentError) do
+        build_client(StreamingHttp.new(response: response)).chat_completion(**request_attributes)
+      end
+      assert_equal "response_too_large", error.code
+    end
   end
 
   test "sends strict structured review requests without changing translation calls" do

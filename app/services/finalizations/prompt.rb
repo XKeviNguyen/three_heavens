@@ -14,12 +14,13 @@ module Finalizations
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(finalization_run, boundary_generator: nil)
-      new(finalization_run, boundary_generator: boundary_generator).build
+    def self.build(finalization_run, experiment_segment: nil, boundary_generator: nil)
+      new(finalization_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
     end
 
-    def initialize(finalization_run, boundary_generator: nil)
+    def initialize(finalization_run, experiment_segment: nil, boundary_generator: nil)
       @finalization_run = finalization_run
+      @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
     end
 
@@ -36,7 +37,7 @@ module Finalizations
 
     private
 
-    attr_reader :boundary_generator, :finalization_run
+    attr_reader :boundary_generator, :experiment_segment, :finalization_run
 
     def round
       finalization_run.finalization_round
@@ -59,18 +60,40 @@ module Finalizations
       {
         source_language: project.source_language,
         target_language: project.target_language,
-        source_text: experiment.document.source_text,
+        source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
-        base_final_draft: round.base_version.content,
-        official_winning_translation: winner.translated_text,
+        base_final_draft: base_draft,
+        official_winning_translation: winning_translation,
         blind_review_feedback: blind_review_feedback,
         judge_feedback: judge_feedback,
         aggregate_judgment: aggregate_judgment
       }
     end
 
+    def base_draft
+      return round.base_version.content unless experiment_segment
+
+      round.base_version.segments.find_by!(experiment_segment: experiment_segment).content
+    end
+
+    def winning_translation
+      return winner.translated_text unless experiment_segment
+
+      winner.translation_segment_runs.find_by!(experiment_segment: experiment_segment).translated_text
+    end
+
     def blind_review_feedback
       winner.review_evaluations.includes(:review_run).order(:created_at, :id).map do |evaluation|
+        if experiment_segment
+          segment_run = evaluation.review_run.review_segment_runs.find_by!(experiment_segment: experiment_segment)
+          segment_evaluation = segment_run.evaluations.find do |item|
+            item.fetch("candidate_label") == evaluation.anonymous_label
+          end
+          raise ActiveRecord::RecordNotFound, "Winner segment review feedback is missing" unless segment_evaluation
+
+          next segment_evaluation.except("candidate_label")
+        end
+
         {
           faithfulness_score: evaluation.faithfulness_score,
           naturalness_score: evaluation.naturalness_score,
@@ -87,6 +110,16 @@ module Finalizations
 
     def judge_feedback
       winner.judge_evaluations.includes(:judge_run).order(:created_at, :id).map do |evaluation|
+        if experiment_segment
+          segment_run = evaluation.judge_run.judge_segment_runs.find_by!(experiment_segment: experiment_segment)
+          ranking = segment_run.judgment.fetch("rankings").find do |item|
+            item.fetch("candidate_label") == evaluation.anonymous_label
+          end
+          raise ActiveRecord::RecordNotFound, "Winner segment judgment is missing" unless ranking
+
+          next ranking.except("candidate_label")
+        end
+
         data = {
           rank: evaluation.rank,
           overall_score: evaluation.overall_score,
@@ -155,7 +188,7 @@ module Finalizations
           proposed_translation: {
             type: "string",
             minLength: 1,
-            maxLength: FinalTranslationVersion::MAX_CONTENT_LENGTH
+            maxLength: experiment_segment ? FinalizationSegmentRun::MAX_OUTPUT_CHARACTERS : FinalTranslationVersion::MAX_CONTENT_LENGTH
           },
           change_summary: string_list_schema,
           terminology_notes: string_list_schema,

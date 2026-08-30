@@ -142,6 +142,25 @@ class LlmModelTest < ActiveSupport::TestCase
     assert model.errors[:display_name].any?
   end
 
+  test "validates bounded context capabilities and output below context" do
+    model = build_openrouter_model("provider/capability")
+    model.context_window_tokens = 64_000
+    model.max_output_tokens = 8_000
+    assert model.valid?
+
+    model.max_output_tokens = 64_000
+    assert_not model.valid?
+    assert_includes model.errors[:max_output_tokens], "must be smaller than the context window"
+
+    model.context_window_tokens = LlmModel::MAX_CONTEXT_WINDOW_TOKENS + 1
+    assert_not model.valid?
+
+    model.context_window_tokens = 64_000
+    model.max_output_tokens = nil
+    assert_not model.valid?
+    assert_includes model.errors[:base], "Context window and maximum output tokens must be configured together"
+  end
+
   test "rejects a credential-like OpenRouter model identifier" do
     model = LlmModel.new(
       gateway: "openrouter",

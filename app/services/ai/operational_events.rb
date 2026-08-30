@@ -27,6 +27,14 @@ module Ai
         run.judge_round.experiment
       when FinalizationRun
         run.finalization_round.final_translation.judge_round.experiment
+      when TranslationSegmentRun
+        run.translation_run.experiment
+      when ReviewSegmentRun
+        run.review_run.review_round.experiment
+      when JudgeSegmentRun
+        run.judge_run.judge_round.experiment
+      when FinalizationSegmentRun
+        run.finalization_run.finalization_round.final_translation.experiment
       else
         raise ArgumentError, "unsupported AI run type"
       end

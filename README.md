@@ -14,6 +14,20 @@ Automatic progression can incur provider cost, and built-in bounded provider ret
 
 `PipelineReconciliationJob` scans a bounded indexed batch every 10 minutes in production to recover missed advancement after queue failures, crashes, or restarts. A dedicated least-recently-reconciled cursor and row locks prevent permanently blocked pipelines from starving newer work. It processes only running or blocked automatic pipelines and never manual, stopped, or ready-for-editor workflows. This is intentionally separate from the provider-free stale-AI watchdog. Operators may invoke the same safe bounded service with `bin/rails pipelines:reconcile`; output contains aggregate counts only.
 
+## Long-document execution and context safety
+
+Documents remain authoritative whole source records up to 100,000 characters. When a source exceeds the single-request target, Three Heavens derives an immutable, versioned sequence of lossless segments using paragraph, line, sentence-like punctuation, and finally Unicode-safe hard boundaries. Rejoining the ordered segment text reproduces the reviewed source exactly; segmentation never replaces or rewrites it.
+
+Translation, blind review, judging, and optional refinement then run one bounded provider request per logical model and source segment. The existing parent runs remain the candidate/reviewer/judge/finalizer records used by history, benchmarks, winner selection, and pipeline advancement. Their child segment runs are the physical provider calls, retain execution lineage and detailed telemetry, and retry only failed work. Parent cost is the sum of known child cost without counting child rows again in analytics; token completeness remains explicitly unknown if any child value is missing.
+
+Administrators configure each model's context-window and maximum-output token capabilities in Settings / Models. Each scheduled provider call stores the capability snapshot and a deterministic application estimate based on the fully serialized request, one token per two UTF-8 bytes, the response schema, a stage output reserve, and a 1,024-token safety margin. This is intentionally conservative and is not claimed to match any provider tokenizer exactly. Existing unconfigured models retain a conservative 16,384/4,096-token fallback only for sources of at most 8,000 characters; long-document planning fails before provider work when capabilities are absent or insufficient.
+
+Every request sends an explicit stage completion limit, and provider responses are streamed through a 1 MiB byte ceiling before JSON parsing or persistence. Segment translations/refinements are limited to 20,000 characters and assembled documents remain limited to 100,000 characters; no output is silently truncated. Automatic pipeline authorization records the segment multiplier and exact initial provider-request slots (logical models × segments) for every stage. Built-in retries may add calls, so this is not a maximum HTTP request count.
+
+Review scores are aggregated by source-character-weighted means. Each judge uses source-character-weighted segment Borda points, then weighted mean score and stable TranslationRun ID tie-breaking; the existing cross-judge Borda aggregate still selects one official logical candidate only after every required judge completes. Refinement proposals are reassembled but remain unapplied until the human editor chooses Apply Proposal. A manual edit deliberately invalidates segment alignment for further segmented AI refinement; manual editing, restoration, finalization, and export remain available. Historical non-segmented experiments continue to render without fabricated segment history, and benchmark translation/win counts remain logical candidate counts rather than physical segment-call counts.
+
+These controls bound requests; they do not guarantee that every 100,000-character document fits every selected model or configuration. Unsupported plans fail safely before the affected stage schedules provider work.
+
 ## Development workflow
 
 `develop` is the default integration branch. Normal Codex work starts from

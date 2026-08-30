@@ -23,12 +23,13 @@ module BlindReviews
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(review_run, boundary_generator: nil)
-      new(review_run, boundary_generator: boundary_generator).build
+    def self.build(review_run, experiment_segment: nil, boundary_generator: nil)
+      new(review_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
     end
 
-    def initialize(review_run, boundary_generator: nil)
+    def initialize(review_run, experiment_segment: nil, boundary_generator: nil)
       @review_run = review_run
+      @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
     end
 
@@ -39,12 +40,12 @@ module BlindReviews
       data = {
         source_language: project.source_language,
         target_language: project.target_language,
-        source_text: experiment.document.source_text,
+        source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
         candidates: review_run.review_evaluations.order(:anonymous_label).map do |evaluation|
           {
             candidate_label: evaluation.anonymous_label,
-            translation: evaluation.translation_run.translated_text
+            translation: candidate_translation(evaluation.translation_run)
           }
         end
       }
@@ -61,7 +62,13 @@ module BlindReviews
 
     private
 
-    attr_reader :boundary_generator, :review_run
+    attr_reader :boundary_generator, :experiment_segment, :review_run
+
+    def candidate_translation(translation_run)
+      return translation_run.translated_text unless experiment_segment
+
+      translation_run.translation_segment_runs.find_by!(experiment_segment: experiment_segment).translated_text
+    end
 
     def collision_safe_boundary(serialized_data)
       MAX_BOUNDARY_ATTEMPTS.times do
@@ -137,7 +144,7 @@ module BlindReviews
         "recommended_corrections" => { type: "string", maxLength: 5_000 },
         "suggested_translation" => {
           type: [ "string", "null" ],
-          maxLength: 50_000
+          maxLength: experiment_segment ? TranslationSegmentRun::MAX_OUTPUT_CHARACTERS : 50_000
         }
       )
     end

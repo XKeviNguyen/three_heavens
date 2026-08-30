@@ -32,9 +32,17 @@ class JudgeRunJob < ApplicationJob
     @claimed_attempt = claim_result.attempt
 
     prompt = Judging::Prompt.build(judge_run)
+    budget = Ai::RunContextBudget.call(
+      run: judge_run,
+      model: judge_run.judge_llm_model,
+      prompt: prompt,
+      stage: :judge,
+      source_character_count: judge_run.judge_round.experiment.document.source_text.length
+    )
     result = client_for(judge_run.judge_llm_model).judge_completion(
       model_identifier: judge_run.judge_llm_model.model_identifier,
-      **prompt
+      **prompt,
+      max_tokens: budget.reserved_output_tokens
     )
     evaluation = Judging::ResponseValidator.call(
       content: result.content,
@@ -89,6 +97,7 @@ class JudgeRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil

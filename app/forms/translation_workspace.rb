@@ -15,9 +15,10 @@ class TranslationWorkspace
                 :workflow_mode,
                 :workflow_profile_revision_id,
                 :automatic_confirmation,
+                :automatic_plan_digest,
                 :submission_token
 
-  attr_reader :document, :experiment, :pipeline_run, :project
+  attr_reader :document, :experiment, :pipeline_run, :project, :provider_work_plan_preview
 
   validate :validate_workspace_records
   validate :validate_model_selection
@@ -56,7 +57,8 @@ class TranslationWorkspace
           experiment: experiment,
           user: user,
           workflow_profile_revision: @workflow_profile_revision,
-          confirmation: automatic_confirmation
+          confirmation: automatic_confirmation,
+          expected_provider_work_plan_digest: automatic_plan_digest
         )
       else
         @start_service.call(experiment: experiment, llm_models: @llm_models)
@@ -191,6 +193,41 @@ class TranslationWorkspace
     unless @workflow_profile_revision.routing_eligible?
       errors.add(:workflow_profile_revision_id, "references unavailable or changed model routing")
     end
+    validate_automatic_provider_plan
+  end
+
+  def validate_automatic_provider_plan
+    return unless source_text.present? && @workflow_profile_revision&.routing_eligible?
+
+    segment_count = if source_text.length > LongDocuments::Segmenter::TARGET_CHARACTERS
+      LongDocuments::Segmenter.call(source_text).size
+    else
+      1
+    end
+    return if segment_count == 1
+
+    role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
+      [ role, @workflow_profile_revision.selections_for(role).map(&:llm_model) ]
+    end
+    preview = LongDocuments::ProviderWorkPlan.call(
+      execution_plan: LongDocuments::ProviderWorkPlan::Preview.new(segment_count: segment_count),
+      role_models: role_models,
+      source_character_count: source_text.length
+    )
+    @provider_work_plan_preview = preview
+    expected_digest = LongDocuments::ProviderWorkPlan.digest(preview)
+    supplied = automatic_plan_digest.to_s
+    return if supplied.length == expected_digest.length &&
+              ActiveSupport::SecurityUtils.secure_compare(supplied, expected_digest)
+
+    self.automatic_plan_digest = expected_digest
+    self.automatic_confirmation = "0"
+    errors.add(
+      :automatic_confirmation,
+      "must confirm the exact segmented provider-work plan shown below, then submit again"
+    )
+  rescue Ai::ContextBudget::Error => error
+    errors.add(:workflow_profile_revision_id, error.message)
   end
 
   def automatic_mode?

@@ -69,6 +69,42 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     assert_equal 1, TranslationWorkspaceSubmission.where(experiment: pipeline.experiment, status: :consumed).count
   end
 
+  test "long automatic launch requires a second confirmation of the exact request multiplier" do
+    profile = create_workflow_profile
+    profile.current_revision.model_selections.each do |selection|
+      selection.llm_model.update!(context_window_tokens: 64_000, max_output_tokens: 4_096)
+    end
+    token = issue_translation_workspace_token
+    source = "Long paragraph。\n\n" * 500
+    attributes = automatic_attributes(profile: profile, submission_token: token).merge(source_text: source)
+
+    assert_no_difference [ -> { Experiment.count }, -> { PipelineRun.count }, -> { DocumentExecutionPlan.count } ] do
+      assert_no_enqueued_jobs only: TranslationSegmentRunJob do
+        post translation_workspace_path, params: { translation_workspace: attributes }
+      end
+    end
+    assert_response :unprocessable_content
+    assert_select "h3", text: "Exact segmented provider-work plan"
+    segment_count = LongDocuments::Segmenter.call(source).size
+    request_slots = profile.current_revision.model_selections.count * segment_count
+    assert_select "p", text: /#{segment_count} source segments require #{request_slots} authorized initial provider request slots/
+    digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
+    assert_match(/\A\h{64}\z/, digest)
+    assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])"
+
+    assert_enqueued_jobs 2 * segment_count, only: TranslationSegmentRunJob do
+      post translation_workspace_path, params: {
+        translation_workspace: attributes.merge(
+          automatic_confirmation: "1",
+          automatic_plan_digest: digest
+        )
+      }
+    end
+    pipeline = PipelineRun.order(:id).last
+    assert_redirected_to pipeline_run_path(pipeline)
+    assert_equal request_slots, pipeline.authorized_initial_provider_run_count
+  end
+
   test "validation failure preserves the identity and a corrected retry consumes it" do
     token = issue_translation_workspace_token
     attributes = manual_attributes(submission_token: token, project_name: "")
