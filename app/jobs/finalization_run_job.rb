@@ -83,6 +83,7 @@ class FinalizationRunJob < ApplicationJob
         error_message: nil
       )
     end
+    Ai::OperationalEvents.emit("ai_run_completed", finalization_run, active_job_id: job_id, status: "completed")
     Finalizations::ReconcileRound.call(finalization_run.finalization_round)
   end
 

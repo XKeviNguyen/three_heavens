@@ -92,6 +92,18 @@ Final translation owners can download the current draft or finalized version as 
 
 Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or exposes database errors. The primary database is the readiness contract because every authenticated web workflow depends on it, while queue/cache/cable degradation is separately visible to operators and does not necessarily make basic web serving unsafe.
 
+## Production operations
+
+The authoritative recovery set is the primary PostgreSQL database plus private Active Storage files. Cache and cable are rebuildable; the queue database is rebuilt empty during disaster recovery so old paid-work jobs are not blindly replayed. Create a versioned checksum-protected bundle with `bin/ops/backup /absolute/backup-root`, verify an isolated restore with `RESTORE_DATABASE_URL` and `RESTORE_STORAGE_PATH` plus `bin/ops/restore-verify BUNDLE_PATH`, and preview/execute local completed-bundle retention with `bin/ops/backup-prune`.
+
+Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
+
+Detailed executable procedures are in:
+
+- [Backup and restore](docs/operations/backup-and-restore.md)
+- [Disaster recovery](docs/operations/disaster-recovery.md)
+- [Production deployment and rollback](docs/operations/production-deploy.md)
+
 ## Production configuration
 
 Production fails fast when its public host or database URLs are missing. Required runtime secret variable names are:
@@ -122,7 +134,7 @@ Production assumes TLS terminates at the trusted Kamal proxy, forces HTTPS for b
 
 Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and does not require real secrets or a live database. That build-only flag must not be used for a running production server.
 
-Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery plans must cover both all PostgreSQL databases and the persistent storage volume; a database-only backup cannot restore original source files.
+Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery cover the authoritative primary PostgreSQL database and the persistent storage volume; cache and cable are recreated, and queue state follows the documented no-stale-replay recovery policy.
 
 ## Kamal prerequisites
 

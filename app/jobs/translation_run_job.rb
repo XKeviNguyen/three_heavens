@@ -81,6 +81,7 @@ class TranslationRunJob < ApplicationJob
       )
     end
 
+    Ai::OperationalEvents.emit("ai_run_completed", translation_run, active_job_id: job_id, status: "completed")
     TranslationExperiments::ReconcileExperiment.call(translation_run.experiment)
   end
 

@@ -43,7 +43,11 @@ module Ai
     end
 
     def self.enqueue_now(schedule)
-      return true if schedule.job.enqueue
+      if schedule.job.enqueue
+        run = schedule.run_class.find_by(id: schedule.run_id)
+        OperationalEvents.emit("ai_run_scheduled", run, status: "pending") if run
+        return true
+      end
 
       fail_pending(schedule)
       false

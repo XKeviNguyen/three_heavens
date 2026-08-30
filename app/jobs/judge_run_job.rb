@@ -95,6 +95,7 @@ class JudgeRunJob < ApplicationJob
       )
     end
 
+    Ai::OperationalEvents.emit("ai_run_completed", judge_run, active_job_id: job_id, status: "completed")
     Judging::ReconcileRound.call(judge_run.judge_round)
   end
 

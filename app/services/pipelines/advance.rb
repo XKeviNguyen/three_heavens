@@ -119,6 +119,7 @@ module Pipelines
           from_stage: "judge",
           to_stage: "finalization"
         )
+        emit_pipeline_event("pipeline_stage_advanced", pipeline_stage: "finalization", outcome: "advanced")
       end
     end
 
@@ -167,6 +168,7 @@ module Pipelines
         from_stage: from,
         to_stage: to
       )
+      emit_pipeline_event("pipeline_stage_advanced", pipeline_stage: to, outcome: "advanced")
     end
 
     def block!(reason:)
@@ -189,6 +191,13 @@ module Pipelines
         to_stage: stage,
         reason_code: reason,
         metadata: { "episode" => episode }
+      )
+      emit_pipeline_event(
+        "pipeline_blocked",
+        pipeline_stage: stage,
+        status: "blocked",
+        error_code: reason,
+        outcome: "blocked"
       )
     end
 
@@ -239,6 +248,21 @@ module Pipelines
         event_type: "ready_for_editor",
         from_stage: from,
         to_stage: "editor"
+      )
+      emit_pipeline_event(
+        "pipeline_ready_for_editor",
+        pipeline_stage: "editor",
+        status: "ready_for_editor",
+        outcome: "success"
+      )
+    end
+
+    def emit_pipeline_event(event, **fields)
+      Operations::EventLogger.emit(
+        event,
+        pipeline_run_id: pipeline_run.id,
+        experiment_id: pipeline_run.experiment_id,
+        **fields
       )
     end
   end

@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+
+require "json"
+
+begin
+  json = ARGV.delete("--json")
+  ENV["RAILS_ENV"] ||= "production"
+  require_relative "../../config/environment"
+
+  result = Operations::Preflight.call
+  if json
+    puts JSON.generate(
+      status: result.successful? ? "healthy" : "unavailable",
+      checks: result.checks.map { |check| { name: check.name, status: check.status, critical: check.critical } }
+    )
+  else
+    result.checks.each { |check| puts "#{check.name}: #{check.status}" }
+    puts(result.successful? ? "Preflight passed" : "Preflight failed")
+  end
+  exit(result.successful? ? 0 : 1)
+rescue StandardError
+  warn "Preflight failed safely due to an unexpected internal error."
+  exit 1
+end
