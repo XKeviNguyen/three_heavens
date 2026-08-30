@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/authorized_ai_job_helper"
+require_relative "../support/truncated_open_router_client_helper"
 
 class ReviewRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include AuthorizedAiJobHelper
+  include TruncatedOpenRouterClientHelper
 
   setup do
     project = Project.create!(
@@ -168,6 +170,16 @@ class ReviewRunJobTest < ActiveJob::TestCase
     assert_equal "invalid_request", @review_run.error_code
     assert_includes @review_run.error_message, "[FILTERED]"
     assert_not_includes @review_run.error_message, "review-secret"
+  end
+
+  test "does not persist valid-looking truncated review output" do
+    with_client(truncated_open_router_client(valid_content)) do
+      perform_authorized_ai_job(ReviewRunJob, @review_run)
+    end
+
+    assert @review_run.reload.failed?
+    assert_equal "incomplete_response", @review_run.error_code
+    assert @review_run.review_evaluations.all? { |evaluation| evaluation.overall_score.nil? }
   end
 
   test "retries transient provider failures with a bounded job policy" do

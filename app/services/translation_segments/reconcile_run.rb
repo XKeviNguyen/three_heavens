@@ -28,7 +28,8 @@ module TranslationSegments
         }
       end
 
-      translated_text = children.sort_by { |child| child.experiment_segment.position }.map(&:translated_text).join
+      parts = children.map { |child| [ child.experiment_segment, child.translated_text ] }
+      translated_text = LongDocuments::SegmentReassembler.call(parts)
       unless translated_text.present? && translated_text.length <= Ai::UsageLimits::MAX_SOURCE_CHARACTERS
         return {
           status: :failed,

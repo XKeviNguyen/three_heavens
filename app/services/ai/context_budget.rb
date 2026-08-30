@@ -2,7 +2,7 @@ require "json"
 
 module Ai
   class ContextBudget
-    POLICY_VERSION = "conservative-bytes-v1"
+    POLICY_VERSION = "serialized-utf8-bytes-v2"
     SAFETY_MARGIN_TOKENS = 1_024
     CONSERVATIVE_CONTEXT_TOKENS = 16_384
     CONSERVATIVE_MAX_OUTPUT_TOKENS = 4_096
@@ -44,7 +44,14 @@ module Ai
     def self.call(model:, system_prompt:, user_prompt:, response_schema: nil, stage:, source_character_count:,
                   capability_snapshot: nil)
       capabilities = capability_snapshot || capabilities_for(model, source_character_count: source_character_count)
-      reserved = [ STAGE_OUTPUT_TOKENS.fetch(stage.to_sym), capability_value(capabilities, :max_output_tokens) ].min
+      reserved = STAGE_OUTPUT_TOKENS.fetch(stage.to_sym)
+      maximum_output = capability_value(capabilities, :max_output_tokens)
+      if maximum_output < reserved
+        raise Error.new(
+          "The selected model cannot satisfy the required #{stage} output reserve",
+          code: "model_output_capability_insufficient"
+        )
+      end
       options = { max_tokens: reserved }
       if response_schema
         options[:response_format] = {
@@ -76,7 +83,7 @@ module Ai
 
       Result.new(
         context_window_tokens: context,
-        max_output_tokens: capability_value(capabilities, :max_output_tokens),
+        max_output_tokens: maximum_output,
         estimated_input_tokens: estimated,
         reserved_output_tokens: reserved,
         safety_margin_tokens: SAFETY_MARGIN_TOKENS,
@@ -85,10 +92,10 @@ module Ai
     end
 
     def self.estimate_tokens(value)
-      # OpenRouter models may use different tokenizers. Counting one token per
-      # two UTF-8 bytes deliberately overestimates ordinary Latin text and also
-      # remains conservative for multibyte scripts and JSON escaping.
-      (value.to_s.bytesize.fdiv(2)).ceil + 64
+      # OpenRouter routes across model families with different tokenizers.
+      # Treating every serialized UTF-8 byte as a token is deterministic and
+      # deliberately conservative even for character-level tokenization.
+      value.to_s.bytesize + 64
     end
 
     def self.capability_snapshot(model:, source_character_count:)

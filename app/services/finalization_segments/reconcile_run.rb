@@ -31,7 +31,8 @@ module FinalizationSegments
       end
 
       ordered = children.sort_by { |child| child.experiment_segment.position }
-      proposal = ordered.map(&:proposed_translation).join
+      parts = ordered.map { |child| [ child.experiment_segment, child.proposed_translation ] }
+      proposal = LongDocuments::SegmentReassembler.call(parts)
       unless proposal.present? && proposal.length <= FinalTranslationVersion::MAX_CONTENT_LENGTH
         return {
           status: :failed,

@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/authorized_ai_job_helper"
+require_relative "../support/truncated_open_router_client_helper"
 
 class TranslationRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include AuthorizedAiJobHelper
+  include TruncatedOpenRouterClientHelper
 
   setup do
     project = Project.create!(
@@ -95,6 +97,38 @@ class TranslationRunJobTest < ActiveJob::TestCase
     assert_not run.telemetry_complete?
   end
 
+  test "accounts known cost independently from optional token telemetry" do
+    run = @experiment.translation_runs.create!(llm_model: @llm_model)
+    result = Ai::OpenRouterClient::Result.new(
+      content: "Translated text",
+      provider_response_id: "generation-partial-telemetry",
+      resolved_model_identifier: "anthropic/claude-resolved",
+      prompt_tokens: 120,
+      completion_tokens: 45,
+      total_tokens: 165,
+      cached_tokens: nil,
+      reasoning_tokens: nil,
+      cost: BigDecimal("0.0123")
+    )
+    client = Object.new
+    client.define_singleton_method(:chat_completion) { |**| result }
+
+    with_client(client) { perform_authorized_ai_job(TranslationRunJob, run) }
+
+    run.reload
+    assert_equal BigDecimal("0.0123"), run.cost
+    assert run.cost_complete?
+    assert_not run.telemetry_complete?
+
+    summary = Pipelines::CostSummary.call(experiment: @experiment)
+    assert_equal BigDecimal("0.0123"), summary.known_cost
+    assert summary.complete?
+
+    entry = History::ExperimentQuery.new(experiment_scope: Experiment.where(id: @experiment.id)).call.entries.sole
+    assert_equal BigDecimal("0.0123"), entry.known_system_cost
+    assert entry.cost_telemetry_complete?
+  end
+
   test "marks permanent failures and sanitizes their messages" do
     run = @experiment.translation_runs.create!(llm_model: @llm_model)
     client = Object.new
@@ -117,6 +151,18 @@ class TranslationRunJobTest < ActiveJob::TestCase
     assert_operator run.error_message.length, :<=, 1_000
     assert_not_nil run.completed_at
     assert @experiment.reload.failed?
+  end
+
+  test "does not persist valid-looking truncated translation output" do
+    run = @experiment.translation_runs.create!(llm_model: @llm_model)
+
+    with_client(truncated_open_router_client("Valid-looking partial translation")) do
+      perform_authorized_ai_job(TranslationRunJob, run)
+    end
+
+    assert run.reload.failed?
+    assert_equal "incomplete_response", run.error_code
+    assert_nil run.translated_text
   end
 
   test "retries retryable failures and leaves the run running" do

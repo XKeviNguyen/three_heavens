@@ -56,7 +56,8 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     assert_select "header", text: /each translation, review, judge, and finalization run once/
     assert_select "article", text: /Completed.*Completed.*Completed/m
     assert_select "article", text: /Official winner.*Candidate model/m
-    assert_select "article", text: /Known total · incomplete telemetry \(3\/4 runs\)/
+    assert_select "article",
+                  text: /Known total · incomplete cost telemetry \(3\/4 runs complete; 3 with known spend\)/
     assert_select "a[href='#{experiment_path(@experiment)}']", "Experiment"
     assert_select "a[href='#{review_round_path(@review_round)}']", "Blind review"
     assert_select "a[href='#{judge_round_path(@judge_round)}']", "Judge results"

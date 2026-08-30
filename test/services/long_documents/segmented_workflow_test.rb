@@ -107,6 +107,23 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     end
   end
 
+  class WhitespaceStrippingClient < FakeClient
+    def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens:)
+      calls << [ :translation, model_identifier, max_tokens, instruction_prompt.bytesize + source_text.bytesize ]
+      result(source_text.rstrip)
+    end
+
+    def finalization_completion(model_identifier:, max_tokens:, **)
+      calls << [ :finalization, model_identifier, max_tokens ]
+      result(JSON.generate(
+        proposed_translation: "Refined segment.",
+        change_summary: [ "Polished" ],
+        terminology_notes: [],
+        warnings: []
+      ))
+    end
+  end
+
   setup do
     @client = FakeClient.new
     @job_classes = [
@@ -234,6 +251,102 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     completed_children.each do |child|
       assert_equal original_completed_attempts.fetch(child.id), child.reload.execution_attempt
     end
+  end
+
+  test "application restores source join boundaries stripped by translation and finalization providers" do
+    @client = WhitespaceStrippingClient.new
+
+    perform_enqueued_jobs(only: TranslationSegmentRunJob) do
+      TranslationExperiments::Start.call(experiment: @experiment, llm_models: @models)
+    end
+    plan = @experiment.reload.document_execution_plan
+    expected_translation = LongDocuments::SegmentReassembler.call(
+      plan.segments.map { |segment| [ segment, segment.source_text.rstrip ] }
+    )
+    assert @experiment.translation_runs.all? { |run| run.translated_text == expected_translation }
+    assert_includes expected_translation, "\n\n"
+
+    perform_enqueued_jobs(only: ReviewSegmentRunJob) do
+      @review_round = BlindReviews::Start.call(
+        experiment: @experiment,
+        reviewer_ids: [ @models.first.id ]
+      )
+    end
+    perform_enqueued_jobs(only: JudgeSegmentRunJob) do
+      @judge_round = Judging::Start.call(
+        review_round: @review_round,
+        judge_ids: [ @models.last.id ]
+      )
+    end
+    final_translation = FinalTranslations::Create.call(judge_round: @judge_round)
+    perform_enqueued_jobs(only: FinalizationSegmentRunJob) do
+      @finalization_round = Finalizations::Start.call(
+        final_translation: final_translation,
+        finalizer_ids: [ @models.first.id ]
+      )
+    end
+
+    expected_proposal = LongDocuments::SegmentReassembler.call(
+      plan.segments.map { |segment| [ segment, "Refined segment." ] }
+    )
+    proposal = @finalization_round.reload.finalization_runs.sole
+    assert_equal expected_proposal, proposal.proposed_translation
+    assert_includes expected_proposal, "\n\n"
+
+    applied = Finalizations::ApplyProposal.call(
+      final_translation: final_translation,
+      finalization_run_id: proposal.id
+    )
+    assert_equal expected_proposal, applied.content
+  end
+
+  test "partial physical costs produce one known incomplete logical total" do
+    plan = LongDocuments::Planner.call(@experiment)
+    run = @experiment.translation_runs.create!(
+      llm_model: @models.first,
+      status: :running,
+      started_at: Time.current
+    )
+    known_costs = [ BigDecimal("0.01"), BigDecimal("0.02") ]
+    plan.segments.each_with_index do |segment, index|
+      run.translation_segment_runs.create!(
+        experiment_segment: segment,
+        status: :completed,
+        translated_text: segment.source_text.rstrip,
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        cached_tokens: 0,
+        reasoning_tokens: 0,
+        cost: known_costs[index],
+        completed_at: Time.current,
+        context_window_tokens_snapshot: 64_000,
+        max_output_tokens_snapshot: 4_096,
+        estimated_input_tokens: 1_000,
+        reserved_output_tokens: 4_096,
+        context_safety_margin_tokens: 1_024,
+        budget_policy_version: Ai::ContextBudget::POLICY_VERSION
+      )
+    end
+
+    TranslationSegments::ReconcileRun.call(run)
+
+    assert_equal BigDecimal("0.03"), run.reload.cost
+    assert_not run.cost_complete?
+    assert run.telemetry_complete?
+
+    summary = Pipelines::CostSummary.call(experiment: @experiment)
+    assert_equal BigDecimal("0.03"), summary.known_cost
+    assert_equal 1, summary.known_count
+    assert_equal 0, summary.complete_count
+    assert_equal 1, summary.record_count
+    assert summary.incomplete?
+
+    entry = History::ExperimentQuery.new(experiment_scope: Experiment.where(id: @experiment.id)).call.entries.sole
+    assert_equal BigDecimal("0.03"), entry.known_system_cost
+    assert_equal 1, entry.cost_sample_count
+    assert_equal 0, entry.cost_complete_count
+    assert entry.cost_telemetry_incomplete?
   end
 
   test "stale physical work reconciles its logical parent and remains explicitly retryable" do

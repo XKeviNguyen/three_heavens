@@ -3,14 +3,33 @@ require "test_helper"
 class Ai::SegmentAggregationTest < ActiveSupport::TestCase
   test "telemetry sums known physical values and marks any missing field incomplete" do
     complete = telemetry_run(cost: BigDecimal("0.1"))
-    incomplete = telemetry_run(cost: BigDecimal("0.2"), reasoning_tokens: nil)
+    incomplete = telemetry_run(
+      cost: BigDecimal("0.2"),
+      reasoning_tokens: nil,
+      cached_tokens: nil
+    )
 
     attributes = Ai::SegmentAggregation.telemetry_attributes([ complete, incomplete ])
 
     assert_equal 20, attributes.fetch(:prompt_tokens)
     assert_nil attributes.fetch(:reasoning_tokens)
     assert_equal BigDecimal("0.3"), attributes.fetch(:cost)
+    assert attributes.fetch(:cost_complete)
     assert_not attributes.fetch(:telemetry_complete)
+  end
+
+  test "keeps partial known segmented spend without converting unknown cost to zero" do
+    runs = [
+      telemetry_run(cost: BigDecimal("0.01")),
+      telemetry_run(cost: BigDecimal("0.02")),
+      telemetry_run(cost: nil)
+    ]
+
+    attributes = Ai::SegmentAggregation.telemetry_attributes(runs)
+
+    assert_equal BigDecimal("0.03"), attributes.fetch(:cost)
+    assert_not attributes.fetch(:cost_complete)
+    assert attributes.fetch(:telemetry_complete)
   end
 
   test "bounded joins disclose omitted segment data within the exact limit" do

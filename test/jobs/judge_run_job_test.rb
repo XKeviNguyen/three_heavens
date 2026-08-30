@@ -1,11 +1,13 @@
 require "test_helper"
 require_relative "../support/judging_test_helper"
 require_relative "../support/authorized_ai_job_helper"
+require_relative "../support/truncated_open_router_client_helper"
 
 class JudgeRunJobTest < ActiveJob::TestCase
   include ActiveJob::TestHelper
   include JudgingTestHelper
   include AuthorizedAiJobHelper
+  include TruncatedOpenRouterClientHelper
 
   setup do
     @review_round = create_completed_review_round
@@ -112,6 +114,17 @@ class JudgeRunJobTest < ActiveJob::TestCase
     assert_includes @judge_run.error_message, "[FILTERED]"
     assert_not_includes @judge_run.error_message, "judge-secret"
     assert_nil @judge_round.winner_translation_run
+  end
+
+  test "does not persist valid-looking truncated judgment output" do
+    with_client(truncated_open_router_client(valid_content)) do
+      perform_authorized_ai_job(JudgeRunJob, @judge_run)
+    end
+
+    assert @judge_run.reload.failed?
+    assert_equal "incomplete_response", @judge_run.error_code
+    assert_nil @judge_run.winner_translation_run
+    assert @judge_run.judge_evaluations.all? { |evaluation| evaluation.rank.nil? }
   end
 
   test "retry exhaustion persists a sanitized failure and stops scheduling retries" do
