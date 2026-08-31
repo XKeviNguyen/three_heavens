@@ -41,7 +41,7 @@
       <div>
         <%= form.label :max_output_tokens, "Maximum output (tokens)", class: "block text-sm font-medium text-slate-700" %>
         <%= form.number_field :max_output_tokens, min: LlmModel::MIN_OUTPUT_TOKENS, max: LlmModel::MAX_OUTPUT_TOKENS, step: 1, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-        <p class="mt-2 text-xs text-slate-500">The application reserves the smaller of this value and its stage-specific completion limit.</p>
+        <p class="mt-2 text-xs text-slate-500">This capability must satisfy the full stage-specific completion reserve or provider work fails before scheduling.</p>
       </div>
     </div>
   </section>
