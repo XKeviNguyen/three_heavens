@@ -2,6 +2,67 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
   def up
     enable_extension "pgcrypto" unless extension_enabled?("pgcrypto")
 
+    execute <<~SQL
+      CREATE FUNCTION glossary_revision_configuration_digest(revision_id bigint)
+      RETURNS text
+      LANGUAGE sql
+      STABLE
+      AS $$
+        SELECT encode(digest(
+          '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
+          ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
+          ',"entries":[' || COALESCE((
+            SELECT string_agg(
+              '{"position":' || position ||
+              ',"source_term":' || to_json(source_term)::text ||
+              ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
+              ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
+              ',' ORDER BY position
+            )
+            FROM glossary_entries
+            WHERE glossary_revision_id = glossary_revisions.id
+          ), '') || ']}',
+          'sha256'
+        ), 'hex')
+        FROM glossary_revisions
+        WHERE id = revision_id;
+      $$;
+    SQL
+
+    execute <<~SQL
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM glossary_revisions
+          WHERE (SELECT count(*) FROM glossary_entries WHERE glossary_revision_id = glossary_revisions.id) NOT BETWEEN 1 AND 100
+             OR configuration_digest <> glossary_revision_configuration_digest(glossary_revisions.id)
+        ) THEN
+          RAISE EXCEPTION 'Existing glossary revisions must have 1-100 entries and a matching configuration digest';
+        END IF;
+      END;
+      $$;
+    SQL
+
+    execute <<~SQL
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM experiments
+          INNER JOIN documents ON documents.id = experiments.document_id
+          INNER JOIN projects ON projects.id = documents.project_id
+          INNER JOIN glossary_revisions ON glossary_revisions.id = experiments.glossary_revision_id
+          INNER JOIN glossaries ON glossaries.id = glossary_revisions.glossary_id
+          WHERE experiments.glossary_revision_id IS NOT NULL
+            AND projects.user_id <> glossaries.user_id
+        ) THEN
+          RAISE EXCEPTION 'Existing experiment glossary ownership integrity check failed';
+        END IF;
+      END;
+      $$;
+    SQL
+
     add_column :glossary_revisions, :entry_set_sealed, :boolean, default: true, null: false
     change_column_default :glossary_revisions, :entry_set_sealed, from: true, to: false
 
@@ -10,10 +71,19 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       RETURNS trigger
       LANGUAGE plpgsql
       AS $$
+      DECLARE
+        project_id bigint;
+        glossary_id bigint;
       BEGIN
         IF NEW.glossary_revision_id IS NULL THEN
           RETURN NEW;
         END IF;
+
+        PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
+        SELECT documents.project_id INTO project_id FROM documents WHERE documents.id = NEW.document_id;
+        PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+        SELECT glossary_revisions.glossary_id INTO glossary_id FROM glossary_revisions WHERE glossary_revisions.id = NEW.glossary_revision_id;
+        PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || glossary_id::text, 0));
 
         IF NOT EXISTS (
           SELECT 1
@@ -39,6 +109,8 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       BEGIN
+        PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
+
         IF EXISTS (
           SELECT 1
           FROM experiments
@@ -63,6 +135,9 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       BEGIN
+        PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
+        PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
+
         IF EXISTS (
           SELECT 1
           FROM experiments
@@ -87,6 +162,8 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       BEGIN
+        PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || NEW.id::text, 0));
+
         IF EXISTS (
           SELECT 1
           FROM glossary_revisions
@@ -163,29 +240,15 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       DECLARE
-        canonical_configuration text;
-        canonical_digest text;
+        entry_count integer;
       BEGIN
-        SELECT
-          '{"source_language":' || to_json(source_language)::text ||
-          ',"target_language":' || to_json(target_language)::text ||
-          ',"entries":[' || COALESCE((
-            SELECT string_agg(
-              '{"position":' || position ||
-              ',"source_term":' || to_json(source_term)::text ||
-              ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-              ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-              ',' ORDER BY position
-            )
-            FROM glossary_entries
-            WHERE glossary_revision_id = NEW.id
-          ), '') || ']}'
-        INTO canonical_configuration
-        FROM glossary_revisions
-        WHERE id = NEW.id;
+        SELECT count(*) INTO entry_count FROM glossary_entries WHERE glossary_revision_id = NEW.id;
+        IF entry_count NOT BETWEEN 1 AND 100 THEN
+          RAISE EXCEPTION 'Glossary revisions must have 1-100 entries'
+            USING ERRCODE = 'check_violation';
+        END IF;
 
-        canonical_digest := encode(digest(canonical_configuration, 'sha256'), 'hex');
-        IF NEW.configuration_digest <> canonical_digest THEN
+        IF NEW.configuration_digest <> glossary_revision_configuration_digest(NEW.id) THEN
           RAISE EXCEPTION 'Glossary revision configuration digest does not match its entries'
             USING ERRCODE = 'check_violation';
         END IF;
@@ -247,6 +310,7 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
       DROP FUNCTION IF EXISTS enforce_document_glossary_owner();
       DROP FUNCTION IF EXISTS enforce_project_glossary_owner();
       DROP FUNCTION IF EXISTS enforce_experiment_glossary_owner();
+      DROP FUNCTION IF EXISTS glossary_revision_configuration_digest(bigint);
     SQL
 
     remove_column :glossary_revisions, :entry_set_sealed

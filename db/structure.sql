@@ -32,6 +32,9 @@ CREATE FUNCTION public.enforce_document_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -57,10 +60,19 @@ $$;
 CREATE FUNCTION public.enforce_experiment_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+DECLARE
+  project_id bigint;
+  glossary_id bigint;
 BEGIN
   IF NEW.glossary_revision_id IS NULL THEN
     RETURN NEW;
   END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE documents.id = NEW.document_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+  SELECT glossary_revisions.glossary_id INTO glossary_id FROM glossary_revisions WHERE glossary_revisions.id = NEW.glossary_revision_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || glossary_id::text, 0));
 
   IF NOT EXISTS (
     SELECT 1
@@ -119,6 +131,8 @@ CREATE FUNCTION public.enforce_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || NEW.id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM glossary_revisions
@@ -145,6 +159,8 @@ CREATE FUNCTION public.enforce_project_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -160,6 +176,34 @@ BEGIN
 
   RETURN NEW;
 END;
+$$;
+
+
+--
+-- Name: glossary_revision_configuration_digest(bigint); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.glossary_revision_configuration_digest(revision_id bigint) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT encode(digest(
+    '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
+    ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
+    ',"entries":[' || COALESCE((
+      SELECT string_agg(
+        '{"position":' || position ||
+        ',"source_term":' || to_json(source_term)::text ||
+        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
+        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
+        ',' ORDER BY position
+      )
+      FROM glossary_entries
+      WHERE glossary_revision_id = glossary_revisions.id
+    ), '') || ']}',
+    'sha256'
+  ), 'hex')
+  FROM glossary_revisions
+  WHERE id = revision_id;
 $$;
 
 
@@ -196,29 +240,15 @@ CREATE FUNCTION public.seal_glossary_revision_entry_set() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
-  canonical_configuration text;
-  canonical_digest text;
+  entry_count integer;
 BEGIN
-  SELECT
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"entries":[' || COALESCE((
-      SELECT string_agg(
-        '{"position":' || position ||
-        ',"source_term":' || to_json(source_term)::text ||
-        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-        ',' ORDER BY position
-      )
-      FROM glossary_entries
-      WHERE glossary_revision_id = NEW.id
-    ), '') || ']}'
-  INTO canonical_configuration
-  FROM glossary_revisions
-  WHERE id = NEW.id;
+  SELECT count(*) INTO entry_count FROM glossary_entries WHERE glossary_revision_id = NEW.id;
+  IF entry_count NOT BETWEEN 1 AND 100 THEN
+    RAISE EXCEPTION 'Glossary revisions must have 1-100 entries'
+      USING ERRCODE = 'check_violation';
+  END IF;
 
-  canonical_digest := encode(digest(canonical_configuration, 'sha256'), 'hex');
-  IF NEW.configuration_digest <> canonical_digest THEN
+  IF NEW.configuration_digest <> glossary_revision_configuration_digest(NEW.id) THEN
     RAISE EXCEPTION 'Glossary revision configuration digest does not match its entries'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -407,8 +437,8 @@ CREATE TABLE public.documents (
     source_sha256 character varying,
     extraction_version character varying,
     CONSTRAINT documents_original_byte_size_check CHECK (((original_byte_size IS NULL) OR ((original_byte_size >= 0) AND (original_byte_size <= 10485760)))),
-    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
-    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY ((ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying])::text[]))),
+    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text])))),
+    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY (ARRAY[('pasted_text'::character varying)::text, ('uploaded_file'::character varying)::text]))),
     CONSTRAINT documents_source_sha256_check CHECK (((source_sha256 IS NULL) OR (char_length((source_sha256)::text) = 64)))
 );
 
@@ -774,7 +804,7 @@ CREATE TABLE public.finalization_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT finalization_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_change_summary_check CHECK (((jsonb_typeof(change_summary) = 'array'::text) AND (octet_length((change_summary)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
@@ -782,11 +812,11 @@ CREATE TABLE public.finalization_segment_runs (
     CONSTRAINT finalization_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT finalization_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT finalization_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_proposal_length_check CHECK (((proposed_translation IS NULL) OR (char_length(proposed_translation) <= 20000))),
     CONSTRAINT finalization_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT finalization_segment_runs_terminology_notes_check CHECK (((jsonb_typeof(terminology_notes) = 'array'::text) AND (octet_length((terminology_notes)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_warnings_check CHECK (((jsonb_typeof(warnings) = 'array'::text) AND (octet_length((warnings)::text) <= 50000)))
@@ -1120,7 +1150,7 @@ CREATE TABLE public.judge_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT judge_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT judge_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT judge_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -1128,10 +1158,10 @@ CREATE TABLE public.judge_segment_runs (
     CONSTRAINT judge_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT judge_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT judge_segment_runs_judgment_check CHECK (((jsonb_typeof(judgment) = 'object'::text) AND (octet_length((judgment)::text) <= 100000))),
-    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT judge_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT judge_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -1211,12 +1241,12 @@ CREATE TABLE public.pipeline_events (
     reason_code character varying,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
+    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
     CONSTRAINT pipeline_events_key_check CHECK (((char_length((event_key)::text) >= 1) AND (char_length((event_key)::text) <= 120))),
     CONSTRAINT pipeline_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND (octet_length((metadata)::text) <= 2048))),
     CONSTRAINT pipeline_events_reason_check CHECK (((reason_code IS NULL) OR (char_length((reason_code)::text) <= 80))),
     CONSTRAINT pipeline_events_sequence_check CHECK ((sequence_number > 0)),
-    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
+    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
     CONSTRAINT pipeline_events_type_check CHECK (((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 80)))
 );
 
@@ -1272,16 +1302,16 @@ CREATE TABLE public.pipeline_runs (
     CONSTRAINT pipeline_runs_authorized_count_check CHECK ((((provider_work_plan = '{}'::jsonb) AND (authorized_initial_provider_run_count = (((translator_count + reviewer_count) + judge_count) + finalizer_count))) OR ((provider_work_plan <> '{}'::jsonb) AND (jsonb_typeof((provider_work_plan -> 'roles'::text)) = 'object'::text) AND (((provider_work_plan ->> 'authorized_initial_provider_request_slots'::text))::integer = authorized_initial_provider_run_count) AND (authorized_initial_provider_run_count >= (((translator_count + reviewer_count) + judge_count) + finalizer_count))))),
     CONSTRAINT pipeline_runs_blocked_message_check CHECK (((blocked_message IS NULL) OR (char_length((blocked_message)::text) <= 500))),
     CONSTRAINT pipeline_runs_blocked_reason_check CHECK (((blocked_reason_code IS NULL) OR (char_length((blocked_reason_code)::text) <= 80))),
-    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying])::text[])))),
+    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text])))),
     CONSTRAINT pipeline_runs_blocked_state_check CHECK ((((status)::text = 'blocked'::text) = ((blocked_stage IS NOT NULL) AND (blocked_reason_code IS NOT NULL)))),
     CONSTRAINT pipeline_runs_completion_finalizer_check CHECK (((((completion_mode)::text = 'winner_draft'::text) AND (finalizer_count = 0)) OR (((completion_mode)::text = 'refinement_proposals'::text) AND (finalizer_count > 0)))),
-    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
-    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[]))),
+    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
+    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text]))),
     CONSTRAINT pipeline_runs_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT pipeline_runs_provider_work_plan_check CHECK (((jsonb_typeof(provider_work_plan) = 'object'::text) AND (octet_length((provider_work_plan)::text) <= 16384))),
     CONSTRAINT pipeline_runs_ready_timestamp_check CHECK ((((status)::text = 'ready_for_editor'::text) = (ready_for_editor_at IS NOT NULL))),
-    CONSTRAINT pipeline_runs_role_counts_check CHECK ((((translator_count >= 2) AND (translator_count <= 6)) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
-    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'blocked'::character varying, 'ready_for_editor'::character varying, 'stopped'::character varying])::text[]))),
+    CONSTRAINT pipeline_runs_role_counts_check CHECK (((translator_count >= 2) AND (translator_count <= 6) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
+    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('blocked'::character varying)::text, ('ready_for_editor'::character varying)::text, ('stopped'::character varying)::text]))),
     CONSTRAINT pipeline_runs_stopped_timestamp_check CHECK ((((status)::text = 'stopped'::text) = (stopped_at IS NOT NULL)))
 );
 
@@ -1529,7 +1559,7 @@ CREATE TABLE public.review_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT review_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT review_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT review_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -1537,10 +1567,10 @@ CREATE TABLE public.review_segment_runs (
     CONSTRAINT review_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT review_segment_runs_evaluations_check CHECK (((jsonb_typeof(evaluations) = 'array'::text) AND (octet_length((evaluations)::text) <= 100000))),
     CONSTRAINT review_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT review_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT review_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT review_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -1598,10 +1628,10 @@ CREATE TABLE public.source_imports (
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
-    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
+    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
-    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying])::text[])))
+    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text, ('consumed'::character varying)::text])))
 );
 
 
@@ -1727,7 +1757,7 @@ CREATE TABLE public.translation_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT translation_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT translation_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT translation_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -1735,10 +1765,10 @@ CREATE TABLE public.translation_segment_runs (
     CONSTRAINT translation_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT translation_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT translation_segment_runs_output_length_check CHECK (((translated_text IS NULL) OR (char_length(translated_text) <= 20000))),
-    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT translation_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT translation_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -1779,7 +1809,7 @@ CREATE TABLE public.translation_workspace_submissions (
     CONSTRAINT translation_workspace_submissions_digest_check CHECK ((char_length((token_digest)::text) = 64)),
     CONSTRAINT translation_workspace_submissions_expiry_check CHECK ((expires_at > created_at)),
     CONSTRAINT translation_workspace_submissions_lifecycle_check CHECK (((((status)::text = 'available'::text) AND (consumed_at IS NULL) AND (experiment_id IS NULL)) OR (((status)::text = 'consumed'::text) AND (consumed_at IS NOT NULL) AND (experiment_id IS NOT NULL)))),
-    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'consumed'::character varying])::text[])))
+    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY (ARRAY[('available'::character varying)::text, ('consumed'::character varying)::text])))
 );
 
 
@@ -1856,7 +1886,7 @@ CREATE TABLE public.workflow_profile_model_selections (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT workflow_profile_model_selections_position_check CHECK (("position" > 0)),
-    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY ((ARRAY['translator'::character varying, 'reviewer'::character varying, 'judge'::character varying, 'finalizer'::character varying])::text[]))),
+    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY (ARRAY[('translator'::character varying)::text, ('reviewer'::character varying)::text, ('judge'::character varying)::text, ('finalizer'::character varying)::text]))),
     CONSTRAINT workflow_profile_selections_display_name_check CHECK (((char_length((display_name_snapshot)::text) >= 1) AND (char_length((display_name_snapshot)::text) <= 150))),
     CONSTRAINT workflow_profile_selections_gateway_check CHECK (((char_length((gateway_snapshot)::text) >= 1) AND (char_length((gateway_snapshot)::text) <= 50))),
     CONSTRAINT workflow_profile_selections_identifier_check CHECK (((char_length((model_identifier_snapshot)::text) >= 1) AND (char_length((model_identifier_snapshot)::text) <= 255))),
@@ -1897,7 +1927,7 @@ CREATE TABLE public.workflow_profile_revisions (
     configuration_digest character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
+    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
     CONSTRAINT workflow_profile_revisions_description_check CHECK (((description IS NULL) OR (char_length((description)::text) <= 500))),
     CONSTRAINT workflow_profile_revisions_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT workflow_profile_revisions_name_check CHECK (((char_length(btrim((name)::text)) >= 1) AND (char_length(btrim((name)::text)) <= 150))),
