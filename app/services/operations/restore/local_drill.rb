@@ -104,7 +104,10 @@ module Operations
         ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
         ActiveRecord::Base.establish_connection(configuration.merge(database: database))
         ActiveRecord::Schema.verbose = false
-        load Rails.root.join("db/schema.rb")
+        ActiveRecord::Tasks::DatabaseTasks.load_schema(
+          ActiveRecord::Base.connection_db_config,
+          ActiveRecord::Base.connection_db_config.schema_format
+        )
         services = ActiveStorage::Service::Registry.new(
           restore_drill: { service: "Disk", root: storage_root }
         )

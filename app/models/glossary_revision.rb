@@ -28,6 +28,8 @@ class GlossaryRevision < ApplicationRecord
   def save_initial_entry_set!
     @accepting_initial_entries = true
     save!
+    self.class.connection.execute("SET CONSTRAINTS seal_glossary_revision_entry_set_trigger IMMEDIATE")
+    self.class.connection.execute("SET CONSTRAINTS seal_glossary_revision_entry_set_trigger DEFERRED")
   ensure
     @accepting_initial_entries = false
   end
