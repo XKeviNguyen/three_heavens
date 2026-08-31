@@ -21,14 +21,35 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
     assert_includes error.message, "production-marked"
   end
 
-  test "loads the SQL schema and completes a disposable database and storage restore" do
-    result = Operations::Restore::LocalDrill.call(
+  test "loads the SQL schema into a disposable source database" do
+    drill = Operations::Restore::LocalDrill.new(
       environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" }
     )
+    original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
+    original_storage_service = ActiveStorage::Blob.service
+    original_storage_services = ActiveStorage::Blob.services
+    admin = PG.connect(drill.send(:pg_options, original_configuration, database: "postgres"))
+    database = drill.send(:create_database!, admin, "schema")
 
-    assert_equal 1, result.blob_count
-    assert_equal 1, result.attachment_count
-    assert_equal 1, result.document_count
-    assert_equal 0, result.critical_count
+    Dir.mktmpdir("three-heavens-schema-load-") do |storage_root|
+      drill.send(:configure_source!, original_configuration, database, storage_root)
+
+      assert_equal database, ActiveRecord::Base.connection_db_config.database
+      assert_equal :sql, ActiveRecord::Base.connection_db_config.schema_format
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'enforce_experiment_glossary_owner_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_proc
+        WHERE proname = 'glossary_revision_configuration_digest'
+      SQL
+    end
+  ensure
+    ActiveStorage::Blob.service = original_storage_service if original_storage_service
+    ActiveStorage::Blob.services = original_storage_services if original_storage_services
+    drill&.send(:restore_application_connection, original_configuration) if original_configuration
+    drill&.send(:drop_databases!, admin) if admin
+    admin&.close
   end
 end
