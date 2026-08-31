@@ -14,6 +14,7 @@ class TranslationWorkspace
                 :model_ids,
                 :workflow_mode,
                 :workflow_profile_revision_id,
+                :glossary_revision_id,
                 :automatic_confirmation,
                 :automatic_plan_digest,
                 :submission_token
@@ -23,6 +24,7 @@ class TranslationWorkspace
   validate :validate_workspace_records
   validate :validate_model_selection
   validate :validate_source_import
+  validate :validate_glossary_selection
 
   def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current })
     @start_service = start_service
@@ -117,7 +119,8 @@ class TranslationWorkspace
     )
     @experiment = @document.experiments.build(
       name: experiment_name,
-      instruction_prompt: instruction_prompt
+      instruction_prompt: instruction_prompt,
+      glossary_revision: @glossary_revision
     )
   end
 
@@ -242,6 +245,31 @@ class TranslationWorkspace
     elsif !source_import.available?(at: current_time)
       errors.add(:source_import_id, "is no longer available")
     end
+  end
+
+  def validate_glossary_selection
+    return if glossary_revision_id.blank?
+
+    unless glossary_revision_id.to_s.match?(/\A[1-9]\d*\z/)
+      errors.add(:glossary_revision_id, "is not a valid glossary revision")
+      return
+    end
+    @glossary_revision = GlossaryRevision.includes(:glossary).joins(:glossary)
+      .where(glossaries: { user_id: user.id, active: true }).find_by(id: glossary_revision_id)
+    unless @glossary_revision
+      errors.add(:glossary_revision_id, "is not available")
+      return
+    end
+    unless @glossary_revision.glossary.current_revision_id == @glossary_revision.id
+      errors.add(:glossary_revision_id, "is stale; select the current glossary revision")
+      return
+    end
+    unless @glossary_revision.language_pair_matches?(source_language: source_language, target_language: target_language)
+      errors.add(:glossary_revision_id, "must match the project's source and target languages")
+      return
+    end
+
+    @experiment.glossary_revision = @glossary_revision
   end
 
   def lock_source_import

@@ -1,0 +1,2 @@
+<% content_for :title, "Revise glossary · Three Heavens" %>
+<div class="mx-auto max-w-4xl"><h1 class="mb-7 text-3xl font-bold">Revise <%= @glossary.name %></h1><%= render "form", form_url: glossary_path(@glossary), form_method: :patch, submit_label: "Create new revision" %></div>

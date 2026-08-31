@@ -42,6 +42,7 @@ module BlindReviews
         target_language: project.target_language,
         source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
+        terminology_requirements: terminology_for(experiment),
         candidates: review_run.review_evaluations.order(:anonymous_label).map do |evaluation|
           {
             candidate_label: evaluation.anonymous_label,
@@ -68,6 +69,13 @@ module BlindReviews
       return translation_run.translated_text unless experiment_segment
 
       translation_run.translation_segment_runs.find_by!(experiment_segment: experiment_segment).translated_text
+    end
+
+    def terminology_for(experiment)
+      source_text = experiment_segment ? experiment_segment.source_text : experiment.document.source_text
+      Glossaries::RelevantEntries.call(revision: experiment.glossary_revision, source_text: source_text).map do |entry|
+        { source_term: entry.source_term, preferred_target_term: entry.preferred_target_term, note: entry.note }
+      end
     end
 
     def collision_safe_boundary(serialized_data)
@@ -97,7 +105,7 @@ module BlindReviews
         Score each dimension with an integer from 1 (unacceptable) to 10 (excellent):
         - faithfulness_score: preservation of source meaning and theological nuance
         - naturalness_score: target-language clarity, readability, and idiomatic quality
-        - terminology_score: consistency and accuracy of theological terminology
+        - terminology_score: consistency and accuracy of theological terminology, including applicable glossary requirements
         - instruction_adherence_score: compliance with the user's translation instruction
         - overall_score: holistic translation quality
 

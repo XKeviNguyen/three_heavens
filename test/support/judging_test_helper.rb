@@ -1,15 +1,16 @@
 module JudgingTestHelper
-  def create_completed_review_round(candidate_texts: [ "First translation", "Second translation" ])
+  def create_completed_review_round(candidate_texts: [ "First translation", "Second translation" ], glossary_revision: nil, source_text: "Source text")
     project = Project.create!(
       user: (defined?(@current_test_user) && @current_test_user) || users(:normal),
       name: "Judging tests",
       source_language: "Vietnamese",
       target_language: "Japanese"
     )
-    document = project.documents.create!(title: "Source", source_text: "Source text")
+    document = project.documents.create!(title: "Source", source_text: source_text)
     experiment = document.experiments.create!(
       instruction_prompt: "Translate faithfully.",
-      status: :completed
+      status: :completed,
+      glossary_revision: glossary_revision
     )
     candidate_models = [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ]
     candidates = candidate_texts.each_with_index.map do |text, index|

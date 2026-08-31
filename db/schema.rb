@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_01_025400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -74,8 +74,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.datetime "updated_at", null: false
     t.index ["project_id"], name: "index_documents_on_project_id"
     t.check_constraint "original_byte_size IS NULL OR original_byte_size >= 0 AND original_byte_size <= 10485760", name: "documents_original_byte_size_check"
-    t.check_constraint "source_format IS NULL OR (source_format::text = ANY (ARRAY['txt'::character varying::text, 'md'::character varying::text, 'docx'::character varying::text]))", name: "documents_source_format_check"
-    t.check_constraint "source_kind::text = ANY (ARRAY['pasted_text'::character varying::text, 'uploaded_file'::character varying::text])", name: "documents_source_kind_check"
+    t.check_constraint "source_format IS NULL OR (source_format::text = ANY (ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying]::text[]))", name: "documents_source_format_check"
+    t.check_constraint "source_kind::text = ANY (ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying]::text[])", name: "documents_source_kind_check"
     t.check_constraint "source_sha256 IS NULL OR char_length(source_sha256::text) = 64", name: "documents_source_sha256_check"
   end
 
@@ -97,11 +97,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
   create_table "experiments", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "document_id", null: false
+    t.bigint "glossary_revision_id"
     t.text "instruction_prompt", null: false
     t.string "name"
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["document_id"], name: "index_experiments_on_document_id"
+    t.index ["glossary_revision_id"], name: "index_experiments_on_glossary_revision_id"
   end
 
   create_table "final_translation_version_segments", force: :cascade do |t|
@@ -279,8 +281,57 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "finalization_segment_runs_prompt_tokens_check"
     t.check_constraint "proposed_translation IS NULL OR char_length(proposed_translation) <= 20000", name: "finalization_segment_runs_proposal_length_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "finalization_segment_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "finalization_segment_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "finalization_segment_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "finalization_segment_runs_total_tokens_check"
+  end
+
+  create_table "glossaries", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_revision_id"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "active"], name: "index_glossaries_on_user_id_and_active"
+    t.index ["user_id"], name: "index_glossaries_on_user_id"
+  end
+
+  create_table "glossary_entries", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "glossary_revision_id", null: false
+    t.string "note"
+    t.integer "position", null: false
+    t.string "preferred_target_term", null: false
+    t.string "source_term", null: false
+    t.datetime "updated_at", null: false
+    t.index ["glossary_revision_id", "position"], name: "index_glossary_entries_on_glossary_revision_id_and_position", unique: true
+    t.index ["glossary_revision_id", "source_term"], name: "index_glossary_entries_on_glossary_revision_id_and_source_term", unique: true
+    t.index ["glossary_revision_id"], name: "index_glossary_entries_on_glossary_revision_id"
+    t.check_constraint "\"position\" > 0", name: "glossary_entries_position_check"
+    t.check_constraint "char_length(btrim(preferred_target_term::text)) >= 1 AND char_length(btrim(preferred_target_term::text)) <= 200", name: "glossary_entries_target_term_check"
+    t.check_constraint "char_length(btrim(source_term::text)) >= 1 AND char_length(btrim(source_term::text)) <= 200", name: "glossary_entries_source_term_check"
+    t.check_constraint "note IS NULL OR char_length(note::text) <= 500", name: "glossary_entries_note_check"
+  end
+
+  create_table "glossary_revisions", force: :cascade do |t|
+    t.string "configuration_digest", null: false
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "glossary_id", null: false
+    t.string "name", null: false
+    t.string "source_language", null: false
+    t.string "target_language", null: false
+    t.datetime "updated_at", null: false
+    t.integer "version", null: false
+    t.index ["configuration_digest"], name: "index_glossary_revisions_on_configuration_digest"
+    t.index ["glossary_id", "id"], name: "index_glossary_revisions_on_glossary_id_and_id", unique: true
+    t.index ["glossary_id", "version"], name: "index_glossary_revisions_on_glossary_id_and_version", unique: true
+    t.index ["glossary_id"], name: "index_glossary_revisions_on_glossary_id"
+    t.check_constraint "char_length(btrim(name::text)) >= 1 AND char_length(btrim(name::text)) <= 150", name: "glossary_revisions_name_check"
+    t.check_constraint "char_length(btrim(source_language::text)) >= 1 AND char_length(btrim(source_language::text)) <= 100", name: "glossary_revisions_source_language_check"
+    t.check_constraint "char_length(btrim(target_language::text)) >= 1 AND char_length(btrim(target_language::text)) <= 100", name: "glossary_revisions_target_language_check"
+    t.check_constraint "char_length(configuration_digest::text) = 64", name: "glossary_revisions_digest_check"
+    t.check_constraint "description IS NULL OR char_length(description::text) <= 500", name: "glossary_revisions_description_check"
+    t.check_constraint "version > 0", name: "glossary_revisions_version_check"
   end
 
   create_table "judge_evaluations", force: :cascade do |t|
@@ -424,7 +475,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "max_output_tokens_snapshot >= 256 AND max_output_tokens_snapshot <= 200000 AND max_output_tokens_snapshot < context_window_tokens_snapshot", name: "judge_segment_runs_output_snapshot_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "judge_segment_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "judge_segment_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "judge_segment_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "judge_segment_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "judge_segment_runs_total_tokens_check"
   end
 
@@ -460,11 +511,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.index ["pipeline_run_id"], name: "index_pipeline_events_on_pipeline_run_id"
     t.check_constraint "char_length(event_key::text) >= 1 AND char_length(event_key::text) <= 120", name: "pipeline_events_key_check"
     t.check_constraint "char_length(event_type::text) >= 1 AND char_length(event_type::text) <= 80", name: "pipeline_events_type_check"
-    t.check_constraint "from_stage IS NULL OR (from_stage::text = ANY (ARRAY['translation'::character varying::text, 'review'::character varying::text, 'judge'::character varying::text, 'finalization'::character varying::text, 'editor'::character varying::text]))", name: "pipeline_events_from_stage_check"
+    t.check_constraint "from_stage IS NULL OR (from_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[]))", name: "pipeline_events_from_stage_check"
     t.check_constraint "jsonb_typeof(metadata) = 'object'::text AND octet_length(metadata::text) <= 2048", name: "pipeline_events_metadata_check"
     t.check_constraint "reason_code IS NULL OR char_length(reason_code::text) <= 80", name: "pipeline_events_reason_check"
     t.check_constraint "sequence_number > 0", name: "pipeline_events_sequence_check"
-    t.check_constraint "to_stage IS NULL OR (to_stage::text = ANY (ARRAY['translation'::character varying::text, 'review'::character varying::text, 'judge'::character varying::text, 'finalization'::character varying::text, 'editor'::character varying::text]))", name: "pipeline_events_to_stage_check"
+    t.check_constraint "to_stage IS NULL OR (to_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[]))", name: "pipeline_events_to_stage_check"
   end
 
   create_table "pipeline_runs", force: :cascade do |t|
@@ -502,14 +553,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "(status::text = 'stopped'::text) = (stopped_at IS NOT NULL)", name: "pipeline_runs_stopped_timestamp_check"
     t.check_constraint "blocked_message IS NULL OR char_length(blocked_message::text) <= 500", name: "pipeline_runs_blocked_message_check"
     t.check_constraint "blocked_reason_code IS NULL OR char_length(blocked_reason_code::text) <= 80", name: "pipeline_runs_blocked_reason_check"
-    t.check_constraint "blocked_stage IS NULL OR (blocked_stage::text = ANY (ARRAY['translation'::character varying::text, 'review'::character varying::text, 'judge'::character varying::text, 'finalization'::character varying::text]))", name: "pipeline_runs_blocked_stage_check"
+    t.check_constraint "blocked_stage IS NULL OR (blocked_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying]::text[]))", name: "pipeline_runs_blocked_stage_check"
     t.check_constraint "char_length(configuration_digest::text) = 64", name: "pipeline_runs_digest_check"
     t.check_constraint "completion_mode::text = 'winner_draft'::text AND finalizer_count = 0 OR completion_mode::text = 'refinement_proposals'::text AND finalizer_count > 0", name: "pipeline_runs_completion_finalizer_check"
-    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying::text, 'refinement_proposals'::character varying::text])", name: "pipeline_runs_completion_mode_check"
-    t.check_constraint "current_stage::text = ANY (ARRAY['translation'::character varying::text, 'review'::character varying::text, 'judge'::character varying::text, 'finalization'::character varying::text, 'editor'::character varying::text])", name: "pipeline_runs_current_stage_check"
+    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying]::text[])", name: "pipeline_runs_completion_mode_check"
+    t.check_constraint "current_stage::text = ANY (ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying]::text[])", name: "pipeline_runs_current_stage_check"
     t.check_constraint "jsonb_typeof(provider_work_plan) = 'object'::text AND octet_length(provider_work_plan::text) <= 16384", name: "pipeline_runs_provider_work_plan_check"
     t.check_constraint "provider_work_plan = '{}'::jsonb AND authorized_initial_provider_run_count = (translator_count + reviewer_count + judge_count + finalizer_count) OR provider_work_plan <> '{}'::jsonb AND jsonb_typeof(provider_work_plan -> 'roles'::text) = 'object'::text AND ((provider_work_plan ->> 'authorized_initial_provider_request_slots'::text)::integer) = authorized_initial_provider_run_count AND authorized_initial_provider_run_count >= (translator_count + reviewer_count + judge_count + finalizer_count)", name: "pipeline_runs_authorized_count_check"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'blocked'::character varying::text, 'ready_for_editor'::character varying::text, 'stopped'::character varying::text])", name: "pipeline_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'blocked'::character varying, 'ready_for_editor'::character varying, 'stopped'::character varying]::text[])", name: "pipeline_runs_status_check"
     t.check_constraint "translator_count >= 2 AND translator_count <= 6 AND reviewer_count >= 1 AND reviewer_count <= 5 AND judge_count >= 1 AND judge_count <= 5 AND finalizer_count >= 0 AND finalizer_count <= 5", name: "pipeline_runs_role_counts_check"
   end
 
@@ -658,7 +709,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "max_output_tokens_snapshot >= 256 AND max_output_tokens_snapshot <= 200000 AND max_output_tokens_snapshot < context_window_tokens_snapshot", name: "review_segment_runs_output_snapshot_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "review_segment_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "review_segment_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "review_segment_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "review_segment_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "review_segment_runs_total_tokens_check"
   end
 
@@ -685,11 +736,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.index ["user_id"], name: "index_source_imports_on_user_id"
     t.check_constraint "(status::text = 'consumed'::text) = (consumed_at IS NOT NULL)", name: "source_imports_consumed_at_check"
     t.check_constraint "byte_size IS NULL OR byte_size >= 0 AND byte_size <= 10485760", name: "source_imports_byte_size_check"
-    t.check_constraint "imported_format IS NULL OR (imported_format::text = ANY (ARRAY['txt'::character varying::text, 'md'::character varying::text, 'docx'::character varying::text]))", name: "source_imports_format_check"
+    t.check_constraint "imported_format IS NULL OR (imported_format::text = ANY (ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying]::text[]))", name: "source_imports_format_check"
     t.check_constraint "sha256 IS NULL OR char_length(sha256::text) = 64", name: "source_imports_sha256_check"
     t.check_constraint "status::text <> 'consumed'::text OR resulting_document_id IS NOT NULL", name: "source_imports_consumed_document_check"
     t.check_constraint "status::text <> 'ready'::text OR extracted_text IS NOT NULL", name: "source_imports_ready_text_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'ready'::character varying::text, 'failed'::character varying::text, 'consumed'::character varying::text])", name: "source_imports_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying]::text[])", name: "source_imports_status_check"
   end
 
   create_table "translation_runs", force: :cascade do |t|
@@ -785,7 +836,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "max_output_tokens_snapshot >= 256 AND max_output_tokens_snapshot <= 200000 AND max_output_tokens_snapshot < context_window_tokens_snapshot", name: "translation_segment_runs_output_snapshot_check"
     t.check_constraint "prompt_tokens IS NULL OR prompt_tokens >= 0", name: "translation_segment_runs_prompt_tokens_check"
     t.check_constraint "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name: "translation_segment_runs_reasoning_tokens_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "translation_segment_runs_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "translation_segment_runs_status_check"
     t.check_constraint "total_tokens IS NULL OR total_tokens >= 0", name: "translation_segment_runs_total_tokens_check"
     t.check_constraint "translated_text IS NULL OR char_length(translated_text) <= 20000", name: "translation_segment_runs_output_length_check"
   end
@@ -807,7 +858,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "char_length(token_digest::text) = 64", name: "translation_workspace_submissions_digest_check"
     t.check_constraint "expires_at > created_at", name: "translation_workspace_submissions_expiry_check"
     t.check_constraint "status::text = 'available'::text AND consumed_at IS NULL AND experiment_id IS NULL OR status::text = 'consumed'::text AND consumed_at IS NOT NULL AND experiment_id IS NOT NULL", name: "translation_workspace_submissions_lifecycle_check"
-    t.check_constraint "status::text = ANY (ARRAY['available'::character varying::text, 'consumed'::character varying::text])", name: "translation_workspace_submissions_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['available'::character varying, 'consumed'::character varying]::text[])", name: "translation_workspace_submissions_status_check"
   end
 
   create_table "users", force: :cascade do |t|
@@ -843,7 +894,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.check_constraint "char_length(gateway_snapshot::text) >= 1 AND char_length(gateway_snapshot::text) <= 50", name: "workflow_profile_selections_gateway_check"
     t.check_constraint "char_length(model_identifier_snapshot::text) >= 1 AND char_length(model_identifier_snapshot::text) <= 255", name: "workflow_profile_selections_identifier_check"
     t.check_constraint "char_length(provider_snapshot::text) >= 1 AND char_length(provider_snapshot::text) <= 100", name: "workflow_profile_selections_provider_check"
-    t.check_constraint "role::text = ANY (ARRAY['translator'::character varying::text, 'reviewer'::character varying::text, 'judge'::character varying::text, 'finalizer'::character varying::text])", name: "workflow_profile_model_selections_role_check"
+    t.check_constraint "role::text = ANY (ARRAY['translator'::character varying, 'reviewer'::character varying, 'judge'::character varying, 'finalizer'::character varying]::text[])", name: "workflow_profile_model_selections_role_check"
   end
 
   create_table "workflow_profile_revisions", force: :cascade do |t|
@@ -861,7 +912,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
     t.index ["workflow_profile_id"], name: "index_workflow_profile_revisions_on_workflow_profile_id"
     t.check_constraint "char_length(btrim(name::text)) >= 1 AND char_length(btrim(name::text)) <= 150", name: "workflow_profile_revisions_name_check"
     t.check_constraint "char_length(configuration_digest::text) = 64", name: "workflow_profile_revisions_digest_check"
-    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying::text, 'refinement_proposals'::character varying::text])", name: "workflow_profile_revisions_completion_mode_check"
+    t.check_constraint "completion_mode::text = ANY (ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying]::text[])", name: "workflow_profile_revisions_completion_mode_check"
     t.check_constraint "description IS NULL OR char_length(description::text) <= 500", name: "workflow_profile_revisions_description_check"
     t.check_constraint "version > 0", name: "workflow_profile_revisions_version_check"
   end
@@ -882,6 +933,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
   add_foreign_key "documents", "projects"
   add_foreign_key "experiment_segments", "document_execution_plans", on_delete: :restrict
   add_foreign_key "experiments", "documents"
+  add_foreign_key "experiments", "glossary_revisions", on_delete: :restrict
   add_foreign_key "final_translation_version_segments", "experiment_segments", on_delete: :restrict
   add_foreign_key "final_translation_version_segments", "final_translation_versions", on_delete: :restrict
   add_foreign_key "final_translation_versions", "final_translations"
@@ -899,6 +951,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_31_090000) do
   add_foreign_key "finalization_runs", "llm_models", column: "finalizer_llm_model_id"
   add_foreign_key "finalization_segment_runs", "experiment_segments", on_delete: :restrict
   add_foreign_key "finalization_segment_runs", "finalization_runs", on_delete: :restrict
+  add_foreign_key "glossaries", "glossary_revisions", column: ["id", "current_revision_id"], primary_key: ["glossary_id", "id"], name: "fk_glossaries_owned_current_revision"
+  add_foreign_key "glossaries", "users", on_delete: :restrict
+  add_foreign_key "glossary_entries", "glossary_revisions", on_delete: :restrict
+  add_foreign_key "glossary_revisions", "glossaries", on_delete: :restrict
   add_foreign_key "judge_evaluations", "judge_runs"
   add_foreign_key "judge_evaluations", "translation_runs"
   add_foreign_key "judge_rounds", "review_rounds"

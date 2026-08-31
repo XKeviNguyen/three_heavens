@@ -12,6 +12,12 @@ Rails.application.routes.draw do
       patch :deactivate
     end
   end
+  resources :glossaries, except: :destroy do
+    member do
+      patch :activate
+      patch :deactivate
+    end
+  end
   resources :pipeline_runs, only: :show do
     member do
       patch :stop

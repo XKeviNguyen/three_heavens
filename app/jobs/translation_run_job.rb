@@ -30,10 +30,10 @@ class TranslationRunJob < ApplicationJob
 
     @claimed_attempt = claim.attempt
 
-    prompt = {
-      system_prompt: translation_run.experiment.instruction_prompt,
-      user_prompt: translation_run.experiment.document.source_text
-    }
+    prompt = TranslationSegments::Prompt.build(
+      experiment: translation_run.experiment,
+      source_text: translation_run.experiment.document.source_text
+    )
     budget = Ai::RunContextBudget.call(
       run: translation_run,
       model: translation_run.llm_model,

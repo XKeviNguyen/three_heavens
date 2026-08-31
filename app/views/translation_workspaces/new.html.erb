@@ -85,6 +85,19 @@
     </section>
 
     <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <legend class="px-1 text-lg font-semibold text-slate-950">Terminology glossary</legend>
+      <p class="mt-1 text-sm text-slate-600">Optional owner-defined terminology guidance. The selected immutable revision applies to manual and automatic workflows.</p>
+      <div class="mt-4 space-y-3">
+        <label class="block rounded-lg border border-slate-200 p-4"><span class="flex items-start gap-3"><%= form.radio_button :glossary_revision_id, "", checked: @translation_workspace.glossary_revision_id.blank?, class: "mt-1 size-4" %><span><span class="font-semibold">No glossary</span><span class="mt-1 block text-sm text-slate-600">Continue without terminology constraints.</span></span></span></label>
+        <% @glossaries.each do |glossary| %>
+          <% revision = glossary.current_revision %>
+          <label class="block rounded-lg border border-slate-200 p-4"><span class="flex items-start gap-3"><%= form.radio_button :glossary_revision_id, revision.id, checked: @translation_workspace.glossary_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-1 block text-sm text-slate-600"><%= revision.source_language %> → <%= revision.target_language %> · <%= pluralize(revision.entries.size, "entry") %></span></span></span></label>
+        <% end %>
+      </div>
+      <% if @glossaries.empty? %><p class="mt-4 text-sm text-slate-600"><%= link_to "Create a glossary", new_glossary_path, class: "font-semibold text-blue-700" %> to add reusable terminology guidance.</p><% end %>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <legend class="px-1 text-lg font-semibold text-slate-950">Workflow mode</legend>
       <p class="mt-1 text-sm text-slate-600">Manual keeps every later stage under separate controls. Automatic uses one immutable profile and progresses only through its authorized initial provider work.</p>
       <div class="mt-4 grid gap-3 md:grid-cols-2">
