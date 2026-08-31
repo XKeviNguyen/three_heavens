@@ -3,6 +3,11 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
     enable_extension "pgcrypto" unless extension_enabled?("pgcrypto")
 
     execute <<~SQL
+      LOCK TABLE glossary_revisions, glossary_entries, experiments, documents, projects, glossaries
+      IN SHARE ROW EXCLUSIVE MODE;
+    SQL
+
+    execute <<~SQL
       CREATE FUNCTION glossary_revision_configuration_digest(revision_id bigint)
       RETURNS text
       LANGUAGE sql

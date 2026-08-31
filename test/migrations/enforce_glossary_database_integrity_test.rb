@@ -8,6 +8,10 @@ class EnforceGlossaryDatabaseIntegrityTest < ActiveSupport::TestCase
     self.abstract_class = true
   end
 
+  class LegacyWriterDatabase < ActiveRecord::Base
+    self.abstract_class = true
+  end
+
   test "legacy integrity preflight accepts a valid existing revision" do
     with_legacy_schema do |connection|
       seed_legacy_records(connection)
@@ -46,6 +50,26 @@ class EnforceGlossaryDatabaseIntegrityTest < ActiveSupport::TestCase
         WHERE projects.id = 1 AND glossaries.id = 1
       SQL
       assert_not connection.column_exists?(:glossary_revisions, :entry_set_sealed)
+    end
+  end
+
+  test "legacy integrity preflight blocks concurrent writes until enforcement is installed" do
+    with_legacy_schema do |connection|
+      seed_legacy_records(connection)
+      writer = establish_legacy_writer(connection.schema_search_path)
+      lock_error = nil
+
+      migrate_up(connection, after_lock: lambda {
+        writer.execute("SET lock_timeout = '250ms'")
+        lock_error = assert_raises(ActiveRecord::LockWaitTimeout) do
+          writer.execute("UPDATE glossary_entries SET note = 'Concurrent mutation' WHERE id = 1")
+        end
+      })
+
+      assert_equal "55P03", lock_error.cause.result.error_field(PG::Result::PG_DIAG_SQLSTATE)
+      assert_nil connection.select_value("SELECT note FROM glossary_entries WHERE id = 1")
+    ensure
+      LegacyWriterDatabase.connection_pool.disconnect!
     end
   end
 
@@ -96,11 +120,27 @@ class EnforceGlossaryDatabaseIntegrityTest < ActiveSupport::TestCase
 
   private
 
-  def migrate_up(connection)
+  def migrate_up(connection, after_lock: nil)
     migration = EnforceGlossaryDatabaseIntegrity.new
     migration.define_singleton_method(:connection) { connection }
+    if after_lock
+      migration.define_singleton_method(:execute) do |sql, *arguments|
+        result = connection.execute(sql, *arguments)
+        after_lock.call if sql.lstrip.start_with?("LOCK TABLE")
+        result
+      end
+    end
     migration.suppress_messages do
       connection.transaction { migration.migrate(:up) }
+    end
+  end
+
+  def establish_legacy_writer(schema_search_path)
+    LegacyWriterDatabase.establish_connection(
+      ActiveRecord::Base.connection_db_config.configuration_hash.merge(schema_search_path:)
+    )
+    LegacyWriterDatabase.connection.tap do |connection|
+      connection.schema_search_path = schema_search_path
     end
   end
 
