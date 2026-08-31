@@ -45,8 +45,47 @@ class GlossaryTest < ActiveSupport::TestCase
         preferred_target_term: "神"
       )
     end
+    assert_raises(ActiveRecord::RecordNotSaved) do
+      revision.entries.first.update!(note: "Changed")
+    end
+    assert_raises(ActiveRecord::RecordNotDestroyed) do
+      revision.entries.first.destroy!
+    end
     assert_equal [ "Sabbath" ], revision.reload.entries.pluck(:source_term)
     assert_equal digest, revision.configuration_digest
+    assert_equal Glossaries::ConfigurationDigest.call(revision), revision.configuration_digest
+  end
+
+  test "database rejects callback-bypassing entry mutations after a revision is sealed" do
+    revision = Glossaries::Create.call(user: users(:normal), attributes: attributes).current_revision
+    entry = revision.entries.first
+    digest = revision.configuration_digest
+
+    assert revision.reload.entry_set_sealed
+    assert_raises(ActiveRecord::StatementInvalid) do
+      GlossaryEntry.transaction(requires_new: true) do
+        GlossaryEntry.insert_all!([ {
+          glossary_revision_id: revision.id,
+          position: 2,
+          source_term: "God",
+          preferred_target_term: "神",
+          created_at: Time.current,
+          updated_at: Time.current
+        } ])
+      end
+    end
+    assert_raises(ActiveRecord::StatementInvalid) do
+      GlossaryEntry.transaction(requires_new: true) do
+        GlossaryEntry.where(id: entry.id).update_all(note: "Changed")
+      end
+    end
+    assert_raises(ActiveRecord::StatementInvalid) do
+      GlossaryEntry.transaction(requires_new: true) do
+        GlossaryEntry.where(id: entry.id).delete_all
+      end
+    end
+
+    assert_equal digest, revision.reload.configuration_digest
     assert_equal Glossaries::ConfigurationDigest.call(revision), revision.configuration_digest
   end
 
