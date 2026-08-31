@@ -264,7 +264,7 @@ class EnforceGlossaryDatabaseIntegrity < ActiveRecord::Migration[8.1]
 
     execute <<~SQL
       CREATE TRIGGER enforce_experiment_glossary_owner_trigger
-      BEFORE INSERT OR UPDATE OF document_id, glossary_revision_id ON experiments
+      AFTER INSERT OR UPDATE OF document_id, glossary_revision_id ON experiments
       FOR EACH ROW EXECUTE FUNCTION enforce_experiment_glossary_owner();
 
       CREATE TRIGGER enforce_project_glossary_owner_trigger

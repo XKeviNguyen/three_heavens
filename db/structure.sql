@@ -3352,7 +3352,7 @@ CREATE TRIGGER enforce_document_glossary_owner_trigger BEFORE UPDATE OF project_
 -- Name: experiments enforce_experiment_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER enforce_experiment_glossary_owner_trigger BEFORE INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
+CREATE TRIGGER enforce_experiment_glossary_owner_trigger AFTER INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
 
 
 --
