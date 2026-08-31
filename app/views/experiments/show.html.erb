@@ -12,6 +12,7 @@
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @experiment.name.presence || @experiment.document.title %></h1>
       <p class="mt-2 text-sm text-slate-600"><%= @experiment.document.project.name %> · <%= @experiment.document.project.source_language %> → <%= @experiment.document.project.target_language %></p>
       <% if @experiment.glossary_revision %><p class="mt-1 text-sm text-slate-600">Glossary: <%= link_to "#{@experiment.glossary_revision.name} · revision #{@experiment.glossary_revision.version}", glossary_path(@experiment.glossary_revision.glossary), class: "text-blue-700" %></p><% end %>
+      <% if @experiment.methodology_profile_revision %><p class="mt-1 text-sm text-slate-600">Methodology: <%= link_to "#{@experiment.methodology_profile_revision.name} · revision #{@experiment.methodology_profile_revision.version}", methodology_profile_path(@experiment.methodology_profile_revision.methodology_profile), class: "text-blue-700" %> · <span class="font-mono text-xs"><%= @experiment.methodology_profile_revision.configuration_digest %></span></p><% end %>
     </div>
     <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@experiment.status) %>"><%= @experiment.status.humanize %></span>
   </header>

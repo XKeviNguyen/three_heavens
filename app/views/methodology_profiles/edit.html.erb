@@ -1,0 +1,6 @@
+<% content_for :title, "Revise methodology · Three Heavens" %>
+<div class="mx-auto max-w-4xl">
+  <h1 class="mb-2 text-3xl font-bold">Revise <%= @methodology_profile.name %></h1>
+  <p class="mb-7 text-sm text-slate-600">Saving creates a new immutable revision. Existing experiments continue using their original methodology snapshot.</p>
+  <%= render "form", form_url: methodology_profile_path(@methodology_profile), form_method: :patch, submit_label: "Create new revision" %>
+</div>

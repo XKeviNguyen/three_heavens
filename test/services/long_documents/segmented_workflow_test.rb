@@ -1,11 +1,13 @@
 require "test_helper"
 require_relative "../../support/authorized_ai_job_helper"
 require_relative "../../support/workflow_profile_test_helper"
+require_relative "../../support/methodology_profile_test_helper"
 
 class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
   include AuthorizedAiJobHelper
   include WorkflowProfileTestHelper
+  include MethodologyProfileTestHelper
 
   class FakeClient
     attr_reader :calls
@@ -141,7 +143,15 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     )
     source = Array.new(24) { |index| "Đoạn #{index}: " + ("thần học。" * 55) + "\n\n" }.join
     document = project.documents.create!(title: "Long source", source_text: source)
-    @experiment = document.experiments.create!(instruction_prompt: "Preserve theological terminology.")
+    @methodology = create_methodology_profile(
+      source_language: "Vietnamese",
+      target_language: "Japanese",
+      guidance: "Use the same complete methodology for every segment."
+    )
+    @experiment = document.experiments.create!(
+      instruction_prompt: "Preserve theological terminology.",
+      methodology_profile_revision: @methodology.current_revision
+    )
     @models = [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ]
     @models.each { |model| model.update!(context_window_tokens: 64_000, max_output_tokens: 4_096) }
   end
@@ -163,6 +173,11 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert @experiment.translation_runs.all?(&:completed?)
     assert @experiment.translation_runs.all? { |run| run.translated_text == @experiment.document.source_text }
     assert @experiment.translation_runs.all? { |run| run.cost == BigDecimal("0.001") * plan.segment_count }
+    assert_all_segment_prompts_use_methodology(
+      plan.segments,
+      ->(segment) { TranslationSegments::Prompt.build(experiment: @experiment, source_text: segment.source_text) },
+      bounded: false
+    )
 
     reviewer = @models.first
     perform_enqueued_jobs(only: ReviewSegmentRunJob) do
@@ -170,6 +185,10 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     end
     assert @review_round.reload.completed?
     review_run = @review_round.review_runs.first
+    assert_all_segment_prompts_use_methodology(
+      plan.segments,
+      ->(segment) { BlindReviews::Prompt.build(review_run, experiment_segment: segment) }
+    )
     labels_by_segment = review_run.review_segment_runs.map do |segment_run|
       segment_run.evaluations.map { |item| item.fetch("candidate_label") }
     end
@@ -185,6 +204,10 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
       @judge_round = Judging::Start.call(review_round: @review_round, judge_ids: [ @models.last.id ])
     end
     assert @judge_round.reload.completed?
+    assert_all_segment_prompts_use_methodology(
+      plan.segments,
+      ->(segment) { Judging::Prompt.build(@judge_round.judge_runs.first, experiment_segment: segment) }
+    )
     expected_winner_id = @judge_round.judge_runs.first.judge_evaluations.order(:anonymous_label).first.translation_run_id
     assert_equal expected_winner_id, @judge_round.winner_translation_run_id
 
@@ -200,6 +223,10 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     end
     proposal = @finalization_round.reload.finalization_runs.first
     assert proposal.completed?
+    assert_all_segment_prompts_use_methodology(
+      plan.segments,
+      ->(segment) { Finalizations::Prompt.build(proposal, experiment_segment: segment) }
+    )
     assert_equal original_content, final_translation.reload.current_version.content
     assert_equal plan.segment_count, proposal.finalization_segment_runs.count
 
@@ -411,6 +438,7 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
   end
 
   test "automatic pipeline preserves initial capabilities through every segmented stage" do
+    selected_methodology = @methodology.current_revision
     profile = create_workflow_profile(completion_mode: "refinement_proposals")
     revision = profile.current_revision
     role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
@@ -434,6 +462,16 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
       )
     end
     clear_enqueued_jobs
+    MethodologyProfiles::Revise.call(
+      methodology_profile: @methodology,
+      expected_version: "1",
+      attributes: methodology_profile_attributes(
+        source_language: "Vietnamese",
+        target_language: "Japanese",
+        guidance: "A later methodology revision must not affect the running pipeline."
+      )
+    )
+    MethodologyProfiles::ChangeStatus.deactivate(methodology_profile: @methodology)
     role_models.values.flatten.uniq.each do |model|
       model.update!(context_window_tokens: 8_000, max_output_tokens: 512)
     end
@@ -450,6 +488,24 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert @pipeline.current_stage_editor?
     assert @pipeline.experiment.final_translation.draft?
     assert_equal 1, @pipeline.experiment.final_translation.versions.count
+    assert_equal selected_methodology, @pipeline.experiment.reload.methodology_profile_revision
+    plan = @pipeline.experiment.document_execution_plan
+    review_run = @pipeline.experiment.review_round.review_runs.sole
+    judge_run = @pipeline.experiment.review_round.judge_round.judge_runs.sole
+    finalization_run = @pipeline.finalization_round.finalization_runs.sole
+    [
+      ->(segment) { TranslationSegments::Prompt.build(experiment: @pipeline.experiment, source_text: segment.source_text) },
+      ->(segment) { BlindReviews::Prompt.build(review_run, experiment_segment: segment) },
+      ->(segment) { Judging::Prompt.build(judge_run, experiment_segment: segment) },
+      ->(segment) { Finalizations::Prompt.build(finalization_run, experiment_segment: segment) }
+    ].each_with_index do |builder, index|
+      assert_all_segment_prompts_use_guidance(
+        plan.segments,
+        builder,
+        guidance: selected_methodology.guidance,
+        bounded: index.positive?
+      )
+    end
     segment_runs = @pipeline.experiment.review_round.review_runs.flat_map(&:review_segment_runs) +
       @pipeline.experiment.review_round.judge_round.judge_runs.flat_map(&:judge_segment_runs) +
       @pipeline.finalization_round.finalization_runs.flat_map(&:finalization_segment_runs)
@@ -496,5 +552,29 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert_not @judge_round.judge_runs.sole.segmented?
     assert @finalization_round.finalization_runs.sole.completed?
     assert_not @finalization_round.finalization_runs.sole.segmented?
+  end
+
+  private
+
+  def assert_all_segment_prompts_use_methodology(segments, builder, bounded: true)
+    assert_all_segment_prompts_use_guidance(
+      segments,
+      builder,
+      guidance: @methodology.current_revision.guidance,
+      bounded: bounded
+    )
+  end
+
+  def assert_all_segment_prompts_use_guidance(segments, builder, guidance:, bounded:)
+    segments.each do |segment|
+      prompt = builder.call(segment)
+      data = if bounded
+        boundary = prompt.fetch(:user_prompt).match(/\A<([^>]+)>\n/)[1]
+        JSON.parse(prompt.fetch(:user_prompt).delete_prefix("<#{boundary}>\n").delete_suffix("</#{boundary}>\n"))
+      else
+        JSON.parse(prompt.fetch(:user_prompt))
+      end
+      assert_equal guidance, data.fetch("translation_methodology")
+    end
   end
 end

@@ -93,6 +93,46 @@ $$;
 
 
 --
+-- Name: enforce_experiment_methodology_snapshot(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_experiment_methodology_snapshot() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND OLD.methodology_profile_revision_id IS DISTINCT FROM NEW.methodology_profile_revision_id THEN
+    RAISE EXCEPTION 'Experiment methodology revision cannot change after creation'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.methodology_profile_revision_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM documents
+    INNER JOIN projects ON projects.id = documents.project_id
+    INNER JOIN methodology_profile_revisions
+      ON methodology_profile_revisions.id = NEW.methodology_profile_revision_id
+    INNER JOIN methodology_profiles
+      ON methodology_profiles.id = methodology_profile_revisions.methodology_profile_id
+    WHERE documents.id = NEW.document_id
+      AND methodology_profiles.user_id = projects.user_id
+      AND lower(btrim(methodology_profile_revisions.source_language)) = lower(btrim(projects.source_language))
+      AND lower(btrim(methodology_profile_revisions.target_language)) = lower(btrim(projects.target_language))
+  ) THEN
+    RAISE EXCEPTION 'Experiment methodology revision is not available for this project and language pair'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_glossary_entry_set_seal(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -227,6 +267,25 @@ BEGIN
   END IF;
 
   RAISE EXCEPTION 'Glossary revisions are immutable'
+    USING ERRCODE = 'check_violation';
+END;
+$$;
+
+
+--
+-- Name: prevent_methodology_profile_revision_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_methodology_profile_revision_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'Methodology profile revisions cannot be deleted'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RAISE EXCEPTION 'Methodology profile revisions are immutable'
     USING ERRCODE = 'check_violation';
 END;
 $$;
@@ -512,7 +571,8 @@ CREATE TABLE public.experiments (
     name character varying,
     status character varying DEFAULT 'pending'::character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    glossary_revision_id bigint
+    glossary_revision_id bigint,
+    methodology_profile_revision_id bigint
 );
 
 
@@ -1224,6 +1284,84 @@ CREATE SEQUENCE public.llm_models_id_seq
 --
 
 ALTER SEQUENCE public.llm_models_id_seq OWNED BY public.llm_models.id;
+
+
+--
+-- Name: methodology_profile_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.methodology_profile_revisions (
+    id bigint NOT NULL,
+    methodology_profile_id bigint NOT NULL,
+    version integer NOT NULL,
+    name character varying NOT NULL,
+    description character varying,
+    source_language character varying NOT NULL,
+    target_language character varying NOT NULL,
+    guidance text NOT NULL,
+    configuration_digest character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT methodology_profile_revisions_description_check CHECK (((description IS NULL) OR (char_length((description)::text) <= 500))),
+    CONSTRAINT methodology_profile_revisions_digest_check CHECK (((configuration_digest)::text ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT methodology_profile_revisions_guidance_check CHECK (((char_length(btrim(guidance)) >= 1) AND (char_length(btrim(guidance)) <= 10000))),
+    CONSTRAINT methodology_profile_revisions_name_check CHECK (((char_length(btrim((name)::text)) >= 1) AND (char_length(btrim((name)::text)) <= 150))),
+    CONSTRAINT methodology_profile_revisions_source_language_check CHECK (((char_length(btrim((source_language)::text)) >= 1) AND (char_length(btrim((source_language)::text)) <= 100))),
+    CONSTRAINT methodology_profile_revisions_target_language_check CHECK (((char_length(btrim((target_language)::text)) >= 1) AND (char_length(btrim((target_language)::text)) <= 100))),
+    CONSTRAINT methodology_profile_revisions_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: methodology_profile_revisions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.methodology_profile_revisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: methodology_profile_revisions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.methodology_profile_revisions_id_seq OWNED BY public.methodology_profile_revisions.id;
+
+
+--
+-- Name: methodology_profiles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.methodology_profiles (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    current_revision_id bigint,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: methodology_profiles_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.methodology_profiles_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: methodology_profiles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.methodology_profiles_id_seq OWNED BY public.methodology_profiles.id;
 
 
 --
@@ -2135,6 +2273,20 @@ ALTER TABLE ONLY public.llm_models ALTER COLUMN id SET DEFAULT nextval('public.l
 
 
 --
+-- Name: methodology_profile_revisions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profile_revisions ALTER COLUMN id SET DEFAULT nextval('public.methodology_profile_revisions_id_seq'::regclass);
+
+
+--
+-- Name: methodology_profiles id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profiles ALTER COLUMN id SET DEFAULT nextval('public.methodology_profiles_id_seq'::regclass);
+
+
+--
 -- Name: pipeline_events id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2416,6 +2568,22 @@ ALTER TABLE ONLY public.llm_models
 
 
 --
+-- Name: methodology_profile_revisions methodology_profile_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profile_revisions
+    ADD CONSTRAINT methodology_profile_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: methodology_profiles methodology_profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profiles
+    ADD CONSTRAINT methodology_profiles_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: pipeline_events pipeline_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2544,6 +2712,20 @@ ALTER TABLE ONLY public.workflow_profiles
 
 
 --
+-- Name: idx_on_methodology_profile_id_id_d920f961d0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_methodology_profile_id_id_d920f961d0 ON public.methodology_profile_revisions USING btree (methodology_profile_id, id);
+
+
+--
+-- Name: idx_on_methodology_profile_id_version_9a54e7270e; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_methodology_profile_id_version_9a54e7270e ON public.methodology_profile_revisions USING btree (methodology_profile_id, version);
+
+
+--
 -- Name: idx_on_status_expires_at_ed9c9803ce; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2618,6 +2800,13 @@ CREATE INDEX index_experiments_on_document_id ON public.experiments USING btree 
 --
 
 CREATE INDEX index_experiments_on_glossary_revision_id ON public.experiments USING btree (glossary_revision_id);
+
+
+--
+-- Name: index_experiments_on_methodology_profile_revision_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_experiments_on_methodology_profile_revision_id ON public.experiments USING btree (methodology_profile_revision_id);
 
 
 --
@@ -2968,6 +3157,34 @@ CREATE INDEX index_judge_segment_runs_on_running_last_claimed_at ON public.judge
 --
 
 CREATE UNIQUE INDEX index_llm_models_on_gateway_and_model_identifier ON public.llm_models USING btree (gateway, model_identifier);
+
+
+--
+-- Name: index_methodology_profile_revisions_on_configuration_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_methodology_profile_revisions_on_configuration_digest ON public.methodology_profile_revisions USING btree (configuration_digest);
+
+
+--
+-- Name: index_methodology_profile_revisions_on_methodology_profile_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_methodology_profile_revisions_on_methodology_profile_id ON public.methodology_profile_revisions USING btree (methodology_profile_id);
+
+
+--
+-- Name: index_methodology_profiles_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_methodology_profiles_on_user_id ON public.methodology_profiles USING btree (user_id);
+
+
+--
+-- Name: index_methodology_profiles_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_methodology_profiles_on_user_id_and_active ON public.methodology_profiles USING btree (user_id, active);
 
 
 --
@@ -3356,6 +3573,13 @@ CREATE TRIGGER enforce_experiment_glossary_owner_trigger AFTER INSERT OR UPDATE 
 
 
 --
+-- Name: experiments enforce_experiment_methodology_snapshot_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_experiment_methodology_snapshot_trigger BEFORE INSERT OR UPDATE OF methodology_profile_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_methodology_snapshot();
+
+
+--
 -- Name: glossary_entries enforce_glossary_entry_set_seal_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3381,6 +3605,13 @@ CREATE TRIGGER enforce_project_glossary_owner_trigger BEFORE UPDATE OF user_id O
 --
 
 CREATE TRIGGER prevent_glossary_revision_mutation_trigger BEFORE DELETE OR UPDATE ON public.glossary_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_glossary_revision_mutation();
+
+
+--
+-- Name: methodology_profile_revisions prevent_methodology_profile_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_methodology_profile_revision_mutation_trigger BEFORE DELETE OR UPDATE ON public.methodology_profile_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_methodology_profile_revision_mutation();
 
 
 --
@@ -3428,6 +3659,14 @@ ALTER TABLE ONLY public.finalization_rounds
 
 ALTER TABLE ONLY public.glossaries
     ADD CONSTRAINT fk_glossaries_owned_current_revision FOREIGN KEY (id, current_revision_id) REFERENCES public.glossary_revisions(glossary_id, id);
+
+
+--
+-- Name: methodology_profiles fk_methodology_profiles_owned_current_revision; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profiles
+    ADD CONSTRAINT fk_methodology_profiles_owned_current_revision FOREIGN KEY (id, current_revision_id) REFERENCES public.methodology_profile_revisions(methodology_profile_id, id);
 
 
 --
@@ -3524,6 +3763,14 @@ ALTER TABLE ONLY public.experiment_segments
 
 ALTER TABLE ONLY public.judge_rounds
     ADD CONSTRAINT fk_rails_342274ea1b FOREIGN KEY (winner_translation_run_id) REFERENCES public.translation_runs(id);
+
+
+--
+-- Name: methodology_profile_revisions fk_rails_385708fe63; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profile_revisions
+    ADD CONSTRAINT fk_rails_385708fe63 FOREIGN KEY (methodology_profile_id) REFERENCES public.methodology_profiles(id) ON DELETE RESTRICT;
 
 
 --
@@ -3671,6 +3918,14 @@ ALTER TABLE ONLY public.workflow_profile_model_selections
 
 
 --
+-- Name: experiments fk_rails_82525cd803; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.experiments
+    ADD CONSTRAINT fk_rails_82525cd803 FOREIGN KEY (methodology_profile_revision_id) REFERENCES public.methodology_profile_revisions(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: translation_segment_runs fk_rails_87331f9d13; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3740,6 +3995,14 @@ ALTER TABLE ONLY public.active_storage_variant_records
 
 ALTER TABLE ONLY public.pipeline_runs
     ADD CONSTRAINT fk_rails_99531aa0f4 FOREIGN KEY (workflow_profile_revision_id) REFERENCES public.workflow_profile_revisions(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: methodology_profiles fk_rails_a1b3f8d960; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.methodology_profiles
+    ADD CONSTRAINT fk_rails_a1b3f8d960 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -3893,6 +4156,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260901100000'),
 ('20260901025500'),
 ('20260901025400'),
 ('20260831090000'),

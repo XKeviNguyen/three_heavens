@@ -11,6 +11,7 @@ class TranslationWorkspacesController < ApplicationController
     workflow_mode
     workflow_profile_revision_id
     glossary_revision_id
+    methodology_profile_revision_id
     automatic_confirmation
     automatic_plan_digest
     submission_token
@@ -77,6 +78,8 @@ class TranslationWorkspacesController < ApplicationController
       current_revision: { model_selections: :llm_model }
     ).order(updated_at: :desc, id: :desc)
     @glossaries = current_user.glossaries.active.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
+    @methodology_profiles = current_user.methodology_profiles.active.includes(:current_revision)
+      .order(updated_at: :desc, id: :desc)
   end
 
   def translation_workspace_params

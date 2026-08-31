@@ -22,7 +22,7 @@ class GlossaryRevision < ApplicationRecord
   before_destroy :prevent_destruction
 
   def language_pair_matches?(source_language:, target_language:)
-    Glossaries::LanguagePair.matches?(self, source_language:, target_language:)
+    TranslationLanguagePair.matches?(self, source_language:, target_language:)
   end
 
   def save_initial_entry_set!
