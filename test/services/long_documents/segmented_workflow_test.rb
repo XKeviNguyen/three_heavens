@@ -16,7 +16,7 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
 
     def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens:)
       calls << [ :translation, model_identifier, max_tokens, instruction_prompt.bytesize + source_text.bytesize ]
-      result(source_text)
+      result(JSON.parse(source_text).fetch("source_text"))
     end
 
     def review_completion(model_identifier:, response_schema:, max_tokens:, **)
@@ -110,7 +110,7 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
   class WhitespaceStrippingClient < FakeClient
     def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens:)
       calls << [ :translation, model_identifier, max_tokens, instruction_prompt.bytesize + source_text.bytesize ]
-      result(source_text.rstrip)
+      result(JSON.parse(source_text).fetch("source_text").rstrip)
     end
 
     def finalization_completion(model_identifier:, max_tokens:, **)

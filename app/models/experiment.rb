@@ -22,6 +22,7 @@ class Experiment < ApplicationRecord
             presence: true,
             length: { maximum: Ai::UsageLimits::MAX_INSTRUCTION_CHARACTERS }
   validate :glossary_revision_matches_project_language_pair
+  validate :glossary_revision_belongs_to_project_owner
   validate :glossary_revision_is_immutable, on: :update
 
   private
@@ -31,6 +32,13 @@ class Experiment < ApplicationRecord
     return if glossary_revision.language_pair_matches?(source_language: document.project.source_language, target_language: document.project.target_language)
 
     errors.add(:glossary_revision, "must match the project's source and target languages")
+  end
+
+  def glossary_revision_belongs_to_project_owner
+    return unless glossary_revision && document&.project
+    return if glossary_revision.glossary.user_id == document.project.user_id
+
+    errors.add(:glossary_revision, "is not available for this experiment")
   end
 
   def glossary_revision_is_immutable

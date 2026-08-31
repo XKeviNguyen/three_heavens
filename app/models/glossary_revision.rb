@@ -25,6 +25,17 @@ class GlossaryRevision < ApplicationRecord
     Glossaries::LanguagePair.matches?(self, source_language:, target_language:)
   end
 
+  def save_initial_entry_set!
+    @accepting_initial_entries = true
+    save!
+  ensure
+    @accepting_initial_entries = false
+  end
+
+  def accepting_initial_entries?
+    @accepting_initial_entries == true
+  end
+
   private
 
   def normalize_values

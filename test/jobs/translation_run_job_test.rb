@@ -55,7 +55,7 @@ class TranslationRunJobTest < ActiveJob::TestCase
     assert @experiment.reload.completed?
   end
 
-  test "uses the persisted instruction prompt and document source text" do
+  test "uses the persisted instruction prompt and document source text as structured user data" do
     run = @experiment.translation_runs.create!(llm_model: @llm_model)
     captured_arguments = nil
     client = Object.new
@@ -83,10 +83,11 @@ class TranslationRunJobTest < ActiveJob::TestCase
 
     assert_equal @llm_model.model_identifier,
                  captured_arguments[:model_identifier]
-    assert_includes captured_arguments[:instruction_prompt], "structured data"
-    data = JSON.parse(captured_arguments[:instruction_prompt].match(/\{.*\}/m)[0])
+    assert_includes captured_arguments[:instruction_prompt], "Apply the\nowner translation_instruction"
+    data = JSON.parse(captured_arguments[:source_text])
     assert_equal @experiment.instruction_prompt, data.fetch("translation_instruction")
-    assert_equal @experiment.document.source_text, captured_arguments[:source_text]
+    assert_equal @experiment.document.source_text, data.fetch("source_text")
+    assert_empty data.fetch("terminology_requirements")
     assert_equal Ai::ContextBudget::CONSERVATIVE_MAX_OUTPUT_TOKENS,
                  captured_arguments[:max_tokens]
     assert_equal Ai::ContextBudget::CONSERVATIVE_CONTEXT_TOKENS,

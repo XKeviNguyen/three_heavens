@@ -4,7 +4,7 @@ module Glossaries
       Glossary.transaction do
         glossary = user.glossaries.create!(active: active)
         revision = BuildRevision.call(glossary:, version: 1, attributes:)
-        revision.save!
+        revision.save_initial_entry_set!
         glossary.update!(current_revision: revision)
         glossary
       end
