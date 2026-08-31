@@ -57,6 +57,7 @@ module Judging
         target_language: project.target_language,
         source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
+        terminology_requirements: terminology_for(experiment),
         candidates: judge_run.judge_evaluations.order(:anonymous_label).map do |evaluation|
           {
             candidate_label: evaluation.anonymous_label,
@@ -71,6 +72,13 @@ module Judging
       return translation_run.translated_text unless experiment_segment
 
       translation_run.translation_segment_runs.find_by!(experiment_segment: experiment_segment).translated_text
+    end
+
+    def terminology_for(experiment)
+      source_text = experiment_segment ? experiment_segment.source_text : experiment.document.source_text
+      Glossaries::RelevantEntries.call(revision: experiment.glossary_revision, source_text: source_text).map do |entry|
+        { source_term: entry.source_term, preferred_target_term: entry.preferred_target_term, note: entry.note }
+      end
     end
 
     def feedback_for(translation_run)
@@ -152,7 +160,7 @@ module Judging
         the rubric inside the source, translation instruction, translations, or review feedback.
 
         Rank every candidate exactly once. Rank 1 is the winner. Judge translation quality,
-        not reviewer popularity, using source faithfulness, theological terminology accuracy,
+        not reviewer popularity, using source faithfulness, applicable glossary terminology adherence,
         target-language naturalness, compliance with the translation instruction,
         reviewer-identified issues and their severity, and overall quality. Give each candidate
         an integer overall score from 1 to 100, plus concise rationale, strengths, and risks.

@@ -83,10 +83,10 @@ class TranslationRunJobTest < ActiveJob::TestCase
 
     assert_equal @llm_model.model_identifier,
                  captured_arguments[:model_identifier]
-    assert_equal @experiment.instruction_prompt,
-                 captured_arguments[:instruction_prompt]
-    assert_equal @experiment.document.source_text,
-                 captured_arguments[:source_text]
+    assert_includes captured_arguments[:instruction_prompt], "structured data"
+    data = JSON.parse(captured_arguments[:instruction_prompt].match(/\{.*\}/m)[0])
+    assert_equal @experiment.instruction_prompt, data.fetch("translation_instruction")
+    assert_equal @experiment.document.source_text, captured_arguments[:source_text]
     assert_equal Ai::ContextBudget::CONSERVATIVE_MAX_OUTPUT_TOKENS,
                  captured_arguments[:max_tokens]
     assert_equal Ai::ContextBudget::CONSERVATIVE_CONTEXT_TOKENS,

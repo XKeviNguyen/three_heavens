@@ -62,11 +62,7 @@ module TranslationExperiments
       llm_models.to_h do |model|
         per_source = sources.to_h do |source|
           source_text = source.respond_to?(:source_text) ? source.source_text : experiment.document.source_text
-          prompt = if plan
-            TranslationSegments::Prompt.build(experiment: experiment, source_text: source_text)
-          else
-            { system_prompt: experiment.instruction_prompt, user_prompt: source_text }
-          end
+          prompt = TranslationSegments::Prompt.build(experiment: experiment, source_text: source_text)
           budget = Ai::ContextBudget.call(
             model: model,
             system_prompt: prompt.fetch(:system_prompt),

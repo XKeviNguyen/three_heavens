@@ -1,5 +1,6 @@
 class Experiment < ApplicationRecord
   belongs_to :document
+  belongs_to :glossary_revision, optional: true
 
   has_many :translation_runs, dependent: :restrict_with_error
   has_one :document_execution_plan, dependent: :restrict_with_error
@@ -20,4 +21,21 @@ class Experiment < ApplicationRecord
   validates :instruction_prompt,
             presence: true,
             length: { maximum: Ai::UsageLimits::MAX_INSTRUCTION_CHARACTERS }
+  validate :glossary_revision_matches_project_language_pair
+  validate :glossary_revision_is_immutable, on: :update
+
+  private
+
+  def glossary_revision_matches_project_language_pair
+    return unless glossary_revision && document&.project
+    return if glossary_revision.language_pair_matches?(source_language: document.project.source_language, target_language: document.project.target_language)
+
+    errors.add(:glossary_revision, "must match the project's source and target languages")
+  end
+
+  def glossary_revision_is_immutable
+    return unless will_save_change_to_glossary_revision_id?
+
+    errors.add(:glossary_revision, "cannot change after experiment creation")
+  end
 end

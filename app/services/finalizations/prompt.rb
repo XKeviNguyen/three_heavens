@@ -62,6 +62,7 @@ module Finalizations
         target_language: project.target_language,
         source_text: experiment_segment ? experiment_segment.source_text : experiment.document.source_text,
         translation_instruction: experiment.instruction_prompt,
+        terminology_requirements: terminology_for,
         base_final_draft: base_draft,
         official_winning_translation: winning_translation,
         blind_review_feedback: blind_review_feedback,
@@ -149,6 +150,13 @@ module Finalizations
       }
     end
 
+    def terminology_for
+      source_text = experiment_segment ? experiment_segment.source_text : experiment.document.source_text
+      Glossaries::RelevantEntries.call(revision: experiment.glossary_revision, source_text: source_text).map do |entry|
+        { source_term: entry.source_term, preferred_target_term: entry.preferred_target_term, note: entry.note }
+      end
+    end
+
     def collision_safe_boundary(serialized_data)
       MAX_BOUNDARY_ATTEMPTS.times do
         boundary = "#{BOUNDARY_PREFIX}#{boundary_generator.call}"
@@ -163,7 +171,8 @@ module Finalizations
       <<~PROMPT
         You are refining a theological translation for a human editor.
         Improve the complete translation rather than scoring it. Preserve source meaning,
-        theological meaning, and terminology; obey the user's translation instruction;
+        theological meaning, and terminology; apply applicable glossary mappings only when their
+        literal source term is present; obey the user's translation instruction;
         improve target-language clarity and naturalness; correct issues supported by the
         supplied review and judge feedback; and do not add unsupported meaning.
         Return a complete proposed translation plus concise change summaries, terminology
