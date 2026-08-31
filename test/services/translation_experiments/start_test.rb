@@ -129,4 +129,39 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
   ensure
     TranslationRunJob.client_factory = original_factory if original_factory
   end
+
+  test "fails closed before scheduling when relevant glossary data exceeds context" do
+    entries = Array.new(GlossaryRevision::MAXIMUM_ENTRIES) do |index|
+      { "source_term" => "term#{index}", "preferred_target_term" => "t" * 200, "note" => "n" * 500 }
+    end
+    glossary = Glossaries::Create.call(
+      user: users(:normal),
+      attributes: {
+        "name" => "Large terms", "source_language" => "vi", "target_language" => "ja", "entries" => entries
+      }
+    )
+    document = @experiment.document.project.documents.create!(
+      title: "Glossary source",
+      source_text: entries.map { |entry| entry.fetch("source_term") }.join(" ")
+    )
+    experiment = document.experiments.create!(
+      instruction_prompt: "Translate faithfully.",
+      glossary_revision: glossary.current_revision
+    )
+    model = llm_models(:openrouter_claude)
+    model.update!(context_window_tokens: 16_384, max_output_tokens: 4_096)
+    client = RequestCountingClient.new
+    original_factory = TranslationRunJob.client_factory
+    TranslationRunJob.client_factory = -> { client }
+
+    assert_no_enqueued_jobs do
+      assert_raises TranslationExperiments::Start::ContextBudgetError do
+        TranslationExperiments::Start.call(experiment: experiment, llm_models: [ model ])
+      end
+    end
+    assert_empty experiment.reload.translation_runs
+    assert_equal 0, client.request_count
+  ensure
+    TranslationRunJob.client_factory = original_factory if original_factory
+  end
 end

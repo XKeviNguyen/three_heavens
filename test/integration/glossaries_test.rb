@@ -1,7 +1,9 @@
 require "test_helper"
+require_relative "../support/workflow_profile_test_helper"
 
 class GlossariesTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
+  include WorkflowProfileTestHelper
 
   setup { sign_in_as users(:normal) }
 
@@ -60,6 +62,36 @@ class GlossariesTest < ActionDispatch::IntegrationTest
       post translation_workspace_path, params: { translation_workspace: workspace_params.merge(glossary_revision_id: mismatch.current_revision_id.to_s) }
     end
     assert_response :unprocessable_content
+  end
+
+  test "automatic pipeline snapshots a glossary revision despite later revision and archive" do
+    glossary = Glossaries::Create.call(user: users(:normal), attributes: glossary_params)
+    profile = create_workflow_profile
+
+    assert_difference -> { PipelineRun.count }, 1 do
+      post translation_workspace_path, params: {
+        translation_workspace: workspace_params.merge(
+          workflow_mode: "automatic",
+          model_ids: [],
+          workflow_profile_revision_id: profile.current_revision_id.to_s,
+          automatic_confirmation: "1",
+          glossary_revision_id: glossary.current_revision_id.to_s
+        )
+      }
+    end
+    pipeline = PipelineRun.order(:id).last
+    selected_revision = glossary.current_revision
+    assert_equal selected_revision, pipeline.experiment.glossary_revision
+
+    Glossaries::Revise.call(glossary:, expected_version: "1", attributes: glossary_params.merge(name: "New terminology"))
+    Glossaries::ChangeStatus.deactivate(glossary: glossary)
+
+    assert_equal selected_revision, pipeline.experiment.reload.glossary_revision
+    payload = JSON.parse(TranslationSegments::Prompt.build(
+      experiment: pipeline.experiment,
+      source_text: pipeline.experiment.document.source_text
+    ).fetch(:user_prompt))
+    assert_equal [ "Sabbath" ], payload.fetch("terminology_requirements").map { |entry| entry.fetch("source_term") }
   end
 
   private

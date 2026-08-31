@@ -5,6 +5,7 @@ class GlossaryEntry < ApplicationRecord
   validates :source_term, presence: true, length: { maximum: 200 }, uniqueness: { scope: :glossary_revision_id }
   validates :preferred_target_term, presence: true, length: { maximum: 200 }
   validates :note, length: { maximum: 500 }, allow_blank: true
+  validate :belongs_to_initial_entry_set, on: :create
 
   before_validation :normalize_values
   before_update :prevent_mutation
@@ -21,6 +22,13 @@ class GlossaryEntry < ApplicationRecord
   def prevent_mutation
     errors.add(:base, "Glossary entries are immutable")
     throw :abort
+  end
+
+  def belongs_to_initial_entry_set
+    return unless glossary_revision&.persisted?
+    return if glossary_revision.accepting_initial_entries?
+
+    errors.add(:base, "Glossary entries can only be created with a new revision")
   end
 
   def prevent_destruction

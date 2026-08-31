@@ -11,7 +11,7 @@ module Glossaries
         end
 
         revision = BuildRevision.call(glossary:, version: current_version + 1, attributes:)
-        revision.save!
+        revision.save_initial_entry_set!
         glossary.update!(current_revision: revision)
         revision
       end

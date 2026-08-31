@@ -33,6 +33,23 @@ class GlossaryTest < ActiveSupport::TestCase
     end
   end
 
+  test "seals a persisted revision entry set and preserves its digest" do
+    glossary = Glossaries::Create.call(user: users(:normal), attributes: attributes)
+    revision = glossary.current_revision
+    digest = revision.configuration_digest
+
+    assert_raises(ActiveRecord::RecordInvalid) do
+      revision.entries.create!(
+        position: 2,
+        source_term: "God",
+        preferred_target_term: "神"
+      )
+    end
+    assert_equal [ "Sabbath" ], revision.reload.entries.pluck(:source_term)
+    assert_equal digest, revision.configuration_digest
+    assert_equal Glossaries::ConfigurationDigest.call(revision), revision.configuration_digest
+  end
+
   test "bounds entries and rejects duplicate literal source terms" do
     glossary = Glossary.new(user: users(:normal))
     duplicate = attributes(entries: [
