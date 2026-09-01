@@ -90,6 +90,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
   end
 
   test "existing Project workspace hides mutable Project fields and filters language snapshots" do
+    @project.update!(source_language: "\tVietnamese\n", target_language: "\vJapanese\r")
     matching_methodology = create_methodology_profile(
       source_language: " vietnamese ",
       target_language: "JAPANESE"

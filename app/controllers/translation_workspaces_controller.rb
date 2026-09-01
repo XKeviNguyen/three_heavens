@@ -96,14 +96,18 @@ class TranslationWorkspacesController < ApplicationController
       source_language = TranslationLanguagePair.normalize(project.source_language)
       target_language = TranslationLanguagePair.normalize(project.target_language)
       glossary_scope = glossary_scope.joins(:current_revision).where(
-        "LOWER(BTRIM(glossary_revisions.source_language)) = :source_language AND " \
-          "LOWER(BTRIM(glossary_revisions.target_language)) = :target_language",
+        "LOWER(BTRIM(glossary_revisions.source_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :source_language AND " \
+          "LOWER(BTRIM(glossary_revisions.target_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :target_language",
         source_language:,
         target_language:
       )
       methodology_scope = methodology_scope.joins(:current_revision).where(
-        "LOWER(BTRIM(methodology_profile_revisions.source_language)) = :source_language AND " \
-          "LOWER(BTRIM(methodology_profile_revisions.target_language)) = :target_language",
+        "LOWER(BTRIM(methodology_profile_revisions.source_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :source_language AND " \
+          "LOWER(BTRIM(methodology_profile_revisions.target_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :target_language",
         source_language:,
         target_language:
       )
