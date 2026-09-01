@@ -2,6 +2,7 @@ class TranslationWorkspace
   include ActiveModel::Model
 
   attr_accessor :project_name,
+                :project_id,
                 :user,
                 :source_language,
                 :target_language,
@@ -9,6 +10,7 @@ class TranslationWorkspace
                 :source_text,
                 :source_import,
                 :source_import_id,
+                :source_import_project_token,
                 :experiment_name,
                 :instruction_prompt,
                 :model_ids,
@@ -28,10 +30,14 @@ class TranslationWorkspace
   validate :validate_glossary_selection
   validate :validate_methodology_selection
 
-  def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current })
+  def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current }, existing_project: nil)
     @start_service = start_service
     @clock = clock
+    @existing_project = existing_project
+    @project = existing_project
     super(attributes)
+    self.project_id ||= existing_project&.id
+    apply_authoritative_project_attributes(existing_project) if existing_project
     self.model_ids = [] if model_ids.nil?
     self.workflow_mode = "manual" if workflow_mode.blank?
     self.source_import_id ||= source_import&.id
@@ -46,10 +52,11 @@ class TranslationWorkspace
         errors.add(:submission_token, "has expired. Reload the workspace and try again.")
         next false
       end
+      next false unless lock_existing_project
       next false unless valid?
       next false unless lock_methodology_selection
 
-      project.save!
+      project.save! if project.new_record?
       locked_import = lock_source_import
       if locked_import
         SourceImports::Consume.apply!(source_import: locked_import, document: document, at: current_time)
@@ -91,6 +98,10 @@ class TranslationWorkspace
     @replayed == true
   end
 
+  def existing_project?
+    project_id.present?
+  end
+
   private
 
   RECORD_ATTRIBUTE_MAPPINGS = {
@@ -111,7 +122,7 @@ class TranslationWorkspace
   }.freeze
 
   def build_workspace_records
-    @project = Project.new(
+    @project = @existing_project || Project.new(
       user: user,
       name: project_name,
       source_language: source_language,
@@ -141,6 +152,32 @@ class TranslationWorkspace
         errors.add(form_attribute, error.message)
       end
     end
+  end
+
+  def lock_existing_project
+    return true unless existing_project?
+
+    unless project_id.to_s.match?(/\A[1-9]\d*\z/)
+      errors.add(:project_id, "is not valid")
+      return false
+    end
+
+    locked_project = user.projects.lock.find_by(id: project_id)
+    unless locked_project
+      errors.add(:project_id, "is not available")
+      return false
+    end
+
+    @existing_project = locked_project
+    @project = locked_project
+    apply_authoritative_project_attributes(locked_project)
+    true
+  end
+
+  def apply_authoritative_project_attributes(existing_project)
+    self.project_name = existing_project.name
+    self.source_language = existing_project.source_language
+    self.target_language = existing_project.target_language
   end
 
   def validate_model_selection
@@ -243,12 +280,21 @@ class TranslationWorkspace
   end
 
   def validate_source_import
-    return if source_import_id.blank?
+    if source_import_id.blank?
+      errors.add(:source_import_project_token, "is unexpected") if source_import_project_token.present?
+      return
+    end
 
     if source_import.nil? || source_import.user_id != user&.id
       errors.add(:source_import_id, "is not available")
     elsif !source_import.available?(at: current_time)
       errors.add(:source_import_id, "is no longer available")
+    elsif !SourceImports::ProjectBinding.valid?(
+      token: source_import_project_token,
+      source_import:,
+      project: binding_project
+    )
+      errors.add(:source_import_id, "is not available for this workspace")
     end
   end
 
@@ -310,7 +356,17 @@ class TranslationWorkspace
   def lock_source_import
     return if source_import_id.blank?
 
-    user.source_imports.lock.find(source_import_id)
+    locked_import = user.source_imports.lock.find(source_import_id)
+    SourceImports::ProjectBinding.verify!(
+      token: source_import_project_token,
+      source_import: locked_import,
+      project: binding_project
+    )
+    locked_import
+  end
+
+  def binding_project
+    project if existing_project?
   end
 
   def lock_methodology_selection

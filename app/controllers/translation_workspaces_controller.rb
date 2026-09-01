@@ -1,11 +1,13 @@
 class TranslationWorkspacesController < ApplicationController
   SCALAR_ATTRIBUTES = %w[
+    project_id
     project_name
     source_language
     target_language
     document_title
     source_text
     source_import_id
+    source_import_project_token
     experiment_name
     instruction_prompt
     workflow_mode
@@ -17,16 +19,19 @@ class TranslationWorkspacesController < ApplicationController
     submission_token
   ].freeze
 
-  before_action :load_available_models
-
   def new
+    project = find_owned_project(project_id_param)
     source_import = load_source_import(source_import_id_param)
+    project_binding = source_import_project_token_param
+    validate_source_import_project_binding!(source_import:, project:, token: project_binding)
+    load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new({
       user: current_user,
       source_import: source_import,
+      source_import_project_token: project_binding,
       source_text: source_import&.extracted_text,
       document_title: source_import && File.basename(source_import.original_filename, ".*")
-    })
+    }, existing_project: project)
     if source_import && !source_import.available?
       @translation_workspace.errors.add(:source_import_id, "is no longer available")
     end
@@ -36,9 +41,17 @@ class TranslationWorkspacesController < ApplicationController
 
   def create
     attributes = translation_workspace_params
+    project = find_owned_project(attributes[:project_id])
     source_import = load_source_import(attributes[:source_import_id])
+    validate_source_import_project_binding!(
+      source_import:,
+      project:,
+      token: attributes[:source_import_project_token]
+    )
+    load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new(
-      attributes.merge(user: current_user, source_import:)
+      attributes.merge(user: current_user, source_import:),
+      existing_project: project
     )
 
     if @translation_workspace.submit
@@ -72,13 +85,35 @@ class TranslationWorkspacesController < ApplicationController
     request.request_id.to_s.gsub(/[^A-Za-z0-9_-]/, "").first(100).presence || SecureRandom.uuid
   end
 
-  def load_available_models
+  def load_available_models(project: nil)
     @available_models = LlmModel.active_openrouter.order(:display_name, :id)
     @workflow_profiles = current_user.workflow_profiles.active.includes(
       current_revision: { model_selections: :llm_model }
     ).order(updated_at: :desc, id: :desc)
-    @glossaries = current_user.glossaries.active.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
-    @methodology_profiles = current_user.methodology_profiles.active.includes(:current_revision)
+    glossary_scope = current_user.glossaries.active
+    methodology_scope = current_user.methodology_profiles.active
+    if project
+      source_language = TranslationLanguagePair.normalize(project.source_language)
+      target_language = TranslationLanguagePair.normalize(project.target_language)
+      glossary_scope = glossary_scope.joins(:current_revision).where(
+        "LOWER(BTRIM(glossary_revisions.source_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :source_language AND " \
+          "LOWER(BTRIM(glossary_revisions.target_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :target_language",
+        source_language:,
+        target_language:
+      )
+      methodology_scope = methodology_scope.joins(:current_revision).where(
+        "LOWER(BTRIM(methodology_profile_revisions.source_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :source_language AND " \
+          "LOWER(BTRIM(methodology_profile_revisions.target_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :target_language",
+        source_language:,
+        target_language:
+      )
+    end
+    @glossaries = glossary_scope.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
+    @methodology_profiles = methodology_scope.includes(:current_revision)
       .order(updated_at: :desc, id: :desc)
   end
 
@@ -125,5 +160,36 @@ class TranslationWorkspacesController < ApplicationController
     end
 
     value.presence
+  end
+
+  def project_id_param
+    value = params[:project_id]
+    return if value.nil?
+    unless value.is_a?(String)
+      raise ActionController::BadRequest, "project_id must be a scalar value"
+    end
+
+    value.presence
+  end
+
+  def source_import_project_token_param
+    value = params[:source_import_project_token]
+    return if value.nil?
+    unless value.is_a?(String)
+      raise ActionController::BadRequest, "source_import_project_token must be a scalar value"
+    end
+
+    value.presence
+  end
+
+  def validate_source_import_project_binding!(source_import:, project:, token:)
+    if source_import
+      return if SourceImports::ProjectBinding.valid?(token:, source_import:, project:)
+
+      raise ActiveRecord::RecordNotFound
+    end
+    return if token.blank?
+
+    raise ActionController::BadRequest, "source_import_project_token is unexpected"
   end
 end

@@ -5,6 +5,7 @@ Rails.application.routes.draw do
   get "login", to: "sessions#new", as: :login
 
   get "history", to: "history#index", as: :history
+  resources :projects, only: %i[index show]
   resources :workflow_profiles, except: :destroy do
     member do
       post :duplicate

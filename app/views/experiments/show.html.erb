@@ -17,6 +17,8 @@
     <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@experiment.status) %>"><%= @experiment.status.humanize %></span>
   </header>
 
+  <%= link_to "← Back to Project", project_path(@experiment.document.project), class: "inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+
   <% if @experiment.pipeline_run %>
     <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"><span class="font-semibold">Automatic pipeline:</span> <%= @experiment.pipeline_run.workflow_profile_revision.name %> · revision <%= @experiment.pipeline_run.workflow_profile_revision.version %> · <%= link_to "View consolidated progress", pipeline_run_path(@experiment.pipeline_run), class: "font-semibold underline" %></div>
   <% end %>

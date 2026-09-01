@@ -35,6 +35,14 @@ class ApplicationController < ActionController::Base
     redirect_to root_path, alert: "You are not authorized to access administration settings."
   end
 
+  def find_owned_project(id)
+    return if id.blank?
+
+    raise ActionController::BadRequest, "project_id is invalid" unless id.to_s.match?(/\A[1-9]\d*\z/)
+
+    current_user.projects.find(id)
+  end
+
   def start_authenticated_session!(user)
     destination = session.delete(:return_to_after_authenticating)
     reset_session

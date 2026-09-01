@@ -55,4 +55,8 @@ module DocumentIoTestHelper
       upload: uploaded_file(text, filename:, content_type: "text/plain")
     )
   end
+
+  def source_import_binding(source_import, project: nil)
+    SourceImports::ProjectBinding.issue(source_import:, project:)
+  end
 end
