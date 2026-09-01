@@ -47,6 +47,7 @@ class TranslationWorkspace
         next false
       end
       next false unless valid?
+      next false unless lock_methodology_selection
 
       project.save!
       locked_import = lock_source_import
@@ -310,6 +311,22 @@ class TranslationWorkspace
     return if source_import_id.blank?
 
     user.source_imports.lock.find(source_import_id)
+  end
+
+  def lock_methodology_selection
+    return true unless @methodology_profile_revision
+
+    profile = MethodologyProfile.lock.find_by(
+      id: @methodology_profile_revision.methodology_profile_id,
+      user_id: user.id
+    )
+    if profile&.active? && profile.current_revision_id == @methodology_profile_revision.id
+      @methodology_profile_revision.association(:methodology_profile).target = profile
+      return true
+    end
+
+    errors.add(:methodology_profile_revision_id, "is no longer the active current methodology revision")
+    false
   end
 
   def current_time

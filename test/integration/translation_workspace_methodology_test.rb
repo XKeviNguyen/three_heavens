@@ -131,6 +131,22 @@ class TranslationWorkspaceMethodologyTest < ActionDispatch::IntegrationTest
     assert_response :bad_request
   end
 
+  test "launch rechecks active current methodology while holding its profile lock" do
+    methodology = create_methodology_profile
+    workspace = TranslationWorkspace.new(
+      workspace_params.except(:submission_token).merge(
+        user: users(:normal),
+        methodology_profile_revision_id: methodology.current_revision_id.to_s
+      )
+    )
+
+    assert workspace.valid?
+    MethodologyProfiles::ChangeStatus.deactivate(methodology_profile: methodology)
+    assert_not workspace.send(:lock_methodology_selection)
+    assert_includes workspace.errors[:methodology_profile_revision_id],
+                    "is no longer the active current methodology revision"
+  end
+
   private
 
   def workspace_params

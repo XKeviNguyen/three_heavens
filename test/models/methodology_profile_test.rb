@@ -50,6 +50,27 @@ class MethodologyProfileTest < ActiveSupport::TestCase
     assert_equal "Preserve theological nuance.\n\nUse a natural literary register.", revision.reload.guidance
   end
 
+  test "database rejects a revision whose digest does not match its behavioral payload" do
+    profile = create_methodology_profile
+
+    assert_raises ActiveRecord::StatementInvalid do
+      MethodologyProfileRevision.transaction(requires_new: true) do
+        MethodologyProfileRevision.insert_all!([ {
+          methodology_profile_id: profile.id,
+          version: 2,
+          name: "Forged digest",
+          source_language: "Vietnamese",
+          target_language: "Japanese",
+          guidance: "Different behavior",
+          configuration_digest: "0" * 64,
+          created_at: Time.current,
+          updated_at: Time.current
+        } ])
+      end
+    end
+    assert_equal 1, profile.revisions.count
+  end
+
   test "revision service creates a new immutable snapshot and rejects stale editors" do
     profile = create_methodology_profile
     first = profile.current_revision
@@ -141,6 +162,46 @@ class MethodologyProfileTest < ActiveSupport::TestCase
           updated_at: Time.current
         } ])
       end
+    end
+  end
+
+  test "database rejects parent mutations that would invalidate a methodology snapshot" do
+    methodology = create_methodology_profile
+    project = users(:normal).projects.create!(
+      name: "Protected project",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    document = project.documents.create!(title: "Protected document", source_text: "Source")
+    experiment = document.experiments.create!(
+      instruction_prompt: "Translate.",
+      methodology_profile_revision: methodology.current_revision
+    )
+    other_project = users(:other).projects.create!(
+      name: "Other project",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    other_document = other_project.documents.create!(title: "Other document", source_text: "Source")
+
+    assert_database_rejects { Project.where(id: project.id).update_all(target_language: "English") }
+    assert_database_rejects { Project.where(id: project.id).update_all(user_id: users(:other).id) }
+    assert_database_rejects { Document.where(id: document.id).update_all(project_id: other_project.id) }
+    assert_database_rejects { MethodologyProfile.where(id: methodology.id).update_all(user_id: users(:other).id) }
+    assert_database_rejects { Experiment.where(id: experiment.id).update_all(document_id: other_document.id) }
+
+    assert_equal "Japanese", project.reload.target_language
+    assert_equal users(:normal), project.user
+    assert_equal project, document.reload.project
+    assert_equal users(:normal), methodology.reload.user
+    assert_equal document, experiment.reload.document
+  end
+
+  private
+
+  def assert_database_rejects
+    assert_raises ActiveRecord::StatementInvalid do
+      ActiveRecord::Base.transaction(requires_new: true) { yield }
     end
   end
 end
