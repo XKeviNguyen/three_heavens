@@ -35,7 +35,8 @@
   <% end %>
 
   <div class="flex">
-    <%= link_to "Back to translation experiment", @review_round.experiment, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to "Back to Project", project_path(@review_round.experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to "Back to translation experiment", @review_round.experiment, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
   </div>
 
   <section class="space-y-6">

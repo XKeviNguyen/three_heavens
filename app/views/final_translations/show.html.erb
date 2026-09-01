@@ -31,6 +31,7 @@
   <% end %>
 
   <div class="flex flex-wrap gap-4 text-sm font-semibold">
+    <%= link_to "Project", project_path(project), class: "text-blue-700 hover:text-blue-900" %>
     <%= link_to "Judge results", @final_translation.judge_round, class: "text-blue-700 hover:text-blue-900" %>
     <%= link_to "Blind review", @final_translation.judge_round.review_round, class: "text-blue-700 hover:text-blue-900" %>
     <%= link_to "Experiment", experiment, class: "text-blue-700 hover:text-blue-900" %>

@@ -1,14 +1,19 @@
 class SourceImportsController < ApplicationController
   def new
+    @project = find_owned_project(project_id_param)
     @source_import = SourceImport.new
+  rescue ActionController::BadRequest
+    head :bad_request
   end
 
   def create
+    submitted = source_import_params
+    @project = find_owned_project(submitted[:project_id])
     @source_import = SourceImports::Create.call(
       user: current_user,
-      upload: source_file_param
+      upload: submitted.fetch(:source_file)
     )
-    redirect_to new_translation_workspace_path(source_import_id: @source_import.id),
+    redirect_to new_translation_workspace_path(source_import_id: @source_import.id, project_id: @project&.id),
                 notice: "Source text extracted. Review and edit it before starting translation."
   rescue SourceImports::Error => error
     @source_import = SourceImport.new
@@ -35,17 +40,35 @@ class SourceImportsController < ApplicationController
 
   private
 
-  def source_file_param
+  def source_import_params
     submitted = params.require(:source_import)
     unless submitted.is_a?(ActionController::Parameters)
       raise ActionController::BadRequest, "source_import must be a parameter object"
     end
+
+    unexpected = submitted.keys - %w[source_file project_id]
+    raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
 
     upload = submitted.require(:source_file)
     unless upload.is_a?(ActionDispatch::Http::UploadedFile)
       raise ActionController::BadRequest, "source_file must be one uploaded file"
     end
 
-    upload
+    project_id = submitted[:project_id]
+    unless project_id.nil? || project_id.is_a?(String)
+      raise ActionController::BadRequest, "project_id must be a scalar value"
+    end
+
+    { source_file: upload, project_id: project_id.presence }
+  end
+
+  def project_id_param
+    value = params[:project_id]
+    return if value.nil?
+    unless value.is_a?(String)
+      raise ActionController::BadRequest, "project_id must be a scalar value"
+    end
+
+    value.presence
   end
 end

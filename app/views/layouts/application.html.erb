@@ -30,6 +30,7 @@
         <% if authenticated? %>
           <div class="flex flex-wrap items-center gap-5">
             <nav class="flex flex-wrap items-center gap-4 text-sm font-medium" aria-label="Primary navigation">
+              <%= link_to "Projects", projects_path, class: "text-slate-600 hover:text-slate-950" %>
               <%= link_to "History", history_path, class: "text-slate-600 hover:text-slate-950" %>
               <%= link_to "Workflow Profiles", workflow_profiles_path, class: "text-slate-600 hover:text-slate-950" %>
               <%= link_to "Glossaries", glossaries_path, class: "text-slate-600 hover:text-slate-950" %>

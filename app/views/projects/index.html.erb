@@ -1,0 +1,43 @@
+<% content_for :title, "Projects · Three Heavens" %>
+
+<div class="space-y-8">
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation workspaces</p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Projects</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Keep related source documents and translation experiments together under one fixed language pair.</p>
+    </div>
+    <%= link_to "Start a new project translation", new_translation_workspace_path, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+  </header>
+
+  <% if @projects.empty? %>
+    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-950">No projects yet</h2>
+      <p class="mt-2 text-sm text-slate-600">Your first translation launch will create a private Project and its first source document.</p>
+      <%= link_to "Start a translation", new_translation_workspace_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+    </section>
+  <% else %>
+    <section class="grid gap-5 lg:grid-cols-2" aria-label="Projects">
+      <% @projects.each do |project| %>
+        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-xl font-semibold text-slate-950"><%= project.name %></h2>
+          <p class="mt-1 text-sm text-slate-600"><%= project.source_language %> → <%= project.target_language %></p>
+          <dl class="mt-5 grid grid-cols-2 gap-4 text-sm">
+            <div><dt class="text-slate-500">Documents</dt><dd class="mt-1 font-semibold text-slate-950"><%= project.documents_count %></dd></div>
+            <div><dt class="text-slate-500">Experiments</dt><dd class="mt-1 font-semibold text-slate-950"><%= project.experiments_count %></dd></div>
+            <div class="col-span-2"><dt class="text-slate-500">Newest activity</dt><dd class="mt-1 font-semibold text-slate-950"><%= l project.latest_activity_at, format: :long %></dd></div>
+          </dl>
+          <%= link_to "Open project", project_path(project), class: "mt-5 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+        </article>
+      <% end %>
+    </section>
+
+    <% if @total_pages > 1 %>
+      <nav class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm" aria-label="Project pagination">
+        <div><% if @current_page > 1 %><%= link_to "← Newer", projects_path(page: @current_page - 1), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
+        <p class="text-slate-600">Page <%= @current_page %> of <%= @total_pages %> · <%= @total_count %> projects</p>
+        <div><% if @current_page < @total_pages %><%= link_to "Older →", projects_path(page: @current_page + 1), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
+      </nav>
+    <% end %>
+  <% end %>
+</div>

@@ -36,7 +36,8 @@
   <% end %>
 
   <div class="flex">
-    <%= link_to "Back to blind review", @judge_round.review_round, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to "Back to Project", project_path(experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to "Back to blind review", @judge_round.review_round, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
   </div>
 
   <% if @judge_round.completed? %>
