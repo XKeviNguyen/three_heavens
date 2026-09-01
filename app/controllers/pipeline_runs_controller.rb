@@ -6,6 +6,7 @@ class PipelineRunsController < ApplicationController
       :events,
       workflow_profile_revision: { model_selections: :llm_model },
       experiment: [
+        { methodology_profile_revision: :methodology_profile },
         :review_round,
         :final_translation,
         { document: :project },

@@ -56,6 +56,7 @@
           <% else %>
             <p class="mt-4 text-sm text-slate-500"><span class="font-semibold">Manual workflow</span></p>
           <% end %>
+          <% if experiment.methodology_profile_revision %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold">Methodology:</span> <%= experiment.methodology_profile_revision.name %> · revision <%= experiment.methodology_profile_revision.version %></p><% end %>
 
           <div class="mt-5 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
             <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>

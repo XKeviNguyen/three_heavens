@@ -1,7 +1,9 @@
 require "test_helper"
+require_relative "../../support/methodology_profile_test_helper"
 
 class TranslationExperiments::StartTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include MethodologyProfileTestHelper
 
   class RequestCountingClient
     attr_reader :request_count
@@ -153,6 +155,48 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
     client = RequestCountingClient.new
     original_factory = TranslationRunJob.client_factory
     TranslationRunJob.client_factory = -> { client }
+
+    assert_no_enqueued_jobs do
+      assert_raises TranslationExperiments::Start::ContextBudgetError do
+        TranslationExperiments::Start.call(experiment: experiment, llm_models: [ model ])
+      end
+    end
+    assert_empty experiment.reload.translation_runs
+    assert_equal 0, client.request_count
+  ensure
+    TranslationRunJob.client_factory = original_factory if original_factory
+  end
+
+  test "fails closed before scheduling or provider IO when methodology exceeds context" do
+    methodology = create_methodology_profile(
+      source_language: "vi",
+      target_language: "ja",
+      guidance: "M" * 6_000
+    )
+    document = @experiment.document.project.documents.create!(
+      title: "Methodology budget source",
+      source_text: "Source theological text"
+    )
+    experiment = document.experiments.create!(
+      instruction_prompt: "Translate faithfully into Japanese.",
+      methodology_profile_revision: methodology.current_revision
+    )
+    model = llm_models(:openrouter_claude)
+    model.update!(context_window_tokens: 8_000, max_output_tokens: 4_096)
+    client = RequestCountingClient.new
+    original_factory = TranslationRunJob.client_factory
+    TranslationRunJob.client_factory = -> { client }
+
+    baseline = TranslationSegments::Prompt.build(
+      experiment: experiment.dup.tap { |copy| copy.methodology_profile_revision = nil },
+      source_text: experiment.document.source_text
+    )
+    assert Ai::ContextBudget.call(
+      model: model,
+      **baseline,
+      stage: :translation,
+      source_character_count: experiment.document.source_text.length
+    )
 
     assert_no_enqueued_jobs do
       assert_raises TranslationExperiments::Start::ContextBudgetError do

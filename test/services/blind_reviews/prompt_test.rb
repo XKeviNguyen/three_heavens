@@ -73,7 +73,7 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     assert_not_includes user_data, @experiment.document.title
     assert_not_includes user_data, "translation_run_id"
     assert_not_includes user_data, "llm_model"
-    assert_equal %w[candidates source_language source_text target_language terminology_requirements translation_instruction],
+    assert_equal %w[candidates source_language source_text target_language terminology_requirements translation_instruction translation_methodology],
                  parsed_data.keys.sort
     assert parsed_data.fetch("candidates").all? do |candidate|
       candidate.keys.sort == %w[candidate_label translation]

@@ -15,6 +15,7 @@ class TranslationWorkspace
                 :workflow_mode,
                 :workflow_profile_revision_id,
                 :glossary_revision_id,
+                :methodology_profile_revision_id,
                 :automatic_confirmation,
                 :automatic_plan_digest,
                 :submission_token
@@ -25,6 +26,7 @@ class TranslationWorkspace
   validate :validate_model_selection
   validate :validate_source_import
   validate :validate_glossary_selection
+  validate :validate_methodology_selection
 
   def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current })
     @start_service = start_service
@@ -45,6 +47,7 @@ class TranslationWorkspace
         next false
       end
       next false unless valid?
+      next false unless lock_methodology_selection
 
       project.save!
       locked_import = lock_source_import
@@ -102,7 +105,8 @@ class TranslationWorkspace
     },
     experiment: {
       name: :experiment_name,
-      instruction_prompt: :instruction_prompt
+      instruction_prompt: :instruction_prompt,
+      methodology_profile_revision: :methodology_profile_revision_id
     }
   }.freeze
 
@@ -120,7 +124,8 @@ class TranslationWorkspace
     @experiment = @document.experiments.build(
       name: experiment_name,
       instruction_prompt: instruction_prompt,
-      glossary_revision: @glossary_revision
+      glossary_revision: @glossary_revision,
+      methodology_profile_revision: @methodology_profile_revision
     )
   end
 
@@ -272,10 +277,56 @@ class TranslationWorkspace
     @experiment.glossary_revision = @glossary_revision
   end
 
+  def validate_methodology_selection
+    return if methodology_profile_revision_id.blank?
+
+    unless methodology_profile_revision_id.to_s.match?(/\A[1-9]\d*\z/)
+      errors.add(:methodology_profile_revision_id, "is not a valid methodology revision")
+      return
+    end
+    @methodology_profile_revision = MethodologyProfileRevision.includes(:methodology_profile)
+      .joins(:methodology_profile)
+      .where(methodology_profiles: { user_id: user.id, active: true })
+      .find_by(id: methodology_profile_revision_id)
+    unless @methodology_profile_revision
+      errors.add(:methodology_profile_revision_id, "is not available")
+      return
+    end
+    unless @methodology_profile_revision.methodology_profile.current_revision_id == @methodology_profile_revision.id
+      errors.add(:methodology_profile_revision_id, "is stale; select the current methodology revision")
+      return
+    end
+    unless @methodology_profile_revision.language_pair_matches?(
+      source_language: source_language,
+      target_language: target_language
+    )
+      errors.add(:methodology_profile_revision_id, "must match the project's source and target languages")
+      return
+    end
+
+    @experiment.methodology_profile_revision = @methodology_profile_revision
+  end
+
   def lock_source_import
     return if source_import_id.blank?
 
     user.source_imports.lock.find(source_import_id)
+  end
+
+  def lock_methodology_selection
+    return true unless @methodology_profile_revision
+
+    profile = MethodologyProfile.lock.find_by(
+      id: @methodology_profile_revision.methodology_profile_id,
+      user_id: user.id
+    )
+    if profile&.active? && profile.current_revision_id == @methodology_profile_revision.id
+      @methodology_profile_revision.association(:methodology_profile).target = profile
+      return true
+    end
+
+    errors.add(:methodology_profile_revision_id, "is no longer the active current methodology revision")
+    false
   end
 
   def current_time

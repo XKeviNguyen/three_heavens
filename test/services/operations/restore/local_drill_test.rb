@@ -44,6 +44,30 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
         SELECT count(*) FROM pg_proc
         WHERE proname = 'glossary_revision_configuration_digest'
       SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'prevent_methodology_profile_revision_mutation_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'enforce_experiment_methodology_snapshot_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'enforce_project_methodology_snapshots_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'enforce_document_methodology_snapshots_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname = 'enforce_methodology_profile_owner_trigger' AND NOT tgisinternal
+      SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_proc
+        WHERE proname = 'methodology_revision_configuration_digest'
+      SQL
     end
   ensure
     ActiveStorage::Blob.service = original_storage_service if original_storage_service
