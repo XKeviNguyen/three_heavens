@@ -84,6 +84,7 @@ module SourceImports
         user: @user,
         source_import:,
         source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import),
         project_name: "Concurrent import",
         source_language: "Vietnamese",
         target_language: "Japanese",

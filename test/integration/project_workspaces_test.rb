@@ -36,14 +36,14 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
   test "Project index activity includes downstream workflow updates" do
     document = @project.documents.create!(title: "Active document", source_text: "Source")
     experiment = document.experiments.create!(name: "Active experiment", instruction_prompt: "Translate.")
-    pipeline = create_pipeline_run(experiment: experiment)
+    translation_run = experiment.translation_runs.create!(llm_model: @model)
     less_recent = users(:normal).projects.create!(
       name: "Less recent Project",
       source_language: "Vietnamese",
       target_language: "Japanese"
     )
     less_recent.update_columns(updated_at: Time.current)
-    pipeline.update_columns(updated_at: 1.minute.from_now)
+    translation_run.update_columns(updated_at: 1.minute.from_now)
 
     get projects_path
 
@@ -359,6 +359,9 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     get new_translation_workspace_path(source_import_id: source_import.id, project_id: @project.id)
     assert_response :not_found
 
+    get new_translation_workspace_path(source_import_id: source_import.id)
+    assert_response :not_found
+
     assert_no_workspace_or_jobs do
       post translation_workspace_path, params: {
         translation_workspace: manual_attributes.merge(
@@ -366,6 +369,13 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
           source_import_id: source_import.id.to_s,
           source_import_project_token: project_binding
         )
+      }
+    end
+    assert_response :not_found
+
+    assert_no_workspace_or_jobs do
+      post translation_workspace_path, params: {
+        translation_workspace: manual_attributes.merge(source_import_id: source_import.id.to_s)
       }
     end
     assert_response :not_found

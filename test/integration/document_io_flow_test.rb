@@ -22,7 +22,11 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     end
 
     source_import = SourceImport.order(:id).last
-    assert_redirected_to new_translation_workspace_path(source_import_id: source_import.id)
+    binding = source_import_binding(source_import)
+    assert_redirected_to new_translation_workspace_path(
+      source_import_id: source_import.id,
+      source_import_project_token: binding
+    )
     assert source_import.ready?
     assert_equal "Original\ntext", source_import.extracted_text
     assert source_import.source_file.attached?
@@ -39,6 +43,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       post translation_workspace_path, params: {
         translation_workspace: workspace_attributes.merge(
           source_import_id: source_import.id,
+          source_import_project_token: binding,
           source_text: "Reviewed and edited source"
         )
       }
@@ -143,7 +148,10 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     end
 
     ready_import = SourceImport.order(:id).last
-    assert_redirected_to new_translation_workspace_path(source_import_id: ready_import.id)
+    assert_redirected_to new_translation_workspace_path(
+      source_import_id: ready_import.id,
+      source_import_project_token: source_import_binding(ready_import)
+    )
     assert ready_import.ready?
     assert SourceImport.find(failed_import.id).failed?
   end
@@ -157,7 +165,10 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     }
 
     source_import = SourceImport.order(:id).last
-    assert_redirected_to new_translation_workspace_path(source_import_id: source_import.id)
+    assert_redirected_to new_translation_workspace_path(
+      source_import_id: source_import.id,
+      source_import_project_token: source_import_binding(source_import)
+    )
     follow_redirect!
     assert_select "textarea", text: source
     assert_includes response.body, "&lt;script&gt;alert"
@@ -261,12 +272,22 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
   test "one-time consumption rejects a second workflow" do
     source_import = create_ready_import(user: users(:normal))
     first = TranslationWorkspace.new(
-      workspace_attributes.merge(user: users(:normal), source_import:, source_import_id: source_import.id)
+      workspace_attributes.merge(
+        user: users(:normal),
+        source_import:,
+        source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import)
+      )
     )
     assert first.submit
 
     second = TranslationWorkspace.new(
-      workspace_attributes.merge(user: users(:normal), source_import: source_import.reload, source_import_id: source_import.id)
+      workspace_attributes.merge(
+        user: users(:normal),
+        source_import: source_import.reload,
+        source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import)
+      )
     )
     assert_not second.submit
     assert_includes second.errors[:source_import_id].join, "no longer available"
@@ -277,7 +298,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     source_import = create_ready_import(user: users(:normal))
     source_import.update!(expires_at: 1.minute.ago)
 
-    get new_translation_workspace_path(source_import_id: source_import.id)
+    binding = source_import_binding(source_import)
+    get new_translation_workspace_path(source_import_id: source_import.id, source_import_project_token: binding)
     assert_response :success
     assert_select "h2", text: /no longer available/i
     assert_select "li", text: /Source import.*no longer available/i
@@ -285,7 +307,10 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_workspace_records_created do
       assert_no_enqueued_jobs only: AI_JOBS do
         post translation_workspace_path, params: {
-          translation_workspace: workspace_attributes.merge(source_import_id: source_import.id)
+          translation_workspace: workspace_attributes.merge(
+            source_import_id: source_import.id,
+            source_import_project_token: binding
+          )
         }
       end
     end
@@ -305,7 +330,12 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       clock_calls == 1 ? before_expiration : at_expiration
     end
     workspace = TranslationWorkspace.new(
-      workspace_attributes.merge(user: users(:normal), source_import:, source_import_id: source_import.id),
+      workspace_attributes.merge(
+        user: users(:normal),
+        source_import:,
+        source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import)
+      ),
       clock:
     )
 
@@ -329,7 +359,12 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       end
     end
     workspace = TranslationWorkspace.new(
-      workspace_attributes.merge(user: users(:normal), source_import:, source_import_id: source_import.id),
+      workspace_attributes.merge(
+        user: users(:normal),
+        source_import:,
+        source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import)
+      ),
       start_service: failing_start
     )
 
@@ -385,7 +420,12 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
   def consume_import(source_import)
     workspace = TranslationWorkspace.new(
-      workspace_attributes.merge(user: users(:normal), source_import:, source_import_id: source_import.id)
+      workspace_attributes.merge(
+        user: users(:normal),
+        source_import:,
+        source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import)
+      )
     )
     assert workspace.submit
     workspace.document

@@ -175,6 +175,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     attributes = manual_attributes(
       submission_token: token,
       source_import_id: source_import.id,
+      source_import_project_token: source_import_binding(source_import),
       source_text: "Reviewed import"
     )
 

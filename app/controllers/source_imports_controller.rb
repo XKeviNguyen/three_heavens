@@ -13,7 +13,7 @@ class SourceImportsController < ApplicationController
       user: current_user,
       upload: submitted.fetch(:source_file)
     )
-    project_binding = SourceImports::ProjectBinding.issue(source_import: @source_import, project: @project) if @project
+    project_binding = SourceImports::ProjectBinding.issue(source_import: @source_import, project: @project)
     redirect_to new_translation_workspace_path(
       source_import_id: @source_import.id,
       project_id: @project&.id,

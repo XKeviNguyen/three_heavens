@@ -289,14 +289,12 @@ class TranslationWorkspace
       errors.add(:source_import_id, "is not available")
     elsif !source_import.available?(at: current_time)
       errors.add(:source_import_id, "is no longer available")
-    elsif existing_project? && !SourceImports::ProjectBinding.valid?(
+    elsif !SourceImports::ProjectBinding.valid?(
       token: source_import_project_token,
       source_import:,
-      project:
+      project: binding_project
     )
-      errors.add(:source_import_id, "is not available for this Project")
-    elsif !existing_project? && source_import_project_token.present?
-      errors.add(:source_import_project_token, "is unexpected")
+      errors.add(:source_import_id, "is not available for this workspace")
     end
   end
 
@@ -359,14 +357,16 @@ class TranslationWorkspace
     return if source_import_id.blank?
 
     locked_import = user.source_imports.lock.find(source_import_id)
-    if existing_project?
-      SourceImports::ProjectBinding.verify!(
-        token: source_import_project_token,
-        source_import: locked_import,
-        project:
-      )
-    end
+    SourceImports::ProjectBinding.verify!(
+      token: source_import_project_token,
+      source_import: locked_import,
+      project: binding_project
+    )
     locked_import
+  end
+
+  def binding_project
+    project if existing_project?
   end
 
   def lock_methodology_selection

@@ -183,7 +183,7 @@ class TranslationWorkspacesController < ApplicationController
   end
 
   def validate_source_import_project_binding!(source_import:, project:, token:)
-    if source_import && project
+    if source_import
       return if SourceImports::ProjectBinding.valid?(token:, source_import:, project:)
 
       raise ActiveRecord::RecordNotFound
