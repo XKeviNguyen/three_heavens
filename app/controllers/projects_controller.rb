@@ -5,18 +5,10 @@ class ProjectsController < ApplicationController
     @total_count = current_user.projects.count
     @total_pages = [ (@total_count.to_f / PER_PAGE).ceil, 1 ].max
     @current_page = normalized_page(@total_pages)
-    @projects = current_user.projects
-      .left_joins(documents: :experiments)
-      .select(<<~SQL.squish)
-        projects.*,
-        COUNT(DISTINCT documents.id) AS documents_count,
-        COUNT(DISTINCT experiments.id) AS experiments_count,
-        MAX(COALESCE(experiments.updated_at, documents.updated_at, projects.updated_at)) AS latest_activity_at
-      SQL
-      .group("projects.id")
-      .order(Arel.sql("latest_activity_at DESC"), id: :desc)
-      .offset((@current_page - 1) * PER_PAGE)
-      .limit(PER_PAGE)
+    @projects = Projects::SummaryQuery.new(project_scope: current_user.projects).call(
+      offset: (@current_page - 1) * PER_PAGE,
+      limit: PER_PAGE
+    )
   end
 
   def show

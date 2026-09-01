@@ -10,6 +10,7 @@ class TranslationWorkspace
                 :source_text,
                 :source_import,
                 :source_import_id,
+                :source_import_project_token,
                 :experiment_name,
                 :instruction_prompt,
                 :model_ids,
@@ -279,12 +280,23 @@ class TranslationWorkspace
   end
 
   def validate_source_import
-    return if source_import_id.blank?
+    if source_import_id.blank?
+      errors.add(:source_import_project_token, "is unexpected") if source_import_project_token.present?
+      return
+    end
 
     if source_import.nil? || source_import.user_id != user&.id
       errors.add(:source_import_id, "is not available")
     elsif !source_import.available?(at: current_time)
       errors.add(:source_import_id, "is no longer available")
+    elsif existing_project? && !SourceImports::ProjectBinding.valid?(
+      token: source_import_project_token,
+      source_import:,
+      project:
+    )
+      errors.add(:source_import_id, "is not available for this Project")
+    elsif !existing_project? && source_import_project_token.present?
+      errors.add(:source_import_project_token, "is unexpected")
     end
   end
 
@@ -346,7 +358,15 @@ class TranslationWorkspace
   def lock_source_import
     return if source_import_id.blank?
 
-    user.source_imports.lock.find(source_import_id)
+    locked_import = user.source_imports.lock.find(source_import_id)
+    if existing_project?
+      SourceImports::ProjectBinding.verify!(
+        token: source_import_project_token,
+        source_import: locked_import,
+        project:
+      )
+    end
+    locked_import
   end
 
   def lock_methodology_selection

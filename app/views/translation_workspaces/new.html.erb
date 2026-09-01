@@ -15,6 +15,7 @@
     <% if @translation_workspace.existing_project? %><%= form.hidden_field :project_id %><% end %>
     <% if @translation_workspace.source_import %>
       <%= form.hidden_field :source_import_id, value: @translation_workspace.source_import.id %>
+      <% if @translation_workspace.source_import_project_token.present? %><%= form.hidden_field :source_import_project_token %><% end %>
       <% if @translation_workspace.source_import.available? %>
         <section class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
           <h2 class="font-semibold text-emerald-950">Uploaded source ready for review</h2>

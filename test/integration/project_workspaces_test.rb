@@ -33,6 +33,24 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{new_translation_workspace_path}']", text: /Start a new project translation/
   end
 
+  test "Project index activity includes downstream workflow updates" do
+    document = @project.documents.create!(title: "Active document", source_text: "Source")
+    experiment = document.experiments.create!(name: "Active experiment", instruction_prompt: "Translate.")
+    pipeline = create_pipeline_run(experiment: experiment)
+    less_recent = users(:normal).projects.create!(
+      name: "Less recent Project",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    less_recent.update_columns(updated_at: Time.current)
+    pipeline.update_columns(updated_at: 1.minute.from_now)
+
+    get projects_path
+
+    assert_response :success
+    assert_operator response.body.index("Reusable sermons"), :<, response.body.index("Less recent Project")
+  end
+
   test "foreign Project routes are not found even for an administrator" do
     get project_path(projects(:two))
     assert_response :not_found
@@ -72,9 +90,16 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
   end
 
   test "existing Project workspace hides mutable Project fields and filters language snapshots" do
-    matching_methodology = create_methodology_profile
+    matching_methodology = create_methodology_profile(
+      source_language: " vietnamese ",
+      target_language: "JAPANESE"
+    )
     mismatched_methodology = create_methodology_profile(name: "English method", target_language: "English")
-    matching_glossary = create_glossary(name: "Matching glossary")
+    matching_glossary = create_glossary(
+      name: "Matching glossary",
+      source_language: " vietnamese ",
+      target_language: "JAPANESE"
+    )
     mismatched_glossary = create_glossary(name: "English glossary", target_language: "English")
 
     get new_translation_workspace_path(project_id: @project.id)
@@ -252,10 +277,19 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
       }
     end
     source_import = SourceImport.order(:id).last
-    assert_redirected_to new_translation_workspace_path(source_import_id: source_import.id, project_id: @project.id)
+    redirect_query = Rack::Utils.parse_query(URI.parse(response.location).query)
+    project_binding = redirect_query.fetch("source_import_project_token")
+    assert_equal source_import.id.to_s, redirect_query.fetch("source_import_id")
+    assert_equal @project.id.to_s, redirect_query.fetch("project_id")
+    assert SourceImports::ProjectBinding.valid?(
+      token: project_binding,
+      source_import:,
+      project: @project
+    )
     follow_redirect!
     assert_select "input[name='translation_workspace[project_id]'][value='#{@project.id}']"
     assert_select "input[name='translation_workspace[source_import_id]'][value='#{source_import.id}']"
+    assert_select "input[name='translation_workspace[source_import_project_token]'][value='#{project_binding}']"
 
     assert_no_difference -> { Project.count } do
       assert_enqueued_jobs 1, only: TranslationRunJob do
@@ -263,6 +297,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
           translation_workspace: manual_attributes.merge(
             project_id: @project.id.to_s,
             source_import_id: source_import.id.to_s,
+            source_import_project_token: project_binding,
             source_text: "Reviewed imported source"
           )
         }
@@ -297,6 +332,45 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert source_import.reload.ready?
   end
 
+  test "an owned upload cannot be moved to another owned Project" do
+    other_owned_project = users(:normal).projects.create!(
+      name: "Other owned Project",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    post source_imports_path, params: {
+      source_import: {
+        project_id: @project.id.to_s,
+        source_file: uploaded_file("Bound source", filename: "bound.txt", content_type: "text/plain")
+      }
+    }
+    source_import = SourceImport.order(:id).last
+    redirect_query = Rack::Utils.parse_query(URI.parse(response.location).query)
+    project_binding = redirect_query.fetch("source_import_project_token")
+
+    get new_translation_workspace_path(
+      source_import_id: source_import.id,
+      project_id: other_owned_project.id,
+      source_import_project_token: project_binding
+    )
+    assert_response :not_found
+
+    get new_translation_workspace_path(source_import_id: source_import.id, project_id: @project.id)
+    assert_response :not_found
+
+    assert_no_workspace_or_jobs do
+      post translation_workspace_path, params: {
+        translation_workspace: manual_attributes.merge(
+          project_id: other_owned_project.id.to_s,
+          source_import_id: source_import.id.to_s,
+          source_import_project_token: project_binding
+        )
+      }
+    end
+    assert_response :not_found
+    assert source_import.reload.ready?
+  end
+
   private
 
   def manual_attributes
@@ -314,12 +388,12 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     }
   end
 
-  def create_glossary(name: "Project glossary", target_language: "Japanese")
+  def create_glossary(name: "Project glossary", source_language: "Vietnamese", target_language: "Japanese")
     Glossaries::Create.call(
       user: users(:normal),
       attributes: {
         name:,
-        source_language: "Vietnamese",
+        source_language:,
         target_language:,
         entries: [ { source_term: "faith", preferred_target_term: "信仰" } ]
       }

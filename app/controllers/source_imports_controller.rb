@@ -13,7 +13,12 @@ class SourceImportsController < ApplicationController
       user: current_user,
       upload: submitted.fetch(:source_file)
     )
-    redirect_to new_translation_workspace_path(source_import_id: @source_import.id, project_id: @project&.id),
+    project_binding = SourceImports::ProjectBinding.issue(source_import: @source_import, project: @project) if @project
+    redirect_to new_translation_workspace_path(
+      source_import_id: @source_import.id,
+      project_id: @project&.id,
+      source_import_project_token: project_binding
+    ),
                 notice: "Source text extracted. Review and edit it before starting translation."
   rescue SourceImports::Error => error
     @source_import = SourceImport.new

@@ -7,6 +7,7 @@ class TranslationWorkspacesController < ApplicationController
     document_title
     source_text
     source_import_id
+    source_import_project_token
     experiment_name
     instruction_prompt
     workflow_mode
@@ -21,10 +22,13 @@ class TranslationWorkspacesController < ApplicationController
   def new
     project = find_owned_project(project_id_param)
     source_import = load_source_import(source_import_id_param)
+    project_binding = source_import_project_token_param
+    validate_source_import_project_binding!(source_import:, project:, token: project_binding)
     load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new({
       user: current_user,
       source_import: source_import,
+      source_import_project_token: project_binding,
       source_text: source_import&.extracted_text,
       document_title: source_import && File.basename(source_import.original_filename, ".*")
     }, existing_project: project)
@@ -39,6 +43,11 @@ class TranslationWorkspacesController < ApplicationController
     attributes = translation_workspace_params
     project = find_owned_project(attributes[:project_id])
     source_import = load_source_import(attributes[:source_import_id])
+    validate_source_import_project_binding!(
+      source_import:,
+      project:,
+      token: attributes[:source_import_project_token]
+    )
     load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new(
       attributes.merge(user: current_user, source_import:),
@@ -84,17 +93,19 @@ class TranslationWorkspacesController < ApplicationController
     glossary_scope = current_user.glossaries.active
     methodology_scope = current_user.methodology_profiles.active
     if project
+      source_language = TranslationLanguagePair.normalize(project.source_language)
+      target_language = TranslationLanguagePair.normalize(project.target_language)
       glossary_scope = glossary_scope.joins(:current_revision).where(
-        glossary_revisions: {
-          source_language: project.source_language,
-          target_language: project.target_language
-        }
+        "LOWER(BTRIM(glossary_revisions.source_language)) = :source_language AND " \
+          "LOWER(BTRIM(glossary_revisions.target_language)) = :target_language",
+        source_language:,
+        target_language:
       )
       methodology_scope = methodology_scope.joins(:current_revision).where(
-        methodology_profile_revisions: {
-          source_language: project.source_language,
-          target_language: project.target_language
-        }
+        "LOWER(BTRIM(methodology_profile_revisions.source_language)) = :source_language AND " \
+          "LOWER(BTRIM(methodology_profile_revisions.target_language)) = :target_language",
+        source_language:,
+        target_language:
       )
     end
     @glossaries = glossary_scope.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
@@ -155,5 +166,26 @@ class TranslationWorkspacesController < ApplicationController
     end
 
     value.presence
+  end
+
+  def source_import_project_token_param
+    value = params[:source_import_project_token]
+    return if value.nil?
+    unless value.is_a?(String)
+      raise ActionController::BadRequest, "source_import_project_token must be a scalar value"
+    end
+
+    value.presence
+  end
+
+  def validate_source_import_project_binding!(source_import:, project:, token:)
+    if source_import && project
+      return if SourceImports::ProjectBinding.valid?(token:, source_import:, project:)
+
+      raise ActiveRecord::RecordNotFound
+    end
+    return if token.blank?
+
+    raise ActionController::BadRequest, "source_import_project_token is unexpected"
   end
 end
