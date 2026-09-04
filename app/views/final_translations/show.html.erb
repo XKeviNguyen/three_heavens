@@ -1,158 +1,170 @@
 <% content_for :title, "Final translation workspace · Three Heavens" %>
-<% if @final_translation.finalization_rounds.any?(&:running?) %>
-  <% content_for :head do %>
-    <meta http-equiv="refresh" content="5">
-  <% end %>
-<% end %>
 
 <% experiment = @final_translation.experiment %>
 <% project = experiment.document.project %>
 <% current = @final_translation.current_version %>
 <% winner = @final_translation.source_winner_translation_run %>
+<% glossary = experiment.glossary_revision %>
+<% methodology = experiment.methodology_profile_revision %>
+<% running_refinement = @final_translation.finalization_rounds.any?(&:running?) %>
 
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Final translation workspace</p>
+      <%= link_to "← Return to #{project.name}", project_path(project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+      <p class="mt-4 text-sm font-semibold uppercase tracking-wide text-blue-700">Final translation workspace</p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= experiment.name.presence || experiment.document.title %></h1>
-      <p class="mt-2 text-sm text-slate-600"><%= project.name %> · <%= project.source_language %> → <%= project.target_language %></p>
-      <p class="mt-1 text-sm text-slate-600">Official seed winner: <span class="font-semibold text-slate-900"><%= winner.llm_model.display_name %></span> · current version <%= current.version_number %></p>
+      <p class="mt-2 text-sm text-slate-600"><%= project.source_language %> → <%= project.target_language %> · official seed winner <span class="font-semibold text-slate-900"><%= winner.llm_model.display_name %></span></p>
+    </div>
+    <div class="text-right">
+      <span class="inline-flex rounded-full px-3 py-1 text-sm font-semibold <%= @final_translation.finalized? ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' %>"><%= @final_translation.status.humanize %></span>
       <% if @final_translation.finalized_at %>
-        <p class="mt-1 text-sm text-slate-600">Finalized <%= l @final_translation.finalized_at, format: :long %></p>
+        <p class="mt-2 text-xs text-slate-500">Finalized <%= l @final_translation.finalized_at, format: :long %></p>
       <% end %>
     </div>
-    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= @final_translation.finalized? ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' %>"><%= @final_translation.status.humanize %></span>
   </header>
 
-  <% if @final_translation.finalization_rounds.any?(&:running?) %>
-    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
-      Refinement proposals are still running. This page refreshes automatically every 5 seconds.
+  <% if running_refinement %>
+    <div class="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between" role="status">
+      <p><strong>Refinement is still running.</strong> This page will not reload automatically, so text in the editor stays safe.</p>
+      <%= link_to "Refresh proposal status", final_translation_path(@final_translation), class: "shrink-0 font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900" %>
     </div>
   <% end %>
 
-  <div class="flex flex-wrap gap-4 text-sm font-semibold">
-    <%= link_to "Project", project_path(project), class: "text-blue-700 hover:text-blue-900" %>
-    <%= link_to "Judge results", @final_translation.judge_round, class: "text-blue-700 hover:text-blue-900" %>
-    <%= link_to "Blind review", @final_translation.judge_round.review_round, class: "text-blue-700 hover:text-blue-900" %>
+  <nav class="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold" aria-label="Related workflow pages">
     <%= link_to "Experiment", experiment, class: "text-blue-700 hover:text-blue-900" %>
-  </div>
+    <%= link_to "Blind review", @final_translation.judge_round.review_round, class: "text-blue-700 hover:text-blue-900" %>
+    <%= link_to "Judge results", @final_translation.judge_round, class: "text-blue-700 hover:text-blue-900" %>
+  </nav>
 
-  <div class="grid gap-6 lg:grid-cols-2">
-    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">Source document</h2>
-      <p class="mt-1 text-sm font-medium text-slate-600"><%= experiment.document.title %></p>
-      <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-800"><%= experiment.document.source_text %></div>
-    </section>
-    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">Translation instruction</h2>
-      <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-800"><%= experiment.instruction_prompt %></div>
-    </section>
-  </div>
+  <div class="grid items-start gap-6 lg:grid-cols-2">
+    <aside class="space-y-4" aria-label="Translation reference">
+      <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="text-lg font-semibold text-slate-950">Reference</h2>
 
-  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-950">Current final draft</h2>
-        <p class="mt-1 text-sm text-slate-600">Version <%= current.version_number %> · <%= current.origin.humanize %></p>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "inline-flex w-fit rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
-        <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "inline-flex w-fit rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
-      </div>
-    </div>
+        <details class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4" open>
+          <summary class="cursor-pointer font-semibold text-slate-900">Source document · <%= experiment.document.title %></summary>
+          <div class="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= experiment.document.source_text %></div>
+        </details>
 
-    <% if @final_translation.draft? %>
-      <%= form_with url: save_revision_final_translation_path(@final_translation), method: :patch, scope: :final_translation, class: "mt-5 space-y-4" do |form| %>
-        <%= form.hidden_field :expected_version_number, value: current.version_number %>
-        <div>
-          <%= form.label :content, "Translation", class: "block text-sm font-semibold text-slate-800" %>
-          <%= form.text_area :content, value: (@submitted_content.nil? ? current.content : @submitted_content), rows: 18, maxlength: FinalTranslationVersion::MAX_CONTENT_LENGTH, required: true, class: "mt-2 block w-full rounded-lg border border-slate-300 px-4 py-3 font-serif text-base leading-7 text-slate-950 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
-        </div>
-        <div>
-          <%= form.label :change_note, "Concise change note (optional)", class: "block text-sm font-semibold text-slate-800" %>
-          <%= form.text_field :change_note, maxlength: FinalTranslationVersion::MAX_CHANGE_NOTE_LENGTH, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
-        </div>
-        <%= form.submit "Save revision", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
-      <% end %>
-    <% else %>
-      <div class="mt-5 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-5 font-serif text-base leading-7 text-slate-950"><%= current.content %></div>
-    <% end %>
-  </section>
+        <details class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4" open>
+          <summary class="cursor-pointer font-semibold text-slate-900">Translation instruction</summary>
+          <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= experiment.instruction_prompt %></div>
+        </details>
 
-  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-xl font-semibold text-slate-950">Quality evidence for the official winner</h2>
-    <div class="mt-5 whitespace-pre-wrap break-words rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-slate-900"><%= winner.translated_text %></div>
+        <% if glossary %>
+          <details class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4" open>
+            <summary class="cursor-pointer font-semibold text-slate-900">Glossary snapshot · <%= glossary.name %> · revision <%= glossary.version %></summary>
+            <% if glossary.description.present? %><p class="mt-2 text-sm text-slate-600"><%= glossary.description %></p><% end %>
+            <dl class="mt-3 divide-y divide-slate-200 text-sm">
+              <% glossary.entries.each do |entry| %>
+                <div class="py-2">
+                  <dt class="font-medium text-slate-900"><%= entry.source_term %> → <%= entry.preferred_target_term %></dt>
+                  <% if entry.note.present? %><dd class="mt-1 text-slate-600"><%= entry.note %></dd><% end %>
+                </div>
+              <% end %>
+            </dl>
+          </details>
+        <% end %>
 
-    <div class="mt-6 grid gap-5 lg:grid-cols-2">
-      <div>
-        <h3 class="font-semibold text-slate-900">Blind-review feedback</h3>
-        <div class="mt-3 space-y-3">
+        <% if methodology %>
+          <details class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4" open>
+            <summary class="cursor-pointer font-semibold text-slate-900">Methodology snapshot · <%= methodology.name %> · revision <%= methodology.version %></summary>
+            <% if methodology.description.present? %><p class="mt-2 text-sm text-slate-600"><%= methodology.description %></p><% end %>
+            <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= methodology.guidance %></div>
+          </details>
+        <% end %>
+      </section>
+
+      <details class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <summary class="cursor-pointer text-lg font-semibold text-slate-950">Quality evidence for the official winner</summary>
+        <p class="mt-2 text-sm text-slate-600">Blind-review and judge evidence is preserved as reference for the human editor.</p>
+        <details class="mt-4 rounded-lg bg-emerald-50 p-4">
+          <summary class="cursor-pointer text-sm font-semibold text-emerald-900">View original winning translation</summary>
+          <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= winner.translated_text %></div>
+        </details>
+        <div class="mt-4 space-y-3">
           <% @winner_review_evaluations.each_with_index do |evaluation, index| %>
-            <article class="rounded-lg border border-slate-200 p-4 text-sm">
-              <p class="font-semibold text-slate-800">Review <%= index + 1 %> · <%= evaluation.overall_score %>/10</p>
-              <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Strengths:</span> <%= evaluation.strengths %></p>
+            <details class="rounded-lg border border-slate-200 p-4 text-sm">
+              <summary class="cursor-pointer font-semibold text-slate-800">Review <%= index + 1 %> · score <%= evaluation.overall_score %>/10</summary>
+              <p class="mt-3 whitespace-pre-wrap break-words"><span class="font-medium">Strengths:</span> <%= evaluation.strengths %></p>
               <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Issues:</span> <%= evaluation.issues %></p>
-              <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Corrections:</span> <%= evaluation.recommended_corrections %></p>
-              <% if evaluation.suggested_translation.present? %><p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Suggestion:</span> <%= evaluation.suggested_translation %></p><% end %>
-            </article>
+              <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Recommended corrections:</span> <%= evaluation.recommended_corrections %></p>
+              <% if evaluation.suggested_translation.present? %><p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Suggested translation:</span> <%= evaluation.suggested_translation %></p><% end %>
+            </details>
           <% end %>
-        </div>
-      </div>
-      <div>
-        <h3 class="font-semibold text-slate-900">Judge feedback</h3>
-        <div class="mt-3 space-y-3">
           <% @winner_judge_evaluations.each_with_index do |evaluation, index| %>
-            <article class="rounded-lg border border-slate-200 p-4 text-sm">
-              <p class="font-semibold text-slate-800">Judgment <%= index + 1 %> · rank <%= evaluation.rank %> · <%= evaluation.overall_score %>/100</p>
-              <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Rationale:</span> <%= evaluation.rationale %></p>
+            <details class="rounded-lg border border-slate-200 p-4 text-sm">
+              <summary class="cursor-pointer font-semibold text-slate-800">Judgment <%= index + 1 %> · rank <%= evaluation.rank %> · score <%= evaluation.overall_score %>/100</summary>
+              <p class="mt-3 whitespace-pre-wrap break-words"><span class="font-medium">Rationale:</span> <%= evaluation.rationale %></p>
               <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Strengths:</span> <%= evaluation.strengths %></p>
               <p class="mt-2 whitespace-pre-wrap break-words"><span class="font-medium">Risks:</span> <%= evaluation.risks %></p>
-            </article>
+            </details>
           <% end %>
         </div>
-      </div>
-    </div>
-  </section>
+      </details>
+    </aside>
 
-  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-xl font-semibold text-slate-950">Revision history</h2>
-    <p class="mt-2 text-sm text-slate-600">Historical versions are immutable. Restoring one creates a new revision.</p>
-    <div class="mt-5 space-y-4">
-      <% @final_translation.versions.each do |version| %>
-        <article class="rounded-lg border <%= version.id == current.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200' %> p-4">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 class="font-semibold text-slate-950">Version <%= version.version_number %> · <%= version.origin.humanize %></h3>
-              <p class="mt-1 text-xs text-slate-500"><%= l version.created_at, format: :long %><% if version.change_note.present? %> · <%= version.change_note %><% end %></p>
-              <% if version.source_finalization_run %>
-                <p class="mt-1 text-xs text-slate-600">AI source: <%= version.source_finalization_run.finalizer_llm_model.display_name %> · <%= version.source_finalization_run.finalizer_llm_model.model_identifier %></p>
-              <% end %>
-            </div>
-            <% if @final_translation.draft? && version.id != current.id %>
-              <%= button_to "Restore as new version", restore_revision_final_translation_path(@final_translation), method: :post, params: { restore: { version_id: version.id, expected_version_number: current.version_number } }, class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
-            <% end %>
-          </div>
-          <details class="mt-3 rounded-lg bg-slate-50 p-3">
-            <summary class="cursor-pointer text-sm font-semibold text-slate-800">View content</summary>
-            <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= version.content %></div>
+    <main class="rounded-xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Final translation editor">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= @final_translation.finalized? ? "Approved final translation" : "Current draft" %></p>
+          <h2 class="mt-1 text-2xl font-semibold text-slate-950">Version <%= current.version_number %></h2>
+          <p class="mt-1 text-sm text-slate-600">Origin: <%= current.origin.humanize %></p>
+        </div>
+        <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= @final_translation.finalized? ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' %>"><%= @final_translation.finalized? ? "Finalized · read only" : "Draft · editable" %></span>
+      </div>
+
+      <% if @stale_save_conflict %>
+        <section class="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4" aria-label="Current persisted version for reconciliation">
+          <h3 class="font-semibold text-amber-950">A newer saved version exists: version <%= current.version_number %></h3>
+          <p class="mt-1 text-sm text-amber-900">Your submitted text remains in the editor below. Compare it with this saved version, reconcile the differences, then save again.</p>
+          <details class="mt-3 rounded-lg border border-amber-200 bg-white p-3" open>
+            <summary class="cursor-pointer text-sm font-semibold text-slate-900">Current persisted version <%= current.version_number %></summary>
+            <div class="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= current.content %></div>
           </details>
-        </article>
+        </section>
       <% end %>
-    </div>
-  </section>
+
+      <% if @final_translation.draft? %>
+        <%= form_with url: save_revision_final_translation_path(@final_translation), method: :patch, scope: :final_translation, class: "mt-5 space-y-4" do |form| %>
+          <%= form.hidden_field :expected_version_number, value: current.version_number %>
+          <div>
+            <%= form.label :content, @stale_save_conflict ? "Your submitted draft" : "Final translation draft", class: "block text-sm font-semibold text-slate-800" %>
+            <%= form.text_area :content, value: (@submitted_content.nil? ? current.content : @submitted_content), rows: 24, maxlength: FinalTranslationVersion::MAX_CONTENT_LENGTH, required: true, class: "mt-2 block w-full rounded-lg border border-slate-300 px-4 py-3 font-serif text-base leading-7 text-slate-950 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+          </div>
+          <div>
+            <%= form.label :change_note, "Change note (optional)", class: "block text-sm font-semibold text-slate-800" %>
+            <%= form.text_field :change_note, value: @submitted_change_note, maxlength: FinalTranslationVersion::MAX_CHANGE_NOTE_LENGTH, placeholder: "Briefly describe this revision", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <%= form.submit "Save revision", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
+            <p class="text-xs text-slate-500">Saving creates a new immutable version.</p>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="mt-5 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-5 font-serif text-base leading-7 text-slate-950"><%= current.content %></div>
+      <% end %>
+
+      <div class="mt-5 flex flex-wrap gap-3 border-t border-slate-200 pt-5">
+        <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+        <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+      </div>
+    </main>
+  </div>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">AI refinement proposals</h2>
-    <p class="mt-2 text-sm text-slate-600">Select up to <%= Ai::UsageLimits::MAX_FINALIZERS %> models. Each proposes against the exact current version, and proposals never alter your draft until you explicitly apply one.</p>
-    <% execution_plan = @final_translation.experiment.document_execution_plan %>
+    <p class="mt-2 text-sm text-slate-600">Each model proposes against the exact current version. Proposals never alter the draft until you explicitly apply one.</p>
+    <% execution_plan = experiment.document_execution_plan %>
     <% if execution_plan %><p class="mt-2 text-sm font-semibold text-amber-800">This document has <%= execution_plan.segment_count %> segments. Each selected finalizer authorizes <%= execution_plan.segment_count %> initial segment provider requests; built-in retries may add calls.</p><% end %>
-    <% if execution_plan && !current.segment_alignment_valid? %><p class="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Segmented refinement is unavailable because the current draft was manually edited without a safe source-segment alignment. Manual editing and finalization remain available.</p><% end %>
+    <% if execution_plan && !current.segment_alignment_valid? %><p class="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Segmented refinement is unavailable because the current draft lacks safe source-segment alignment. Manual editing and finalization remain available.</p><% end %>
 
     <% if @final_translation.draft? %>
       <%= form_with url: refine_final_translation_path(@final_translation), method: :post, scope: :refinement, class: "mt-5 space-y-4" do |form| %>
         <% if @finalizer_models.any? %>
           <fieldset>
-            <legend class="text-sm font-semibold text-slate-800">Active OpenRouter finalizers</legend>
+            <legend class="text-sm font-semibold text-slate-800">Active OpenRouter finalizers (select up to <%= Ai::UsageLimits::MAX_FINALIZERS %>)</legend>
             <div class="mt-3 grid gap-3 md:grid-cols-2">
               <% @finalizer_models.each do |model| %>
                 <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40">
@@ -165,7 +177,7 @@
         <% else %>
           <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active OpenRouter finalizer models are available.</p>
         <% end %>
-        <%= form.submit "Start refinement", disabled: @finalizer_models.empty? || @final_translation.finalization_rounds.any?(&:running?) || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400" %>
+        <%= form.submit "Start refinement", disabled: @finalizer_models.empty? || running_refinement || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400" %>
       <% end %>
     <% end %>
 
@@ -173,7 +185,7 @@
       <% @final_translation.finalization_rounds.sort_by { |round| [round.created_at, round.id] }.reverse_each do |round| %>
         <article class="rounded-lg border border-slate-200 p-5">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 class="font-semibold text-slate-950">Refinement from version <%= round.base_version.version_number %></h3>
+            <h3 class="font-semibold text-slate-950">Refinement round · exact base version <%= round.base_version.version_number %></h3>
             <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(round.status) %>"><%= round.status.humanize %></span>
           </div>
           <% failed_runs = round.finalization_runs.select(&:failed?) %>
@@ -186,28 +198,51 @@
               <% elsif current.id != round.base_final_translation_version_id %>
                 <p class="mt-2 font-semibold text-amber-900">This round targets an older draft version and cannot be retried.</p>
               <% else %>
-                <p class="mt-2 font-semibold text-amber-900">Retry is unavailable because the draft is finalized or a historical model is inactive or unsupported.</p>
+                <p class="mt-2 font-semibold text-amber-900">Retry is unavailable while finalized or because a historical model is inactive or unsupported.</p>
               <% end %>
             </div>
           <% end %>
           <div class="mt-4 space-y-4">
             <% round.finalization_runs.sort_by { |run| [run.finalizer_llm_model.display_name, run.id] }.each do |run| %>
-              <section class="rounded-lg bg-slate-50 p-4">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div><h4 class="font-semibold text-slate-900"><%= run.finalizer_llm_model.display_name %></h4><p class="mt-1 break-all font-mono text-xs text-slate-500"><%= run.finalizer_llm_model.model_identifier %></p></div>
-                  <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(run.status) %>"><%= run.status.humanize %></span>
+              <% applied_versions = @final_translation.versions.select { |version| version.source_finalization_run_id == run.id } %>
+              <% applied = applied_versions.any? %>
+              <% stale = !applied && current.id != round.base_final_translation_version_id %>
+              <% applicable = run.completed? && !applied && !stale && @final_translation.draft? %>
+              <section class="rounded-lg border <%= applicable ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50' %> p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 class="font-semibold text-slate-900"><%= run.finalizer_llm_model.display_name %></h4>
+                    <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= run.finalizer_llm_model.model_identifier %></p>
+                    <p class="mt-1 text-xs text-slate-600">Exact base version: <strong><%= round.base_version.version_number %></strong></p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(run.status) %>"><%= run.status.humanize %></span>
+                    <% if applied %><span class="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Already applied</span><% end %>
+                    <% if stale %><span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Stale proposal</span><% end %>
+                    <% if applicable %><span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">Applicable proposal</span><% end %>
+                  </div>
                 </div>
-                <% if run.finalization_segment_runs.any? %><p class="mt-3 text-sm text-blue-900">Segmented execution: <strong><%= run.finalization_segment_runs.count(&:completed?) %> / <%= run.finalization_segment_runs.size %></strong> provider requests complete.</p><% end %>
+                <% if run.finalization_segment_runs.any? %>
+                  <% segment_counts = run.finalization_segment_runs.group_by(&:status).transform_values(&:size) %>
+                  <p class="mt-3 text-sm text-blue-900">Segmented progress: <strong><%= segment_counts.fetch("completed", 0) %> / <%= run.finalization_segment_runs.size %></strong> complete<% if segment_counts.fetch("running", 0).positive? %> · <%= segment_counts.fetch("running") %> running<% end %><% if segment_counts.fetch("failed", 0).positive? %> · <%= segment_counts.fetch("failed") %> failed<% end %>.</p>
+                <% end %>
                 <% if run.completed? %>
-                  <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-white p-4 text-sm leading-6 text-slate-900"><%= run.proposed_translation %></div>
+                  <h5 class="mt-4 text-sm font-semibold text-slate-800">Proposed translation</h5>
+                  <div class="mt-2 whitespace-pre-wrap break-words rounded-lg bg-white p-4 text-sm leading-6 text-slate-900"><%= run.proposed_translation %></div>
                   <% { "Change summary" => run.change_summary, "Terminology notes" => run.terminology_notes, "Warnings" => run.warnings }.each do |label, items| %>
-                    <div class="mt-4"><h5 class="text-sm font-semibold text-slate-800"><%= label %></h5><ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700"><% items.each do |item| %><li class="whitespace-pre-wrap break-words"><%= item %></li><% end %></ul></div>
+                    <div class="mt-4">
+                      <h5 class="text-sm font-semibold text-slate-800"><%= label %></h5>
+                      <% if items.any? %><ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700"><% items.each do |item| %><li class="whitespace-pre-wrap break-words"><%= item %></li><% end %></ul><% else %><p class="mt-1 text-sm text-slate-500">None reported.</p><% end %>
+                    </div>
                   <% end %>
-                  <% applicable = @final_translation.draft? && current.id == round.base_final_translation_version_id && run.applied_versions.empty? %>
                   <% if applicable %>
                     <%= button_to "Apply proposal", apply_proposal_final_translation_path(@final_translation), method: :post, params: { proposal: { finalization_run_id: run.id } }, class: "mt-4 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" %>
-                  <% elsif current.id != round.base_final_translation_version_id && run.applied_versions.empty? %>
-                    <p class="mt-4 text-sm font-medium text-amber-700">This proposal is stale because the current draft has changed.</p>
+                  <% elsif applied %>
+                    <p class="mt-4 text-sm font-medium text-blue-800">Applied as <%= applied_versions.map { |version| "version #{version.version_number}" }.to_sentence %>.</p>
+                  <% elsif stale %>
+                    <p class="mt-4 text-sm font-medium text-amber-800">This proposal is stale because the current draft no longer matches its base version. It cannot be applied.</p>
+                  <% else %>
+                    <p class="mt-4 text-sm font-medium text-slate-600">Reopen the translation before applying this proposal.</p>
                   <% end %>
                 <% elsif run.failed? %>
                   <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-semibold">Refinement failed<% if run.error_code.present? %> · <%= run.error_code %><% end %></p><% if run.error_message.present? %><p class="mt-1 break-words"><%= safe_provider_error(run.error_message) %></p><% end %></div>
@@ -224,15 +259,48 @@
     </div>
   </section>
 
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-950">Revision history</h2>
+    <p class="mt-2 text-sm text-slate-600">Historical versions are immutable. Restoring one always creates a new revision.</p>
+    <div class="mt-5 space-y-3">
+      <% @final_translation.versions.each do |version| %>
+        <article class="rounded-lg border <%= version.id == current.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200' %> p-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-semibold text-slate-950">Version <%= version.version_number %> · <%= version.origin.humanize %></h3>
+                <% if version.id == current.id %><span class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">Current version</span><% end %>
+              </div>
+              <p class="mt-1 text-xs text-slate-500"><%= l version.created_at, format: :long %></p>
+              <p class="mt-1 text-sm text-slate-700"><span class="font-medium">Change note:</span> <%= version.change_note.presence || "None" %></p>
+              <% if version.source_finalization_run %><p class="mt-1 text-xs text-slate-600">AI source: <%= version.source_finalization_run.finalizer_llm_model.display_name %> · <%= version.source_finalization_run.finalizer_llm_model.model_identifier %></p><% end %>
+            </div>
+            <% if @final_translation.draft? && version.id != current.id %>
+              <%= button_to "Restore as new version", restore_revision_final_translation_path(@final_translation), method: :post, params: { restore: { version_id: version.id, expected_version_number: current.version_number } }, class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+            <% end %>
+          </div>
+          <details class="mt-3 rounded-lg bg-slate-50 p-3">
+            <summary class="cursor-pointer text-sm font-semibold text-slate-800">View historical content</summary>
+            <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= version.content %></div>
+          </details>
+        </article>
+      <% end %>
+    </div>
+  </section>
+
   <section class="rounded-xl border <%= @final_translation.finalized? ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' %> p-6 shadow-sm">
     <% if @final_translation.draft? %>
-      <h2 class="text-xl font-semibold text-slate-950">Finalize translation</h2>
-      <p class="mt-2 text-sm text-slate-700">Finalizing locks editing, restoration, proposal application, and new refinement requests. You can explicitly reopen later without losing history.</p>
-      <%= button_to "Finalize translation", finalize_final_translation_path(@final_translation), method: :patch, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
+      <h2 class="text-xl font-semibold text-slate-950">Approve the final translation</h2>
+      <p class="mt-2 text-sm text-slate-700">Finalize marks the current version as the approved final translation and makes it read-only. You can explicitly reopen it later without losing history.</p>
+      <%= button_to "Finalize current version", finalize_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: "Finalize version #{current.version_number} as the approved final translation?" }, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
     <% else %>
       <h2 class="text-xl font-semibold text-slate-950">Translation finalized</h2>
-      <p class="mt-2 text-sm text-slate-700">Reopen only when further editing or refinement is required. Every revision and proposal remains preserved.</p>
-      <%= button_to "Reopen for editing", reopen_final_translation_path(@final_translation), method: :patch, class: "mt-4 rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white hover:bg-emerald-800" %>
+      <p class="mt-2 text-sm text-slate-700">Version <%= current.version_number %> is the approved final translation. Reopen only when further editing or refinement is required.</p>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "rounded-lg border border-emerald-300 bg-white px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100" %>
+        <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "rounded-lg border border-emerald-300 bg-white px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100" %>
+        <%= button_to "Reopen for editing", reopen_final_translation_path(@final_translation), method: :patch, class: "rounded-lg bg-emerald-700 px-5 py-2 font-semibold text-white hover:bg-emerald-800" %>
+      </div>
     <% end %>
   </section>
 </div>

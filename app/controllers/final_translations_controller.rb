@@ -24,9 +24,12 @@ class FinalTranslationsController < ApplicationController
     redirect_to @final_translation, notice: "Revision saved."
   rescue FinalTranslations::StaleVersionError => error
     @submitted_content = attributes&.fetch("content", "")
+    @submitted_change_note = attributes&.fetch("change_note", nil)
+    @stale_save_conflict = true
     render_workspace_error(error, :conflict)
   rescue FinalTranslations::InvalidStateError, ActionController::ParameterMissing => error
     @submitted_content = attributes&.fetch("content", "")
+    @submitted_change_note = attributes&.fetch("change_note", nil)
     render_workspace_error(error, :unprocessable_content)
   end
 
@@ -116,8 +119,12 @@ class FinalTranslationsController < ApplicationController
   def load_workspace
     @final_translation = current_user.final_translations.includes(
       :current_version,
-      :source_winner_translation_run,
-      experiment: { document: :project },
+      { source_winner_translation_run: :llm_model },
+      experiment: [
+        { document: :project },
+        { glossary_revision: [ :glossary, :entries ] },
+        { methodology_profile_revision: :methodology_profile }
+      ],
       judge_round: :review_round,
       versions: { source_finalization_run: :finalizer_llm_model },
       finalization_rounds: [
