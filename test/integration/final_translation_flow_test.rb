@@ -158,7 +158,10 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     get final_translation_path(@final_translation)
     assert_select "meta[http-equiv='refresh']", count: 0
     assert_select "[role='status']", text: /will not reload automatically/
-    assert_select "a[href='#{final_translation_path(@final_translation)}']", text: "Refresh proposal status"
+    assert_select "a[href='#{final_translation_path(@final_translation)}'][data-turbo-confirm]", text: "Refresh proposal status" do |links|
+      assert_equal "Refresh proposal status? Any unsaved editor changes will be discarded.",
+                   links.first["data-turbo-confirm"]
+    end
     assert_select "article", text: /exact base version 1/i
     assert_select "section", text: /#{Regexp.escape(@finalizer.display_name)}/
   end
@@ -247,7 +250,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_select "input[type='checkbox'][name='refinement[finalizer_ids][]']", count: 0
     assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}']", count: 0
     assert_select "form[action='#{reopen_final_translation_path(@final_translation)}']", count: 1
-    assert_select "main[aria-label='Final translation editor']", text: /Finalized · read only/
+    assert_select "section[aria-label='Final translation editor']", text: /Finalized · read only/
 
     patch save_revision_final_translation_path(@final_translation), params: {
       final_translation: { content: "Forbidden", expected_version_number: 1 }

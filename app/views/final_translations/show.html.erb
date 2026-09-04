@@ -27,7 +27,7 @@
   <% if running_refinement %>
     <div class="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between" role="status">
       <p><strong>Refinement is still running.</strong> This page will not reload automatically, so text in the editor stays safe.</p>
-      <%= link_to "Refresh proposal status", final_translation_path(@final_translation), class: "shrink-0 font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900" %>
+      <%= link_to "Refresh proposal status", final_translation_path(@final_translation), data: { turbo_confirm: "Refresh proposal status? Any unsaved editor changes will be discarded." }, class: "shrink-0 font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900" %>
     </div>
   <% end %>
 
@@ -105,7 +105,7 @@
       </details>
     </aside>
 
-    <main class="rounded-xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Final translation editor">
+    <section class="rounded-xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Final translation editor">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= @final_translation.finalized? ? "Approved final translation" : "Current draft" %></p>
@@ -150,7 +150,7 @@
         <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
         <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
       </div>
-    </main>
+    </section>
   </div>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
