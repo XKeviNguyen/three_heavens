@@ -108,7 +108,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert Document.order(:id).last.pasted_text?
   end
 
-  test "final translation workspace exposes owner TXT and DOCX downloads" do
+  test "owner edits approves reopens and downloads a final translation without provider work" do
     final_translation = create_final_translation_workspace
     clear_enqueued_jobs
     sign_in_in_browser(users(:normal), "correct horse battery staple")
@@ -117,6 +117,26 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
     assert_link "Download TXT", href: download_final_translation_path(final_translation, format: :txt)
     assert_link "Download DOCX", href: download_final_translation_path(final_translation, format: :docx)
+    fill_in "Final translation draft", with: "Human-edited browser revision"
+    fill_in "Change note (optional)", with: "Final human pass"
+    click_button "Save revision"
+
+    assert_text "Revision saved."
+    assert_field "Final translation draft", with: "Human-edited browser revision"
+    assert_text "Version 2"
+
+    accept_confirm "Finalize version 2 as the approved final translation?" do
+      click_button "Finalize current version"
+    end
+    assert_text "Final translation finalized."
+    assert_text "Finalized · read only"
+    assert_no_field "Final translation draft"
+    assert_link "Download TXT"
+    assert_link "Download DOCX"
+
+    click_button "Reopen for editing"
+    assert_text "Final translation reopened for editing."
+    assert_field "Final translation draft", with: "Human-edited browser revision"
     assert_no_enqueued_jobs
   end
 
