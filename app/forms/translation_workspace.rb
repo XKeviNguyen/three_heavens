@@ -18,6 +18,8 @@ class TranslationWorkspace
                 :workflow_profile_revision_id,
                 :glossary_revision_id,
                 :methodology_profile_revision_id,
+                :translation_reference_revision_ids,
+                :guidance_preference,
                 :automatic_confirmation,
                 :automatic_plan_digest,
                 :submission_token
@@ -29,6 +31,7 @@ class TranslationWorkspace
   validate :validate_source_import
   validate :validate_glossary_selection
   validate :validate_methodology_selection
+  validate :validate_reference_selection
 
   def initialize(attributes = {}, start_service: TranslationExperiments::Start, clock: -> { Time.current }, existing_project: nil)
     @start_service = start_service
@@ -39,6 +42,8 @@ class TranslationWorkspace
     self.project_id ||= existing_project&.id
     apply_authoritative_project_attributes(existing_project) if existing_project
     self.model_ids = [] if model_ids.nil?
+    self.translation_reference_revision_ids = [] if translation_reference_revision_ids.nil?
+    self.guidance_preference = "reference_examples" if guidance_preference.blank?
     self.workflow_mode = "manual" if workflow_mode.blank?
     self.source_import_id ||= source_import&.id
     issue_submission_token if submission_token.blank? && user&.persisted?
@@ -55,6 +60,7 @@ class TranslationWorkspace
       next false unless lock_existing_project
       next false unless valid?
       next false unless lock_methodology_selection
+      next false unless lock_reference_selections
 
       project.save! if project.new_record?
       locked_import = lock_source_import
@@ -63,6 +69,7 @@ class TranslationWorkspace
       end
       document.save!
       experiment.save!
+      snapshot_reference_revisions!
       SourceImports::Consume.finish!(source_import: locked_import, document: document) if locked_import
       if automatic_mode?
         @pipeline_run = Pipelines::Start.call(
@@ -90,7 +97,12 @@ class TranslationWorkspace
       errors.add(:source_import_id, error.message)
       return false
     end
-    errors.add(:base, "The translation experiment could not be started. Please review the form and try again.")
+    message = if error.message == TranslationReferences::ContextBudgetMessage::MESSAGE
+      error.message
+    else
+      "The translation experiment could not be started. Please review the form and try again."
+    end
+    errors.add(:base, message)
     false
   end
 
@@ -117,7 +129,8 @@ class TranslationWorkspace
     experiment: {
       name: :experiment_name,
       instruction_prompt: :instruction_prompt,
-      methodology_profile_revision: :methodology_profile_revision_id
+      methodology_profile_revision: :methodology_profile_revision_id,
+      guidance_preference: :guidance_preference
     }
   }.freeze
 
@@ -136,7 +149,8 @@ class TranslationWorkspace
       name: experiment_name,
       instruction_prompt: instruction_prompt,
       glossary_revision: @glossary_revision,
-      methodology_profile_revision: @methodology_profile_revision
+      methodology_profile_revision: @methodology_profile_revision,
+      guidance_preference: guidance_preference
     )
   end
 
@@ -353,6 +367,50 @@ class TranslationWorkspace
     @experiment.methodology_profile_revision = @methodology_profile_revision
   end
 
+  def validate_reference_selection
+    ids = translation_reference_revision_ids
+    unless ids.is_a?(Array)
+      errors.add(:translation_reference_revision_ids, "must be a list")
+      return
+    end
+    submitted = ids.map(&:to_s)
+    if submitted.length > ExperimentReferenceRevision::MAXIMUM_REFERENCES
+      errors.add(:translation_reference_revision_ids, "cannot include more than 5 references")
+      return
+    end
+    unless submitted.all? { |id| id.match?(/\A[1-9]\d*\z/) }
+      errors.add(:translation_reference_revision_ids, "contain an invalid reference selection")
+      return
+    end
+    if submitted.uniq.length != submitted.length
+      errors.add(:translation_reference_revision_ids, "cannot contain duplicates")
+      return
+    end
+
+    selected_ids = submitted.map(&:to_i).sort
+    @selected_reference_revisions = TranslationReferenceRevision.includes(:translation_reference)
+      .joins(:translation_reference)
+      .where(
+        id: selected_ids,
+        translation_references: { user_id: user.id, active: true }
+      ).order(:id).to_a
+    unless @selected_reference_revisions.map(&:id) == selected_ids
+      errors.add(:translation_reference_revision_ids, "contain an unavailable reference")
+      return
+    end
+
+    @selected_reference_revisions.each do |revision|
+      reference = revision.translation_reference
+      unless reference.current_revision_id == revision.id
+        errors.add(:translation_reference_revision_ids, "contain a stale reference revision")
+        next
+      end
+      unless revision.language_pair_matches?(source_language: source_language, target_language: target_language)
+        errors.add(:translation_reference_revision_ids, "must match the project's source and target languages")
+      end
+    end
+  end
+
   def lock_source_import
     return if source_import_id.blank?
 
@@ -383,6 +441,36 @@ class TranslationWorkspace
 
     errors.add(:methodology_profile_revision_id, "is no longer the active current methodology revision")
     false
+  end
+
+  def lock_reference_selections
+    return true if @selected_reference_revisions.blank?
+
+    references_by_id = TranslationReference.lock.where(
+      id: @selected_reference_revisions.map(&:translation_reference_id),
+      user_id: user.id
+    ).order(:id).index_by(&:id)
+    eligible = @selected_reference_revisions.all? do |revision|
+      reference = references_by_id[revision.translation_reference_id]
+      reference&.active? && reference.current_revision_id == revision.id &&
+        revision.language_pair_matches?(
+          source_language: project.source_language,
+          target_language: project.target_language
+        )
+    end
+    return true if eligible
+
+    errors.add(:translation_reference_revision_ids, "are no longer active current references for this project")
+    false
+  end
+
+  def snapshot_reference_revisions!
+    Array(@selected_reference_revisions).each_with_index do |revision, index|
+      experiment.experiment_reference_revisions.create!(
+        translation_reference_revision: revision,
+        position: index + 1
+      )
+    end
   end
 
   def current_time

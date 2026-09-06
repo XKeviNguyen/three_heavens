@@ -1,0 +1,140 @@
+require "test_helper"
+require_relative "../support/document_io_test_helper"
+require_relative "../support/translation_reference_test_helper"
+
+class TranslationReferencesTest < ActionDispatch::IntegrationTest
+  include DocumentIoTestHelper
+  include TranslationReferenceTestHelper
+
+  setup { sign_in_as users(:normal) }
+
+  test "owner creates a pasted pair revises archives and reactivates it" do
+    assert_difference -> { TranslationReference.count }, 1 do
+      assert_difference -> { TranslationReferenceRevision.count }, 1 do
+        post translation_references_path, params: {
+          translation_reference: translation_reference_attributes
+        }
+      end
+    end
+    reference = TranslationReference.order(:id).last
+    assert_redirected_to translation_reference_path(reference)
+    follow_redirect!
+    assert_response :success
+    assert_select "h1", text: "Sabbath study"
+    assert_includes response.body, reference.current_revision.configuration_digest
+
+    assert_difference -> { TranslationReferenceRevision.count }, 1 do
+      patch translation_reference_path(reference), params: {
+        translation_reference: translation_reference_attributes(
+          title: "Sabbath study revised",
+          approved_translation: "改訂された承認訳"
+        ).merge(expected_version: "1")
+      }
+    end
+    assert_equal 2, reference.reload.current_revision.version
+
+    patch deactivate_translation_reference_path(reference)
+    assert_not reference.reload.active?
+    patch activate_translation_reference_path(reference)
+    assert reference.reload.active?
+  end
+
+  test "TXT MD and DOCX uploads use the shared extraction path on either side" do
+    cases = [
+      [ "source.txt", "TXT source", "approved.md", "# Approved" ],
+      [ "source.md", "# Source", "approved.txt", "Approved text" ],
+      [ "source.docx", build_docx(document_xml: basic_document_xml("<w:p><w:r><w:t>DOCX source</w:t></w:r></w:p>")),
+        "approved.docx", build_docx(document_xml: basic_document_xml("<w:p><w:r><w:t>DOCX approved</w:t></w:r></w:p>")) ]
+    ]
+
+    cases.each_with_index do |(source_name, source_bytes, approved_name, approved_bytes), index|
+      post translation_references_path, params: {
+        translation_reference: {
+          title: "Uploaded #{index}",
+          source_language: "Vietnamese",
+          target_language: "Japanese",
+          source_file: uploaded_file(source_bytes, filename: source_name),
+          approved_translation_file: uploaded_file(approved_bytes, filename: approved_name)
+        }
+      }
+      assert_response :redirect
+    end
+
+    revisions = TranslationReference.order(:id).last(3).map(&:current_revision)
+    assert_equal "TXT source", revisions[0].source_text
+    assert_equal "# Approved", revisions[0].approved_translation
+    assert_equal "# Source", revisions[1].source_text
+    assert_equal "Approved text", revisions[1].approved_translation
+    assert_equal "DOCX source", revisions[2].source_text
+    assert_equal "DOCX approved", revisions[2].approved_translation
+  end
+
+  test "ambiguous paste plus file and unsafe DOCX are rejected without AI work" do
+    macro_docx = build_docx(entries: { "word/vbaProject.bin" => "macro" })
+
+    assert_no_difference [
+      -> { TranslationReference.count },
+      -> { TranslationRun.count },
+      -> { ActiveJob::Base.queue_adapter.enqueued_jobs.size }
+    ] do
+      post translation_references_path, params: {
+        translation_reference: translation_reference_attributes.merge(
+          source_file: uploaded_file("uploaded source", filename: "source.txt", content_type: "text/plain")
+        )
+      }
+    end
+    assert_response :unprocessable_content
+    assert_includes response.body, "not both"
+
+    assert_no_difference [ -> { TranslationReference.count }, -> { TranslationRun.count } ] do
+      post translation_references_path, params: {
+        translation_reference: {
+          title: "Unsafe",
+          source_language: "Vietnamese",
+          target_language: "Japanese",
+          source_file: uploaded_file(macro_docx, filename: "source.docx"),
+          approved_translation: "Approved"
+        }
+      }
+    end
+    assert_response :unprocessable_content
+    assert_includes response.body, "Macro-enabled Word documents are not supported"
+  end
+
+  test "stale editing strict parameters owner isolation and admin no-bypass fail closed" do
+    reference = create_translation_reference
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes.merge(expected_version: "0")
+    }
+    assert_response :conflict
+    assert_equal 1, reference.revisions.count
+
+    [
+      { translation_reference: "bad" },
+      { translation_reference: translation_reference_attributes.merge(user_id: users(:other).id) },
+      { translation_reference: translation_reference_attributes.merge(source_text: [ "bad" ]) }
+    ].each do |payload|
+      assert_no_difference -> { TranslationReference.count } do
+        post translation_references_path, params: payload
+      end
+      assert_response :bad_request
+    end
+
+    sign_out
+    sign_in_as users(:other)
+    get translation_reference_path(reference)
+    assert_response :not_found
+    get edit_translation_reference_path(reference)
+    assert_response :not_found
+
+    sign_out
+    sign_in_as users(:admin)
+    get translation_reference_path(reference)
+    assert_response :not_found
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes.merge(expected_version: "1")
+    }
+    assert_response :not_found
+  end
+end

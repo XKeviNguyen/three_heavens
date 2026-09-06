@@ -41,7 +41,13 @@ module Judging
       end
       Ai::RunScheduler.enqueue_all(schedules)
       judge_round
-    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError,
+            TranslationReferences::ContextBudgetMessage.for(
+              experiment: review_round.experiment,
+              error: error
+            )
+    rescue LongDocuments::Planner::SourceChangedError => error
       raise ContextBudgetError, error.message
     end
 

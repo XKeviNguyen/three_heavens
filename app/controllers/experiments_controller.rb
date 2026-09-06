@@ -2,6 +2,7 @@ class ExperimentsController < ApplicationController
   def show
     @experiment = current_user.experiments.includes(
       methodology_profile_revision: :methodology_profile,
+      experiment_reference_revisions: { translation_reference_revision: :translation_reference },
       document: :project,
       translation_runs: [ :llm_model, :translation_segment_runs ],
       pipeline_run: :workflow_profile_revision,

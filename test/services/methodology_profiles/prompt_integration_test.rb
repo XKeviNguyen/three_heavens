@@ -34,7 +34,8 @@ class MethodologyProfiles::PromptIntegrationTest < ActiveSupport::TestCase
       source_text: experiment.document.source_text
     )
     assert_methodology_payload(translation, bounded: false, expected_guidance: selected.guidance)
-    assert_includes translation.fetch(:system_prompt), "translation_instruction as the most specific owner guidance"
+    assert_includes translation.fetch(:system_prompt),
+                    TranslationGuidance::Policy.precedence_statement(experiment.guidance_preference)
     assert_match(/Return only\s+the translation/, translation.fetch(:system_prompt))
 
     review = BlindReviews::Prompt.build(review_round.review_runs.first)

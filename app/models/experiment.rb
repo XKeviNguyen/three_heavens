@@ -3,6 +3,12 @@ class Experiment < ApplicationRecord
   belongs_to :glossary_revision, optional: true
   belongs_to :methodology_profile_revision, optional: true
 
+  has_many :experiment_reference_revisions,
+           -> { order(:position) },
+           dependent: :restrict_with_error
+  has_many :translation_reference_revisions,
+           through: :experiment_reference_revisions
+
   has_many :translation_runs, dependent: :restrict_with_error
   has_one :document_execution_plan, dependent: :restrict_with_error
   has_one :review_round, dependent: :restrict_with_error
@@ -18,6 +24,12 @@ class Experiment < ApplicationRecord
     failed: "failed"
   }, validate: true
 
+  enum :guidance_preference, {
+    reference_examples: "reference_examples",
+    glossary: "glossary",
+    experiment_instruction: "experiment_instruction"
+  }, validate: true
+
   validates :name, length: { maximum: 150 }, allow_blank: true
   validates :instruction_prompt,
             presence: true,
@@ -28,6 +40,7 @@ class Experiment < ApplicationRecord
   validate :methodology_revision_matches_project_language_pair
   validate :methodology_revision_belongs_to_project_owner
   validate :methodology_revision_is_immutable, on: :update
+  validate :guidance_preference_is_immutable, on: :update
 
   private
 
@@ -72,5 +85,11 @@ class Experiment < ApplicationRecord
     return unless will_save_change_to_methodology_profile_revision_id?
 
     errors.add(:methodology_profile_revision, "cannot change after experiment creation")
+  end
+
+  def guidance_preference_is_immutable
+    return unless will_save_change_to_guidance_preference?
+
+    errors.add(:guidance_preference, "cannot change after experiment creation")
   end
 end

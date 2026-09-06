@@ -45,6 +45,8 @@
                 <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
                   <% if experiment.glossary_revision %><span>Glossary: <strong><%= experiment.glossary_revision.name %> · revision <%= experiment.glossary_revision.version %></strong></span><% end %>
                   <% if experiment.methodology_profile_revision %><span>Methodology: <strong><%= experiment.methodology_profile_revision.name %> · revision <%= experiment.methodology_profile_revision.version %></strong></span><% end %>
+                  <span>Guidance preference: <strong><%= TranslationGuidance::Policy.label(experiment.guidance_preference) %></strong></span>
+                  <% if experiment.experiment_reference_revisions.any? %><span>References: <strong><%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · revision #{snapshot.translation_reference_revision.version}" }.to_sentence %></strong></span><% end %>
                   <span>Blind review: <strong><%= review_round&.status&.humanize || "Not started" %></strong></span>
                   <span>Judge: <strong><%= judge_round&.status&.humanize || "Not started" %></strong></span>
                   <span>Final translation: <strong><%= experiment.final_translation&.status&.humanize || "Not created" %></strong></span>

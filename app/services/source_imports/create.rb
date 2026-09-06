@@ -13,18 +13,18 @@ module SourceImports
     end
 
     def call
-      raise Error.new("missing_file", "Choose a source file to upload.") unless upload.respond_to?(:read)
-
-      advertised_size = upload.respond_to?(:size) ? upload.size : nil
-      reject_oversize! if advertised_size && advertised_size > Limits::MAX_UPLOAD_BYTES
-
-      bytes = read_bounded
-      filename = Filename.safe_original(upload.original_filename)
-      detection = Detector.call(filename:, bytes:)
-      source_import = create_pending_import(filename:, detection:, bytes:)
+      payload = UploadPayload.call(upload:)
+      source_import = create_pending_import(
+        filename: payload.filename,
+        detection: payload.detection,
+        bytes: payload.bytes
+      )
 
       begin
-        extracted_text = TextExtractor.call(format: detection.format, bytes:)
+        extracted_text = TextExtractor.call(
+          format: payload.detection.format,
+          bytes: payload.bytes
+        )
         source_import.update!(
           status: :ready,
           extracted_text:,
@@ -47,20 +47,6 @@ module SourceImports
     private
 
     attr_reader :user, :upload
-
-    def read_bounded
-      upload.rewind if upload.respond_to?(:rewind)
-      bytes = upload.read(Limits::MAX_UPLOAD_BYTES + 1).to_s.b
-      reject_oversize! if bytes.bytesize > Limits::MAX_UPLOAD_BYTES
-      bytes
-    end
-
-    def reject_oversize!
-      raise Error.new(
-        "file_too_large",
-        "The source file is larger than the #{Limits::MAX_UPLOAD_BYTES / 1.megabyte} MiB limit."
-      )
-    end
 
     def create_pending_import(filename:, detection:, bytes:)
       user.source_imports.create!(

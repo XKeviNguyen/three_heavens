@@ -2,12 +2,63 @@ require "test_helper"
 require_relative "../../support/judging_test_helper"
 require_relative "../../support/final_translation_test_helper"
 require_relative "../../support/workflow_profile_test_helper"
+require_relative "../../support/translation_reference_test_helper"
 
 class Pipelines::AdvanceTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
   include JudgingTestHelper
   include FinalTranslationTestHelper
   include WorkflowProfileTestHelper
+  include TranslationReferenceTestHelper
+
+  test "automatic pipeline keeps the original reference revision through every later stage" do
+    experiment = create_completed_experiment
+    reference = create_translation_reference(
+      source_language: experiment.document.project.source_language,
+      target_language: experiment.document.project.target_language,
+      source_text: "AUTOMATIC_REFERENCE_SOURCE_V1",
+      approved_translation: "AUTOMATIC_REFERENCE_APPROVED_V1"
+    )
+    selected = reference.current_revision
+    snapshot_reference(experiment: experiment, revision: selected)
+    profile = create_workflow_profile(completion_mode: "refinement_proposals")
+    pipeline = create_pipeline_run(experiment: experiment, profile: profile)
+
+    TranslationReferences::Revise.call(
+      translation_reference: reference,
+      expected_version: "1",
+      attributes: translation_reference_attributes(
+        source_language: experiment.document.project.source_language,
+        target_language: experiment.document.project.target_language,
+        source_text: "AUTOMATIC_REFERENCE_SOURCE_V2",
+        approved_translation: "AUTOMATIC_REFERENCE_APPROVED_V2"
+      )
+    )
+    TranslationReferences::ChangeStatus.deactivate(translation_reference: reference)
+
+    assert_prompt_uses_reference(
+      TranslationSegments::Prompt.build(experiment: experiment, source_text: experiment.document.source_text),
+      selected
+    )
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    review_run = experiment.reload.review_round.review_runs.sole
+    assert_prompt_uses_reference(BlindReviews::Prompt.build(review_run), selected)
+    complete_review_run(review_run)
+    BlindReviews::ReconcileRound.call(review_run.review_round)
+    clear_enqueued_jobs
+
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    judge_run = review_run.review_round.reload.judge_round.judge_runs.sole
+    assert_prompt_uses_reference(Judging::Prompt.build(judge_run), selected)
+    complete_judge_run(judge_run)
+    Judging::ReconcileRound.call(judge_run.judge_round)
+    clear_enqueued_jobs
+
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    finalization_run = pipeline.reload.finalization_round.finalization_runs.sole
+    assert_prompt_uses_reference(Finalizations::Prompt.build(finalization_run), selected)
+    assert_equal selected, experiment.reload.translation_reference_revisions.sole
+  end
 
   test "winner draft advances through existing services exactly once and stops for editor" do
     review_round = create_completed_review_round
@@ -303,6 +354,20 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
   end
 
   private
+
+  def assert_prompt_uses_reference(prompt, revision)
+    user_prompt = prompt.fetch(:user_prompt)
+    data = if user_prompt.start_with?("<UNTRUSTED_")
+      JSON.parse(user_prompt.lines[1...-1].join)
+    else
+      JSON.parse(user_prompt)
+    end
+    assert_equal [ {
+      "source_text" => revision.source_text,
+      "approved_translation" => revision.approved_translation
+    } ], data.fetch("reference_examples")
+    assert_not_includes user_prompt, "AUTOMATIC_REFERENCE_SOURCE_V2"
+  end
 
   def create_completed_experiment
     project = users(:normal).projects.create!(name: "Pipeline concurrency", source_language: "Vietnamese", target_language: "Japanese")

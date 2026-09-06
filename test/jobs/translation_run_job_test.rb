@@ -83,7 +83,8 @@ class TranslationRunJobTest < ActiveJob::TestCase
 
     assert_equal @llm_model.model_identifier,
                  captured_arguments[:model_identifier]
-    assert_includes captured_arguments[:instruction_prompt], "Apply the\nowner translation_instruction"
+    assert_includes captured_arguments[:instruction_prompt],
+                    TranslationGuidance::Policy.precedence_statement(@experiment.guidance_preference)
     data = JSON.parse(captured_arguments[:source_text])
     assert_equal @experiment.instruction_prompt, data.fetch("translation_instruction")
     assert_equal @experiment.document.source_text, data.fetch("source_text")

@@ -1,0 +1,28 @@
+<% content_for :title, "Translation references · Three Heavens" %>
+<div class="space-y-8">
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation Reference Library</p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">References</h1>
+      <p class="mt-2 max-w-3xl text-slate-600">References are examples of translations you already approve. They help AI follow your established wording and style.</p>
+    </div>
+    <%= link_to "New reference", new_translation_reference_path, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+  </header>
+
+  <% if @translation_references.empty? %>
+    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p class="text-slate-600">No translation references yet.</p></section>
+  <% else %>
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+          <thead class="bg-slate-50 text-slate-600"><tr><th class="px-5 py-3">Title</th><th class="px-5 py-3">Languages</th><th class="px-5 py-3">Revision</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Updated</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <% @translation_references.each do |reference| %>
+              <tr><td class="px-5 py-4 font-semibold"><%= link_to reference.title, reference, class: "text-blue-700 hover:text-blue-900" %></td><td class="px-5 py-4"><%= reference.source_language %> → <%= reference.target_language %></td><td class="px-5 py-4"><%= reference.current_revision.version %></td><td class="px-5 py-4"><%= reference.active? ? "Active" : "Archived" %></td><td class="px-5 py-4"><%= l reference.updated_at, format: :long %></td></tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

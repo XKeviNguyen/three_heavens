@@ -24,7 +24,10 @@ module TranslationExperiments
       runs, schedules = create_runs(plan, budgets)
       Ai::RunScheduler.enqueue_all(schedules)
       runs
-    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError,
+            TranslationReferences::ContextBudgetMessage.for(experiment: experiment, error: error)
+    rescue LongDocuments::Planner::SourceChangedError => error
       raise ContextBudgetError, error.message
     end
 

@@ -2,12 +2,14 @@ require "test_helper"
 require_relative "../../support/authorized_ai_job_helper"
 require_relative "../../support/workflow_profile_test_helper"
 require_relative "../../support/methodology_profile_test_helper"
+require_relative "../../support/translation_reference_test_helper"
 
 class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
   include AuthorizedAiJobHelper
   include WorkflowProfileTestHelper
   include MethodologyProfileTestHelper
+  include TranslationReferenceTestHelper
 
   class FakeClient
     attr_reader :calls
@@ -152,6 +154,14 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
       instruction_prompt: "Preserve theological terminology.",
       methodology_profile_revision: @methodology.current_revision
     )
+    @reference = create_translation_reference(
+      source_language: "Vietnamese",
+      target_language: "Japanese",
+      source_text: "Complete reference source",
+      approved_translation: "完全な参照訳"
+    )
+    @reference_revision = @reference.current_revision
+    snapshot_reference(experiment: @experiment, revision: @reference_revision)
     @models = [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ]
     @models.each { |model| model.update!(context_window_tokens: 64_000, max_output_tokens: 4_096) }
   end
@@ -178,6 +188,18 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
       ->(segment) { TranslationSegments::Prompt.build(experiment: @experiment, source_text: segment.source_text) },
       bounded: false
     )
+
+    TranslationReferences::Revise.call(
+      translation_reference: @reference,
+      expected_version: "1",
+      attributes: translation_reference_attributes(
+        source_language: "Vietnamese",
+        target_language: "Japanese",
+        source_text: "New reference source",
+        approved_translation: "新しい参照訳"
+      )
+    )
+    TranslationReferences::ChangeStatus.deactivate(translation_reference: @reference)
 
     reviewer = @models.first
     perform_enqueued_jobs(only: ReviewSegmentRunJob) do
@@ -575,6 +597,11 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
         JSON.parse(prompt.fetch(:user_prompt))
       end
       assert_equal guidance, data.fetch("translation_methodology")
+      assert_equal [ {
+        "source_text" => @reference_revision.source_text,
+        "approved_translation" => @reference_revision.approved_translation
+      } ], data.fetch("reference_examples")
+      assert_equal "reference_examples", data.fetch("guidance_preference")
     end
   end
 end

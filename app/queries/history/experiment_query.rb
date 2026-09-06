@@ -79,6 +79,7 @@ module History
         :translation_runs,
         :final_translation,
         methodology_profile_revision: :methodology_profile,
+        experiment_reference_revisions: :translation_reference_revision,
         pipeline_run: :workflow_profile_revision,
         review_round: { judge_round: { winner_translation_run: :llm_model } }
       ).order(created_at: :desc, id: :desc)

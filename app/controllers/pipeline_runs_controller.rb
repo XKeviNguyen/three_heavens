@@ -7,6 +7,7 @@ class PipelineRunsController < ApplicationController
       workflow_profile_revision: { model_selections: :llm_model },
       experiment: [
         { methodology_profile_revision: :methodology_profile },
+        { experiment_reference_revisions: :translation_reference_revision },
         :review_round,
         :final_translation,
         { document: :project },

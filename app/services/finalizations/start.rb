@@ -42,7 +42,13 @@ module Finalizations
       end
       Ai::RunScheduler.enqueue_all(schedules)
       round
-    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+    rescue Ai::ContextBudget::Error => error
+      raise FinalTranslations::InvalidStateError,
+            TranslationReferences::ContextBudgetMessage.for(
+              experiment: final_translation.experiment,
+              error: error
+            )
+    rescue LongDocuments::Planner::SourceChangedError => error
       raise FinalTranslations::InvalidStateError, error.message
     end
 
