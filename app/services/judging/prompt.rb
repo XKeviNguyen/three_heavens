@@ -22,14 +22,16 @@ module Judging
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(judge_run, experiment_segment: nil, boundary_generator: nil)
-      new(judge_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
+    def self.build(judge_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
+      new(judge_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator,
+          reference_examples: reference_examples).build
     end
 
-    def initialize(judge_run, experiment_segment: nil, boundary_generator: nil)
+    def initialize(judge_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
       @judge_run = judge_run
       @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
+      @reference_examples = reference_examples
     end
 
     def build
@@ -59,7 +61,7 @@ module Judging
         translation_instruction: experiment.instruction_prompt,
         terminology_requirements: terminology_for(experiment),
         translation_methodology: experiment.methodology_profile_revision&.guidance,
-        reference_examples: TranslationReferences::PromptExamples.call(experiment),
+        reference_examples: @reference_examples || TranslationReferences::PromptExamples.call(experiment),
         guidance_preference: experiment.guidance_preference,
         candidates: judge_run.judge_evaluations.order(:anonymous_label).map do |evaluation|
           {

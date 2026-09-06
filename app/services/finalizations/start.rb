@@ -43,11 +43,7 @@ module Finalizations
       Ai::RunScheduler.enqueue_all(schedules)
       round
     rescue Ai::ContextBudget::Error => error
-      raise FinalTranslations::InvalidStateError,
-            TranslationReferences::ContextBudgetMessage.for(
-              experiment: final_translation.experiment,
-              error: error
-            )
+      raise FinalTranslations::InvalidStateError, error.message
     rescue LongDocuments::Planner::SourceChangedError => error
       raise FinalTranslations::InvalidStateError, error.message
     end
@@ -96,13 +92,14 @@ module Finalizations
           run.update!(status: :running, started_at: Time.current)
           plan.segments.each do |segment|
             prompt = Finalizations::Prompt.build(run, experiment_segment: segment)
-            budget = Ai::ContextBudget.call(
+            budget = TranslationReferences::ContextBudget.call(
+              experiment: final_translation.experiment,
               model: finalizer,
-              **prompt,
               stage: :finalization,
               source_character_count: final_translation.experiment.document.source_text.length,
-              capability_snapshot: capability_snapshots[finalizer.id]
-            )
+              capability_snapshot: capability_snapshots[finalizer.id],
+              prompt: prompt
+            ) { Finalizations::Prompt.build(run, experiment_segment: segment, reference_examples: []) }
             segment_run = run.finalization_segment_runs.create!(
               experiment_segment: segment,
               **budget.snapshot_attributes
@@ -111,13 +108,14 @@ module Finalizations
           end
         else
           prompt = Finalizations::Prompt.build(run)
-          budget = Ai::ContextBudget.call(
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: final_translation.experiment,
             model: finalizer,
-            **prompt,
             stage: :finalization,
             source_character_count: final_translation.experiment.document.source_text.length,
-            capability_snapshot: capability_snapshots[finalizer.id]
-          )
+            capability_snapshot: capability_snapshots[finalizer.id],
+            prompt: prompt
+          ) { Finalizations::Prompt.build(run, reference_examples: []) }
           run.assign_attributes(**budget.snapshot_attributes)
           schedules << Ai::RunScheduler.prepare(run: run, job_class: job_class)
         end

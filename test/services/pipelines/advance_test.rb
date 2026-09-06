@@ -12,15 +12,14 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
   include TranslationReferenceTestHelper
 
   test "automatic pipeline keeps the original reference revision through every later stage" do
-    experiment = create_completed_experiment
     reference = create_translation_reference(
-      source_language: experiment.document.project.source_language,
-      target_language: experiment.document.project.target_language,
+      source_language: "Vietnamese",
+      target_language: "Japanese",
       source_text: "AUTOMATIC_REFERENCE_SOURCE_V1",
       approved_translation: "AUTOMATIC_REFERENCE_APPROVED_V1"
     )
     selected = reference.current_revision
-    snapshot_reference(experiment: experiment, revision: selected)
+    experiment = create_completed_experiment(reference_revision: selected)
     profile = create_workflow_profile(completion_mode: "refinement_proposals")
     pipeline = create_pipeline_run(experiment: experiment, profile: profile)
 
@@ -387,11 +386,12 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     assert_not_includes user_prompt, "AUTOMATIC_REFERENCE_SOURCE_V2"
   end
 
-  def create_completed_experiment
+  def create_completed_experiment(reference_revision: nil)
     project = users(:normal).projects.create!(name: "Pipeline concurrency", source_language: "Vietnamese", target_language: "Japanese")
     experiment = project.documents.create!(title: "Source", source_text: "Source").experiments.create!(
       instruction_prompt: "Translate faithfully.", status: :completed
     )
+    snapshot_reference(experiment: experiment, revision: reference_revision) if reference_revision
     [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ].each_with_index do |model, index|
       experiment.translation_runs.create!(llm_model: model, status: :completed, translated_text: "Translation #{index}")
     end

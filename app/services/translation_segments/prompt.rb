@@ -2,7 +2,7 @@ require "json"
 
 module TranslationSegments
   class Prompt
-    def self.build(experiment:, source_text:)
+    def self.build(experiment:, source_text:, reference_examples: nil)
       project = experiment.document.project
       terminology = Glossaries::RelevantEntries.call(revision: experiment.glossary_revision, source_text: source_text).map do |entry|
         { source_term: entry.source_term, preferred_target_term: entry.preferred_target_term, note: entry.note }
@@ -26,7 +26,7 @@ module TranslationSegments
           translation_instruction: experiment.instruction_prompt,
           terminology_requirements: terminology,
           translation_methodology: experiment.methodology_profile_revision&.guidance,
-          reference_examples: TranslationReferences::PromptExamples.call(experiment),
+          reference_examples: reference_examples || TranslationReferences::PromptExamples.call(experiment),
           guidance_preference: experiment.guidance_preference,
           source_text: source_text
         )

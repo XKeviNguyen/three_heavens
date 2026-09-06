@@ -14,14 +14,16 @@ module Finalizations
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(finalization_run, experiment_segment: nil, boundary_generator: nil)
-      new(finalization_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
+    def self.build(finalization_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
+      new(finalization_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator,
+          reference_examples: reference_examples).build
     end
 
-    def initialize(finalization_run, experiment_segment: nil, boundary_generator: nil)
+    def initialize(finalization_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
       @finalization_run = finalization_run
       @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
+      @reference_examples = reference_examples
     end
 
     def build
@@ -64,7 +66,7 @@ module Finalizations
         translation_instruction: experiment.instruction_prompt,
         terminology_requirements: terminology_for,
         translation_methodology: experiment.methodology_profile_revision&.guidance,
-        reference_examples: TranslationReferences::PromptExamples.call(experiment),
+        reference_examples: @reference_examples || TranslationReferences::PromptExamples.call(experiment),
         guidance_preference: experiment.guidance_preference,
         base_final_draft: base_draft,
         official_winning_translation: winning_translation,

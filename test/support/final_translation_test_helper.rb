@@ -3,11 +3,13 @@ require_relative "judging_test_helper"
 module FinalTranslationTestHelper
   include JudgingTestHelper
 
-  def create_final_translation_workspace(glossary_revision: nil, methodology_profile_revision: nil, source_text: "Source text")
+  def create_final_translation_workspace(glossary_revision: nil, methodology_profile_revision: nil, source_text: "Source text",
+                                         reference_revision: nil)
     review_round = create_completed_review_round(
       glossary_revision: glossary_revision,
       methodology_profile_revision: methodology_profile_revision,
-      source_text: source_text
+      source_text: source_text,
+      reference_revision: reference_revision
     )
     judge = create_judge_model
     judge_round = Judging::Start.call(

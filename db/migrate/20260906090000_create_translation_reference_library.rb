@@ -166,19 +166,27 @@ class CreateTranslationReferenceLibrary < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       DECLARE
+        document_id bigint;
         reference_id bigint;
         project_id bigint;
       BEGIN
         PERFORM pg_advisory_xact_lock(hashtextextended('experiment:' || NEW.experiment_id::text, 0));
-        SELECT documents.project_id INTO project_id
+        PERFORM 1 FROM experiments WHERE id = NEW.experiment_id FOR UPDATE;
+        SELECT experiments.document_id, documents.project_id INTO document_id, project_id
           FROM experiments
           INNER JOIN documents ON documents.id = experiments.document_id
           WHERE experiments.id = NEW.experiment_id;
+        PERFORM pg_advisory_xact_lock(hashtextextended('document:' || document_id::text, 0));
         PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
         SELECT translation_reference_id INTO reference_id
           FROM translation_reference_revisions
           WHERE id = NEW.translation_reference_revision_id;
         PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0));
+
+        IF EXISTS (SELECT 1 FROM translation_runs WHERE experiment_id = NEW.experiment_id) THEN
+          RAISE EXCEPTION 'Experiment reference snapshots must be selected before provider work starts'
+            USING ERRCODE = 'check_violation';
+        END IF;
 
         IF NOT EXISTS (
           SELECT 1

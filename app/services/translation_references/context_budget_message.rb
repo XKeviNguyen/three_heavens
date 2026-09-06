@@ -5,13 +5,21 @@ module TranslationReferences
 
     module_function
 
-    def for(experiment:, error:)
-      if error.respond_to?(:code) && error.code == "context_budget_exceeded" &&
-          experiment.experiment_reference_revisions.exists?
-        MESSAGE
-      else
-        error.message
-      end
+    def for(experiment:, error:, model: nil, stage: nil, source_character_count: nil,
+            capability_snapshot: nil, prompt_without_references: nil)
+      return error.message unless error.respond_to?(:code) && error.code == "context_budget_exceeded"
+      return error.message unless experiment.experiment_reference_revisions.exists? && prompt_without_references
+
+      Ai::ContextBudget.call(
+        model: model,
+        **prompt_without_references,
+        stage: stage,
+        source_character_count: source_character_count,
+        capability_snapshot: capability_snapshot
+      )
+      MESSAGE
+    rescue Ai::ContextBudget::Error
+      error.message
     end
   end
 end

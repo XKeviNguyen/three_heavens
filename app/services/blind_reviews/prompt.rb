@@ -23,14 +23,16 @@ module BlindReviews
 
     class BoundaryGenerationError < StandardError; end
 
-    def self.build(review_run, experiment_segment: nil, boundary_generator: nil)
-      new(review_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator).build
+    def self.build(review_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
+      new(review_run, experiment_segment: experiment_segment, boundary_generator: boundary_generator,
+          reference_examples: reference_examples).build
     end
 
-    def initialize(review_run, experiment_segment: nil, boundary_generator: nil)
+    def initialize(review_run, experiment_segment: nil, boundary_generator: nil, reference_examples: nil)
       @review_run = review_run
       @experiment_segment = experiment_segment
       @boundary_generator = boundary_generator || -> { SecureRandom.hex(32) }
+      @reference_examples = reference_examples
     end
 
     def build
@@ -44,7 +46,7 @@ module BlindReviews
         translation_instruction: experiment.instruction_prompt,
         terminology_requirements: terminology_for(experiment),
         translation_methodology: experiment.methodology_profile_revision&.guidance,
-        reference_examples: TranslationReferences::PromptExamples.call(experiment),
+        reference_examples: @reference_examples || TranslationReferences::PromptExamples.call(experiment),
         guidance_preference: experiment.guidance_preference,
         candidates: review_run.review_evaluations.order(:anonymous_label).map do |evaluation|
           {

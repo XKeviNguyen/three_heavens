@@ -8,17 +8,16 @@ class TranslationReferences::PromptIntegrationTest < ActiveSupport::TestCase
   include TranslationReferenceTestHelper
 
   test "translation review judge and finalization use exact snapshots without identity metadata" do
-    final_translation = create_final_translation_workspace
-    experiment = final_translation.experiment
     reference = create_translation_reference(
       title: "PRIVATE_REFERENCE_TITLE_MARKER",
-      source_language: experiment.document.project.source_language,
-      target_language: experiment.document.project.target_language,
+      source_language: "Vietnamese",
+      target_language: "Japanese",
       source_text: "REFERENCE_SOURCE_MARKER",
       approved_translation: "REFERENCE_APPROVED_MARKER"
     )
     selected = reference.current_revision
-    snapshot_reference(experiment: experiment, revision: selected)
+    final_translation = create_final_translation_workspace(reference_revision: selected)
+    experiment = final_translation.experiment
 
     TranslationReferences::Revise.call(
       translation_reference: reference,
@@ -116,6 +115,26 @@ class TranslationReferences::PromptIntegrationTest < ActiveSupport::TestCase
       assert_equal TranslationReferences::ContextBudgetMessage::MESSAGE, error.message
     end
     assert_empty experiment.reload.translation_runs
+  end
+
+  test "a context budget that fails without references keeps its generic message" do
+    project = users(:normal).projects.create!(
+      name: "Generic context",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    experiment = project.documents.create!(title: "Source", source_text: "S" * 8_000).experiments.create!(
+      instruction_prompt: "Translate."
+    )
+    reference = create_translation_reference
+    snapshot_reference(experiment: experiment, revision: reference.current_revision)
+    model = llm_models(:openrouter_claude)
+    model.update!(context_window_tokens: 6_000, max_output_tokens: 4_096)
+
+    error = assert_raises TranslationExperiments::Start::ContextBudgetError do
+      TranslationExperiments::Start.call(experiment: experiment, llm_models: [ model ])
+    end
+    assert_equal "The selected model cannot safely fit the planned translation request", error.message
   end
 
   private

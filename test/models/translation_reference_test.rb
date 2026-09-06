@@ -131,6 +131,35 @@ class TranslationReferenceTest < ActiveSupport::TestCase
     assert_database_rejects { TranslationReference.where(id: reference.id).update_all(user_id: users(:other).id) }
   end
 
+  test "reference snapshots are sealed before provider work in Rails and PostgreSQL" do
+    reference = create_translation_reference
+    project = users(:normal).projects.create!(
+      name: "Sealed reference project",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    experiment = project.documents.create!(title: "Source", source_text: "Source").experiments.create!(
+      instruction_prompt: "Translate."
+    )
+    experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude))
+
+    snapshot = experiment.experiment_reference_revisions.build(
+      translation_reference_revision: reference.current_revision,
+      position: 1
+    )
+    assert_not snapshot.save
+    assert_includes snapshot.errors[:experiment], "reference snapshots must be selected before provider work starts"
+    assert_database_rejects do
+      ExperimentReferenceRevision.insert_all!([ {
+        experiment_id: experiment.id,
+        translation_reference_revision_id: reference.current_revision.id,
+        position: 1,
+        created_at: Time.current,
+        updated_at: Time.current
+      } ])
+    end
+  end
+
   test "guidance preference defaults for new experiments accepts exact values and is immutable" do
     project = users(:normal).projects.create!(name: "Guidance", source_language: "vi", target_language: "ja")
     document = project.documents.create!(title: "Source", source_text: "Source")

@@ -101,21 +101,35 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Macro-enabled Word documents are not supported"
   end
 
-  test "stale editing strict parameters owner isolation and admin no-bypass fail closed" do
+  test "stale editing exposes current content strict parameters owner isolation and admin no-bypass fail closed" do
     reference = create_translation_reference
 
-    patch translation_reference_path(reference), params: {
-      translation_reference: translation_reference_attributes.merge(expected_version: "0")
-    }
-    assert_response :conflict
-    assert_select "input[name='translation_reference[expected_version]'][value='1']"
-    assert_equal 1, reference.revisions.count
+    TranslationReferences::Revise.call(
+      translation_reference: reference,
+      expected_version: "1",
+      attributes: translation_reference_attributes(
+        source_text: "Current source from another editor",
+        approved_translation: "Current translation from another editor"
+      )
+    )
 
     patch translation_reference_path(reference), params: {
       translation_reference: translation_reference_attributes.merge(expected_version: "1")
     }
+    assert_response :conflict
+    assert_select "input[name='translation_reference[expected_version]'][value='2']"
+    assert_includes response.body, "Current source from another editor"
+    assert_includes response.body, "Current translation from another editor"
+    assert_equal 2, reference.revisions.count
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes(
+        source_text: "Manually merged source",
+        approved_translation: "Manually merged translation"
+      ).merge(expected_version: "2")
+    }
     assert_response :redirect
-    assert_equal 2, reference.reload.revisions.count
+    assert_equal 3, reference.reload.revisions.count
 
     [
       { translation_reference: "bad" },
@@ -140,7 +154,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     get translation_reference_path(reference)
     assert_response :not_found
     patch translation_reference_path(reference), params: {
-      translation_reference: translation_reference_attributes.merge(expected_version: "1")
+      translation_reference: translation_reference_attributes.merge(expected_version: "3")
     }
     assert_response :not_found
   end
@@ -171,5 +185,32 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     }
     assert_response :unprocessable_content
     assert_includes response.body, "not both"
+  end
+
+  test "a stale edit with a replacement upload is reported as a conflict" do
+    reference = create_translation_reference
+    original = reference.current_revision
+    TranslationReferences::Revise.call(
+      translation_reference: reference,
+      expected_version: original.version.to_s,
+      attributes: translation_reference_attributes(
+        source_text: "Current source from another editor",
+        approved_translation: "Current translation from another editor"
+      )
+    )
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes(
+        source_text: original.source_text,
+        approved_translation: original.approved_translation
+      ).merge(
+        source_file: uploaded_file("Uploaded stale replacement", filename: "replacement.txt"),
+        expected_version: original.version.to_s
+      )
+    }
+
+    assert_response :conflict
+    assert_select "input[name='translation_reference[expected_version]'][value='2']"
+    assert_includes response.body, "Current source from another editor"
   end
 end
