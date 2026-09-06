@@ -114,7 +114,8 @@ module BlindReviews
         - faithfulness_score: preservation of source meaning and theological nuance
         - naturalness_score: target-language clarity, readability, and idiomatic quality
         - terminology_score: consistency and accuracy of theological terminology, including applicable glossary requirements
-        - instruction_adherence_score: compliance with methodology and the user's more specific translation instruction
+        - instruction_adherence_score: compliance with the configured owner-guidance precedence,
+          including reference examples, glossary terminology, the experiment instruction, and methodology
         - overall_score: holistic translation quality
 
         Return exactly one evaluation for every supplied candidate label. Use labels exactly

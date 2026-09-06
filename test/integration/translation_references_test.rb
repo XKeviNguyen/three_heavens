@@ -108,7 +108,14 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       translation_reference: translation_reference_attributes.merge(expected_version: "0")
     }
     assert_response :conflict
+    assert_select "input[name='translation_reference[expected_version]'][value='1']"
     assert_equal 1, reference.revisions.count
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes.merge(expected_version: "1")
+    }
+    assert_response :redirect
+    assert_equal 2, reference.reload.revisions.count
 
     [
       { translation_reference: "bad" },
@@ -136,5 +143,33 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       translation_reference: translation_reference_attributes.merge(expected_version: "1")
     }
     assert_response :not_found
+  end
+
+  test "an edit upload replaces unchanged prefilled text while edited paste plus file remains ambiguous" do
+    reference = create_translation_reference
+    revision = reference.current_revision
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes.merge(
+        source_text: revision.source_text,
+        approved_translation: revision.approved_translation,
+        source_file: uploaded_file("Replacement source", filename: "replacement.txt"),
+        expected_version: revision.version.to_s
+      )
+    }
+    assert_response :redirect
+    assert_equal "Replacement source", reference.reload.current_revision.source_text
+
+    patch translation_reference_path(reference), params: {
+      translation_reference: translation_reference_attributes(
+        source_text: "An intentional different paste",
+        approved_translation: reference.current_revision.approved_translation
+      ).merge(
+        source_file: uploaded_file("Another replacement", filename: "another.txt"),
+        expected_version: reference.current_revision.version.to_s
+      )
+    }
+    assert_response :unprocessable_content
+    assert_includes response.body, "not both"
   end
 end

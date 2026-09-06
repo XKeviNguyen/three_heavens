@@ -44,6 +44,7 @@ class TranslationReferencesController < ApplicationController
   def update
     submitted = exact_reference_parameters!(include_expected_version: true)
     expected_version = submitted.delete("expected_version")
+    replace_prefilled_text_with_upload!(submitted)
     attributes = TranslationReferences::AuthoringAttributes.call(submitted)
     revision = TranslationReferences::Revise.call(
       translation_reference: @translation_reference,
@@ -52,7 +53,9 @@ class TranslationReferencesController < ApplicationController
     )
     redirect_to @translation_reference, notice: "Translation reference revision #{revision.version} created."
   rescue TranslationReferences::Revise::StaleRevisionError => error
-    @form_values = safe_submitted_values
+    @form_values = safe_submitted_values.merge(
+      "expected_version" => @translation_reference.reload.current_revision.version.to_s
+    )
     @form_errors = [ error.message ]
     render :edit, status: :conflict
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
@@ -125,6 +128,19 @@ class TranslationReferencesController < ApplicationController
     return {} unless submitted.is_a?(ActionController::Parameters)
 
     submitted.to_unsafe_h.slice(*SCALAR_KEYS)
+  end
+
+  def replace_prefilled_text_with_upload!(submitted)
+    revision = @translation_reference.current_revision
+    {
+      "source_text" => "source_file",
+      "approved_translation" => "approved_translation_file"
+    }.each do |text_key, file_key|
+      next unless submitted[file_key].present?
+      next unless submitted[text_key] == revision.public_send(text_key)
+
+      submitted[text_key] = ""
+    end
   end
 
   def error_messages(error)

@@ -24,7 +24,7 @@ module Operations
     SAFE_ERROR_CODES = %w[
       enqueue_failed invalid_response malformed_json missing_api_key
       model_unavailable network_error provider_failure stale_execution
-      stale_pending configuration_unavailable stage_failed stage_conflict
+      stale_pending configuration_unavailable stage_failed stage_conflict reference_context_budget
     ].freeze
     INTEGER_FIELDS = %i[execution_attempt run_id experiment_id pipeline_run_id duration_ms count].freeze
     TOKEN_FIELDS = %i[run_type pipeline_stage status error_code outcome].freeze

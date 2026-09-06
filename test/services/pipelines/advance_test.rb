@@ -141,6 +141,24 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     assert_equal 1, pipeline.events.where(event_type: "translation_blocked", reason_code: "stage_failed").count
   end
 
+  test "reference context exhaustion blocks the automatic pipeline with a safe operational error code" do
+    pipeline = create_pipeline_run(experiment: create_completed_experiment)
+    original_start = BlindReviews::Start.method(:call)
+    BlindReviews::Start.define_singleton_method(:call) do |**|
+      raise BlindReviews::Start::ContextBudgetError, TranslationReferences::ContextBudgetMessage::MESSAGE
+    end
+
+    begin
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    ensure
+      BlindReviews::Start.define_singleton_method(:call, original_start)
+    end
+
+    assert pipeline.reload.blocked?
+    assert_equal "reference_context_budget", pipeline.blocked_reason_code
+    assert_equal TranslationReferences::ContextBudgetMessage::MESSAGE, pipeline.blocked_message
+  end
+
   test "repeated block and resume episodes are distinct while unchanged reconciliation is deduplicated" do
     experiment = create_failed_experiment
     pipeline = create_pipeline_run(experiment: experiment)
