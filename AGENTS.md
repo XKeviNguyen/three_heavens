@@ -132,6 +132,37 @@ Never force-push or rewrite published shared history. Never delete or reset
 databases, schemas, Docker volumes, user data, or other persistent data without
 explicit approval.
 
+## Codex usage efficiency
+
+- Use the smallest sufficient investigation and context. Start with targeted
+  files and searches; do not broadly scan the repository, Git history, session
+  archives, or unrelated task history when focused evidence is enough.
+- Do not launch subagents unless the user explicitly authorizes them. Avoid
+  duplicate searches, repeated verification, unnecessary retries, and rereading
+  large context unless new evidence requires it.
+- Poll CI and GitHub at reasonable intervals. Do not request another Codex
+  review for a commit SHA that already has a valid review; after a corrective
+  commit, request review only for the new exact final SHA.
+- During implementation, run focused tests while iterating. Run the complete
+  required quality gate once the change is stable, and repeat it after a
+  correction only as needed to prove final correctness. Never skip, weaken,
+  suppress, or bypass required tests, security checks, database integrity
+  checks, or CI gates to reduce usage.
+- Preserve the user's selected model and reasoning effort. When Codex controls
+  the choice, use the lowest sufficient reasoning effort and do not increase it
+  merely because a task is long. When the client offers a supported speed
+  setting, prefer Standard unless the user requests Fast or the task requires it.
+- If allowance becomes constrained during legitimate work, preserve the branch,
+  worktree, progress, and resumable state. Resume from that state rather than
+  restarting or rediscovering completed work.
+- Do not purge caches, history, memories, or project state based on unsupported
+  usage claims. Do not enable experimental features, purchase credits, consume
+  resets, change subscriptions, or alter billing settings to save usage. An open
+  process, connection, or client is not proof of model consumption.
+- Keep ordinary engineering work focused on the assigned task. Investigate
+  Codex allowance or accounting only when explicitly tasked, then finish the
+  assigned work, report the result, and stop without starting another milestone.
+
 ## Unattended execution and CI ownership
 
 Assume the user may leave an assigned mega-task unattended for several hours.
