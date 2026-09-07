@@ -14,6 +14,7 @@ class TranslationWorkspacesController < ApplicationController
     workflow_profile_revision_id
     glossary_revision_id
     methodology_profile_revision_id
+    guidance_preference
     automatic_confirmation
     automatic_plan_digest
     submission_token
@@ -92,6 +93,7 @@ class TranslationWorkspacesController < ApplicationController
     ).order(updated_at: :desc, id: :desc)
     glossary_scope = current_user.glossaries.active
     methodology_scope = current_user.methodology_profiles.active
+    reference_scope = current_user.translation_references.active
     if project
       source_language = TranslationLanguagePair.normalize(project.source_language)
       target_language = TranslationLanguagePair.normalize(project.target_language)
@@ -111,9 +113,19 @@ class TranslationWorkspacesController < ApplicationController
         source_language:,
         target_language:
       )
+      reference_scope = reference_scope.joins(:current_revision).where(
+        "LOWER(BTRIM(translation_reference_revisions.source_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :source_language AND " \
+          "LOWER(BTRIM(translation_reference_revisions.target_language, " \
+          "CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = :target_language",
+        source_language:,
+        target_language:
+      )
     end
     @glossaries = glossary_scope.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
     @methodology_profiles = methodology_scope.includes(:current_revision)
+      .order(updated_at: :desc, id: :desc)
+    @translation_references = reference_scope.includes(:current_revision)
       .order(updated_at: :desc, id: :desc)
   end
 
@@ -124,7 +136,7 @@ class TranslationWorkspacesController < ApplicationController
     end
     # The legacy form object exposes a virtual `user` attribute. Ignore it at
     # this boundary and always inject current_user server-side.
-    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "user" ])
+    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "translation_reference_revision_ids", "user" ])
     raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
 
     SCALAR_ATTRIBUTES.each do |attribute|
@@ -143,7 +155,13 @@ class TranslationWorkspacesController < ApplicationController
       raise ActionController::BadRequest, "model_ids must be a list of scalar values"
     end
 
-    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [])
+
+    reference_ids = submitted[:translation_reference_revision_ids]
+    unless reference_ids.nil? || (reference_ids.is_a?(Array) && reference_ids.all? { |id| id.is_a?(String) })
+      raise ActionController::BadRequest, "translation_reference_revision_ids must be a list of scalar values"
+    end
+
+    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [], translation_reference_revision_ids: [])
   end
 
   def load_source_import(id)

@@ -111,10 +111,10 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[project_name]']", count: 0
     assert_select "input[name='translation_workspace[source_language]']", count: 0
     assert_select "input[name='translation_workspace[target_language]']", count: 0
-    assert_select "input[value='#{matching_methodology.current_revision_id}']"
-    assert_select "input[value='#{mismatched_methodology.current_revision_id}']", count: 0
-    assert_select "input[value='#{matching_glossary.current_revision_id}']"
-    assert_select "input[value='#{mismatched_glossary.current_revision_id}']", count: 0
+    assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{matching_methodology.current_revision_id}']"
+    assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{mismatched_methodology.current_revision_id}']", count: 0
+    assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{matching_glossary.current_revision_id}']"
+    assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{mismatched_glossary.current_revision_id}']", count: 0
   end
 
   test "manual existing Project launch creates only one Document and Experiment with authoritative Project data" do

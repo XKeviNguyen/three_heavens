@@ -41,7 +41,9 @@ module Judging
       end
       Ai::RunScheduler.enqueue_all(schedules)
       judge_round
-    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError, error.message
+    rescue LongDocuments::Planner::SourceChangedError => error
       raise ContextBudgetError, error.message
     end
 
@@ -136,13 +138,14 @@ module Judging
           judge_run.update!(status: :running, started_at: Time.current)
           plan.segments.each do |segment|
             prompt = Judging::Prompt.build(judge_run, experiment_segment: segment)
-            budget = Ai::ContextBudget.call(
+            budget = TranslationReferences::ContextBudget.call(
+              experiment: review_round.experiment,
               model: judge,
-              **prompt,
               stage: :judge,
               source_character_count: review_round.experiment.document.source_text.length,
-              capability_snapshot: capability_snapshots[judge.id]
-            )
+              capability_snapshot: capability_snapshots[judge.id],
+              prompt: prompt
+            ) { Judging::Prompt.build(judge_run, experiment_segment: segment, reference_examples: []) }
             segment_run = judge_run.judge_segment_runs.create!(
               experiment_segment: segment,
               **budget.snapshot_attributes
@@ -151,13 +154,14 @@ module Judging
           end
         else
           prompt = Judging::Prompt.build(judge_run)
-          budget = Ai::ContextBudget.call(
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: review_round.experiment,
             model: judge,
-            **prompt,
             stage: :judge,
             source_character_count: review_round.experiment.document.source_text.length,
-            capability_snapshot: capability_snapshots[judge.id]
-          )
+            capability_snapshot: capability_snapshots[judge.id],
+            prompt: prompt
+          ) { Judging::Prompt.build(judge_run, reference_examples: []) }
           judge_run.assign_attributes(**budget.snapshot_attributes)
           schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob)
         end

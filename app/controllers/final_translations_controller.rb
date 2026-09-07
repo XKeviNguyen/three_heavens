@@ -123,7 +123,8 @@ class FinalTranslationsController < ApplicationController
       experiment: [
         { document: :project },
         { glossary_revision: [ :glossary, :entries ] },
-        { methodology_profile_revision: :methodology_profile }
+        { methodology_profile_revision: :methodology_profile },
+        { experiment_reference_revisions: :translation_reference_revision }
       ],
       judge_round: :review_round,
       versions: { source_finalization_run: :finalizer_llm_model },

@@ -1,6 +1,6 @@
 module JudgingTestHelper
   def create_completed_review_round(candidate_texts: [ "First translation", "Second translation" ], glossary_revision: nil,
-                                    methodology_profile_revision: nil, source_text: "Source text")
+                                    methodology_profile_revision: nil, source_text: "Source text", reference_revision: nil)
     project = Project.create!(
       user: (defined?(@current_test_user) && @current_test_user) || users(:normal),
       name: "Judging tests",
@@ -14,6 +14,7 @@ module JudgingTestHelper
       glossary_revision: glossary_revision,
       methodology_profile_revision: methodology_profile_revision
     )
+    snapshot_reference(experiment: experiment, revision: reference_revision) if reference_revision
     candidate_models = [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ]
     candidates = candidate_texts.each_with_index.map do |text, index|
       experiment.translation_runs.create!(

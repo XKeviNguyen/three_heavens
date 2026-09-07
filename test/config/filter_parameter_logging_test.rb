@@ -12,6 +12,8 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
       "preview_text" => "preview-value",
       "source_file" => "binary-value",
       "instruction_prompt" => "instruction-value",
+      "approved_translation" => "approved-value",
+      "approved_translation_file" => "approved-binary-value",
       "final_translation" => {
         "content" => "final-value",
         "change_note" => "note-value"
@@ -26,6 +28,8 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     assert_equal "[FILTERED]", filtered["preview_text"]
     assert_equal "[FILTERED]", filtered["source_file"]
     assert_equal "[FILTERED]", filtered["instruction_prompt"]
+    assert_equal "[FILTERED]", filtered["approved_translation"]
+    assert_equal "[FILTERED]", filtered["approved_translation_file"]
     assert_equal "[FILTERED]", filtered.dig("final_translation", "content")
     assert_equal "[FILTERED]", filtered.dig("final_translation", "change_note")
     assert_equal "operational-value", filtered.dig("unrelated", "content")

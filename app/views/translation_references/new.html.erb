@@ -1,0 +1,9 @@
+<% content_for :title, "New translation reference · Three Heavens" %>
+<div class="mx-auto max-w-4xl space-y-6">
+  <header>
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation Reference Library</p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Create a translation reference</h1>
+    <p class="mt-2 text-slate-600">References are examples of translations you already approve. They help AI follow your established wording and style.</p>
+  </header>
+  <%= render "form", form_url: translation_references_path, form_method: :post, submit_label: "Create reference" %>
+</div>

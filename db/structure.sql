@@ -89,6 +89,52 @@ $$;
 
 
 --
+-- Name: enforce_document_reference_snapshots(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_document_reference_snapshots() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      JOIN experiments ON experiments.id = snapshots.experiment_id
+      WHERE experiments.document_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
+
+  IF EXISTS (
+    SELECT 1
+    FROM experiments
+    INNER JOIN experiment_reference_revisions
+      ON experiment_reference_revisions.experiment_id = experiments.id
+    INNER JOIN translation_reference_revisions
+      ON translation_reference_revisions.id = experiment_reference_revisions.translation_reference_revision_id
+    INNER JOIN translation_references
+      ON translation_references.id = translation_reference_revisions.translation_reference_id
+    INNER JOIN projects ON projects.id = NEW.project_id
+    WHERE experiments.document_id = NEW.id
+      AND (
+        translation_references.user_id <> projects.user_id
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+      )
+  ) THEN
+    RAISE EXCEPTION 'Document change would invalidate an experiment reference snapshot'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_experiment_glossary_owner(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -171,6 +217,54 @@ BEGIN
       AND lower(btrim(methodology_profile_revisions.target_language)) = lower(btrim(projects.target_language))
   ) THEN
     RAISE EXCEPTION 'Experiment methodology revision is not available for this project and language pair'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_experiment_reference_snapshots(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_experiment_reference_snapshots() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  project_id bigint;
+BEGIN
+  -- UPDATE already owns the experiment row. Never request it after advisory locks.
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE id = NEW.document_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      WHERE snapshots.experiment_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
+
+  IF EXISTS (
+    SELECT 1
+    FROM experiment_reference_revisions
+    INNER JOIN translation_reference_revisions
+      ON translation_reference_revisions.id = experiment_reference_revisions.translation_reference_revision_id
+    INNER JOIN translation_references
+      ON translation_references.id = translation_reference_revisions.translation_reference_id
+    INNER JOIN documents ON documents.id = NEW.document_id
+    INNER JOIN projects ON projects.id = documents.project_id
+    WHERE experiment_reference_revisions.experiment_id = NEW.id
+      AND (
+        translation_references.user_id <> projects.user_id
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+      )
+  ) THEN
+    RAISE EXCEPTION 'Experiment change would invalidate a reference snapshot'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -268,6 +362,58 @@ $$;
 
 
 --
+-- Name: enforce_new_experiment_reference_snapshot(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_new_experiment_reference_snapshot() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  document_id bigint;
+  reference_id bigint;
+  project_id bigint;
+BEGIN
+  PERFORM 1 FROM experiments WHERE id = NEW.experiment_id FOR UPDATE;
+  SELECT experiments.document_id INTO document_id FROM experiments WHERE id = NEW.experiment_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE id = document_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+  SELECT translation_reference_id INTO reference_id
+    FROM translation_reference_revisions
+    WHERE id = NEW.translation_reference_revision_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0));
+
+  IF EXISTS (SELECT 1 FROM translation_runs WHERE experiment_id = NEW.experiment_id) THEN
+    RAISE EXCEPTION 'Experiment reference snapshots must be selected before provider work starts'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM experiments
+    INNER JOIN documents ON documents.id = experiments.document_id
+    INNER JOIN projects ON projects.id = documents.project_id
+    INNER JOIN translation_reference_revisions
+      ON translation_reference_revisions.id = NEW.translation_reference_revision_id
+    INNER JOIN translation_references
+      ON translation_references.id = translation_reference_revisions.translation_reference_id
+    WHERE experiments.id = NEW.experiment_id
+      AND translation_references.user_id = projects.user_id
+      AND translation_references.active
+      AND translation_references.current_revision_id = translation_reference_revisions.id
+      AND lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+      AND lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+  ) THEN
+    RAISE EXCEPTION 'Translation reference revision is not available for this experiment'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_project_glossary_owner(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -330,6 +476,82 @@ $$;
 
 
 --
+-- Name: enforce_project_reference_snapshots(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_project_reference_snapshots() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      JOIN experiments ON experiments.id = snapshots.experiment_id
+      JOIN documents ON documents.id = experiments.document_id
+      WHERE documents.project_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
+
+  IF EXISTS (
+    SELECT 1
+    FROM documents
+    INNER JOIN experiments ON experiments.document_id = documents.id
+    INNER JOIN experiment_reference_revisions
+      ON experiment_reference_revisions.experiment_id = experiments.id
+    INNER JOIN translation_reference_revisions
+      ON translation_reference_revisions.id = experiment_reference_revisions.translation_reference_revision_id
+    INNER JOIN translation_references
+      ON translation_references.id = translation_reference_revisions.translation_reference_id
+    WHERE documents.project_id = NEW.id
+      AND (
+        translation_references.user_id <> NEW.user_id
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(NEW.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(NEW.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+      )
+  ) THEN
+    RAISE EXCEPTION 'Project change would invalidate an experiment reference snapshot'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_translation_reference_owner(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_translation_reference_owner() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || NEW.id::text, 0));
+
+  IF EXISTS (
+    SELECT 1
+    FROM translation_reference_revisions
+    INNER JOIN experiment_reference_revisions
+      ON experiment_reference_revisions.translation_reference_revision_id = translation_reference_revisions.id
+    INNER JOIN experiments ON experiments.id = experiment_reference_revisions.experiment_id
+    INNER JOIN documents ON documents.id = experiments.document_id
+    INNER JOIN projects ON projects.id = documents.project_id
+    WHERE translation_reference_revisions.translation_reference_id = NEW.id
+      AND projects.user_id <> NEW.user_id
+  ) THEN
+    RAISE EXCEPTION 'Translation reference ownership change would invalidate an experiment snapshot'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: glossary_revision_configuration_digest(bigint); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -370,6 +592,43 @@ CREATE FUNCTION public.methodology_revision_configuration_digest(source_language
     ',"guidance":' || to_json(guidance)::text || '}',
     'sha256'
   ), 'hex');
+$$;
+
+
+--
+-- Name: prevent_experiment_guidance_preference_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_experiment_guidance_preference_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.guidance_preference IS DISTINCT FROM NEW.guidance_preference THEN
+    RAISE EXCEPTION 'Experiment guidance preference cannot change after creation'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: prevent_experiment_reference_snapshot_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_experiment_reference_snapshot_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'Experiment reference snapshots cannot be deleted'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RAISE EXCEPTION 'Experiment reference snapshots are immutable'
+    USING ERRCODE = 'check_violation';
+END;
 $$;
 
 
@@ -418,6 +677,25 @@ $$;
 
 
 --
+-- Name: prevent_translation_reference_revision_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_translation_reference_revision_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'Translation reference revisions cannot be deleted'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RAISE EXCEPTION 'Translation reference revisions are immutable'
+    USING ERRCODE = 'check_violation';
+END;
+$$;
+
+
+--
 -- Name: seal_glossary_revision_entry_set(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -444,6 +722,23 @@ BEGIN
 
   RETURN NULL;
 END;
+$$;
+
+
+--
+-- Name: translation_reference_revision_configuration_digest(text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.translation_reference_revision_configuration_digest(source_language text, target_language text, source_text text, approved_translation text) RETURNS text
+    LANGUAGE sql IMMUTABLE STRICT
+    AS $$
+  SELECT encode(digest(
+    '{"source_language":' || to_json(source_language)::text ||
+    ',"target_language":' || to_json(target_language)::text ||
+    ',"source_text":' || to_json(source_text)::text ||
+    ',"approved_translation":' || to_json(approved_translation)::text || '}',
+    'sha256'
+  ), 'hex');
 $$;
 
 
@@ -648,6 +943,40 @@ ALTER SEQUENCE public.documents_id_seq OWNED BY public.documents.id;
 
 
 --
+-- Name: experiment_reference_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.experiment_reference_revisions (
+    id bigint NOT NULL,
+    experiment_id bigint NOT NULL,
+    translation_reference_revision_id bigint NOT NULL,
+    "position" integer NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT experiment_reference_revisions_position_check CHECK ((("position" >= 1) AND ("position" <= 5)))
+);
+
+
+--
+-- Name: experiment_reference_revisions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.experiment_reference_revisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: experiment_reference_revisions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.experiment_reference_revisions_id_seq OWNED BY public.experiment_reference_revisions.id;
+
+
+--
 -- Name: experiment_segments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -698,7 +1027,9 @@ CREATE TABLE public.experiments (
     status character varying DEFAULT 'pending'::character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     glossary_revision_id bigint,
-    methodology_profile_revision_id bigint
+    methodology_profile_revision_id bigint,
+    guidance_preference character varying DEFAULT 'reference_examples'::character varying NOT NULL,
+    CONSTRAINT experiments_guidance_preference_check CHECK (((guidance_preference)::text = ANY ((ARRAY['reference_examples'::character varying, 'glossary'::character varying, 'experiment_instruction'::character varying])::text[])))
 );
 
 
@@ -1920,6 +2251,85 @@ ALTER SEQUENCE public.source_imports_id_seq OWNED BY public.source_imports.id;
 
 
 --
+-- Name: translation_reference_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_reference_revisions (
+    id bigint NOT NULL,
+    translation_reference_id bigint NOT NULL,
+    version integer NOT NULL,
+    title character varying NOT NULL,
+    source_language character varying NOT NULL,
+    target_language character varying NOT NULL,
+    source_text text NOT NULL,
+    approved_translation text NOT NULL,
+    configuration_digest character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT translation_reference_revisions_approved_translation_check CHECK (((char_length(btrim(approved_translation)) >= 1) AND (char_length(btrim(approved_translation)) <= 100000))),
+    CONSTRAINT translation_reference_revisions_digest_check CHECK (((configuration_digest)::text ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT translation_reference_revisions_payload_digest_check CHECK (((configuration_digest)::text = public.translation_reference_revision_configuration_digest((source_language)::text, (target_language)::text, source_text, approved_translation))),
+    CONSTRAINT translation_reference_revisions_source_language_check CHECK (((char_length(btrim((source_language)::text)) >= 1) AND (char_length(btrim((source_language)::text)) <= 100))),
+    CONSTRAINT translation_reference_revisions_source_text_check CHECK (((char_length(btrim(source_text)) >= 1) AND (char_length(btrim(source_text)) <= 100000))),
+    CONSTRAINT translation_reference_revisions_target_language_check CHECK (((char_length(btrim((target_language)::text)) >= 1) AND (char_length(btrim((target_language)::text)) <= 100))),
+    CONSTRAINT translation_reference_revisions_title_check CHECK (((char_length(btrim((title)::text)) >= 1) AND (char_length(btrim((title)::text)) <= 150))),
+    CONSTRAINT translation_reference_revisions_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: translation_reference_revisions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_reference_revisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_reference_revisions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_reference_revisions_id_seq OWNED BY public.translation_reference_revisions.id;
+
+
+--
+-- Name: translation_references; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_references (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    current_revision_id bigint,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: translation_references_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_references_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_references_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_references_id_seq OWNED BY public.translation_references.id;
+
+
+--
 -- Name: translation_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2288,6 +2698,13 @@ ALTER TABLE ONLY public.documents ALTER COLUMN id SET DEFAULT nextval('public.do
 
 
 --
+-- Name: experiment_reference_revisions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.experiment_reference_revisions ALTER COLUMN id SET DEFAULT nextval('public.experiment_reference_revisions_id_seq'::regclass);
+
+
+--
 -- Name: experiment_segments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2470,6 +2887,20 @@ ALTER TABLE ONLY public.source_imports ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: translation_reference_revisions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_revisions ALTER COLUMN id SET DEFAULT nextval('public.translation_reference_revisions_id_seq'::regclass);
+
+
+--
+-- Name: translation_references id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_references ALTER COLUMN id SET DEFAULT nextval('public.translation_references_id_seq'::regclass);
+
+
+--
 -- Name: translation_runs id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2564,6 +2995,14 @@ ALTER TABLE ONLY public.document_execution_plans
 
 ALTER TABLE ONLY public.documents
     ADD CONSTRAINT documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: experiment_reference_revisions experiment_reference_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.experiment_reference_revisions
+    ADD CONSTRAINT experiment_reference_revisions_pkey PRIMARY KEY (id);
 
 
 --
@@ -2783,6 +3222,22 @@ ALTER TABLE ONLY public.source_imports
 
 
 --
+-- Name: translation_reference_revisions translation_reference_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_revisions
+    ADD CONSTRAINT translation_reference_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_references translation_references_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_references
+    ADD CONSTRAINT translation_references_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: translation_runs translation_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2860,6 +3315,13 @@ CREATE INDEX idx_on_status_expires_at_ed9c9803ce ON public.translation_workspace
 
 
 --
+-- Name: idx_on_translation_reference_id_6fd1e25754; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_translation_reference_id_6fd1e25754 ON public.translation_reference_revisions USING btree (translation_reference_id);
+
+
+--
 -- Name: index_active_storage_attachments_on_blob_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2899,6 +3361,34 @@ CREATE UNIQUE INDEX index_document_execution_plans_on_experiment_id ON public.do
 --
 
 CREATE INDEX index_documents_on_project_id ON public.documents USING btree (project_id);
+
+
+--
+-- Name: index_experiment_reference_revisions_on_experiment_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_experiment_reference_revisions_on_experiment_id ON public.experiment_reference_revisions USING btree (experiment_id);
+
+
+--
+-- Name: index_experiment_reference_revisions_on_experiment_position; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_experiment_reference_revisions_on_experiment_position ON public.experiment_reference_revisions USING btree (experiment_id, "position");
+
+
+--
+-- Name: index_experiment_reference_revisions_on_experiment_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_experiment_reference_revisions_on_experiment_revision ON public.experiment_reference_revisions USING btree (experiment_id, translation_reference_revision_id);
+
+
+--
+-- Name: index_experiment_reference_revisions_on_reference_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_experiment_reference_revisions_on_reference_revision ON public.experiment_reference_revisions USING btree (translation_reference_revision_id);
 
 
 --
@@ -3532,6 +4022,41 @@ CREATE INDEX index_source_imports_on_user_id_and_status ON public.source_imports
 
 
 --
+-- Name: index_translation_reference_revisions_on_configuration_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_reference_revisions_on_configuration_digest ON public.translation_reference_revisions USING btree (configuration_digest);
+
+
+--
+-- Name: index_translation_reference_revisions_on_reference_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_id ON public.translation_reference_revisions USING btree (translation_reference_id, id);
+
+
+--
+-- Name: index_translation_reference_revisions_on_reference_and_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_version ON public.translation_reference_revisions USING btree (translation_reference_id, version);
+
+
+--
+-- Name: index_translation_references_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_references_on_user_id ON public.translation_references USING btree (user_id);
+
+
+--
+-- Name: index_translation_references_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_references_on_user_id_and_active ON public.translation_references USING btree (user_id, active);
+
+
+--
 -- Name: index_translation_runs_on_experiment_and_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3700,6 +4225,13 @@ CREATE TRIGGER enforce_document_methodology_snapshots_trigger BEFORE UPDATE OF p
 
 
 --
+-- Name: documents enforce_document_reference_snapshots_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_document_reference_snapshots_trigger BEFORE UPDATE OF project_id ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_document_reference_snapshots();
+
+
+--
 -- Name: experiments enforce_experiment_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3711,6 +4243,13 @@ CREATE TRIGGER enforce_experiment_glossary_owner_trigger AFTER INSERT OR UPDATE 
 --
 
 CREATE TRIGGER enforce_experiment_methodology_snapshot_trigger AFTER INSERT OR UPDATE OF document_id, methodology_profile_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_methodology_snapshot();
+
+
+--
+-- Name: experiments enforce_experiment_reference_snapshots_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_experiment_reference_snapshots_trigger BEFORE UPDATE OF document_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_reference_snapshots();
 
 
 --
@@ -3735,6 +4274,13 @@ CREATE TRIGGER enforce_methodology_profile_owner_trigger BEFORE UPDATE OF user_i
 
 
 --
+-- Name: experiment_reference_revisions enforce_new_experiment_reference_snapshot_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_new_experiment_reference_snapshot_trigger BEFORE INSERT ON public.experiment_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_new_experiment_reference_snapshot();
+
+
+--
 -- Name: projects enforce_project_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3749,6 +4295,34 @@ CREATE TRIGGER enforce_project_methodology_snapshots_trigger BEFORE UPDATE OF us
 
 
 --
+-- Name: projects enforce_project_reference_snapshots_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_project_reference_snapshots_trigger BEFORE UPDATE OF user_id, source_language, target_language ON public.projects FOR EACH ROW EXECUTE FUNCTION public.enforce_project_reference_snapshots();
+
+
+--
+-- Name: translation_references enforce_translation_reference_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_translation_reference_owner_trigger BEFORE UPDATE OF user_id ON public.translation_references FOR EACH ROW EXECUTE FUNCTION public.enforce_translation_reference_owner();
+
+
+--
+-- Name: experiments prevent_experiment_guidance_preference_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_experiment_guidance_preference_mutation_trigger BEFORE UPDATE OF guidance_preference ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.prevent_experiment_guidance_preference_mutation();
+
+
+--
+-- Name: experiment_reference_revisions prevent_experiment_reference_snapshot_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_experiment_reference_snapshot_mutation_trigger BEFORE DELETE OR UPDATE ON public.experiment_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_experiment_reference_snapshot_mutation();
+
+
+--
 -- Name: glossary_revisions prevent_glossary_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3760,6 +4334,13 @@ CREATE TRIGGER prevent_glossary_revision_mutation_trigger BEFORE DELETE OR UPDAT
 --
 
 CREATE TRIGGER prevent_methodology_profile_revision_mutation_trigger BEFORE DELETE OR UPDATE ON public.methodology_profile_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_methodology_profile_revision_mutation();
+
+
+--
+-- Name: translation_reference_revisions prevent_translation_reference_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_translation_reference_revision_mutation_trigger BEFORE DELETE OR UPDATE ON public.translation_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_translation_reference_revision_mutation();
 
 
 --
@@ -3847,6 +4428,14 @@ ALTER TABLE ONLY public.workflow_profile_model_selections
 
 ALTER TABLE ONLY public.pipeline_runs
     ADD CONSTRAINT fk_rails_17da527305 FOREIGN KEY (experiment_id) REFERENCES public.experiments(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: experiment_reference_revisions fk_rails_1fc4e85b1c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.experiment_reference_revisions
+    ADD CONSTRAINT fk_rails_1fc4e85b1c FOREIGN KEY (translation_reference_revision_id) REFERENCES public.translation_reference_revisions(id) ON DELETE RESTRICT;
 
 
 --
@@ -3975,6 +4564,14 @@ ALTER TABLE ONLY public.pipeline_events
 
 ALTER TABLE ONLY public.source_imports
     ADD CONSTRAINT fk_rails_4770a41ce7 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: experiment_reference_revisions fk_rails_4c5edad130; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.experiment_reference_revisions
+    ADD CONSTRAINT fk_rails_4c5edad130 FOREIGN KEY (experiment_id) REFERENCES public.experiments(id) ON DELETE RESTRICT;
 
 
 --
@@ -4258,6 +4855,22 @@ ALTER TABLE ONLY public.translation_segment_runs
 
 
 --
+-- Name: translation_reference_revisions fk_rails_c9dcbca26e; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_revisions
+    ADD CONSTRAINT fk_rails_c9dcbca26e FOREIGN KEY (translation_reference_id) REFERENCES public.translation_references(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: translation_references fk_rails_ccc71a71c6; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_references
+    ADD CONSTRAINT fk_rails_ccc71a71c6 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: review_rounds fk_rails_e4d2c9843a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4290,6 +4903,14 @@ ALTER TABLE ONLY public.judge_rounds
 
 
 --
+-- Name: translation_references fk_translation_references_owned_current_revision; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_references
+    ADD CONSTRAINT fk_translation_references_owned_current_revision FOREIGN KEY (id, current_revision_id) REFERENCES public.translation_reference_revisions(translation_reference_id, id);
+
+
+--
 -- Name: workflow_profiles fk_workflow_profiles_owned_current_revision; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4304,6 +4925,8 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260907090000'),
+('20260906090000'),
 ('20260901110000'),
 ('20260901100000'),
 ('20260901025500'),

@@ -24,7 +24,9 @@ module TranslationExperiments
       runs, schedules = create_runs(plan, budgets)
       Ai::RunScheduler.enqueue_all(schedules)
       runs
-    rescue Ai::ContextBudget::Error, LongDocuments::Planner::SourceChangedError => error
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError, error.message
+    rescue LongDocuments::Planner::SourceChangedError => error
       raise ContextBudgetError, error.message
     end
 
@@ -63,14 +65,14 @@ module TranslationExperiments
         per_source = sources.to_h do |source|
           source_text = source.respond_to?(:source_text) ? source.source_text : experiment.document.source_text
           prompt = TranslationSegments::Prompt.build(experiment: experiment, source_text: source_text)
-          budget = Ai::ContextBudget.call(
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: experiment,
             model: model,
-            system_prompt: prompt.fetch(:system_prompt),
-            user_prompt: prompt.fetch(:user_prompt),
             stage: :translation,
             source_character_count: experiment.document.source_text.length,
-            capability_snapshot: capability_snapshots[model.id]
-          )
+            capability_snapshot: capability_snapshots[model.id],
+            prompt: prompt
+          ) { TranslationSegments::Prompt.build(experiment: experiment, source_text: source_text, reference_examples: []) }
           [ source.id, budget ]
         end
         [ model.id, per_source ]

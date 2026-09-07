@@ -3,7 +3,8 @@ module Pipelines
     BLOCKED_MESSAGES = {
       "stage_failed" => "One or more runs failed. Use the existing explicit retry action on the linked stage page.",
       "configuration_unavailable" => "The next stage's authorized model configuration is unavailable. Stop automation and continue manually, or restore the original model configuration.",
-      "stage_conflict" => "Existing workflow state conflicts with this automatic stage. Stop automation and continue from the linked stage page."
+      "stage_conflict" => "Existing workflow state conflicts with this automatic stage. Stop automation and continue from the linked stage page.",
+      "reference_context_budget" => TranslationReferences::ContextBudgetMessage::MESSAGE
     }.freeze
 
     def self.call(pipeline_run:)
@@ -23,8 +24,13 @@ module Pipelines
         block!(reason: "configuration_unavailable")
       rescue BlindReviews::Start::Error,
              Judging::Start::Error,
-             FinalTranslations::Error
-        block!(reason: "stage_conflict")
+             FinalTranslations::Error => error
+        reason = if error.message == TranslationReferences::ContextBudgetMessage::MESSAGE
+          "reference_context_budget"
+        else
+          "stage_conflict"
+        end
+        block!(reason: reason)
       end
       pipeline_run
     end

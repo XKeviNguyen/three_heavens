@@ -16,6 +16,7 @@ class User < ApplicationRecord
   has_many :workflow_profiles, dependent: :restrict_with_error
   has_many :glossaries, dependent: :restrict_with_error
   has_many :methodology_profiles, dependent: :restrict_with_error
+  has_many :translation_references, dependent: :restrict_with_error
   has_many :pipeline_runs, through: :experiments
   has_many :translation_workspace_submissions, dependent: :restrict_with_error
 

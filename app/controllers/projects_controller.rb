@@ -21,6 +21,7 @@ class ProjectsController < ApplicationController
         experiments: [
           :glossary_revision,
           :methodology_profile_revision,
+          { experiment_reference_revisions: :translation_reference_revision },
           :pipeline_run,
           :final_translation,
           { review_round: :judge_round }

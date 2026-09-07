@@ -1,0 +1,14 @@
+<% revision = @translation_reference.current_revision %>
+<% content_for :title, "#{revision.title} · Translation references · Three Heavens" %>
+<div class="space-y-8">
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div><p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation Reference</p><h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= revision.title %></h1><p class="mt-2 text-slate-600"><%= revision.source_language %> → <%= revision.target_language %> · revision <%= revision.version %> · <%= @translation_reference.active? ? "Active" : "Archived" %></p></div>
+    <div class="flex gap-3"><%= link_to "Edit", edit_translation_reference_path(@translation_reference), class: "rounded-lg border border-blue-200 px-4 py-2 font-semibold text-blue-700" %><% if @translation_reference.active? %><%= button_to "Archive", deactivate_translation_reference_path(@translation_reference), method: :patch, class: "rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white" %><% else %><%= button_to "Activate", activate_translation_reference_path(@translation_reference), method: :patch, class: "rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white" %><% end %></div>
+  </header>
+  <div class="grid gap-6 lg:grid-cols-2">
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="text-lg font-semibold">Exact source text</h2><div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm leading-6"><%= revision.source_text %></div></section>
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="text-lg font-semibold">Exact approved translation</h2><div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm leading-6"><%= revision.approved_translation %></div></section>
+  </div>
+  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="text-lg font-semibold">Revision history</h2><p class="mt-2 break-all font-mono text-xs text-slate-500">Current digest: <%= revision.configuration_digest %></p><div class="mt-4 space-y-3"><% @translation_reference.revisions.each do |item| %><article class="rounded-lg border border-slate-200 p-4"><div class="flex flex-wrap justify-between gap-3"><p class="font-semibold">Revision <%= item.version %><%= " · Current" if item.id == revision.id %></p><p class="text-xs text-slate-500"><%= l item.created_at, format: :long %></p></div><p class="mt-1 text-sm text-slate-600"><%= item.title %> · <%= item.source_language %> → <%= item.target_language %> · used by <%= pluralize(item.experiments.size, "experiment") %></p><p class="mt-2 break-all font-mono text-xs text-slate-500"><%= item.configuration_digest %></p></article><% end %></div></section>
+  <%= link_to "← All references", translation_references_path, class: "inline-flex text-sm font-semibold text-blue-700" %>
+</div>

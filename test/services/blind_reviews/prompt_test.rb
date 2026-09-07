@@ -73,7 +73,7 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     assert_not_includes user_data, @experiment.document.title
     assert_not_includes user_data, "translation_run_id"
     assert_not_includes user_data, "llm_model"
-    assert_equal %w[candidates source_language source_text target_language terminology_requirements translation_instruction translation_methodology],
+    assert_equal %w[candidates guidance_preference reference_examples source_language source_text target_language terminology_requirements translation_instruction translation_methodology],
                  parsed_data.keys.sort
     assert parsed_data.fetch("candidates").all? do |candidate|
       candidate.keys.sort == %w[candidate_label translation]
@@ -164,6 +164,16 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     assert_equal 2, schema.dig(:properties, :evaluations, :maxItems)
     assert_includes @prompt.fetch(:system_prompt), "Do not provide hidden reasoning"
     assert_not_includes schema.to_json, "reasoning"
+  end
+
+  test "scores owner guidance according to the configured precedence" do
+    prompt = BlindReviews::Prompt.build(@round.review_runs.first)
+
+    assert_includes prompt.fetch(:system_prompt),
+                    "instruction_adherence_score: compliance with the configured owner-guidance precedence"
+    assert_includes prompt.fetch(:system_prompt),
+                    TranslationGuidance::Policy.precedence_statement("reference_examples")
+    assert_not_includes prompt.fetch(:system_prompt), "user's more specific translation instruction"
   end
 
   private
