@@ -131,6 +131,30 @@ class TranslationReferenceTest < ActiveSupport::TestCase
     assert_database_rejects { TranslationReference.where(id: reference.id).update_all(user_id: users(:other).id) }
   end
 
+  test "database snapshot language comparisons match Rails whitespace and case normalization on every path" do
+    reference = create_translation_reference
+    [ "\t", "\n", "\v", "\f", "\r", " ", " \t\n\v\f\r" ].each do |whitespace|
+      project = users(:normal).projects.create!(
+        name: "Whitespace languages", source_language: "Vietnamese", target_language: "Japanese"
+      )
+      languages = { source_language: "#{whitespace}vIeTnAmEsE#{whitespace}",
+                    target_language: "#{whitespace}jApAnEsE#{whitespace}" }
+      Project.where(id: project.id).update_all(languages)
+      project.reload
+      assert TranslationLanguagePair.matches?(reference.current_revision, **languages)
+      document = project.documents.create!(title: "Source", source_text: "Source")
+      experiment = document.experiments.create!(instruction_prompt: "Translate.")
+      snapshot_reference(experiment: experiment, revision: reference.current_revision)
+      Project.where(id: project.id).update_all(languages)
+      other_document = project.documents.create!(title: "Other source", source_text: "Source")
+      Experiment.where(id: experiment.id).update_all(document_id: other_document.id)
+      other_project = users(:normal).projects.create!(name: "Other project", **languages)
+      Project.where(id: other_project.id).update_all(languages)
+      Document.where(id: other_document.id).update_all(project_id: other_project.id)
+      assert_equal reference.current_revision, experiment.reload.translation_reference_revisions.sole
+    end
+  end
+
   test "reference snapshots are sealed before provider work in Rails and PostgreSQL" do
     reference = create_translation_reference
     project = users(:normal).projects.create!(

@@ -98,6 +98,15 @@ CREATE FUNCTION public.enforce_document_reference_snapshots() RETURNS trigger
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
   PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      JOIN experiments ON experiments.id = snapshots.experiment_id
+      WHERE experiments.document_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
 
   IF EXISTS (
     SELECT 1
@@ -112,8 +121,8 @@ BEGIN
     WHERE experiments.document_id = NEW.id
       AND (
         translation_references.user_id <> projects.user_id
-        OR lower(btrim(translation_reference_revisions.source_language)) <> lower(btrim(projects.source_language))
-        OR lower(btrim(translation_reference_revisions.target_language)) <> lower(btrim(projects.target_language))
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
       )
   ) THEN
     RAISE EXCEPTION 'Document change would invalidate an experiment reference snapshot'
@@ -223,8 +232,21 @@ $$;
 CREATE FUNCTION public.enforce_experiment_reference_snapshots() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+DECLARE
+  project_id bigint;
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('experiment:' || NEW.id::text, 0));
+  -- UPDATE already owns the experiment row. Never request it after advisory locks.
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE id = NEW.document_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      WHERE snapshots.experiment_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
 
   IF EXISTS (
     SELECT 1
@@ -238,8 +260,8 @@ BEGIN
     WHERE experiment_reference_revisions.experiment_id = NEW.id
       AND (
         translation_references.user_id <> projects.user_id
-        OR lower(btrim(translation_reference_revisions.source_language)) <> lower(btrim(projects.source_language))
-        OR lower(btrim(translation_reference_revisions.target_language)) <> lower(btrim(projects.target_language))
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
       )
   ) THEN
     RAISE EXCEPTION 'Experiment change would invalidate a reference snapshot'
@@ -351,13 +373,10 @@ DECLARE
   reference_id bigint;
   project_id bigint;
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('experiment:' || NEW.experiment_id::text, 0));
   PERFORM 1 FROM experiments WHERE id = NEW.experiment_id FOR UPDATE;
-  SELECT experiments.document_id, documents.project_id INTO document_id, project_id
-    FROM experiments
-    INNER JOIN documents ON documents.id = experiments.document_id
-    WHERE experiments.id = NEW.experiment_id;
+  SELECT experiments.document_id INTO document_id FROM experiments WHERE id = NEW.experiment_id;
   PERFORM pg_advisory_xact_lock(hashtextextended('document:' || document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE id = document_id;
   PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
   SELECT translation_reference_id INTO reference_id
     FROM translation_reference_revisions
@@ -382,8 +401,8 @@ BEGIN
       AND translation_references.user_id = projects.user_id
       AND translation_references.active
       AND translation_references.current_revision_id = translation_reference_revisions.id
-      AND lower(btrim(translation_reference_revisions.source_language)) = lower(btrim(projects.source_language))
-      AND lower(btrim(translation_reference_revisions.target_language)) = lower(btrim(projects.target_language))
+      AND lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = lower(btrim(projects.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+      AND lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) = lower(btrim(projects.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
   ) THEN
     RAISE EXCEPTION 'Translation reference revision is not available for this experiment'
       USING ERRCODE = 'check_violation';
@@ -465,6 +484,16 @@ CREATE FUNCTION public.enforce_project_reference_snapshots() RETURNS trigger
     AS $$
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('translation_reference:' || reference_id::text, 0))
+    FROM (
+      SELECT DISTINCT revisions.translation_reference_id AS reference_id
+      FROM experiment_reference_revisions snapshots
+      JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
+      JOIN experiments ON experiments.id = snapshots.experiment_id
+      JOIN documents ON documents.id = experiments.document_id
+      WHERE documents.project_id = NEW.id
+      ORDER BY reference_id
+    ) references_to_lock;
 
   IF EXISTS (
     SELECT 1
@@ -479,8 +508,8 @@ BEGIN
     WHERE documents.project_id = NEW.id
       AND (
         translation_references.user_id <> NEW.user_id
-        OR lower(btrim(translation_reference_revisions.source_language)) <> lower(btrim(NEW.source_language))
-        OR lower(btrim(translation_reference_revisions.target_language)) <> lower(btrim(NEW.target_language))
+        OR lower(btrim(translation_reference_revisions.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(NEW.source_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
+        OR lower(btrim(translation_reference_revisions.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' ')) <> lower(btrim(NEW.target_language, CHR(9) || CHR(10) || CHR(11) || CHR(12) || CHR(13) || ' '))
       )
   ) THEN
     RAISE EXCEPTION 'Project change would invalidate an experiment reference snapshot'
@@ -4896,6 +4925,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260907090000'),
 ('20260906090000'),
 ('20260901110000'),
 ('20260901100000'),

@@ -54,7 +54,7 @@ class TranslationReferencesController < ApplicationController
     redirect_to @translation_reference, notice: "Translation reference revision #{revision.version} created."
   rescue TranslationReferences::Revise::StaleRevisionError => error
     @current_revision = @translation_reference.reload.current_revision
-    @form_values = safe_submitted_values.merge(
+    @form_values = attributes.merge(
       "expected_version" => @current_revision.version.to_s
     )
     @form_errors = [ error.message ]

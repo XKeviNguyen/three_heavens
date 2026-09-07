@@ -108,6 +108,9 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       translation_reference: reference,
       expected_version: "1",
       attributes: translation_reference_attributes(
+        title: "Current saved title",
+        source_language: "English",
+        target_language: "French",
         source_text: "Current source from another editor",
         approved_translation: "Current translation from another editor"
       )
@@ -120,6 +123,17 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_reference[expected_version]'][value='2']"
     assert_includes response.body, "Current source from another editor"
     assert_includes response.body, "Current translation from another editor"
+    assert_select "section[aria-labelledby='reference-conflict-heading']" do
+      [ "Current saved title", "English", "French", "2" ].each do |value|
+        assert_select "dd", text: value
+      end
+    end
+    translation_reference_attributes.slice(:title, :source_language, :target_language).each do |key, value|
+      assert_select "input[name='translation_reference[#{key}]'][value=?]", value
+    end
+    translation_reference_attributes.slice(:source_text, :approved_translation).each do |key, value|
+      assert_select "textarea[name='translation_reference[#{key}]']", text: value
+    end
     assert_equal 2, reference.revisions.count
 
     patch translation_reference_path(reference), params: {
@@ -187,30 +201,34 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "not both"
   end
 
-  test "a stale edit with a replacement upload is reported as a conflict" do
-    reference = create_translation_reference
-    original = reference.current_revision
-    TranslationReferences::Revise.call(
-      translation_reference: reference,
-      expected_version: original.version.to_s,
-      attributes: translation_reference_attributes(
-        source_text: "Current source from another editor",
-        approved_translation: "Current translation from another editor"
+  %i[source_text approved_translation].each do |side|
+    test "a stale #{side} replacement upload preserves extracted content in the conflict form" do
+      reference = create_translation_reference
+      original = reference.current_revision
+      TranslationReferences::Revise.call(
+        translation_reference: reference,
+        expected_version: original.version.to_s,
+        attributes: translation_reference_attributes(
+          source_text: "Current source from another editor",
+          approved_translation: "Current translation from another editor"
+        )
       )
-    )
 
-    patch translation_reference_path(reference), params: {
-      translation_reference: translation_reference_attributes(
-        source_text: original.source_text,
-        approved_translation: original.approved_translation
-      ).merge(
-        source_file: uploaded_file("Uploaded stale replacement", filename: "replacement.txt"),
-        expected_version: original.version.to_s
-      )
-    }
+      patch translation_reference_path(reference), params: {
+        translation_reference: translation_reference_attributes(
+          source_text: original.source_text,
+          approved_translation: original.approved_translation
+        ).merge(
+          "#{side == :source_text ? :source : :approved_translation}_file" => uploaded_file("Uploaded stale replacement", filename: "replacement.txt"),
+          expected_version: original.version.to_s
+        )
+      }
 
-    assert_response :conflict
-    assert_select "input[name='translation_reference[expected_version]'][value='2']"
-    assert_includes response.body, "Current source from another editor"
+      assert_response :conflict
+      assert_select "input[name='translation_reference[expected_version]'][value='2']"
+      assert_includes response.body, "Current source from another editor"
+      assert_select "textarea[name='translation_reference[#{side}]']", text: "Uploaded stale replacement"
+      assert_equal 2, reference.reload.current_revision.version
+    end
   end
 end

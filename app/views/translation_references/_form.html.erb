@@ -12,6 +12,12 @@
   <section class="rounded-xl border border-amber-300 bg-amber-50 p-5" aria-labelledby="reference-conflict-heading">
     <h2 id="reference-conflict-heading" class="font-semibold text-amber-950">A newer revision is available</h2>
     <p class="mt-1 text-sm text-amber-900">Compare the current revision below with your submitted values, merge the changes deliberately, then save.</p>
+    <dl class="mt-4 space-y-2 text-sm text-amber-950">
+      <div><dt class="font-semibold">Current title</dt><dd><%= @current_revision.title %></dd></div>
+      <div><dt class="font-semibold">Current source language</dt><dd><%= @current_revision.source_language %></dd></div>
+      <div><dt class="font-semibold">Current target language</dt><dd><%= @current_revision.target_language %></dd></div>
+      <div><dt class="font-semibold">Current revision number</dt><dd><%= @current_revision.version %></dd></div>
+    </dl>
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <div>
         <h3 class="text-sm font-semibold text-amber-950">Current source example (revision <%= @current_revision.version %>)</h3>
