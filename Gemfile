@@ -44,7 +44,7 @@ gem "image_processing", "~> 2.0.3"
 gem "ruby-vips", "~> 2.3"
 
 # Read and write bounded Office Open XML packages without shelling out.
-gem "rubyzip", "~> 3.5"
+gem "rubyzip", "~> 3.6"
 
 group :development, :test do
   gem "dotenv-rails"
