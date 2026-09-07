@@ -1,6 +1,13 @@
 module TranslationReferences
   class AuthoringAttributes
-    class Error < StandardError; end
+    class Error < StandardError
+      attr_reader :resolved_attributes
+
+      def initialize(message, resolved_attributes: {})
+        @resolved_attributes = resolved_attributes
+        super(message)
+      end
+    end
 
     SIDES = {
       "source_text" => "source_file",
@@ -17,18 +24,23 @@ module TranslationReferences
 
     def call
       resolved = attributes.slice("title", "source_language", "target_language")
+      errors = []
       SIDES.each do |text_key, file_key|
-        pasted = attributes[text_key].to_s
+        resolved[text_key] = attributes[text_key].to_s
         upload = attributes[file_key]
-        if pasted.present? && upload.present?
-          raise Error, "Provide either pasted text or an uploaded file for #{human_side(text_key)}, not both."
-        end
+        begin
+          if resolved[text_key].present? && upload.present?
+            raise Error, "Provide either pasted text or an uploaded file for #{human_side(text_key)}, not both."
+          end
 
-        resolved[text_key] = upload.present? ? extract(upload) : pasted
+          resolved[text_key] = extract(upload) if upload.present?
+        rescue SourceImports::Error, Error => error
+          errors << error.message
+        end
       end
+      raise Error.new(errors.join(" "), resolved_attributes: resolved) if errors.any?
+
       resolved
-    rescue SourceImports::Error => error
-      raise Error, error.message
     end
 
     private

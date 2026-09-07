@@ -28,6 +28,7 @@ class TranslationReferencesController < ApplicationController
     redirect_to reference, notice: "Translation reference created."
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values.merge(attributes || {})
+    @form_values.merge!(error.resolved_attributes) if error.is_a?(TranslationReferences::AuthoringAttributes::Error)
     @form_errors = error_messages(error)
     render :new, status: :unprocessable_content
   end
@@ -61,6 +62,7 @@ class TranslationReferencesController < ApplicationController
     render :edit, status: :conflict
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values.merge(attributes || {})
+    @form_values.merge!(error.resolved_attributes) if error.is_a?(TranslationReferences::AuthoringAttributes::Error)
     @form_errors = error_messages(error)
     render :edit, status: :unprocessable_content
   end

@@ -228,6 +228,37 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       assert_equal "Desired replacement", reference.current_revision.public_send(side)
     end
 
+    test "a valid #{side} replacement survives failure to extract the opposite upload" do
+      reference = create_translation_reference
+      other_side = side == :source_text ? :approved_translation : :source_text
+      file_keys = { source_text: :source_file, approved_translation: :approved_translation_file }
+      submitted = translation_reference_attributes.merge(
+        file_keys.fetch(side) => uploaded_file("Successful replacement", filename: "valid.txt"),
+        file_keys.fetch(other_side) => uploaded_file("PK\x03\x04garbage".b, filename: "invalid.docx"),
+        expected_version: "1"
+      )
+
+      assert_no_difference -> { TranslationReferenceRevision.count } do
+        patch translation_reference_path(reference), params: { translation_reference: submitted }
+      end
+      assert_response :unprocessable_content
+      assert_select "textarea[name='translation_reference[#{side}]']", text: "Successful replacement"
+      assert_select "textarea[name='translation_reference[#{other_side}]']", text: ""
+      assert_select "input[name='translation_reference[expected_version]'][value='1']"
+
+      patch translation_reference_path(reference), params: {
+        translation_reference: translation_reference_attributes.merge(
+          side => "Successful replacement", other_side => "",
+          file_keys.fetch(other_side) => uploaded_file("Corrected opposite side", filename: "fixed.txt"),
+          expected_version: "1"
+        )
+      }
+      assert_response :redirect
+      assert_equal 2, reference.reload.current_revision.version
+      assert_equal "Successful replacement", reference.current_revision.public_send(side)
+      assert_equal "Corrected opposite side", reference.current_revision.public_send(other_side)
+    end
+
     test "new #{side} upload survives a validation error" do
       file_key = side == :source_text ? :source_file : :approved_translation_file
       submitted = translation_reference_attributes(title: "").except(side).merge(
