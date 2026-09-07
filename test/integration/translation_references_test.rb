@@ -202,6 +202,46 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
   end
 
   %i[source_text approved_translation].each do |side|
+    test "#{side} replacement upload survives a validation error and corrected resubmission" do
+      reference = create_translation_reference
+      file_key = side == :source_text ? :source_file : :approved_translation_file
+      submitted = translation_reference_attributes(title: "").merge(
+        file_key => uploaded_file("Desired replacement", filename: "replacement.txt"),
+        expected_version: "1"
+      )
+
+      assert_no_difference -> { TranslationReferenceRevision.count } do
+        patch translation_reference_path(reference), params: { translation_reference: submitted }
+      end
+      assert_response :unprocessable_content
+      assert_select "textarea[name='translation_reference[#{side}]']", text: "Desired replacement"
+      assert_select "input[name='translation_reference[expected_version]'][value='1']"
+      assert_select "input[name='translation_reference[title]'][value='']"
+
+      patch translation_reference_path(reference), params: {
+        translation_reference: translation_reference_attributes(title: "Corrected title").merge(
+          side => "Desired replacement", expected_version: "1"
+        )
+      }
+      assert_response :redirect
+      assert_equal 2, reference.reload.current_revision.version
+      assert_equal "Desired replacement", reference.current_revision.public_send(side)
+    end
+
+    test "new #{side} upload survives a validation error" do
+      file_key = side == :source_text ? :source_file : :approved_translation_file
+      submitted = translation_reference_attributes(title: "").except(side).merge(
+        file_key => uploaded_file("Desired new content", filename: "new.txt")
+      )
+      assert_no_difference -> { TranslationReference.count } do
+        post translation_references_path, params: { translation_reference: submitted }
+      end
+      assert_response :unprocessable_content
+      assert_select "textarea[name='translation_reference[#{side}]']", text: "Desired new content"
+    end
+  end
+
+  %i[source_text approved_translation].each do |side|
     test "a stale #{side} replacement upload preserves extracted content in the conflict form" do
       reference = create_translation_reference
       original = reference.current_revision
