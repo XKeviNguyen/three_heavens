@@ -41,8 +41,8 @@ module BlindReviews
       invalid!("evaluations payload is too large") if JSON.generate(validated).bytesize > 100_000
 
       validated
-    rescue JSON::ParserError => error
-      raise Error.new("Reviewer returned malformed JSON"), cause: error
+    rescue JSON::ParserError
+      raise Error.new("Reviewer returned malformed JSON"), cause: nil
     end
 
     private

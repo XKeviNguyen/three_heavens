@@ -1,6 +1,20 @@
 require "test_helper"
 
 class FilterParameterLoggingTest < ActiveSupport::TestCase
+  test "filters owner guidance used in provider prompts" do
+    filtered = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters).filter(
+      "methodology_profile" => { "guidance" => "private methodology" },
+      "glossary" => { "entries" => [ {
+        "source_term" => "private source term",
+        "preferred_target_term" => "private target term",
+        "note" => "private terminology guidance"
+      } ] }
+    )
+
+    assert_equal "[FILTERED]", filtered.dig("methodology_profile", "guidance")
+    assert_equal [ "[FILTERED]" ] * 3, filtered.dig("glossary", "entries").sole.values
+  end
+
   test "filters authentication and translation request bodies without filtering generic content" do
     filtered = ActiveSupport::ParameterFilter.new(
       Rails.application.config.filter_parameters

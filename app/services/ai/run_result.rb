@@ -32,6 +32,5 @@ module Ai
       safe = Operations::EventLogger::SAFE_ERROR_CODES.include?(code) || code.match?(/\A(?:http_)?[45][0-9]{2}\z/)
       safe ? code : "provider_failure"
     end
-    private_class_method :safe_error_code
   end
 end

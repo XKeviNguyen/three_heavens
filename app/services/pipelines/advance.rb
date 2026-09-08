@@ -19,12 +19,18 @@ module Pipelines
       pipeline_run.with_lock do
         return pipeline_run if pipeline_run.stopped? || pipeline_run.ready_for_editor?
 
-        send("advance_#{pipeline_run.current_stage}")
+        # A failed stage must roll back its graph and commit callbacks before
+        # the outer transaction records the recoverable pipeline block.
+        PipelineRun.transaction(requires_new: true) do
+          send("advance_#{pipeline_run.current_stage}")
+        end
       rescue WorkflowProfiles::RoutingModels::ConfigurationUnavailableError
+        pipeline_run.reload
         block!(reason: "configuration_unavailable")
       rescue BlindReviews::Start::Error,
              Judging::Start::Error,
              FinalTranslations::Error => error
+        pipeline_run.reload
         reason = if error.message == TranslationReferences::ContextBudgetMessage::MESSAGE
           "reference_context_budget"
         else

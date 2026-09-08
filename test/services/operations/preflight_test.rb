@@ -3,6 +3,18 @@ require "test_helper"
 class Operations::PreflightTest < ActiveSupport::TestCase
   HealthySnapshot = Data.define(:checks)
 
+  test "default migration check uses the real primary connection pool" do
+    result = Operations::Preflight.call(
+      environment: {},
+      system_health: -> { HealthySnapshot.new(checks: []) },
+      executable_finder: ->(*) { true },
+      recurring_validator: ->(*) { true },
+      eager_load_check: -> { true }
+    )
+
+    assert_equal "healthy", result.checks.find { |check| check.name == "schema_migrations" }.status
+  end
+
   test "passes with safe prerequisites and never reads or reports environment values" do
     environment = Operations::Preflight::REQUIRED_ENVIRONMENT_NAMES.index_with { |name| "synthetic-#{name.downcase}" }
     health = HealthySnapshot.new(

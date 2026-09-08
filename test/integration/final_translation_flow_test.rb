@@ -230,14 +230,15 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     failed.update!(
       status: :failed,
       completed_at: Time.current,
-      error_code: "provider_error",
+      error_code: "PRIVATE_PROVIDER_ERROR_CODE",
       error_message: "Bearer secret-value <script>error()</script>"
     )
     Finalizations::ReconcileRound.call(other_round)
     get final_translation_path(@final_translation)
-    assert_includes response.body, "[FILTERED]"
+    assert_includes response.body, "AI work failed."
+    assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
     assert_not_includes response.body, "secret-value"
-    assert_includes response.body, "&lt;script&gt;error()&lt;/script&gt;"
+    assert_not_includes response.body, "&lt;script&gt;error()&lt;/script&gt;"
   end
 
   test "finalize disables every mutation control and reopen preserves history" do

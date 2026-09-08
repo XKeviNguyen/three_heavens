@@ -360,7 +360,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     run = translation_runs(:one)
     run.update!(
       status: :failed,
-      error_code: "provider_error",
+      error_code: "PRIVATE_PROVIDER_ERROR_CODE",
       error_message: "Bearer provider-secret <script>alert('unsafe')</script>"
     )
 
@@ -369,9 +369,10 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "meta[http-equiv='refresh']", count: 0
     assert_select "article", text: /Translation failed/
-    assert_select "article", text: /provider_error/
-    assert_includes response.body, "[FILTERED]"
-    assert_includes response.body, "&lt;script&gt;alert"
+    assert_select "article", text: /provider_failure/
+    assert_includes response.body, "AI work failed."
+    assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
+    assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"
     assert_not_includes response.body, "<script>alert('unsafe')</script>"
   end

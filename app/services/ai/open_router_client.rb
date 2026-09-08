@@ -174,7 +174,7 @@ module Ai
       raise RetryableError.new(
         "OpenRouter network request failed: #{error.class}",
         code: "network_error"
-      )
+      ), cause: nil
     end
 
     def read_bounded_response(response)
@@ -217,7 +217,7 @@ module Ai
       body = parse_json(response.body, retryable: retryable_status?(status))
 
       unless status.between?(200, 299)
-        raise error_for_response(status, body)
+        raise error_for_response(status)
       end
 
       choice = body.fetch("choices").first
@@ -250,32 +250,28 @@ module Ai
         ),
         cost: optional_decimal(usage["cost"])
       )
-    rescue KeyError, NoMethodError, TypeError => error
-      raise invalid_response(error.message)
+    rescue KeyError, NoMethodError, TypeError
+      raise invalid_response("unexpected response shape"), cause: nil
     end
 
     def parse_json(body, retryable:)
       JSON.parse(body.to_s)
-    rescue JSON::ParserError => error
+    rescue JSON::ParserError
       error_class = retryable ? RetryableError : PermanentError
       raise error_class.new(
         "OpenRouter returned malformed JSON",
         code: "malformed_json"
-      ), cause: error
+      ), cause: nil
     end
 
-    def error_for_response(status, body)
-      provider_error = body["error"].is_a?(Hash) ? body["error"] : {}
-      code = provider_error["code"].presence || "http_#{status}"
-      detail = Ai::ErrorSanitizer.call(
-        provider_error["message"].presence || "request failed",
-        secrets: [ @api_key ]
-      )
+    def error_for_response(status)
+      # Provider errors may echo prompts, credentials, or reasoning. Only the
+      # HTTP status is safe to retain in job failures, logs, and owner pages.
       error_class = retryable_status?(status) ? RetryableError : PermanentError
 
       error_class.new(
-        "OpenRouter request failed (HTTP #{status}): #{detail}",
-        code: code.to_s.first(255)
+        "OpenRouter request failed (HTTP #{status})",
+        code: "http_#{status}"
       )
     end
 
@@ -295,7 +291,7 @@ module Ai
 
       Integer(value)
     rescue ArgumentError
-      raise invalid_response("invalid token count")
+      raise invalid_response("invalid token count"), cause: nil
     end
 
     def optional_decimal(value)
@@ -303,7 +299,7 @@ module Ai
 
       BigDecimal(value.to_s)
     rescue ArgumentError
-      raise invalid_response("invalid cost")
+      raise invalid_response("invalid cost"), cause: nil
     end
   end
 end
