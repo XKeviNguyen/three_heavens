@@ -184,3 +184,28 @@ bin/rails zeitwerk:check
 ```
 
 Tests use deterministic fakes and Active Job's test adapter. They require PostgreSQL and a local Chrome/Chromium browser for system tests, but never require `OPENROUTER_API_KEY` and never make a real provider request.
+
+## Supply-chain maintenance
+
+CI actions use verified release commit SHAs with version comments, maintained by
+weekly grouped GitHub Actions Dependabot updates. Bundler updates remain weekly
+and separate. Update the setup-ruby pin when adopting a Ruby version newer than
+that action release. CI grants only `contents: read` and does not persist checkout
+credentials. Keep `pull_request` execution and all five fail-closed jobs.
+
+The Dockerfile base, Dockerfile frontend, and both CI PostgreSQL services use
+official multi-architecture index digests resolved from Docker Hub. Before each
+release, review upstream security updates and refresh these digests with
+`docker buildx imagetools inspect <image:tag>`; use the top-level digest, retaining
+the readable tag. Update both PostgreSQL services together. These image pins
+require manual review; the configured Dependabot ecosystems maintain actions and
+gems. Validate a bounded production build and all five CI jobs after updates.
+Pinning the frontend also stabilizes build checks under `check=error=true`.
+Debian packages remain unpinned to receive repository security fixes, so builds
+are not claimed to be bit-for-bit reproducible. Kamal still builds for amd64.
+
+RuboCop caches contain lint results, and setup-ruby caches installed gems keyed
+by runtime and lockfile. Neither cache should contain secrets. GitHub's branch
+and pull-request cache scopes prevent caches written by a pull request from
+being restored by the base branch; keep this workflow free of privileged
+`pull_request_target` or `workflow_run` execution of pull-request code.
