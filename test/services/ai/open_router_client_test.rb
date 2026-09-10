@@ -344,7 +344,7 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
         client.chat_completion(**request_attributes)
       end
 
-      assert_equal "provider_busy", error.code
+      assert_equal "http_#{status}", error.code
     end
   end
 
@@ -365,10 +365,49 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
       client.chat_completion(**request_attributes)
     end
 
-    assert_equal "invalid_request", error.code
+    assert_equal "http_400", error.code
     assert_not_includes error.message, "test-openrouter-key"
     assert_not_includes error.message, "another-secret"
-    assert_includes error.message, "[FILTERED]"
+    assert_equal "OpenRouter request failed (HTTP 400)", error.message
+  end
+
+  test "provider error payloads cannot enter messages codes or exception causes" do
+    [ 400, 429, 503 ].each do |status|
+      client = build_client(fake_http(status: status, body: {
+        error: { code: "PRIVATE_PROVIDER_CODE", message: "PRIVATE_SOURCE_AND_REASONING" }
+      }))
+      error = assert_raises Ai::OpenRouterClient::Error do
+        client.chat_completion(**request_attributes)
+      end
+      assert_equal "http_#{status}", error.code
+      assert_not_includes error.full_message, "PRIVATE_"
+    end
+  end
+
+  test "malformed provider shapes and JSON do not retain raw bodies in exceptions" do
+    [ "PRIVATE_INVALID_JSON", '{"choices":"PRIVATE_WRONG_SHAPE"}' ].each do |body|
+      client = build_client(FakeHttp.new(response: FakeResponse.new(code: "200", body: body)))
+      error = assert_raises Ai::OpenRouterClient::Error do
+        client.chat_completion(**request_attributes)
+      end
+      assert_not_includes error.full_message, "PRIVATE_"
+      assert_nil error.cause
+    end
+  end
+
+  test "structured validators discard parser causes containing private provider output" do
+    [ BlindReviews::ResponseValidator, Judging::ResponseValidator ].each do |validator|
+      error = assert_raises Ai::OpenRouterClient::Error do
+        validator.call(content: "PRIVATE_PROVIDER_OUTPUT", expected_labels: [ "Candidate A" ])
+      end
+      assert_nil error.cause
+      assert_not_includes error.full_message, "PRIVATE_PROVIDER_OUTPUT"
+    end
+    error = assert_raises Ai::OpenRouterClient::Error do
+      Finalizations::ResponseValidator.call(content: "PRIVATE_PROVIDER_OUTPUT")
+    end
+    assert_nil error.cause
+    assert_not_includes error.full_message, "PRIVATE_PROVIDER_OUTPUT"
   end
 
   test "classifies network errors as retryable without exposing details" do
@@ -381,6 +420,7 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
 
     assert_equal "network_error", error.code
     assert_not_includes error.message, "private response body"
+    assert_nil error.cause
   end
 
   test "handles malformed success JSON as retryable" do

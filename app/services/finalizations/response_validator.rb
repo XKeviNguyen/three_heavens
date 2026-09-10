@@ -38,8 +38,8 @@ module Finalizations
 
       LIST_FIELDS.each { |field| validate_list!(payload[field], field) }
       payload
-    rescue JSON::ParserError => error
-      raise Error.new("Finalizer returned malformed JSON"), cause: error
+    rescue JSON::ParserError
+      raise Error.new("Finalizer returned malformed JSON"), cause: nil
     end
 
     private

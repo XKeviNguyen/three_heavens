@@ -26,7 +26,7 @@ module Operations
       @environment = environment
       @system_health = system_health
       @executable_finder = executable_finder || method(:executable?)
-      @migration_check = migration_check || -> { !ActiveRecord::Base.connection.migration_context.needs_migration? }
+      @migration_check = migration_check || -> { !ActiveRecord::Base.connection_pool.migration_context.needs_migration? }
       @recurring_path = recurring_path
       @recurring_validator = recurring_validator || method(:valid_recurring_task?)
       @queue_adapter = queue_adapter

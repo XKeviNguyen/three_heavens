@@ -36,8 +36,8 @@ module Judging
       invalid!("judgment payload is too large") if JSON.generate(payload).bytesize > 100_000
 
       payload
-    rescue JSON::ParserError => error
-      raise Error.new("Judge returned malformed JSON"), cause: error
+    rescue JSON::ParserError
+      raise Error.new("Judge returned malformed JSON"), cause: nil
     end
 
     private

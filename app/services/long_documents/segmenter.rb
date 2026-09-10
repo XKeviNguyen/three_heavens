@@ -2,7 +2,7 @@ require "digest"
 
 module LongDocuments
   class Segmenter
-    VERSION = "semantic-boundaries-v1"
+    VERSION = "semantic-boundaries-v2"
     TARGET_CHARACTERS = 4_000
     MIN_SEMANTIC_SPLIT_CHARACTERS = 1_000
 
@@ -18,7 +18,7 @@ module LongDocuments
     end
 
     def call
-      raise ArgumentError, "source text must be present" if source_text.empty?
+      raise ArgumentError, "source text must be present" if source_text.blank?
       unless target_characters.between?(256, 20_000)
         raise ArgumentError, "segment target is outside the supported range"
       end
@@ -29,7 +29,16 @@ module LongDocuments
         cut = preferred_cut(remaining[0, target_characters])
         parts << remaining.slice!(0, cut)
       end
-      parts << remaining if remaining.present?
+      parts << remaining unless remaining.empty?
+      # Whitespace belongs to adjacent source content, never a standalone
+      # provider request. The target is soft; ContextBudget still bounds bytes.
+      parts = parts.each_with_object([]) do |part, combined|
+        if combined.any? && (part.blank? || combined.last.blank?)
+          combined.last << part
+        else
+          combined << part
+        end
+      end
 
       segments = parts.each_with_index.map do |text, index|
         Segment.new(

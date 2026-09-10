@@ -267,7 +267,7 @@
                     <p class="mt-4 text-sm font-medium text-slate-600">Reopen the translation before applying this proposal.</p>
                   <% end %>
                 <% elsif run.failed? %>
-                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-semibold">Refinement failed<% if run.error_code.present? %> · <%= run.error_code %><% end %></p><% if run.error_message.present? %><p class="mt-1 break-words"><%= safe_provider_error(run.error_message) %></p><% end %></div>
+                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-semibold">Refinement failed<% if run.error_code.present? %> · <%= safe_provider_error_code(run.error_code) %><% end %></p><% if run.error_message.present? %><p class="mt-1 break-words"><%= safe_provider_error(run.error_message) %></p><% end %></div>
                 <% else %>
                   <p class="mt-4 text-sm text-slate-600"><%= run.running? ? "The model is preparing its proposal." : "This proposal is queued." %></p>
                 <% end %>

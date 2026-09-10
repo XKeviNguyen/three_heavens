@@ -25,6 +25,7 @@ module LongDocuments
         return if source.length <= LongDocuments::Segmenter::TARGET_CHARACTERS
 
         segments = LongDocuments::Segmenter.call(source)
+        return if segments.one?
 
         plan = experiment.create_document_execution_plan!(
           segmentation_version: LongDocuments::Segmenter::VERSION,

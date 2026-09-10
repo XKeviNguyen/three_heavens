@@ -32,4 +32,26 @@ class LongDocuments::SegmenterTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { LongDocuments::Segmenter.call("") }
     assert_raises(ArgumentError) { LongDocuments::Segmenter.call("text", target_characters: 255) }
   end
+
+  test "preserves whitespace tails and prefixes without creating blank provider segments" do
+    [ "語" * 256 + "\n", " " * 300 + "語", "語" * 300 + "\n" * 300 ].each do |source|
+      segments = LongDocuments::Segmenter.call(source, target_characters: 256)
+      assert_equal source, segments.sum("", &:source_text)
+      assert segments.all? { |segment| segment.source_text.present? }
+      assert_equal segments, LongDocuments::Segmenter.call(source, target_characters: 256)
+    end
+  end
+
+  test "planner keeps a source with only one nonblank segment in whole-document execution" do
+    source = "語" * LongDocuments::Segmenter::TARGET_CHARACTERS + "\n"
+    project = users(:normal).projects.create!(name: "Whitespace boundary", source_language: "ja", target_language: "en")
+    experiment = project.documents.create!(title: "Source", source_text: source).experiments.create!(
+      instruction_prompt: "Translate faithfully."
+    )
+
+    assert_no_difference -> { DocumentExecutionPlan.count } do
+      assert_nil LongDocuments::Planner.call(experiment)
+    end
+    assert_equal source, experiment.document.reload.source_text
+  end
 end

@@ -12,8 +12,13 @@ module ApplicationHelper
     end
   end
 
-  def safe_provider_error(message)
-    Ai::ErrorSanitizer.call(message)
+  def safe_provider_error(_message)
+    # Historical rows may contain provider bodies from before safe error storage.
+    "AI work failed. Review the error code before retrying explicitly."
+  end
+
+  def safe_provider_error_code(code)
+    Ai::RunResult.safe_error_code(code)
   end
 
   def analytics_number(value, precision: 2)

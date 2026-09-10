@@ -94,7 +94,7 @@
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p class="font-semibold">Judge failed</p>
             <% if judge_run.error_code.present? %>
-              <p class="mt-1">Error code: <span class="font-mono"><%= judge_run.error_code %></span></p>
+              <p class="mt-1">Error code: <span class="font-mono"><%= safe_provider_error_code(judge_run.error_code) %></span></p>
             <% end %>
             <% if judge_run.error_message.present? %>
               <p class="mt-1 break-words"><%= safe_provider_error(judge_run.error_message) %></p>

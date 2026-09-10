@@ -158,6 +158,79 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     assert_equal TranslationReferences::ContextBudgetMessage::MESSAGE, pipeline.blocked_message
   end
 
+  test "review budget failure rolls back the entire stage before recording its block" do
+    pipeline = create_pipeline_run(experiment: create_completed_experiment)
+    reviewer = llm_models(:openrouter_claude)
+    reviewer.update!(context_window_tokens: 6_000, max_output_tokens: 4_096)
+
+    assert_no_difference [ -> { ReviewRound.count }, -> { ReviewRun.count }, -> { ReviewEvaluation.count } ] do
+      assert_no_enqueued_jobs only: ReviewRunJob do
+        Pipelines::Reconcile.call
+      end
+    end
+    assert pipeline.reload.blocked?
+    assert pipeline.current_stage_translation?
+    assert_nil pipeline.experiment.reload.review_round
+
+    reviewer.update!(context_window_tokens: 100_000, max_output_tokens: 4_096)
+    assert_enqueued_jobs 1, only: ReviewRunJob do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+    assert pipeline.reload.current_stage_review?
+  end
+
+  test "judge budget failure leaves no partial round and can recover" do
+    review = create_completed_review_round
+    pipeline = create_pipeline_run(experiment: review.experiment)
+    Pipelines::Advance.call(pipeline_run: pipeline)
+    judge = llm_models(:openrouter_gpt)
+    judge.update!(context_window_tokens: 6_000, max_output_tokens: 4_096)
+    clear_enqueued_jobs
+
+    assert_no_difference [ -> { JudgeRound.count }, -> { JudgeRun.count }, -> { JudgeEvaluation.count } ] do
+      assert_no_enqueued_jobs only: JudgeRunJob do
+        Pipelines::Advance.call(pipeline_run: pipeline)
+      end
+    end
+    assert pipeline.reload.blocked?
+    assert pipeline.current_stage_review?
+
+    judge.update!(context_window_tokens: 100_000, max_output_tokens: 4_096)
+    assert_enqueued_jobs 1, only: JudgeRunJob do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+    assert pipeline.reload.current_stage_judge?
+  end
+
+  test "refinement budget failure rolls back draft and round creation together" do
+    review = create_completed_review_round
+    profile = create_workflow_profile(completion_mode: "refinement_proposals")
+    pipeline = create_pipeline_run(experiment: review.experiment, profile: profile)
+    2.times { Pipelines::Advance.call(pipeline_run: pipeline) }
+    judge_round = review.reload.judge_round
+    complete_judge_run(judge_round.judge_runs.sole)
+    Judging::ReconcileRound.call(judge_round)
+    finalizer = llm_models(:openrouter_claude)
+    finalizer.update!(context_window_tokens: 6_000, max_output_tokens: 4_096)
+    clear_enqueued_jobs
+
+    assert_no_difference [ -> { FinalTranslation.count }, -> { FinalTranslationVersion.count },
+                          -> { FinalizationRound.count }, -> { FinalizationRun.count } ] do
+      assert_no_enqueued_jobs only: FinalizationRunJob do
+        Pipelines::Advance.call(pipeline_run: pipeline)
+      end
+    end
+    assert pipeline.reload.blocked?
+    assert pipeline.current_stage_judge?
+    assert_not pipeline.events.exists?(event_key: "final_workspace_created")
+
+    finalizer.update!(context_window_tokens: 100_000, max_output_tokens: 4_096)
+    assert_enqueued_jobs 1, only: FinalizationRunJob do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+    assert pipeline.reload.current_stage_finalization?
+  end
+
   test "repeated block and resume episodes are distinct while unchanged reconciliation is deduplicated" do
     experiment = create_failed_experiment
     pipeline = create_pipeline_run(experiment: experiment)

@@ -98,7 +98,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     run.update!(
       status: :failed,
       completed_at: Time.current,
-      error_code: "provider_error",
+      error_code: "PRIVATE_PROVIDER_ERROR_CODE",
       error_message: "Bearer provider-secret <script>alert('unsafe')</script>"
     )
     Judging::ReconcileRound.call(round)
@@ -108,8 +108,9 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", "No official aggregate winner"
     assert_select "article", text: /Judge failed/
-    assert_includes response.body, "[FILTERED]"
-    assert_includes response.body, "&lt;script&gt;alert"
+    assert_includes response.body, "AI work failed."
+    assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
+    assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"
     assert_not_includes response.body, "<script>alert('unsafe')</script>"
   end
