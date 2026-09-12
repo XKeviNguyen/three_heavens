@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
-require "json"
-
 begin
   json = ARGV.delete("--json")
   ENV["RAILS_ENV"] ||= "production"
