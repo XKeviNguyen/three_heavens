@@ -50,6 +50,17 @@ module SourceImports
       }.code
     end
 
+    test "detects genuine DOCX with the common x-zip-compressed declaration" do
+      result = Detector.call(
+        filename: "source.docx",
+        bytes: build_docx,
+        declared_content_type: "application/x-zip-compressed"
+      )
+
+      assert_equal "docx", result.format
+      assert_equal Detector::DOCX_MIME, result.content_type
+    end
+
     test "extracts DOCX paragraphs tabs breaks tables Unicode entities and skips deleted text" do
       xml = basic_document_xml(<<~XML)
         <w:p><w:r><w:t>Japanese 日本語 &amp; Vietnamese tiếng Việt</w:t><w:tab/><w:t>tabbed</w:t><w:br/><w:t>break</w:t></w:r></w:p>
@@ -70,6 +81,27 @@ module SourceImports
       XML
 
       assert_equal "Linked\tcontrol\ninserted and moved here\u00ADsoft\u2011fixed\nJanuary 1\nBefore Box one\nBox two",
+                   TextExtractor.call(format: "docx", bytes: build_docx(document_xml: xml))
+    end
+
+    test "honors WordprocessingML on-off values for hidden run properties" do
+      xml = basic_document_xml(<<~XML)
+        <w:p>
+          <w:r><w:t>Visible:</w:t></w:r>
+          <w:r><w:rPr><w:vanish w:val="0"/></w:rPr><w:t> vanish-zero</w:t></w:r>
+          <w:r><w:rPr><w:vanish w:val="false"/></w:rPr><w:t> vanish-false</w:t></w:r>
+          <w:r><w:rPr><w:vanish w:val="off"/></w:rPr><w:t> vanish-off</w:t></w:r>
+          <w:r><w:rPr><w:webHidden w:val="0"/></w:rPr><w:t> web-zero</w:t></w:r>
+          <w:r><w:rPr><w:webHidden w:val="false"/></w:rPr><w:t> web-false</w:t></w:r>
+          <w:r><w:rPr><w:webHidden w:val="off"/></w:rPr><w:t> web-off</w:t></w:r>
+          <w:r><w:rPr><w:vanish/></w:rPr><w:t> hidden-default</w:t></w:r>
+          <w:r><w:rPr><w:vanish w:val="1"/></w:rPr><w:t> hidden-one</w:t></w:r>
+          <w:r><w:rPr><w:webHidden w:val="true"/></w:rPr><w:t> hidden-true</w:t></w:r>
+          <w:r><w:rPr><w:webHidden w:val="on"/></w:rPr><w:t> hidden-on</w:t></w:r>
+        </w:p>
+      XML
+
+      assert_equal "Visible: vanish-zero vanish-false vanish-off web-zero web-false web-off",
                    TextExtractor.call(format: "docx", bytes: build_docx(document_xml: xml))
     end
 
@@ -283,6 +315,160 @@ module SourceImports
         [Footer: default]
         Footer
       TEXT
+    end
+
+    test "includes only notes referenced by visible current text" do
+      content_types = CONTENT_TYPES_XML.sub(
+        "</Types>",
+        <<~XML
+          <Override PartName="/word/footnotes.xml" ContentType="#{DocxExtractor::SECONDARY_CONTENT_TYPES.fetch("footnotes")}"/>
+          <Override PartName="/word/endnotes.xml" ContentType="#{DocxExtractor::SECONDARY_CONTENT_TYPES.fetch("endnotes")}"/>
+        </Types>
+        XML
+      )
+      relationships = <<~XML
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>
+          <Relationship Id="rEndnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/>
+        </Relationships>
+      XML
+      body = <<~XML
+        <w:p><w:r><w:t>Visible footnote</w:t><w:footnoteReference w:id="1"/></w:r></w:p>
+        <w:p><w:r><w:rPr><w:vanish/></w:rPr><w:footnoteReference w:id="2"/></w:r></w:p>
+        <w:p><w:r><w:rPr><w:vanish w:val="false"/></w:rPr><w:t>False vanish</w:t><w:footnoteReference w:id="3"/></w:r></w:p>
+        <w:p><w:del><w:r><w:footnoteReference w:id="4"/></w:r></w:del><w:moveFrom><w:r><w:footnoteReference w:id="5"/></w:r></w:moveFrom></w:p>
+        <w:p><w:r><w:t>Visible endnote</w:t><w:endnoteReference w:id="6"/></w:r></w:p>
+        <w:p><w:r><w:rPr><w:webHidden w:val="on"/></w:rPr><w:endnoteReference w:id="7"/></w:r></w:p>
+        <w:p><w:r><w:rPr><w:webHidden w:val="off"/></w:rPr><w:t>False web hidden</w:t><w:endnoteReference w:id="8"/></w:r></w:p>
+      XML
+      footnotes = <<~XML
+        <w:footnotes xmlns:w="#{DocxExtractor::WORD_NAMESPACE}">
+          #{(1..5).map { |id| %(<w:footnote w:id="#{id}"><w:p><w:r><w:t>Footnote #{id}</w:t></w:r></w:p></w:footnote>) }.join}
+        </w:footnotes>
+      XML
+      endnotes = <<~XML
+        <w:endnotes xmlns:w="#{DocxExtractor::WORD_NAMESPACE}">
+          #{(6..8).map { |id| %(<w:endnote w:id="#{id}"><w:p><w:r><w:t>Endnote #{id}</w:t></w:r></w:p></w:endnote>) }.join}
+        </w:endnotes>
+      XML
+      bytes = build_docx(document_xml: basic_document_xml(body), entries: {
+        "[Content_Types].xml" => content_types,
+        "word/_rels/document.xml.rels" => relationships,
+        "word/footnotes.xml" => footnotes,
+        "word/endnotes.xml" => endnotes
+      })
+
+      assert_equal <<~TEXT.chomp, TextExtractor.call(format: "docx", bytes:)
+        Visible footnote[1]
+
+        False vanish[3]
+
+        Visible endnote[6]
+
+        False web hidden[8]
+
+        [Footnotes]
+        [1] Footnote 1
+        [3] Footnote 3
+
+        [Endnotes]
+        [6] Endnote 6
+        [8] Endnote 8
+      TEXT
+    end
+
+    test "treats numbering id zero as removal of numbering" do
+      body = <<~XML
+        <w:p><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr><w:r><w:t>Plain paragraph</w:t></w:r></w:p>
+      XML
+
+      assert_equal "Plain paragraph", TextExtractor.call(format: "docx", bytes: build_docx(document_xml: basic_document_xml(body)))
+    end
+
+    test "extracts active section headers and footers without reading historical sectPrChange references" do
+      content_types = CONTENT_TYPES_XML.sub(
+        "</Types>",
+        <<~XML
+          <Override PartName="/word/header1.xml" ContentType="#{DocxExtractor::SECONDARY_CONTENT_TYPES.fetch("header")}"/>
+          <Override PartName="/word/footer1.xml" ContentType="#{DocxExtractor::SECONDARY_CONTENT_TYPES.fetch("footer")}"/>
+        </Types>
+        XML
+      )
+      relationships = <<~XML
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+          <Relationship Id="rFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+        </Relationships>
+      XML
+      body = <<~XML
+        <w:p><w:r><w:t>Current body</w:t></w:r></w:p>
+        <w:sectPr>
+          <w:headerReference w:type="default" r:id="rHeader"/>
+          <w:footerReference w:type="default" r:id="rFooter"/>
+          <w:sectPrChange><w:sectPr><w:headerReference r:id="rRemovedHeader"/><w:footerReference r:id="rRemovedFooter"/></w:sectPr></w:sectPrChange>
+        </w:sectPr>
+      XML
+      document = basic_document_xml(body).sub(
+        "<w:document ",
+        '<w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+      )
+      bytes = build_docx(document_xml: document, entries: {
+        "[Content_Types].xml" => content_types,
+        "word/_rels/document.xml.rels" => relationships,
+        "word/header1.xml" => "<w:hdr xmlns:w=\"#{DocxExtractor::WORD_NAMESPACE}\"><w:p><w:r><w:t>Current header</w:t></w:r></w:p></w:hdr>",
+        "word/footer1.xml" => "<w:ftr xmlns:w=\"#{DocxExtractor::WORD_NAMESPACE}\"><w:p><w:r><w:t>Current footer</w:t></w:r></w:p></w:ftr>"
+      })
+
+      assert_equal <<~TEXT.chomp, TextExtractor.call(format: "docx", bytes:)
+        Current body
+
+        [Header: default]
+        Current header
+
+        [Footer: default]
+        Current footer
+      TEXT
+    end
+
+    test "accepts relationship parts for package root root-level and nested parts only" do
+      root_part_relationships = <<~XML
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rRootTarget" Type="urn:test" Target="root-target.xml"/>
+        </Relationships>
+      XML
+      nested_part_relationships = <<~XML
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rNestedTarget" Type="urn:test" Target="nested-target.xml"/>
+        </Relationships>
+      XML
+      valid = build_docx(entries: {
+        "custom.xml" => "<custom/>",
+        "root-target.xml" => "<target/>",
+        "_rels/custom.xml.rels" => root_part_relationships,
+        "word/custom.xml" => "<custom/>",
+        "word/nested-target.xml" => "<target/>",
+        "word/_rels/custom.xml.rels" => nested_part_relationships
+      })
+
+      assert_includes DocxExtractor.call(valid), "Faith & hope"
+
+      malformed = build_docx(entries: { "_rels/nested/custom.xml.rels" => root_part_relationships })
+      assert_equal "malformed_docx", assert_raises(Error) { DocxExtractor.call(malformed) }.code
+
+      traversal = build_docx(entries: { "_rels/../custom.xml.rels" => root_part_relationships })
+      assert_equal "unsafe_docx", assert_raises(Error) { DocxExtractor.call(traversal) }.code
+
+      traversal_target = <<~XML
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rTraversal" Type="urn:test" Target="../outside.xml"/>
+        </Relationships>
+      XML
+      unsafe_target = build_docx(entries: {
+        "custom.xml" => "<custom/>",
+        "outside.xml" => "<outside/>",
+        "_rels/custom.xml.rels" => traversal_target
+      })
+      assert_equal "unsafe_docx", assert_raises(Error) { DocxExtractor.call(unsafe_target) }.code
     end
 
     test "rejects duplicate package declarations unsafe external parts and embedded objects" do

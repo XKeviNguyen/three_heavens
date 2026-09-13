@@ -4,7 +4,7 @@ module SourceImports
   class Detector
     DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     DOCM_MIME = "application/vnd.ms-word.document.macroenabled.12"
-    GENERIC_MIMES = [ "application/octet-stream", "application/zip" ].freeze
+    GENERIC_MIMES = [ "application/octet-stream", "application/zip", "application/x-zip-compressed" ].freeze
     TEXT_MIMES = %w[text/plain].freeze
     MARKDOWN_MIMES = %w[text/plain text/markdown text/x-markdown].freeze
 

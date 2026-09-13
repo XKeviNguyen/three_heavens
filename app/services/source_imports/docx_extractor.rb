@@ -242,6 +242,9 @@ module SourceImports
     def source_part_for_relationships(name)
       return nil if name == "_rels/.rels"
 
+      root_match = name.match(%r{\A_rels/([^/]+)\.rels\z})
+      return root_match[1] if root_match
+
       match = name.match(%r{\A(.+)/_rels/([^/]+)\.rels\z})
       match ? "#{match[1]}/#{match[2]}" : :invalid
     end
@@ -436,8 +439,7 @@ module SourceImports
       unless node.namespace&.href == namespace.fetch("w")
         return ensure_text_limit!(node.element_children.map { |child| extract_inline(child, namespace, depth: depth + 1) }.join)
       end
-      return "" if DELETED_CONTAINERS.include?(node.name)
-      return "" if node.name == "r" && hidden_run?(node, namespace)
+      return "" if excluded_inline_node?(node, namespace)
 
       case node.name
       when "t" then node.text
@@ -460,7 +462,26 @@ module SourceImports
     end
 
     def hidden_run?(run, namespace)
-      run.at_xpath("./w:rPr/w:vanish | ./w:rPr/w:webHidden", namespace).present?
+      run.xpath("./w:rPr/w:vanish | ./w:rPr/w:webHidden", namespace).any? do |property|
+        word_on_off_enabled?(property)
+      end
+    end
+
+    def word_on_off_enabled?(property)
+      value = word_attribute(property, "val")
+      return true if value.nil? || value.in?(%w[1 true on])
+      return false if value.in?(%w[0 false off])
+
+      raise malformed_error
+    end
+
+    def excluded_inline_node?(node, namespace)
+      node.element? && node.namespace&.href == namespace.fetch("w") &&
+        (DELETED_CONTAINERS.include?(node.name) || (node.name == "r" && hidden_run?(node, namespace)))
+    end
+
+    def visible_inline_node?(node, namespace)
+      node.ancestors.none? { |ancestor| excluded_inline_node?(ancestor, namespace) }
     end
 
     def numbering_prefix(paragraph, namespace)
@@ -468,8 +489,11 @@ module SourceImports
       return "" unless num_properties
 
       num_id = word_attribute(num_properties.at_xpath("./w:numId", namespace), "val")
+      raise malformed_error unless integer_string?(num_id)
+      return "" if num_id.to_i.zero?
+
       level_index = word_attribute(num_properties.at_xpath("./w:ilvl", namespace), "val").presence || "0"
-      raise malformed_error unless integer_string?(num_id) && integer_string?(level_index)
+      raise malformed_error unless integer_string?(level_index)
 
       level_number = level_index.to_i
       levels = @numbering_levels.fetch(num_id) { raise malformed_error }
@@ -534,7 +558,8 @@ module SourceImports
     end
 
     def extract_notes(body, namespace, kind:, relationship_kind:)
-      reference_ids = body.xpath(".//w:#{kind}Reference[not(ancestor::w:del) and not(ancestor::w:moveFrom)]", namespace)
+      reference_ids = body.xpath(".//w:#{kind}Reference", namespace)
+                          .select { |node| visible_inline_node?(node, namespace) }
                           .filter_map { |node| word_attribute(node, "id") }
                           .select { |id| integer_string?(id) && id.to_i.positive? }
                           .uniq
@@ -556,7 +581,7 @@ module SourceImports
     end
 
     def extract_headers_or_footers(document, namespace, kind:)
-      references = document.xpath("//w:#{kind}Reference", namespace)
+      references = document.xpath("//w:sectPr/w:#{kind}Reference[not(ancestor::w:sectPrChange)]", namespace)
       seen_targets = Set.new
       references.filter_map do |reference|
         relationship_id = relationship_attribute(reference, "id")
