@@ -266,7 +266,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "TXT download preserves UTF-8 with a sanitized state-aware attachment filename" do
-    unicode = "Bản dịch cuối cùng — 神学"
+    unicode = "Bản dịch cuối cùng — 神学\n\nTabbed\tvalue\n#{'bounded text ' * 1_000}"
     @final_translation.experiment.document.update!(title: "Sermon\r\nunsafe")
     FinalTranslations::SaveRevision.call(
       final_translation: @final_translation,
@@ -278,7 +278,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal unicode, response.body.force_encoding(Encoding::UTF_8)
-    assert_match(%r{\Atext/plain}, response.media_type)
+    assert_equal "text/plain; charset=utf-8", response.headers.fetch("Content-Type")
     assert_includes response.headers.fetch("Content-Disposition"),
                     "Sermonunsafe-draft.txt"
     refute_match(/[\r\n]/, response.headers.fetch("Content-Disposition"))

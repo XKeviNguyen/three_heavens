@@ -1,4 +1,10 @@
 class SourceImport < ApplicationRecord
+  AVAILABILITY_MESSAGES = {
+    expired: "has expired; upload the source file again",
+    already_consumed: "was already used",
+    unavailable: "is no longer available; upload the source file again"
+  }.freeze
+
   belongs_to :user
   belongs_to :resulting_document, class_name: "Document", optional: true
 
@@ -40,6 +46,19 @@ class SourceImport < ApplicationRecord
 
   def available?(at: Time.current)
     ready? && consumed_at.nil? && source_file.attached? && expires_at > at
+  end
+
+  def availability_failure(at: Time.current)
+    return if available?(at:)
+    return :already_consumed if consumed? || consumed_at.present?
+    return :expired if expires_at <= at
+
+    :unavailable
+  end
+
+  def availability_message(at: Time.current)
+    failure = availability_failure(at:)
+    AVAILABILITY_MESSAGES.fetch(failure) if failure
   end
 
   private

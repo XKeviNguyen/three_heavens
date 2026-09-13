@@ -11,6 +11,13 @@ module DocumentIoTestHelper
     </Types>
   XML
 
+  PACKAGE_RELATIONSHIPS_XML = <<~XML.freeze
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+    </Relationships>
+  XML
+
   def uploaded_file(bytes, filename:, content_type: "application/octet-stream")
     Rack::Test::UploadedFile.new(
       StringIO.new(bytes),
@@ -25,6 +32,7 @@ module DocumentIoTestHelper
     buffer = Zip::OutputStream.write_buffer(**options) do |zip|
       {
         "[Content_Types].xml" => CONTENT_TYPES_XML,
+        "_rels/.rels" => PACKAGE_RELATIONSHIPS_XML,
         "word/document.xml" => document_xml
       }.merge(entries).each do |name, contents|
         zip.put_next_entry(name)

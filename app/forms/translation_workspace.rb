@@ -301,8 +301,8 @@ class TranslationWorkspace
 
     if source_import.nil? || source_import.user_id != user&.id
       errors.add(:source_import_id, "is not available")
-    elsif !source_import.available?(at: current_time)
-      errors.add(:source_import_id, "is no longer available")
+    elsif source_import.availability_failure(at: current_time)
+      errors.add(:source_import_id, source_import.availability_message(at: current_time))
     elsif !SourceImports::ProjectBinding.valid?(
       token: source_import_project_token,
       source_import:,

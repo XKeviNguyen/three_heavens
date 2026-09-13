@@ -34,7 +34,7 @@ class TranslationWorkspacesController < ApplicationController
       document_title: source_import && File.basename(source_import.original_filename, ".*")
     }, existing_project: project)
     if source_import && !source_import.available?
-      @translation_workspace.errors.add(:source_import_id, "is no longer available")
+      @translation_workspace.errors.add(:source_import_id, source_import.availability_message)
     end
   rescue ActionController::BadRequest
     head :bad_request
