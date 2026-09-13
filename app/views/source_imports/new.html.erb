@@ -13,7 +13,7 @@
       <%= form.file_field :source_file, required: true, accept: ".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" %>
     </div>
     <div class="flex flex-wrap gap-3">
-      <%= form.submit "Upload and preview", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
+      <%= form.submit "Upload and preview", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-wait disabled:bg-blue-400", data: { turbo_submits_with: "Extracting source…" } %>
       <%= link_to "Back to pasted text", new_translation_workspace_path(project_id: @project&.id), class: "rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50" %>
     </div>
   <% end %>

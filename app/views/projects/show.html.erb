@@ -33,6 +33,7 @@
             <% document.experiments.sort_by { |experiment| [experiment.created_at, experiment.id] }.reverse_each do |experiment| %>
               <% review_round = experiment.review_round %>
               <% judge_round = review_round&.judge_round %>
+              <% next_action_label, next_action_path = experiment_next_action(experiment) %>
               <section class="rounded-lg border border-slate-200 bg-slate-50 p-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -52,12 +53,13 @@
                   <span>Final translation: <strong><%= experiment.final_translation&.status&.humanize || "Not created" %></strong></span>
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-4 border-t border-slate-200 pt-3 text-sm font-semibold">
-                  <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
-                  <% if experiment.pipeline_run %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if review_round %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if judge_round %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if experiment.final_translation %><%= link_to "Final translation", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3 text-sm font-semibold">
+                  <%= link_to next_action_label, next_action_path, class: "rounded-lg bg-blue-700 px-3 py-2 text-white hover:bg-blue-800" %>
+                  <% unless next_action_path == experiment_path(experiment) %><%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to "Final translation", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
                 </div>
               </section>
             <% end %>
@@ -66,13 +68,7 @@
       <% end %>
     </section>
 
-    <% if @total_pages > 1 %>
-      <nav class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm" aria-label="Document pagination">
-        <div><% if @current_page > 1 %><%= link_to "← Newer", project_path(@project, page: @current_page - 1), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
-        <p class="text-slate-600">Page <%= @current_page %> of <%= @total_pages %> · <%= @total_count %> documents</p>
-        <div><% if @current_page < @total_pages %><%= link_to "Older →", project_path(@project, page: @current_page + 1), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
-      </nav>
-    <% end %>
+    <%= render "shared/pagination", pagination: { current_page: @current_page, total_pages: @total_pages, total_count: @total_count }, label: "Documents" %>
   <% end %>
 
   <%= link_to "← All Projects", projects_path, class: "inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>

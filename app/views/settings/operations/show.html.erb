@@ -31,12 +31,12 @@
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-          <tr><th class="px-6 py-3">Workflow</th><th class="px-6 py-3">Pending</th><th class="px-6 py-3">Running</th><th class="px-6 py-3">Failed</th><th class="px-6 py-3">Stale pending</th><th class="px-6 py-3">Stale running</th><th class="px-6 py-3">Oldest active</th></tr>
+          <tr><th scope="col" class="px-6 py-3">Workflow</th><th scope="col" class="px-6 py-3">Pending</th><th scope="col" class="px-6 py-3">Running</th><th scope="col" class="px-6 py-3">Failed</th><th scope="col" class="px-6 py-3">Stale pending</th><th scope="col" class="px-6 py-3">Stale running</th><th scope="col" class="px-6 py-3">Oldest active</th></tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           <% @health.workflows.each do |workflow| %>
             <tr>
-              <th class="px-6 py-4 text-left font-semibold text-slate-900"><%= workflow.fetch(:label) %></th>
+              <th scope="row" class="px-6 py-4 text-left font-semibold text-slate-900"><%= workflow.fetch(:label) %></th>
               <% %w[pending running failed].each do |status| %><td class="px-6 py-4 text-slate-700"><%= workflow.dig(:counts, status) %></td><% end %>
               <td class="px-6 py-4 font-semibold <%= workflow.fetch(:stale_pending_count).positive? ? 'text-red-700' : 'text-slate-700' %>"><%= workflow.fetch(:stale_pending_count) %></td>
               <td class="px-6 py-4 font-semibold <%= workflow.fetch(:stale_running_count).positive? ? 'text-red-700' : 'text-slate-700' %>"><%= workflow.fetch(:stale_running_count) %></td>
@@ -64,7 +64,7 @@
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">Stale reconciliation</h2>
     <p class="mt-2 text-sm text-slate-600">This marks stale pending and running records failed and reconciles parent workflows. It is idempotent and never starts a provider request; owners decide whether to retry afterward.</p>
-    <%= button_to "Reconcile stale work now", reconcile_stale_settings_operations_path, method: :post, class: "mt-4 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800" %>
+    <%= button_to "Reconcile stale work now", reconcile_stale_settings_operations_path, method: :post, data: { turbo_confirm: "Mark all currently stale AI records as failed and reconcile their parent workflows? No provider work will start.", turbo_submits_with: "Reconciling…" }, class: "mt-4 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800" %>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

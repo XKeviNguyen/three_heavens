@@ -32,12 +32,6 @@
       <% end %>
     </section>
 
-    <% if @total_pages > 1 %>
-      <nav class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm" aria-label="Project pagination">
-        <div><% if @current_page > 1 %><%= link_to "← Newer", projects_path(page: @current_page - 1), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
-        <p class="text-slate-600">Page <%= @current_page %> of <%= @total_pages %> · <%= @total_count %> projects</p>
-        <div><% if @current_page < @total_pages %><%= link_to "Older →", projects_path(page: @current_page + 1), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %><% end %></div>
-      </nav>
-    <% end %>
+    <%= render "shared/pagination", pagination: { current_page: @current_page, total_pages: @total_pages, total_count: @total_count }, label: "Projects" %>
   <% end %>
 </div>

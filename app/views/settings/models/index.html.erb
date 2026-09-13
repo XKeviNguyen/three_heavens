@@ -25,18 +25,18 @@
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
           <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th class="px-4 py-3">Model</th>
-              <th class="px-4 py-3">Provider / gateway</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3">Usage</th>
-              <th class="px-4 py-3 text-right">Actions</th>
+              <th scope="col" class="px-4 py-3">Model</th>
+              <th scope="col" class="px-4 py-3">Provider / gateway</th>
+              <th scope="col" class="px-4 py-3">Status</th>
+              <th scope="col" class="px-4 py-3">Usage</th>
+              <th scope="col" class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
             <% @llm_models.each do |llm_model| %>
               <% usage = @usage_by_model_id.fetch(llm_model.id) %>
               <tr data-model-id="<%= llm_model.id %>">
-                <th class="px-4 py-4 font-normal">
+                <th scope="row" class="px-4 py-4 font-normal">
                   <p class="font-semibold text-slate-950"><%= llm_model.display_name %></p>
                   <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= llm_model.model_identifier %></p>
                   <p class="mt-1 text-xs text-slate-500"><% if llm_model.context_window_tokens && llm_model.max_output_tokens %><%= number_with_delimiter(llm_model.context_window_tokens) %> context · <%= number_with_delimiter(llm_model.max_output_tokens) %> max output tokens<% else %>Context capability not configured<% end %></p>

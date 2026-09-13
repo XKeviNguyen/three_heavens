@@ -7,9 +7,9 @@ class WorkflowProfilesController < ApplicationController
   before_action :load_models, only: %i[new create edit update]
 
   def index
-    @workflow_profiles = current_user.workflow_profiles.includes(
+    @workflow_profiles = paginate(current_user.workflow_profiles.includes(
       current_revision: :model_selections
-    ).order(active: :desc, updated_at: :desc, id: :desc)
+    ).order(active: :desc, updated_at: :desc, id: :desc))
   end
 
   def new
@@ -27,9 +27,10 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def show
-    @workflow_profile = current_user.workflow_profiles.includes(
-      revisions: [ :pipeline_runs, { model_selections: :llm_model } ]
-    ).find(@workflow_profile.id)
+    @workflow_profile = current_user.workflow_profiles.find(@workflow_profile.id)
+    @revisions = paginate(
+      @workflow_profile.revisions.includes(:pipeline_runs, model_selections: :llm_model)
+    )
   end
 
   def edit

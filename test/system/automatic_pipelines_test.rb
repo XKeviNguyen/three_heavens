@@ -21,7 +21,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     assert_text "Judges (1)"
     assert_text "Finalizers (0)"
 
-    click_link "Edit"
+    click_link "Create revision"
     fill_in "Name", with: "Browser winner profile revised"
     click_button "Create new revision"
     assert_text "Workflow profile revision 2 created."
@@ -49,11 +49,17 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     visit new_translation_workspace_path
     fill_workspace
+    assert_selector "fieldset[data-workflow-mode-target='manual']", visible: true
+    assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: false
     choose "Automatic pipeline"
+    assert_selector "fieldset[data-workflow-mode-target='manual']", visible: false
+    assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
     click_button "Start translation runs"
     assert_text "Automatic confirmation must be accepted for each launch"
+    assert_field "Automatic pipeline", checked: true
+    assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     assert_equal 0, PipelineRun.count
 
     check "translation_workspace_automatic_confirmation"
@@ -88,9 +94,9 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     assert_text "Signed out successfully."
     sign_in_in_browser(users(:other), "other secure password value")
     visit workflow_profile_path(profile)
-    assert_text "Couldn't find WorkflowProfile"
+    assert_text "We couldn’t find that page"
     visit pipeline_run_path(pipeline)
-    assert_text "Couldn't find PipelineRun"
+    assert_text "We couldn’t find that page"
   end
 
   private

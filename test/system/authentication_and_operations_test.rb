@@ -26,8 +26,10 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   test "admin reaches model settings and operations" do
     sign_in_in_browser(users(:admin), "admin secure password value")
 
+    find("summary", text: /Menu|Admin/).click
     click_link "Settings / Models"
     assert_text "OpenRouter model catalog"
+    find("summary", text: /Menu|Admin/).click
     click_link "Operations"
     assert_text "AI workflow operations"
   end
@@ -41,7 +43,9 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_text "Recover failed translations"
     assert_text "incur additional cost"
     assert_enqueued_with(job: TranslationRunJob, args: [ failed_run.id ]) do
-      click_button "Retry failed translations"
+      accept_confirm(/new provider requests/) do
+        click_button "Retry failed translations"
+      end
       assert_text "Queued 1 failed translation run(s) for retry."
     end
     assert failed_run.reload.pending?
@@ -106,6 +110,15 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     end
 
     assert Document.order(:id).last.pasted_text?
+    page.current_window.resize_to(320, 844)
+    visit projects_path
+    assert_selector "summary", text: "Menu"
+    find("summary", text: "Menu").click
+    assert_link "Projects"
+    viewport_width = page.evaluate_script("document.documentElement.clientWidth")
+    assert_operator viewport_width, :<=, 500
+    assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, viewport_width
+    page.current_window.resize_to(1400, 1000)
   end
 
   test "owner edits approves reopens and downloads a final translation without provider work" do
@@ -125,7 +138,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_field "Final translation draft", with: "Human-edited browser revision"
     assert_text "Version 2"
 
-    accept_confirm "Finalize version 2 as the approved final translation?" do
+    accept_confirm(/Finalize version 2 as the approved final translation/) do
       click_button "Finalize current version"
     end
     assert_text "Final translation finalized."
@@ -134,7 +147,9 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_link "Download TXT"
     assert_link "Download DOCX"
 
-    click_button "Reopen for editing"
+    accept_confirm(/Reopen this approved translation for editing/) do
+      click_button "Reopen for editing"
+    end
     assert_text "Final translation reopened for editing."
     assert_field "Final translation draft", with: "Human-edited browser revision"
     assert_no_enqueued_jobs
