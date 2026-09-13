@@ -31,13 +31,4 @@ class ProjectsController < ApplicationController
       .offset((@current_page - 1) * PER_PAGE)
       .limit(PER_PAGE)
   end
-
-  private
-
-  def normalized_page(total_pages)
-    requested = Integer(params[:page].presence || 1, 10)
-    requested.clamp(1, total_pages)
-  rescue ArgumentError, TypeError
-    1
-  end
 end

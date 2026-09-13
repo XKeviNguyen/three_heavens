@@ -22,6 +22,7 @@
         <% project = experiment.document.project %>
         <% review_round = experiment.review_round %>
         <% judge_round = review_round&.judge_round %>
+        <% next_action_label, next_action_path = experiment_next_action(experiment) %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -60,29 +61,18 @@
           <p class="mt-2 text-sm text-slate-600"><span class="font-semibold">Guidance preference:</span> <%= TranslationGuidance::Policy.label(experiment.guidance_preference) %></p>
           <% if experiment.experiment_reference_revisions.any? %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold">References:</span> <%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · revision #{snapshot.translation_reference_revision.version}" }.to_sentence %></p><% end %>
 
-          <div class="mt-5 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
-            <%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
-            <% if experiment.pipeline_run %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if review_round %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if judge_round %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if experiment.final_translation %><%= link_to "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
+          <div class="mt-5 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
+            <%= link_to next_action_label, next_action_path, class: "rounded-lg bg-blue-700 px-3 py-2 text-white hover:bg-blue-800" %>
+            <% unless next_action_path == experiment_path(experiment) %><%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
           </div>
         </article>
       <% end %>
     </section>
 
-    <nav class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm" aria-label="History pagination">
-      <div>
-        <% if @history.previous_page %>
-          <%= link_to "← Newer", history_path(page: @history.previous_page), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %>
-        <% end %>
-      </div>
-      <p class="text-slate-600">Page <%= @history.current_page %> of <%= @history.total_pages %> · <%= @history.total_count %> experiments</p>
-      <div>
-        <% if @history.next_page %>
-          <%= link_to "Older →", history_path(page: @history.next_page), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %>
-        <% end %>
-      </div>
-    </nav>
+    <%= render "shared/pagination", pagination: { current_page: @history.current_page, total_pages: @history.total_pages, total_count: @history.total_count }, label: "Experiments" %>
   <% end %>
 </div>

@@ -5,7 +5,9 @@ class GlossariesController < ApplicationController
   before_action :set_glossary, only: %i[show edit update activate deactivate]
 
   def index
-    @glossaries = current_user.glossaries.includes(current_revision: :entries).order(active: :desc, updated_at: :desc, id: :desc)
+    @glossaries = paginate(
+      current_user.glossaries.includes(current_revision: :entries).order(active: :desc, updated_at: :desc, id: :desc)
+    )
   end
 
   def new
@@ -22,7 +24,8 @@ class GlossariesController < ApplicationController
   end
 
   def show
-    @glossary = current_user.glossaries.includes(revisions: [ :entries, :experiments ]).find(@glossary.id)
+    @glossary = current_user.glossaries.find(@glossary.id)
+    @revisions = paginate(@glossary.revisions.includes(:entries, :experiments))
   end
 
   def edit

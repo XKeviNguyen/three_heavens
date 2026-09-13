@@ -42,7 +42,7 @@
             <%= link_to "Edit", edit_workflow_profile_path(profile), class: "text-blue-700 hover:text-blue-900" %>
             <%= button_to "Duplicate", duplicate_workflow_profile_path(profile), method: :post, class: "text-blue-700 hover:text-blue-900" %>
             <% if profile.active? %>
-              <%= button_to "Deactivate", deactivate_workflow_profile_path(profile), method: :patch, class: "text-amber-700 hover:text-amber-900" %>
+              <%= button_to "Deactivate", deactivate_workflow_profile_path(profile), method: :patch, data: { turbo_confirm: "Deactivate this workflow profile? Historical pipelines remain unchanged." }, class: "text-amber-700 hover:text-amber-900" %>
             <% else %>
               <%= button_to "Activate", activate_workflow_profile_path(profile), method: :patch, class: "text-emerald-700 hover:text-emerald-900" %>
             <% end %>
@@ -50,5 +50,6 @@
         </article>
       <% end %>
     </section>
+    <%= render "shared/pagination", pagination: @pagination, label: "Workflow profiles" %>
   <% end %>
 </div>

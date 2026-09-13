@@ -1,4 +1,8 @@
 class ApplicationController < ActionController::Base
+  DEFAULT_PAGE_SIZE = 25
+
+  rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+
   before_action :require_authentication
 
   helper_method :current_user, :authenticated?
@@ -10,6 +14,32 @@ class ApplicationController < ActionController::Base
   stale_when_importmap_changes
 
   private
+
+  def paginate(scope, per_page: DEFAULT_PAGE_SIZE)
+    total_count = scope.count
+    total_pages = [ (total_count.to_f / per_page).ceil, 1 ].max
+    current_page = normalized_page(total_pages)
+    @pagination = {
+      current_page: current_page,
+      total_pages: total_pages,
+      total_count: total_count
+    }
+    scope.offset((current_page - 1) * per_page).limit(per_page)
+  end
+
+  def normalized_page(total_pages)
+    requested = Integer(params[:page].presence || 1, 10)
+    requested.clamp(1, total_pages)
+  rescue ArgumentError, TypeError
+    1
+  end
+
+  def render_not_found
+    respond_to do |format|
+      format.html { render "errors/not_found", status: :not_found }
+      format.any { head :not_found }
+    end
+  end
 
   def current_user
     return @current_user if defined?(@current_user)

@@ -68,5 +68,5 @@
     <%= form.file_field :approved_translation_file, accept: ".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full text-sm" %>
   </section>
 
-  <div class="flex justify-end"><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800" %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving reference…" } %></div>
 <% end %>

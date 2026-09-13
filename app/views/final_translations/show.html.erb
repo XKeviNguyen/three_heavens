@@ -25,6 +25,8 @@
     </div>
   </header>
 
+  <%= render "shared/workflow_progress", experiment: experiment %>
+
   <% if running_refinement %>
     <div class="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between" role="status">
       <p><strong>Refinement is still running.</strong> This page will not reload automatically, so text in the editor stays safe.</p>
@@ -153,14 +155,15 @@
           <%= form.hidden_field :expected_version_number, value: current.version_number %>
           <div>
             <%= form.label :content, @stale_save_conflict ? "Your submitted draft" : "Final translation draft", class: "block text-sm font-semibold text-slate-800" %>
-            <%= form.text_area :content, value: (@submitted_content.nil? ? current.content : @submitted_content), rows: 24, maxlength: FinalTranslationVersion::MAX_CONTENT_LENGTH, required: true, class: "mt-2 block w-full rounded-lg border border-slate-300 px-4 py-3 font-serif text-base leading-7 text-slate-950 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+            <%= form.text_area :content, value: (@submitted_content.nil? ? current.content : @submitted_content), rows: 24, maxlength: FinalTranslationVersion::MAX_CONTENT_LENGTH, required: true, aria: { describedby: "draft-editing-help" }, class: "mt-2 block w-full rounded-lg border border-slate-300 px-4 py-3 font-serif text-base leading-7 text-slate-950 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+            <p id="draft-editing-help" class="mt-2 text-xs leading-5 text-slate-500">A manual save creates a new immutable version. Any unapplied AI proposal based on the current version will become historical and can no longer be applied.</p>
           </div>
           <div>
             <%= form.label :change_note, "Change note (optional)", class: "block text-sm font-semibold text-slate-800" %>
             <%= form.text_field :change_note, value: @submitted_change_note, maxlength: FinalTranslationVersion::MAX_CHANGE_NOTE_LENGTH, placeholder: "Briefly describe this revision", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <%= form.submit "Save revision", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
+            <%= form.submit "Save revision", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800", data: { turbo_submits_with: "Saving revision…" } %>
             <p class="text-xs text-slate-500">Saving creates a new immutable version.</p>
           </div>
         <% end %>
@@ -199,8 +202,12 @@
         <% else %>
           <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active OpenRouter finalizer models are available.</p>
         <% end %>
-        <%= form.submit "Start refinement", disabled: @finalizer_models.empty? || running_refinement || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400" %>
+        <%= form.submit "Start refinement", disabled: @finalizer_models.empty? || running_refinement || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: "Start refinement with the selected models? This begins provider work and may incur additional cost. Proposals will not be applied automatically.", turbo_submits_with: "Starting refinement…" } %>
       <% end %>
+    <% end %>
+
+    <% if @final_translation.finalization_rounds.empty? %>
+      <p class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No refinement proposals yet. The human editor can save and finalize the draft without using AI refinement.</p>
     <% end %>
 
     <div class="mt-7 space-y-6">
@@ -216,7 +223,7 @@
             <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
               <p><%= pluralize(failed_runs.size, "failed refinement") %>. Completed proposals remain immutable. Retrying may make another provider request and incur additional cost.</p>
               <% if retry_valid %>
-                <%= button_to "Retry failed refinements", retry_failed_final_translation_finalization_round_path(@final_translation, round), method: :post, class: "mt-3 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+                <%= button_to "Retry failed refinements", retry_failed_final_translation_finalization_round_path(@final_translation, round), method: :post, data: { turbo_confirm: "Retry the failed refinements? This may make new provider requests and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-3 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
               <% elsif current.id != round.base_final_translation_version_id %>
                 <p class="mt-2 font-semibold text-amber-900">This round targets an older draft version and cannot be retried.</p>
               <% else %>
@@ -258,7 +265,7 @@
                     </div>
                   <% end %>
                   <% if applicable %>
-                    <%= button_to "Apply proposal", apply_proposal_final_translation_path(@final_translation), method: :post, params: { proposal: { finalization_run_id: run.id } }, class: "mt-4 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" %>
+                    <%= button_to "Apply proposal", apply_proposal_final_translation_path(@final_translation), method: :post, params: { proposal: { finalization_run_id: run.id } }, data: { turbo_confirm: "Apply this proposal as a new editable revision? Your current version remains in immutable history.", turbo_submits_with: "Applying proposal…" }, class: "mt-4 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" %>
                   <% elsif applied %>
                     <p class="mt-4 text-sm font-medium text-blue-800">Applied as <%= applied_versions.map { |version| "version #{version.version_number}" }.to_sentence %>.</p>
                   <% elsif stale %>
@@ -298,7 +305,7 @@
               <% if version.source_finalization_run %><p class="mt-1 text-xs text-slate-600">AI source: <%= version.source_finalization_run.finalizer_llm_model.display_name %> · <%= version.source_finalization_run.finalizer_llm_model.model_identifier %></p><% end %>
             </div>
             <% if @final_translation.draft? && version.id != current.id %>
-              <%= button_to "Restore as new version", restore_revision_final_translation_path(@final_translation), method: :post, params: { restore: { version_id: version.id, expected_version_number: current.version_number } }, class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+              <%= button_to "Restore as new version", restore_revision_final_translation_path(@final_translation), method: :post, params: { restore: { version_id: version.id, expected_version_number: current.version_number } }, data: { turbo_confirm: "Restore version #{version.version_number} as a new current revision? No history will be deleted.", turbo_submits_with: "Restoring…" }, class: "rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
             <% end %>
           </div>
           <details class="mt-3 rounded-lg bg-slate-50 p-3">
@@ -314,14 +321,14 @@
     <% if @final_translation.draft? %>
       <h2 class="text-xl font-semibold text-slate-950">Approve the final translation</h2>
       <p class="mt-2 text-sm text-slate-700">Finalize marks the current version as the approved final translation and makes it read-only. You can explicitly reopen it later without losing history.</p>
-      <%= button_to "Finalize current version", finalize_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: "Finalize version #{current.version_number} as the approved final translation?" }, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
+      <%= button_to "Finalize current version", finalize_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: "Finalize version #{current.version_number} as the approved final translation? Editing and refinement will be disabled until you explicitly reopen it.", turbo_submits_with: "Finalizing…" }, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
     <% else %>
       <h2 class="text-xl font-semibold text-slate-950">Translation finalized</h2>
       <p class="mt-2 text-sm text-slate-700">Version <%= current.version_number %> is the approved final translation. Reopen only when further editing or refinement is required.</p>
       <div class="mt-4 flex flex-wrap gap-3">
         <%= link_to "Download TXT", download_final_translation_path(@final_translation, format: :txt), class: "rounded-lg border border-emerald-300 bg-white px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100" %>
         <%= link_to "Download DOCX", download_final_translation_path(@final_translation, format: :docx), class: "rounded-lg border border-emerald-300 bg-white px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100" %>
-        <%= button_to "Reopen for editing", reopen_final_translation_path(@final_translation), method: :patch, class: "rounded-lg bg-emerald-700 px-5 py-2 font-semibold text-white hover:bg-emerald-800" %>
+        <%= button_to "Reopen for editing", reopen_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: "Reopen this approved translation for editing? Downloads will be labeled as draft until you finalize again.", turbo_submits_with: "Reopening…" }, class: "rounded-lg bg-emerald-700 px-5 py-2 font-semibold text-white hover:bg-emerald-800" %>
       </div>
     <% end %>
   </section>

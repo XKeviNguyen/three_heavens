@@ -12,8 +12,10 @@ class TranslationReferencesController < ApplicationController
   before_action :set_translation_reference, only: %i[show edit update activate deactivate]
 
   def index
-    @translation_references = current_user.translation_references.includes(:current_revision)
-      .order(active: :desc, updated_at: :desc, id: :desc)
+    @translation_references = paginate(
+      current_user.translation_references.includes(:current_revision)
+        .order(active: :desc, updated_at: :desc, id: :desc)
+    )
   end
 
   def new
@@ -34,8 +36,8 @@ class TranslationReferencesController < ApplicationController
   end
 
   def show
-    @translation_reference = current_user.translation_references.includes(revisions: :experiments)
-      .find(@translation_reference.id)
+    @translation_reference = current_user.translation_references.find(@translation_reference.id)
+    @revisions = paginate(@translation_reference.revisions.includes(:experiments))
   end
 
   def edit

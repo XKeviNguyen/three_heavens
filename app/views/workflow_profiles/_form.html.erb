@@ -1,6 +1,6 @@
 <%= form_with url: form_url, method: form_method, scope: :workflow_profile, class: "space-y-7" do |form| %>
   <% if @form_errors.present? %>
-    <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="profile-errors-heading">
+    <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="profile-errors-heading" role="alert">
       <h2 id="profile-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800"><% @form_errors.each do |message| %><li><%= message %></li><% end %></ul>
     </section>
@@ -42,5 +42,5 @@
     </fieldset>
   <% end %>
 
-  <div class="flex justify-end"><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800" %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @workflow_profile&.persisted? ? workflow_profile_path(@workflow_profile) : workflow_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving profile…" } %></div>
 <% end %>

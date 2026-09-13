@@ -48,7 +48,8 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
 
     assert_response :too_many_requests
     assert_equal SessionsController::LOGIN_RATE_LIMIT_WINDOW.to_i.to_s, response.headers["Retry-After"]
-    assert_empty response.body
+    assert_select "[role='alert']", text: /Too many sign-in attempts/
+    assert_select "h1", "Sign in"
     assert_not_authenticated
   end
 

@@ -1,6 +1,6 @@
 <%= form_with url: form_url, method: form_method, scope: :methodology_profile, class: "space-y-7" do |form| %>
   <% if @form_errors.present? %>
-    <section class="rounded-xl border border-red-200 bg-red-50 p-5">
+    <section class="rounded-xl border border-red-200 bg-red-50 p-5" role="alert">
       <h2 class="font-semibold text-red-900">Please correct the following:</h2>
       <ul class="mt-2 list-disc pl-5 text-sm text-red-800"><% @form_errors.each do |message| %><li><%= message %></li><% end %></ul>
     </section>
@@ -21,5 +21,5 @@
       </div>
     </div>
   </section>
-  <div class="flex justify-end"><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white" %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @methodology_profile&.persisted? ? methodology_profile_path(@methodology_profile) : methodology_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white", data: { turbo_submits_with: "Saving revision…" } %></div>
 <% end %>

@@ -15,6 +15,8 @@
     <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@review_round.status) %>"><%= @review_round.status.humanize %></span>
   </header>
 
+  <%= render "shared/workflow_progress", experiment: @review_round.experiment %>
+
   <% unless @review_round.terminal? %>
     <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
       Reviewers are still evaluating the translations. This page refreshes automatically every 5 seconds.
@@ -27,7 +29,7 @@
       <h2 class="text-xl font-semibold text-slate-950">Recover failed reviewers</h2>
       <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed reviewer") %> can be retried in this round. Completed reviews and anonymous candidate mappings stay unchanged. Retrying may make another provider request and incur additional cost.</p>
       <% if failed_runs.all? { |run| run.reviewer_llm_model.active? && run.reviewer_llm_model.gateway == "openrouter" } %>
-        <%= button_to "Retry failed reviewers", retry_failed_review_round_path(@review_round), method: :post, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+        <%= button_to "Retry failed reviewers", retry_failed_review_round_path(@review_round), method: :post, data: { turbo_confirm: "Retry the failed reviewers? This may make new provider requests and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
       <% else %>
         <p class="mt-3 text-sm font-semibold text-amber-900">Retry is unavailable because a historical reviewer model is inactive or unsupported.</p>
       <% end %>
@@ -189,7 +191,7 @@
           <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active OpenRouter judge models are available.</p>
         <% end %>
 
-        <%= form.submit "Start judge selection", disabled: @judge_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400" %>
+        <%= form.submit "Start judge selection", disabled: @judge_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: "Start judging with the selected models? This begins provider work and may incur cost.", turbo_submits_with: "Starting judging…" } %>
       <% end %>
     </section>
   <% end %>

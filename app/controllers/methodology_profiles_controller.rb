@@ -4,8 +4,10 @@ class MethodologyProfilesController < ApplicationController
   before_action :set_methodology_profile, only: %i[show edit update activate deactivate]
 
   def index
-    @methodology_profiles = current_user.methodology_profiles.includes(:current_revision)
-      .order(active: :desc, updated_at: :desc, id: :desc)
+    @methodology_profiles = paginate(
+      current_user.methodology_profiles.includes(:current_revision)
+        .order(active: :desc, updated_at: :desc, id: :desc)
+    )
   end
 
   def new
@@ -25,8 +27,8 @@ class MethodologyProfilesController < ApplicationController
   end
 
   def show
-    @methodology_profile = current_user.methodology_profiles.includes(revisions: :experiments)
-      .find(@methodology_profile.id)
+    @methodology_profile = current_user.methodology_profiles.find(@methodology_profile.id)
+    @revisions = paginate(@methodology_profile.revisions.includes(:experiments))
   end
 
   def edit
