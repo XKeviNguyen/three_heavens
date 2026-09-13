@@ -55,10 +55,22 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert document.uploaded_file?
     assert_equal "txt", document.source_format
     assert_equal "sermon.txt", document.original_filename
+    assert_equal source_import.sha256, document.source_sha256
+    assert_equal SourceImports::Limits::EXTRACTION_VERSION, document.extraction_version
+    assert_equal "\xEF\xBB\xBFOriginal\r\ntext".b.bytesize, document.original_byte_size
     assert_equal blob_id, document.source_file.blob_id
     assert source_import.reload.consumed?
     assert_nil source_import.extracted_text
     assert_equal document, source_import.resulting_document
+
+    get experiment_path(document.experiments.sole)
+    assert_select "p", text: /Uploaded file.*sermon\.txt.*TXT/m
+    assert_select "a[href='#{download_original_document_path(document)}']", text: "Original source file"
+    assert_select "div", text: /Reviewed and edited source/
+
+    get project_path(document.project)
+    assert_select "p", text: /Uploaded source.*sermon\.txt.*TXT/m
+    assert_select "a[href='#{download_original_document_path(document)}']", text: "Download original"
   end
 
   test "pasted workflow remains supported with pasted provenance" do
@@ -87,6 +99,29 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
+      assert_not_includes response.body, "backtrace"
+    end
+  end
+
+  test "document-specific parse failures are actionable and do not expose internals" do
+    cases = [
+      [ uploaded_file("plain", filename: "source.txt", content_type: SourceImports::Detector::DOCX_MIME), /type does not match/ ],
+      [ uploaded_file("\xFF".b, filename: "source.txt", content_type: "text/plain"), /valid UTF-8/ ],
+      [ uploaded_file(" \n\t", filename: "source.md", content_type: "text/markdown"), /readable text/ ],
+      [ uploaded_file("a" * (SourceImports::Limits::MAX_EXTRACTED_CHARACTERS + 1), filename: "long.txt", content_type: "text/plain"), /limit is/ ],
+      [ uploaded_file(build_docx(encrypted: true), filename: "encrypted.docx", content_type: SourceImports::Detector::DOCX_MIME), /Encrypted DOCX/ ],
+      [ uploaded_file(build_docx(entries: { "word/vbaProject.bin" => "macro" }), filename: "macro.docx", content_type: SourceImports::Detector::DOCX_MIME), /Macro-enabled/ ],
+      [ uploaded_file(build_docx(entries: { "../outside" => "unsafe" }), filename: "unsafe.docx", content_type: SourceImports::Detector::DOCX_MIME), /cannot be processed safely/ ]
+    ]
+
+    cases.each do |upload, message|
+      assert_no_enqueued_jobs only: AI_JOBS do
+        post source_imports_path, params: { source_import: { source_file: upload } }
+      end
+      assert_response :unprocessable_content
+      assert_select "[role='alert']", text: message
+      assert_not_includes response.body, Rails.root.to_s
+      assert_not_includes response.body, "storage/"
       assert_not_includes response.body, "backtrace"
     end
   end
@@ -290,7 +325,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       )
     )
     assert_not second.submit
-    assert_includes second.errors[:source_import_id].join, "no longer available"
+    assert_includes second.errors[:source_import_id].join, "was already used"
     assert_equal 1, SourceImport.find(source_import.id).resulting_document.experiments.count
   end
 
@@ -302,7 +337,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     get new_translation_workspace_path(source_import_id: source_import.id, source_import_project_token: binding)
     assert_response :success
     assert_select "h2", text: /no longer available/i
-    assert_select "li", text: /Source import.*no longer available/i
+    assert_select "li", text: /Source import.*has expired/i
 
     assert_no_workspace_records_created do
       assert_no_enqueued_jobs only: AI_JOBS do
@@ -346,7 +381,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_operator clock_calls, :>=, 2
-    assert_includes workspace.errors[:source_import_id], "This source import is no longer available."
+    assert_includes workspace.errors[:source_import_id], "This source import has expired; upload the source file again."
     assert source_import.reload.ready?
     assert_nil source_import.resulting_document
   end

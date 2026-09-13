@@ -24,7 +24,13 @@
       <% else %>
         <section class="rounded-xl border border-red-200 bg-red-50 p-5">
           <h2 class="font-semibold text-red-950">Uploaded source is no longer available</h2>
-          <p class="mt-1 text-sm text-red-800">This temporary import expired or was already used. Cancel it and upload the source again.</p>
+          <% if @translation_workspace.source_import.availability_failure == :expired %>
+            <p class="mt-1 text-sm text-red-800">This temporary import expired. Cancel it and upload the source file again.</p>
+          <% elsif @translation_workspace.source_import.availability_failure == :already_consumed %>
+            <p class="mt-1 text-sm text-red-800">This import was already used to launch a translation and cannot be reused.</p>
+          <% else %>
+            <p class="mt-1 text-sm text-red-800">This import is unavailable. Cancel it and upload the source file again.</p>
+          <% end %>
       <% end %>
         <%= link_to "Cancel this import", source_import_path(@translation_workspace.source_import), data: { turbo_method: :delete, turbo_confirm: "Cancel this import and remove its temporary upload?" }, class: "mt-3 inline-flex text-sm font-semibold text-red-700 hover:text-red-900" %>
       </section>

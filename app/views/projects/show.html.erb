@@ -26,7 +26,15 @@
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= l document.created_at, format: :long %></p>
             <h2 class="mt-2 text-xl font-semibold text-slate-950"><%= document.title %></h2>
-            <p class="mt-1 text-sm text-slate-600"><%= document.uploaded_file? ? "Uploaded source" : "Pasted source" %> · <%= pluralize(document.experiments.size, "experiment") %></p>
+            <p class="mt-1 text-sm text-slate-600">
+              <% if document.uploaded_file? %>
+                Uploaded source · <%= document.original_filename %> · <%= document.source_format.upcase %>
+              <% else %>
+                Pasted source
+              <% end %>
+              · <%= pluralize(document.experiments.size, "experiment") %>
+            </p>
+            <% if document.uploaded_file? %><%= link_to "Download original", download_original_document_path(document), class: "mt-2 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %><% end %>
           </div>
 
           <div class="mt-5 space-y-4">
