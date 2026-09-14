@@ -452,6 +452,12 @@ module SourceImports
 
       assert_includes DocxExtractor.call(valid), "Faith & hope"
 
+      orphan = build_docx(entries: {
+        "root-target.xml" => "<target/>",
+        "_rels/ghost.xml.rels" => root_part_relationships
+      })
+      assert_equal "malformed_docx", assert_raises(Error) { DocxExtractor.call(orphan) }.code
+
       malformed = build_docx(entries: { "_rels/nested/custom.xml.rels" => root_part_relationships })
       assert_equal "malformed_docx", assert_raises(Error) { DocxExtractor.call(malformed) }.code
 
