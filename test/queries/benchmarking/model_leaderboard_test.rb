@@ -42,7 +42,10 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
     stats = stats_for(@candidate)
 
     assert_not @candidate.active?
+    assert_equal 1, stats.translation_participation_count
     assert_equal 1, stats.completed_translation_count
+    assert_equal 0, stats.failed_translation_count
+    assert_equal BigDecimal("0"), stats.translation_failure_rate
     assert_equal 1, stats.reviewed_candidate_count
     assert_equal 3, stats.review_score_sample_count
     assert_equal BigDecimal("8"), stats.review_average_score
@@ -86,7 +89,10 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
 
     stats = stats_for(@candidate)
 
+    assert_equal 3, stats.translation_participation_count
     assert_equal 2, stats.completed_translation_count
+    assert_equal 1, stats.failed_translation_count
+    assert_equal BigDecimal("1") / 3, stats.translation_failure_rate
     assert_equal BigDecimal("0.04"), stats.total_translation_cost
     assert_equal BigDecimal("0.02"), stats.average_translation_cost
     assert_equal 2, stats.cost_sample_count

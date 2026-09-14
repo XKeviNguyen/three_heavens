@@ -89,7 +89,7 @@
 
   <aside class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-slate-700">
     <h2 class="font-semibold text-slate-950">Metric notes</h2>
-    <p class="mt-2">Official win rate = completed judge rounds won ÷ completed judge rounds where the model had an evaluated candidate. Failed and incomplete rounds are excluded. Quality averages use non-null scores from completed reviewer or judge runs. Cost, tokens, and latency use completed translation runs only; latency requires both timestamps and a nonnegative duration.</p>
+    <p class="mt-2">Official win rate = completed judge rounds won ÷ completed judge rounds where the model had an evaluated candidate. Failed and incomplete rounds are excluded. Translation participation and failure rate count logical translation runs, never physical segment calls. Quality averages use non-null scores from completed reviewer or judge runs. Cost, tokens, and latency use completed translation runs only; latency requires both timestamps and a nonnegative duration.</p>
     <p class="mt-2">Cost per judge-score point is calculated per completed positive-cost translation run as cost ÷ that run’s mean completed judge score, then averaged across eligible runs. Zero-cost and unjudged runs are excluded.</p>
   </aside>
 </div>

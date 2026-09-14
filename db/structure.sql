@@ -848,6 +848,66 @@ ALTER SEQUENCE public.active_storage_variant_records_id_seq OWNED BY public.acti
 
 
 --
+-- Name: ai_provider_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_provider_attempts (
+    id bigint NOT NULL,
+    provider_run_type character varying NOT NULL,
+    provider_run_id bigint NOT NULL,
+    attempt_number integer NOT NULL,
+    stage character varying NOT NULL,
+    status character varying NOT NULL,
+    gateway_snapshot character varying NOT NULL,
+    provider_snapshot character varying NOT NULL,
+    model_identifier_snapshot character varying NOT NULL,
+    display_name_snapshot character varying NOT NULL,
+    started_at timestamp(6) without time zone NOT NULL,
+    completed_at timestamp(6) without time zone,
+    error_code character varying,
+    prompt_tokens integer,
+    completion_tokens integer,
+    total_tokens integer,
+    cached_tokens integer,
+    reasoning_tokens integer,
+    cost numeric(20,10),
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ai_provider_attempts_attempt_number_check CHECK ((attempt_number > 0)),
+    CONSTRAINT ai_provider_attempts_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
+    CONSTRAINT ai_provider_attempts_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
+    CONSTRAINT ai_provider_attempts_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
+    CONSTRAINT ai_provider_attempts_duration_check CHECK (((completed_at IS NULL) OR (completed_at >= started_at))),
+    CONSTRAINT ai_provider_attempts_lifecycle_check CHECK (((((status)::text = 'running'::text) AND (completed_at IS NULL) AND (error_code IS NULL)) OR (((status)::text = 'completed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NULL)) OR (((status)::text = 'failed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NOT NULL)))),
+    CONSTRAINT ai_provider_attempts_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
+    CONSTRAINT ai_provider_attempts_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
+    CONSTRAINT ai_provider_attempts_run_type_check CHECK (((provider_run_type)::text = ANY (ARRAY[('TranslationRun'::character varying)::text, ('TranslationSegmentRun'::character varying)::text, ('ReviewRun'::character varying)::text, ('ReviewSegmentRun'::character varying)::text, ('JudgeRun'::character varying)::text, ('JudgeSegmentRun'::character varying)::text, ('FinalizationRun'::character varying)::text, ('FinalizationSegmentRun'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_stage_check CHECK (((stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
+);
+
+
+--
+-- Name: ai_provider_attempts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_provider_attempts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_provider_attempts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_provider_attempts_id_seq OWNED BY public.ai_provider_attempts.id;
+
+
+--
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2684,6 +2744,13 @@ ALTER TABLE ONLY public.active_storage_variant_records ALTER COLUMN id SET DEFAU
 
 
 --
+-- Name: ai_provider_attempts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_provider_attempts ALTER COLUMN id SET DEFAULT nextval('public.ai_provider_attempts_id_seq'::regclass);
+
+
+--
 -- Name: document_execution_plans id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2971,6 +3038,14 @@ ALTER TABLE ONLY public.active_storage_blobs
 
 ALTER TABLE ONLY public.active_storage_variant_records
     ADD CONSTRAINT active_storage_variant_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_provider_attempts ai_provider_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_provider_attempts
+    ADD CONSTRAINT ai_provider_attempts_pkey PRIMARY KEY (id);
 
 
 --
@@ -3347,6 +3422,20 @@ CREATE UNIQUE INDEX index_active_storage_blobs_on_key ON public.active_storage_b
 --
 
 CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.active_storage_variant_records USING btree (blob_id, variation_digest);
+
+
+--
+-- Name: index_ai_provider_attempts_on_run_and_attempt; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ai_provider_attempts_on_run_and_attempt ON public.ai_provider_attempts USING btree (provider_run_type, provider_run_id, attempt_number);
+
+
+--
+-- Name: index_ai_provider_attempts_on_status_and_completed_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_provider_attempts_on_status_and_completed_at_and_id ON public.ai_provider_attempts USING btree (status, completed_at, id);
 
 
 --
@@ -4925,6 +5014,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260914090000'),
 ('20260907090000'),
 ('20260906090000'),
 ('20260901110000'),

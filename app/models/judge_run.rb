@@ -1,5 +1,6 @@
 class JudgeRun < ApplicationRecord
   include Ai::BudgetSnapshot
+  include Ai::ProviderAttemptTracking
 
   TERMINAL_STATUSES = %w[completed failed].freeze
 

@@ -40,6 +40,28 @@ class TranslationWorkspacesController < ApplicationController
     head :bad_request
   end
 
+  def repeat
+    historical = current_user.experiments.includes(
+      { glossary_revision: :glossary },
+      { methodology_profile_revision: :methodology_profile },
+      { pipeline_run: { workflow_profile_revision: [ :workflow_profile, { model_selections: :llm_model } ] } },
+      { experiment_reference_revisions: { translation_reference_revision: :translation_reference } },
+      { translation_runs: :llm_model },
+      document: :project
+    ).find(params[:experiment_id])
+    @repeated_from_experiment = historical
+    project = historical.document.project
+    load_available_models(project: project)
+    attributes = repeat_attributes(historical)
+    @translation_workspace = TranslationWorkspace.new(
+      attributes.merge(user: current_user),
+      existing_project: project
+    )
+    revision = repeatable_pipeline_revision(historical)
+    prepare_repeat_preview(revision, historical) if revision
+    render :new
+  end
+
   def create
     attributes = translation_workspace_params
     project = find_owned_project(attributes[:project_id])
@@ -81,6 +103,69 @@ class TranslationWorkspacesController < ApplicationController
   end
 
   private
+
+  def prepare_repeat_preview(revision, historical)
+    @translation_workspace.prepare_provider_work_plan_preview(revision: revision)
+  rescue Ai::ContextBudget::Error
+    @repeat_configuration_notice =
+      "The historical automatic profile no longer has the model capability data required for this source. " \
+      "A manual launch has been prefilled with its currently active translation models; review or replace them before authorizing work."
+    @translation_workspace.workflow_mode = "manual"
+    @translation_workspace.workflow_profile_revision_id = nil
+    @translation_workspace.automatic_plan_digest = nil
+    @translation_workspace.model_ids = repeatable_translation_model_ids(historical)
+  end
+
+  def repeat_attributes(historical)
+    revision = repeatable_pipeline_revision(historical)
+    {
+      document_title: historical.document.title,
+      source_text: historical.document.source_text,
+      experiment_name: "Repeat of #{historical.name.presence || historical.document.title}".first(150),
+      instruction_prompt: historical.instruction_prompt,
+      glossary_revision_id: repeatable_glossary_revision_id(historical),
+      methodology_profile_revision_id: repeatable_methodology_revision_id(historical),
+      translation_reference_revision_ids: repeatable_reference_revision_ids(historical),
+      guidance_preference: historical.guidance_preference,
+      workflow_mode: revision ? "automatic" : "manual",
+      workflow_profile_revision_id: revision&.id,
+      model_ids: revision ? [] : repeatable_translation_model_ids(historical),
+      automatic_confirmation: "0"
+    }
+  end
+
+  def repeatable_pipeline_revision(historical)
+    revision = historical.pipeline_run&.workflow_profile_revision
+    profile = revision&.workflow_profile
+    revision if profile&.active? && profile.current_revision_id == revision.id && revision.routing_eligible?
+  end
+
+  def repeatable_translation_model_ids(historical)
+    historical.translation_runs.filter_map do |run|
+      model = run.llm_model
+      model.id if model.active? && model.gateway == "openrouter"
+    end
+  end
+
+  def repeatable_glossary_revision_id(historical)
+    revision = historical.glossary_revision
+    glossary = revision&.glossary
+    revision.id if glossary&.active? && glossary.current_revision_id == revision.id
+  end
+
+  def repeatable_methodology_revision_id(historical)
+    revision = historical.methodology_profile_revision
+    profile = revision&.methodology_profile
+    revision.id if profile&.active? && profile.current_revision_id == revision.id
+  end
+
+  def repeatable_reference_revision_ids(historical)
+    historical.experiment_reference_revisions.filter_map do |snapshot|
+      revision = snapshot.translation_reference_revision
+      reference = revision.translation_reference
+      revision.id.to_s if reference.active? && reference.current_revision_id == revision.id
+    end
+  end
 
   def operational_request_id
     request.request_id.to_s.gsub(/[^A-Za-z0-9_-]/, "").first(100).presence || SecureRandom.uuid

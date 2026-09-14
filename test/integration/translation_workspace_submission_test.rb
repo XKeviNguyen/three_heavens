@@ -84,10 +84,10 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
       end
     end
     assert_response :unprocessable_content
-    assert_select "h3", text: "Exact segmented provider-work plan"
+    assert_select "h3", text: "Exact provider-work authorization"
     segment_count = LongDocuments::Segmenter.call(source).size
     request_slots = profile.current_revision.model_selections.count * segment_count
-    assert_select "p", text: /#{segment_count} source segments require #{request_slots} authorized initial provider request slots/
+    assert_select "p", text: /#{segment_count} source segment\(s\) require #{request_slots} initial provider request slots and authorize at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} requests/
     digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, digest)
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])"

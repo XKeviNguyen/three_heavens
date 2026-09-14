@@ -9,6 +9,11 @@ module Ai
     private
 
     def retry_job(options = {})
+      error = options[:error]
+      if error && claimed_attempt
+        run = self.class.ai_run_class.find_by(id: arguments.first)
+        Ai::ProviderAttempts.fail_retryable!(run: run, attempt: claimed_attempt, error: error) if run
+      end
       result = super
       return result if result
 

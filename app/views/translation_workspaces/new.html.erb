@@ -10,6 +10,14 @@
     <% end %>
   </div>
 
+  <% if @repeated_from_experiment %>
+    <section class="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
+      <h2 class="font-semibold">New launch prefilled from historical experiment</h2>
+      <p class="mt-1">The historical experiment remains unchanged. Only settings that are still active and current are preselected. Review every field and explicitly authorize any paid work; submitting creates new experiment, run, and provider-attempt identities.</p>
+    </section>
+  <% end %>
+  <% if @repeat_configuration_notice %><p class="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
+
   <%= form_with model: @translation_workspace, url: translation_workspace_path, class: "space-y-8", data: { controller: "workflow-mode" } do |form| %>
     <%= form.hidden_field :submission_token %>
     <% if @translation_workspace.existing_project? %><%= form.hidden_field :project_id %><% end %>
@@ -171,26 +179,26 @@
           <% @workflow_profiles.each do |profile| %>
             <% revision = profile.current_revision %>
             <label class="block rounded-lg border border-slate-200 p-4">
-              <span class="flex items-start gap-3"><%= form.radio_button :workflow_profile_revision_id, revision.id, checked: @translation_workspace.workflow_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-1 block text-sm text-slate-600"><%= revision.completion_mode.humanize %> · <%= revision.role_count("translator") %> translators · <%= revision.role_count("reviewer") %> reviewers · <%= revision.role_count("judge") %> judges · <%= revision.role_count("finalizer") %> finalizers = <%= revision.authorized_initial_provider_run_count %> initial provider run slots</span></span></span>
+              <span class="flex items-start gap-3"><%= form.radio_button :workflow_profile_revision_id, revision.id, checked: @translation_workspace.workflow_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-1 block text-sm text-slate-600"><%= revision.completion_mode.humanize %> · <%= revision.role_count("translator") %> translators · <%= revision.role_count("reviewer") %> reviewers · <%= revision.role_count("judge") %> judges · <%= revision.role_count("finalizer") %> finalizers = <%= revision.authorized_initial_provider_run_count %> initial requests for a single-segment source, at most <%= revision.authorized_initial_provider_run_count * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> including built-in retries</span><span class="mt-1 block text-xs text-slate-500">Models: <%= revision.model_selections.map(&:display_name_snapshot).to_sentence %>. Stages: translation → blind review → independent judging<%= " → refinement proposals" if revision.refinement_proposals? %> → human editor.</span></span></span>
             </label>
           <% end %>
         </div>
         <% if @translation_workspace.provider_work_plan_preview %>
           <% work_plan = @translation_workspace.provider_work_plan_preview %>
           <section class="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-            <h3 class="font-semibold">Exact segmented provider-work plan</h3>
-            <p class="mt-1"><%= work_plan.fetch("segment_count") %> source segments require <strong><%= work_plan.fetch("authorized_initial_provider_request_slots") %></strong> authorized initial provider request slots.</p>
+            <h3 class="font-semibold">Exact provider-work authorization</h3>
+            <p class="mt-1"><%= work_plan.fetch("segment_count") %> source segment(s) require <strong><%= work_plan.fetch("authorized_initial_provider_request_slots") %></strong> initial provider request slots and authorize at most <strong><%= work_plan.fetch("maximum_automatic_provider_requests") %></strong> requests including built-in retries.</p>
             <ul class="mt-2 list-disc space-y-1 pl-5">
               <% work_plan.fetch("roles").each do |role, details| %>
                 <li><%= role.humanize.pluralize %>: <%= details.fetch("logical_run_count") %> logical runs × <%= work_plan.fetch("segment_count") %> segments = <%= details.fetch("provider_request_slots") %> requests</li>
               <% end %>
             </ul>
-            <p class="mt-2">Review this exact multiplier and check the authorization box again. Built-in retries may add requests.</p>
+            <p class="mt-2">Every slot has an exact ceiling of <%= work_plan.dig("built_in_retry_policy", "maximum_attempts_per_slot") %> attempts. The pipeline stops for the human editor; refinement is <%= work_plan.dig("roles", "finalizer", "logical_run_count").positive? ? "included as proposals only" : "not included" %>. Review this plan and check the authorization box again.</p>
           </section>
         <% end %>
         <label class="mt-5 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <%= form.check_box :automatic_confirmation, { checked: @translation_workspace.automatic_confirmation == "1", class: "mt-1 size-4" }, "1", "0" %>
-          <span><span class="font-semibold">I authorize this profile's initial provider work for this launch.</span> Automatic progression causes provider usage and cost. Built-in bounded provider retries may add requests; terminal failures still require an explicit manual retry. Stopping cannot cancel work already queued or running.</span>
+          <span><span class="font-semibold">I authorize the exact bounded provider-work plan shown for this launch.</span> Automatic progression causes provider usage and cost. Each initial slot may make at most <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> attempts; terminal failures require a separate explicit manual retry. The pipeline always stops for the human editor. Stopping future automation cannot cancel work already queued or running.</span>
         </label>
       <% else %>
         <p class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">No active workflow profile is available. <%= link_to "Create a Workflow Profile", new_workflow_profile_path, class: "font-semibold underline" %>, or choose the manual workflow.</p>

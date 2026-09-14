@@ -28,9 +28,9 @@
   <% if failed_runs.any? %>
     <section class="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-950">Recover failed judges</h2>
-      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed judge") %> can be retried in this round. Completed judgments and anonymous mappings stay unchanged. No official winner exists until every judge completes and aggregation succeeds. Retrying may make another provider request and incur additional cost.</p>
+      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed judge") %> can be retried in this round. Completed judgments and anonymous mappings stay unchanged. No official winner exists until every judge completes and aggregation succeeds. Each failed physical work item selected by this action authorizes up to <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> new provider attempts and may incur additional cost.</p>
       <% if failed_runs.all? { |run| run.judge_llm_model.active? && run.judge_llm_model.gateway == "openrouter" } %>
-        <%= button_to "Retry failed judges", retry_failed_judge_round_path(@judge_round), method: :post, data: { turbo_confirm: "Retry the failed judges? This may make new provider requests and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+        <%= button_to "Retry failed judges", retry_failed_judge_round_path(@judge_round), method: :post, data: { turbo_confirm: "Retry only the failed judge work? Each failed physical item may make up to #{Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} new provider attempts and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
       <% else %>
         <p class="mt-3 text-sm font-semibold text-amber-900">Retry is unavailable because a historical judge model is inactive or unsupported.</p>
       <% end %>

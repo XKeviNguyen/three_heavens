@@ -20,13 +20,16 @@ class Pipelines::StartTest < ActiveSupport::TestCase
             experiment: @experiment,
             user: users(:normal),
             workflow_profile_revision: @profile.current_revision,
-            confirmation: "1"
+            confirmation: "1",
+            expected_provider_work_plan_digest: provider_plan_digest(@profile.current_revision)
           )
         end
       end
     end
 
     assert_equal 4, @pipeline.authorized_initial_provider_run_count
+    assert_equal 20, @pipeline.provider_work_plan.fetch("maximum_automatic_provider_requests")
+    assert_equal 5, @pipeline.provider_work_plan.dig("built_in_retry_policy", "maximum_attempts_per_slot")
     assert_equal 2, @pipeline.translator_count
     assert_equal @profile.configuration_digest, @pipeline.configuration_digest
     assert_equal %w[pipeline_started translation_started], @pipeline.events.pluck(:event_type)
@@ -48,6 +51,8 @@ class Pipelines::StartTest < ActiveSupport::TestCase
     expected = @profile.current_revision.model_selections.count * segment_count
     assert_equal expected, @pipeline.authorized_initial_provider_run_count
     assert_equal expected, @pipeline.provider_work_plan.fetch("authorized_initial_provider_request_slots")
+    assert_equal expected * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION,
+                 @pipeline.provider_work_plan.fetch("maximum_automatic_provider_requests")
     assert_equal segment_count, @pipeline.provider_work_plan.fetch("segment_count")
     assert_equal 2 * segment_count,
                  @pipeline.provider_work_plan.dig("roles", "translator", "provider_request_slots")
@@ -161,7 +166,7 @@ class Pipelines::StartTest < ActiveSupport::TestCase
   private
 
   def start_pipeline(confirmation: "1", revision: @profile.current_revision,
-                     expected_provider_work_plan_digest: segmented_plan_digest(revision))
+                     expected_provider_work_plan_digest: provider_plan_digest(revision))
     Pipelines::Start.call(
       experiment: @experiment,
       user: users(:normal),
@@ -171,17 +176,14 @@ class Pipelines::StartTest < ActiveSupport::TestCase
     )
   end
 
-  def segmented_plan_digest(revision)
+  def provider_plan_digest(revision)
     source = @experiment.document.source_text
-    return if source.length <= LongDocuments::Segmenter::TARGET_CHARACTERS
-
     role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
       [ role, revision.selections_for(role).map(&:llm_model) ]
     end
     preview = LongDocuments::ProviderWorkPlan.call(
-      execution_plan: LongDocuments::ProviderWorkPlan::Preview.new(
-        segment_count: LongDocuments::Segmenter.call(source).size
-      ),
+      execution_plan: source.length > LongDocuments::Segmenter::TARGET_CHARACTERS ?
+        LongDocuments::ProviderWorkPlan::Preview.new(segment_count: LongDocuments::Segmenter.call(source).size) : nil,
       role_models: role_models,
       source_character_count: source.length
     )

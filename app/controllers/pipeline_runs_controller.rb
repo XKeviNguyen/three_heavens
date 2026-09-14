@@ -15,6 +15,7 @@ class PipelineRunsController < ApplicationController
       ]
     ).find(@pipeline_run.id)
     @cost_summary = Pipelines::CostSummary.call(experiment: @pipeline_run.experiment)
+    @execution_summary = Pipelines::ExecutionSummary.call(experiment: @pipeline_run.experiment)
   end
 
   def stop
