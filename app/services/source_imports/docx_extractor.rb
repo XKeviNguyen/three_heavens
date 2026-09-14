@@ -224,6 +224,7 @@ module SourceImports
       @entries_by_name.keys.grep(/\.rels\z/).sort.each do |relationship_part|
         source_part = source_part_for_relationships(relationship_part)
         raise malformed_error if source_part == :invalid
+        raise malformed_error if source_part && !@entries_by_name.key?(source_part)
 
         relationships = parse_relationships(
           read_entry(relationship_part, Limits::MAX_RELATIONSHIPS_XML_BYTES),
