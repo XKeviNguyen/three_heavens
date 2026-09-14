@@ -48,25 +48,28 @@ module Benchmarking
     def translation_aggregates
       rows_by_model(<<~SQL)
         SELECT llm_model_id AS model_id,
-               COUNT(*) AS completed_translation_count,
-               COUNT(cost) AS cost_sample_count,
-               SUM(cost) AS total_translation_cost,
-               AVG(cost) AS average_translation_cost,
-               COUNT(total_tokens) AS token_sample_count,
-               AVG(total_tokens) AS average_total_tokens,
+               COUNT(*) AS translation_participation_count,
+               COUNT(*) FILTER (WHERE status = 'completed') AS completed_translation_count,
+               COUNT(*) FILTER (WHERE status = 'failed') AS failed_translation_count,
+               COUNT(cost) FILTER (WHERE status = 'completed') AS cost_sample_count,
+               SUM(cost) FILTER (WHERE status = 'completed') AS total_translation_cost,
+               AVG(cost) FILTER (WHERE status = 'completed') AS average_translation_cost,
+               COUNT(total_tokens) FILTER (WHERE status = 'completed') AS token_sample_count,
+               AVG(total_tokens) FILTER (WHERE status = 'completed') AS average_total_tokens,
                COUNT(*) FILTER (
-                 WHERE started_at IS NOT NULL
+                 WHERE status = 'completed'
+                   AND started_at IS NOT NULL
                    AND completed_at IS NOT NULL
                    AND completed_at >= started_at
                ) AS latency_sample_count,
                AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) FILTER (
-                 WHERE started_at IS NOT NULL
+                 WHERE status = 'completed'
+                   AND started_at IS NOT NULL
                    AND completed_at IS NOT NULL
                    AND completed_at >= started_at
                ) AS average_latency_seconds
           FROM translation_runs
-         WHERE status = 'completed'
-           AND experiment_id IN (#{experiment_ids_sql})
+         WHERE experiment_id IN (#{experiment_ids_sql})
          GROUP BY llm_model_id
       SQL
     end
@@ -174,7 +177,9 @@ module Benchmarking
 
       ModelStats.new(
         model: model,
+        translation_participation_count: integer(translation, "translation_participation_count"),
         completed_translation_count: integer(translation, "completed_translation_count"),
+        failed_translation_count: integer(translation, "failed_translation_count"),
         reviewed_candidate_count: integer(review, "reviewed_candidate_count"),
         judged_candidate_count: integer(judge, "judged_candidate_count"),
         completed_judged_experiment_count: integer(participation, "completed_judged_experiment_count"),

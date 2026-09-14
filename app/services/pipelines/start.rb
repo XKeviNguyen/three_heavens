@@ -43,7 +43,7 @@ module Pipelines
           role_models: role_models,
           source_character_count: experiment.document.source_text.length
         )
-        validate_segmented_authorization!(execution_plan, provider_work_plan)
+        validate_provider_authorization!(execution_plan, provider_work_plan)
         now = clock.call
         pipeline_run = experiment.create_pipeline_run!(audit_attributes(role_models, provider_work_plan, now))
         pipeline_run.append_event!(
@@ -102,7 +102,7 @@ module Pipelines
       end
     end
 
-    def validate_segmented_authorization!(execution_plan, provider_work_plan)
+    def validate_provider_authorization!(execution_plan, provider_work_plan)
       return unless execution_plan
 
       expected = LongDocuments::ProviderWorkPlan.digest(provider_work_plan)
@@ -111,7 +111,7 @@ module Pipelines
                 ActiveSupport::SecurityUtils.secure_compare(supplied, expected)
 
       raise ConfirmationRequiredError,
-            "Confirm the exact segmented provider-work plan for this launch"
+            "Confirm the exact provider-work plan for this launch"
     end
 
     def audit_attributes(role_models, provider_work_plan, now)

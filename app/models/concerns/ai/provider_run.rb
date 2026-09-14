@@ -6,6 +6,7 @@ module Ai
 
     included do
       include Ai::BudgetSnapshot
+      include Ai::ProviderAttemptTracking
 
       enum :status, {
         pending: "pending",

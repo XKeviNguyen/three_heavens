@@ -177,7 +177,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", pipeline.workflow_profile_revision.name
     assert_select "h2", text: /Progress/
-    assert_select "h2", text: /Known provider cost/
+    assert_select "h2", text: /Historical logical-run cost/
     assert_select "form[action='#{stop_pipeline_run_path(pipeline)}']"
 
     patch stop_pipeline_run_path(pipeline)

@@ -58,6 +58,14 @@ class PipelineRun < ApplicationRecord
     unless authorized_initial_provider_run_count == expected
       errors.add(:authorized_initial_provider_run_count, "must equal all configured initial provider run slots")
     end
+    if provider_work_plan.is_a?(Hash) && provider_work_plan["version"] == "provider-work-plan-v2"
+      attempts = provider_work_plan.dig("built_in_retry_policy", "maximum_attempts_per_slot")
+      maximum = provider_work_plan["maximum_automatic_provider_requests"]
+      unless attempts == Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION &&
+             maximum == expected.to_i * attempts.to_i
+        errors.add(:provider_work_plan, "must contain the exact bounded built-in retry envelope")
+      end
+    end
     if completion_mode == "winner_draft" && finalizer_count.to_i.positive?
       errors.add(:finalizer_count, "must be zero in winner draft mode")
     elsif completion_mode == "refinement_proposals" && finalizer_count.to_i.zero?

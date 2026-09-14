@@ -11,7 +11,7 @@ class JudgeSegmentRunJob < ApplicationJob
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
-           attempts: 5 do |job, error|
+           attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION do |job, error|
     job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 

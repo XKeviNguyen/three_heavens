@@ -24,6 +24,7 @@
   <%= render "shared/workflow_progress", experiment: @experiment %>
 
   <%= link_to "← Back to Project", project_path(@experiment.document.project), class: "inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+  <%= link_to "Repeat this configuration", repeat_experiment_path(@experiment), class: "ml-4 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
 
   <% if @experiment.pipeline_run %>
     <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"><span class="font-semibold">Automatic pipeline:</span> <%= @experiment.pipeline_run.workflow_profile_revision.name %> · revision <%= @experiment.pipeline_run.workflow_profile_revision.version %> · <%= link_to "View consolidated progress", pipeline_run_path(@experiment.pipeline_run), class: "font-semibold underline" %></div>
@@ -39,9 +40,9 @@
   <% if failed_runs.any? %>
     <section class="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-950">Recover failed translations</h2>
-      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed run") %> can be retried without changing completed translations or model identities. Retrying may make another provider request and incur additional cost.</p>
+      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed run") %> can be retried without changing completed translations or model identities. Each failed physical work item selected by this action authorizes up to <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> new provider attempts and may incur additional cost.</p>
       <% if failed_runs.all? { |run| run.llm_model.active? && run.llm_model.gateway == "openrouter" } %>
-        <%= button_to "Retry failed translations", retry_failed_experiment_path(@experiment), method: :post, data: { turbo_confirm: "Retry the failed translation runs? This may make new provider requests and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+        <%= button_to "Retry failed translations", retry_failed_experiment_path(@experiment), method: :post, data: { turbo_confirm: "Retry only the failed translation work? Each failed physical item may make up to #{Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} new provider attempts and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
       <% else %>
         <p class="mt-3 text-sm font-semibold text-amber-900">Retry is unavailable because a historical model is inactive or unsupported.</p>
       <% end %>

@@ -52,6 +52,7 @@ Rails.application.routes.draw do
   end
 
   resource :translation_workspace, only: %i[new create]
+  get "experiments/:experiment_id/repeat", to: "translation_workspaces#repeat", as: :repeat_experiment
   resources :source_imports, only: %i[new create destroy]
   resources :documents, only: [] do
     member do

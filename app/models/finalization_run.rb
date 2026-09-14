@@ -1,5 +1,6 @@
 class FinalizationRun < ApplicationRecord
   include Ai::BudgetSnapshot
+  include Ai::ProviderAttemptTracking
 
   TERMINAL_STATUSES = %w[completed failed].freeze
   LIST_ATTRIBUTES = %i[change_summary terminology_notes warnings].freeze

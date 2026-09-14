@@ -26,12 +26,18 @@ module LongDocuments
           }
         ]
       end
+      initial_slots = roles.values.sum { |role| role.fetch("provider_request_slots") }
       {
-        "version" => "provider-work-plan-v1",
+        "version" => "provider-work-plan-v2",
         "segment_count" => segment_count,
         "segmented" => execution_plan.present?,
         "roles" => roles,
-        "authorized_initial_provider_request_slots" => roles.values.sum { |role| role.fetch("provider_request_slots") }
+        "authorized_initial_provider_request_slots" => initial_slots,
+        "built_in_retry_policy" => {
+          "version" => Ai::ProviderRetryPolicy::VERSION,
+          "maximum_attempts_per_slot" => Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION
+        },
+        "maximum_automatic_provider_requests" => initial_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION
       }
     end
 

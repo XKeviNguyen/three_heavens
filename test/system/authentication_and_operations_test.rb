@@ -43,7 +43,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_text "Recover failed translations"
     assert_text "incur additional cost"
     assert_enqueued_with(job: TranslationRunJob, args: [ failed_run.id ]) do
-      accept_confirm(/new provider requests/) do
+      accept_confirm(/up to 5 new provider attempts/) do
         click_button "Retry failed translations"
       end
       assert_text "Queued 1 failed translation run(s) for retry."

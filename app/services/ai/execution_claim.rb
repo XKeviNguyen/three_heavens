@@ -26,6 +26,7 @@ module Ai
           error_code: nil,
           error_message: nil
         )
+        Ai::ProviderAttempts.start!(run: run, attempt: attempt)
         Result.new(state: :claimed, attempt: attempt)
       end
       if result.state == :claimed

@@ -114,6 +114,13 @@ class TranslationWorkspace
     project_id.present?
   end
 
+  def prepare_provider_work_plan_preview(revision:)
+    @workflow_profile_revision = revision
+    @provider_work_plan_preview = build_automatic_provider_plan
+    self.automatic_plan_digest = LongDocuments::ProviderWorkPlan.digest(@provider_work_plan_preview)
+    @provider_work_plan_preview
+  end
+
   private
 
   RECORD_ATTRIBUTE_MAPPINGS = {
@@ -258,21 +265,10 @@ class TranslationWorkspace
   def validate_automatic_provider_plan
     return unless source_text.present? && @workflow_profile_revision&.routing_eligible?
 
-    segment_count = if source_text.length > LongDocuments::Segmenter::TARGET_CHARACTERS
-      LongDocuments::Segmenter.call(source_text).size
-    else
-      1
-    end
+    segment_count = automatic_segment_count
     return if segment_count == 1
 
-    role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
-      [ role, @workflow_profile_revision.selections_for(role).map(&:llm_model) ]
-    end
-    preview = LongDocuments::ProviderWorkPlan.call(
-      execution_plan: LongDocuments::ProviderWorkPlan::Preview.new(segment_count: segment_count),
-      role_models: role_models,
-      source_character_count: source_text.length
-    )
+    preview = build_automatic_provider_plan(segment_count: segment_count)
     @provider_work_plan_preview = preview
     expected_digest = LongDocuments::ProviderWorkPlan.digest(preview)
     supplied = automatic_plan_digest.to_s
@@ -283,10 +279,29 @@ class TranslationWorkspace
     self.automatic_confirmation = "0"
     errors.add(
       :automatic_confirmation,
-      "must confirm the exact segmented provider-work plan shown below, then submit again"
+      "must confirm the exact provider-work plan shown below, then submit again"
     )
   rescue Ai::ContextBudget::Error => error
     errors.add(:workflow_profile_revision_id, error.message)
+  end
+
+  def build_automatic_provider_plan(segment_count: automatic_segment_count)
+    role_models = WorkflowProfileModelSelection::ROLES.to_h do |role|
+      [ role, @workflow_profile_revision.selections_for(role).map(&:llm_model) ]
+    end
+    LongDocuments::ProviderWorkPlan.call(
+      execution_plan: segment_count == 1 ? nil : LongDocuments::ProviderWorkPlan::Preview.new(segment_count: segment_count),
+      role_models: role_models,
+      source_character_count: source_text.length
+    )
+  end
+
+  def automatic_segment_count
+    if source_text.length > LongDocuments::Segmenter::TARGET_CHARACTERS
+      LongDocuments::Segmenter.call(source_text).size
+    else
+      1
+    end
   end
 
   def automatic_mode?
