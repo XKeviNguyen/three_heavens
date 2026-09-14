@@ -32,6 +32,8 @@ class Pipelines::ExecutionSummaryTest < ActiveSupport::TestCase
     assert_equal 2, result.physical_total
     assert_equal({ "completed" => 1, "pending" => 1 }, result.logical_status_counts)
     assert_equal 1, result.attempt_total
+    assert_equal 1, result.tracked_physical_run_count
+    assert result.attempt_coverage_incomplete?
     assert_equal 42, result.known_total_tokens
     assert_equal BigDecimal("0"), result.known_cost
     assert_not result.cost_telemetry_incomplete?

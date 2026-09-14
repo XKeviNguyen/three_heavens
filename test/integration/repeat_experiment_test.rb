@@ -1,7 +1,9 @@
 require "test_helper"
+require_relative "../support/workflow_profile_test_helper"
 
 class RepeatExperimentTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
+  include WorkflowProfileTestHelper
 
   setup do
     sign_in_as users(:normal)
@@ -63,5 +65,27 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     other = experiments(:two)
     get repeat_experiment_path(other)
     assert_response :not_found
+  end
+
+  test "long automatic history with unavailable capabilities falls back to a usable manual prefill" do
+    @historical.document.update!(source_text: "Long paragraph。\n\n" * 500)
+    @historical.translation_runs.create!(
+      llm_model: llm_models(:openrouter_gpt),
+      status: :completed,
+      translated_text: "Second translation",
+      completed_at: Time.current
+    )
+    profile = create_workflow_profile
+    create_pipeline_run(experiment: @historical, profile: profile)
+
+    assert_no_enqueued_jobs do
+      get repeat_experiment_path(@historical)
+    end
+
+    assert_response :success
+    assert_select "[role='status']", text: /no longer has the model capability data/
+    assert_select "input[name='translation_workspace[workflow_mode]'][value='manual'][checked]"
+    assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][checked]", count: 0
+    assert_select "input[name='translation_workspace[model_ids][]'][checked]", count: 2
   end
 end

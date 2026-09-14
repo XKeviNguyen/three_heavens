@@ -58,7 +58,7 @@ class TranslationWorkspacesController < ApplicationController
       existing_project: project
     )
     revision = repeatable_pipeline_revision(historical)
-    @translation_workspace.prepare_provider_work_plan_preview(revision: revision) if revision
+    prepare_repeat_preview(revision, historical) if revision
     render :new
   end
 
@@ -103,6 +103,18 @@ class TranslationWorkspacesController < ApplicationController
   end
 
   private
+
+  def prepare_repeat_preview(revision, historical)
+    @translation_workspace.prepare_provider_work_plan_preview(revision: revision)
+  rescue Ai::ContextBudget::Error
+    @repeat_configuration_notice =
+      "The historical automatic profile no longer has the model capability data required for this source. " \
+      "A manual launch has been prefilled with its currently active translation models; review or replace them before authorizing work."
+    @translation_workspace.workflow_mode = "manual"
+    @translation_workspace.workflow_profile_revision_id = nil
+    @translation_workspace.automatic_plan_digest = nil
+    @translation_workspace.model_ids = repeatable_translation_model_ids(historical)
+  end
 
   def repeat_attributes(historical)
     revision = repeatable_pipeline_revision(historical)

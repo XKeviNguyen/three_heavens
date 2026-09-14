@@ -10,6 +10,7 @@ module Pipelines
       :cost_sample_count,
       :average_latency_seconds,
       :latency_sample_count,
+      :tracked_physical_run_count,
       :recent_failures
     ) do
       def logical_total
@@ -30,6 +31,10 @@ module Pipelines
 
       def cost_telemetry_incomplete?
         attempt_total.positive? && cost_sample_count < attempt_total
+      end
+
+      def attempt_coverage_incomplete?
+        tracked_physical_run_count < physical_total
       end
     end
 
@@ -72,7 +77,8 @@ module Pipelines
         Arel.sql("SUM(cost)"),
         Arel.sql("COUNT(cost)"),
         Arel.sql("AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) FILTER (WHERE completed_at IS NOT NULL)"),
-        Arel.sql("COUNT(*) FILTER (WHERE completed_at IS NOT NULL)")
+        Arel.sql("COUNT(*) FILTER (WHERE completed_at IS NOT NULL)"),
+        Arel.sql("COUNT(DISTINCT (provider_run_type, provider_run_id))")
       )
 
       Result.new(
@@ -85,6 +91,7 @@ module Pipelines
         cost_sample_count: aggregate[3],
         average_latency_seconds: aggregate[4] && BigDecimal(aggregate[4].to_s),
         latency_sample_count: aggregate[5],
+        tracked_physical_run_count: aggregate[6],
         recent_failures: attempts.failed.order(completed_at: :desc, id: :desc).limit(20).to_a
       )
     end

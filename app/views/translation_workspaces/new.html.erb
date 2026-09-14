@@ -16,6 +16,7 @@
       <p class="mt-1">The historical experiment remains unchanged. Only settings that are still active and current are preselected. Review every field and explicitly authorize any paid work; submitting creates new experiment, run, and provider-attempt identities.</p>
     </section>
   <% end %>
+  <% if @repeat_configuration_notice %><p class="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
 
   <%= form_with model: @translation_workspace, url: translation_workspace_path, class: "space-y-8", data: { controller: "workflow-mode" } do |form| %>
     <%= form.hidden_field :submission_token %>
