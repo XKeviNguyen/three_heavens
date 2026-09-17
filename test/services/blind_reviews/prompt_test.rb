@@ -119,7 +119,9 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     candidate = @round.review_runs.first.review_evaluations
       .find_by!(anonymous_label: "Candidate B")
       .translation_run
-    candidate.update!(translated_text: close_reopen_attempt)
+    mutate_historical_fixture do
+      candidate.update!(translated_text: close_reopen_attempt)
+    end
 
     prompt = BlindReviews::Prompt.build(@round.review_runs.first)
     boundary = boundary_from(prompt)

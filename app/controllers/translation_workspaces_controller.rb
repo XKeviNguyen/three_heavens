@@ -1,4 +1,5 @@
 class TranslationWorkspacesController < ApplicationController
+  CONFIGURATION_OPTION_LIMIT = 100
   SCALAR_ATTRIBUTES = %w[
     project_id
     project_name
@@ -175,7 +176,7 @@ class TranslationWorkspacesController < ApplicationController
     @available_models = LlmModel.active_openrouter.order(:display_name, :id)
     @workflow_profiles = current_user.workflow_profiles.active.includes(
       current_revision: { model_selections: :llm_model }
-    ).order(updated_at: :desc, id: :desc)
+    ).order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
     glossary_scope = current_user.glossaries.active
     methodology_scope = current_user.methodology_profiles.active
     reference_scope = current_user.translation_references.active
@@ -207,11 +208,12 @@ class TranslationWorkspacesController < ApplicationController
         target_language:
       )
     end
-    @glossaries = glossary_scope.includes(current_revision: :entries).order(updated_at: :desc, id: :desc)
+    @glossaries = glossary_scope.includes(current_revision: :entries)
+      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
     @methodology_profiles = methodology_scope.includes(:current_revision)
-      .order(updated_at: :desc, id: :desc)
+      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
     @translation_references = reference_scope.includes(:current_revision)
-      .order(updated_at: :desc, id: :desc)
+      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
   end
 
   def translation_workspace_params

@@ -14,7 +14,8 @@ module Operations
       ai_execution_claimed ai_run_completed ai_run_failed pipeline_stage_advanced
       pipeline_blocked pipeline_ready_for_editor stale_reconciliation_completed
       pipeline_reconciliation_completed source_import_cleanup_completed
-      workspace_submission_cleanup_completed backup_started backup_completed
+      workspace_submission_cleanup_completed active_storage_cleanup_completed
+      backup_started backup_completed
       backup_failed restore_verification_started restore_verification_completed
       restore_verification_failed operations_preflight_completed
     ].index_with { COMMON_FIELDS }.freeze

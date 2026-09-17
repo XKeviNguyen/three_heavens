@@ -1,4 +1,5 @@
 require_relative "boot"
+require_relative "../app/middleware/request_body_limit"
 
 require "rails/all"
 
@@ -10,6 +11,11 @@ module ThreeHeavens
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
+
+    # Reject declared oversized request bodies before multipart parsing or
+    # application allocation. The edge proxy must enforce the same limit for
+    # chunked requests that do not carry Content-Length.
+    config.middleware.insert_before 0, RequestBodyLimit
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

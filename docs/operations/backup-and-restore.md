@@ -34,6 +34,8 @@ The command rejects an empty/relative/dangerous destination, the application roo
 
 The database dump is taken before the storage archive. Active Storage writes object bytes before committing attachment metadata. Durable Document attachments are immutable in normal product behavior and Documents are not destructively deleted; consequently every durable file referenced by the database snapshot is present when the subsequent storage archive walks the tree. A concurrently abandoned SourceImport may leave an extra unreferenced object or may be absent; the integrity audit classifies temporary staging separately. Unreferenced extra files are recoverable warnings, while a missing durable Document source is critical.
 
+`pg_dump` covers the complete primary schema and data, including `ai_provider_attempts`, owner/lineage foreign keys and triggers, immutable revision/version history, and Active Storage attachment references. The storage archive covers the corresponding private object tree. Temporary SourceImports, one-time workspace submissions, and unattached blobs may legitimately disappear through their documented maintenance schedules; durable Document attachments and translation history do not. Restore verification requires the exact schema version, so a bundle cannot silently omit this milestone's constraints or trigger functions.
+
 A local completed bundle is not sufficient disaster protection. Copy it promptly to an independent, access-controlled, encrypted off-host backup system using the organization's approved tooling. This repository deliberately does not invent encryption or perform a cloud upload.
 
 ## Retention

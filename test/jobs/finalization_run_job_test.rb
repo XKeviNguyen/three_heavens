@@ -150,7 +150,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
 
   test "terminal redelivery reconciles stale parent with zero provider calls" do
     complete_finalization_run(@run)
-    @round.update_column(:status, "running")
+    mutate_historical_fixture { @round.update_column(:status, "running") }
     client, calls = counting_client
     with_client(client) { perform_authorized_ai_job(FinalizationRunJob, @run) }
 

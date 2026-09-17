@@ -174,7 +174,7 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
 
   def review_run
     round = create_completed_review_round
-    round.update!(status: :running)
+    mutate_historical_fixture { round.update!(status: :running) }
     round.review_runs.create!(reviewer_llm_model: llm_models(:openrouter_gpt))
   end
 

@@ -1,4 +1,6 @@
 class FinalTranslationsController < ApplicationController
+  FINALIZATION_HISTORY_LIMIT = 25
+  VERSION_HISTORY_LIMIT = 100
   before_action :set_final_translation, except: :create
 
   def create
@@ -126,13 +128,24 @@ class FinalTranslationsController < ApplicationController
         { methodology_profile_revision: :methodology_profile },
         { experiment_reference_revisions: :translation_reference_revision }
       ],
-      judge_round: :review_round,
-      versions: { source_finalization_run: :finalizer_llm_model },
-      finalization_rounds: [
-        :base_version,
-        { finalization_runs: [ :finalizer_llm_model, :finalization_segment_runs ] }
-      ]
+      judge_round: :review_round
     ).find(@final_translation.id)
+    @versions = @final_translation.versions
+      .includes(source_finalization_run: :finalizer_llm_model)
+      .limit(VERSION_HISTORY_LIMIT)
+    @versions_truncated = @final_translation.versions.offset(VERSION_HISTORY_LIMIT).exists?
+    @finalization_rounds = @final_translation.finalization_rounds
+      .includes(:base_version, finalization_runs: [ :finalizer_llm_model, :finalization_segment_runs ])
+      .order(created_at: :desc, id: :desc)
+      .limit(FINALIZATION_HISTORY_LIMIT)
+      .to_a
+    @finalization_rounds_truncated = @final_translation.finalization_rounds
+      .offset(FINALIZATION_HISTORY_LIMIT).exists?
+    @has_running_refinement = @final_translation.finalization_rounds.running.exists?
+    visible_run_ids = @finalization_rounds.flat_map { |round| round.finalization_runs.map(&:id) }
+    @applied_versions_by_run = @final_translation.versions
+      .where(source_finalization_run_id: visible_run_ids)
+      .group_by(&:source_finalization_run_id)
     @finalizer_models = LlmModel.active_openrouter.order(:display_name, :id)
     winner = @final_translation.source_winner_translation_run
     @winner_review_evaluations = winner.review_evaluations.includes(:review_run).order(:created_at, :id)

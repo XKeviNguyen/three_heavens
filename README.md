@@ -101,6 +101,15 @@ Original uploads are private. Downloads pass application owner authorization, us
 bin/rails source_imports:cleanup
 ```
 
+Durable Projects, Documents, workflow snapshots, AI results, final translations, and final-version history are intentionally retained; Three Heavens does not silently expire user translation history. Temporary workspace submissions and SourceImports expire after 24 hours. Unattached Active Storage blobs older than seven days are collected once daily in bounded, lock-and-recheck batches, while any attached Document or SourceImport blob is preserved. Both maintenance tasks below are dry-run by default; set `EXECUTE=1` only after reviewing aggregate counts:
+
+```sh
+bin/rails backend:cleanup_unattached_blobs
+BEFORE=2026-01-01T00:00:00Z bin/rails backend:remediate_legacy_errors
+```
+
+The legacy-error task examines only failed AI runs before the explicit cutoff, never prints stored error content, replaces at most 100 rows per invocation by default with a fixed safe message, and is idempotent. Use `BATCH_SIZE` to select a smaller batch or at most 1,000 rows. Repository-controlled structured operational events go to standard output and contain only allowlisted bounded fields; production log retention belongs to the deployment log collector and must be configured there rather than by deleting durable product records.
+
 Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or as a clean macro-free OOXML DOCX generated solely from the authoritative final text. TXT contains exactly the stored text with no BOM or added prose. DOCX preserves Unicode, LF paragraph/blank-line semantics, tabs, and XML whitespace, and contains a small app-generated style plus safe core metadata; it never copies the uploaded package, relationships, provider data, or hidden private content. Three Heavens' generated DOCX subset round-trips through its importer to the same normalized text. Exports are generated on demand and are not stored.
 
 ## Health endpoints
@@ -115,6 +124,8 @@ Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or ex
 The authoritative recovery set is the primary PostgreSQL database plus private Active Storage files. Cache and cable are rebuildable; the queue database is rebuilt empty during disaster recovery so old paid-work jobs are not blindly replayed. Create a versioned checksum-protected bundle with `bin/ops/backup /absolute/backup-root`, verify an isolated restore with `RESTORE_DATABASE_URL` and `RESTORE_STORAGE_PATH` plus `bin/ops/restore-verify BUNDLE_PATH`, and preview/execute local completed-bundle retention with `bin/ops/backup-prune`.
 
 Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
+
+The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests with a declared body larger than 12 MiB are rejected before parsing; the trusted edge proxy must enforce the same limit for chunked requests without `Content-Length`.
 
 Detailed executable procedures are in:
 

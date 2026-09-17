@@ -7,7 +7,7 @@
 <% glossary = experiment.glossary_revision %>
 <% methodology = experiment.methodology_profile_revision %>
 <% reference_snapshots = experiment.experiment_reference_revisions %>
-<% running_refinement = @final_translation.finalization_rounds.any?(&:running?) %>
+<% running_refinement = @has_running_refinement %>
 
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -206,12 +206,12 @@
       <% end %>
     <% end %>
 
-    <% if @final_translation.finalization_rounds.empty? %>
+    <% if @finalization_rounds.empty? %>
       <p class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No refinement proposals yet. The human editor can save and finalize the draft without using AI refinement.</p>
     <% end %>
 
     <div class="mt-7 space-y-6">
-      <% @final_translation.finalization_rounds.sort_by { |round| [round.created_at, round.id] }.reverse_each do |round| %>
+      <% @finalization_rounds.each do |round| %>
         <article class="rounded-lg border border-slate-200 p-5">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 class="font-semibold text-slate-950">Refinement round · exact base version <%= round.base_version.version_number %></h3>
@@ -233,7 +233,7 @@
           <% end %>
           <div class="mt-4 space-y-4">
             <% round.finalization_runs.sort_by { |run| [run.finalizer_llm_model.display_name, run.id] }.each do |run| %>
-              <% applied_versions = @final_translation.versions.select { |version| version.source_finalization_run_id == run.id } %>
+              <% applied_versions = @applied_versions_by_run.fetch(run.id, []) %>
               <% applied = applied_versions.any? %>
               <% stale = !applied && current.id != round.base_final_translation_version_id %>
               <% applicable = run.completed? && !applied && !stale && @final_translation.draft? %>
@@ -286,13 +286,19 @@
         </article>
       <% end %>
     </div>
+    <% if @finalization_rounds_truncated %>
+      <p class="mt-5 text-sm text-slate-500">Showing the <%= FinalTranslationsController::FINALIZATION_HISTORY_LIMIT %> most recent refinement rounds.</p>
+    <% end %>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">Revision history</h2>
     <p class="mt-2 text-sm text-slate-600">Historical versions are immutable. Restoring one always creates a new revision.</p>
+    <% if @versions_truncated %>
+      <p class="mt-2 text-sm text-slate-500">Showing the <%= FinalTranslationsController::VERSION_HISTORY_LIMIT %> most recent versions.</p>
+    <% end %>
     <div class="mt-5 space-y-3">
-      <% @final_translation.versions.each do |version| %>
+      <% @versions.each do |version| %>
         <article class="rounded-lg border <%= version.id == current.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200' %> p-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

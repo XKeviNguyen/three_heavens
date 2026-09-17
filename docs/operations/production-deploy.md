@@ -8,6 +8,7 @@
 4. Confirm the `three_heavens_storage:/rails/storage` Kamal volume is attached and writable by uid/gid 1000.
 5. Confirm `/up`, `/ready`, queue processing, and the old environment's admin Operations diagnostics are healthy enough for deployment.
 6. Determine code/schema rollback compatibility. Do not deploy a destructive same-release schema removal. Use expand, deploy compatible code, migrate/backfill, then contract in a later independently backed-up release.
+7. Configure the edge proxy to reject request bodies larger than 12 MiB, including chunked requests without `Content-Length`, matching the application-side declared-length guard.
 
 ## Deploy
 
@@ -20,6 +21,8 @@ bin/kamal deploy
 Kamal Proxy uses `/up` for lightweight container liveness. The image entrypoint runs `bin/rails db:prepare`; a failed migration stops startup/deployment. Do not automatically run `db:rollback`. Inspect schema and migration state before correcting and retrying. Never edit files inside a running production container.
 
 This repository does not create a large backup automatically in a deploy hook: backup storage availability and freshness are explicit operator prerequisites, and brittle hook behavior must not obstruct incident recovery.
+
+The recurring operations queue removes expired SourceImports and unused workspace submissions hourly, clears finished queue records hourly, reconciles stale work, and removes only unattached Active Storage blobs older than seven days once daily. Structured application events are emitted to standard output; configure a bounded retention policy in the deployment log collector because the application does not own external log storage.
 
 ## Post-deploy
 

@@ -136,31 +136,33 @@ module TranslationWorkspaceSubmissions
     end
 
     def cleanup_test_graph
-      project_ids = Project.where(user_id: @user.id).pluck(:id)
-      document_ids = Document.where(project_id: project_ids).pluck(:id)
-      experiment_ids = Experiment.where(document_id: document_ids).pluck(:id)
-      review_round_ids = ReviewRound.where(experiment_id: experiment_ids).pluck(:id)
-      review_run_ids = ReviewRun.where(review_round_id: review_round_ids).pluck(:id)
+      ActiveRecord::Base.connection.disable_referential_integrity do
+        project_ids = Project.where(user_id: @user.id).pluck(:id)
+        document_ids = Document.where(project_id: project_ids).pluck(:id)
+        experiment_ids = Experiment.where(document_id: document_ids).pluck(:id)
+        review_round_ids = ReviewRound.where(experiment_id: experiment_ids).pluck(:id)
+        review_run_ids = ReviewRun.where(review_round_id: review_round_ids).pluck(:id)
 
-      ReviewEvaluation.where(review_run_id: review_run_ids).delete_all
-      ReviewRun.where(id: review_run_ids).delete_all
-      ReviewRound.where(id: review_round_ids).delete_all
-      PipelineEvent.where(pipeline_run_id: PipelineRun.where(experiment_id: experiment_ids).select(:id)).delete_all
-      PipelineRun.where(experiment_id: experiment_ids).delete_all
-      TranslationRun.where(experiment_id: experiment_ids).delete_all
-      TranslationWorkspaceSubmission.where(user_id: @user.id).delete_all
-      Experiment.where(id: experiment_ids).delete_all
-      Document.where(id: document_ids).delete_all
-      Project.where(id: project_ids).delete_all
+        ReviewEvaluation.where(review_run_id: review_run_ids).delete_all
+        ReviewRun.where(id: review_run_ids).delete_all
+        ReviewRound.where(id: review_round_ids).delete_all
+        PipelineEvent.where(pipeline_run_id: PipelineRun.where(experiment_id: experiment_ids).select(:id)).delete_all
+        PipelineRun.where(experiment_id: experiment_ids).delete_all
+        TranslationRun.where(experiment_id: experiment_ids).delete_all
+        TranslationWorkspaceSubmission.where(user_id: @user.id).delete_all
+        Experiment.where(id: experiment_ids).delete_all
+        Document.where(id: document_ids).delete_all
+        Project.where(id: project_ids).delete_all
 
-      profile_ids = WorkflowProfile.where(user_id: @user.id).pluck(:id)
-      revision_ids = WorkflowProfileRevision.where(workflow_profile_id: profile_ids).pluck(:id)
-      WorkflowProfile.where(id: profile_ids).update_all(current_revision_id: nil)
-      WorkflowProfileModelSelection.where(workflow_profile_revision_id: revision_ids).delete_all
-      WorkflowProfileRevision.where(id: revision_ids).delete_all
-      WorkflowProfile.where(id: profile_ids).delete_all
-      @models.each(&:delete)
-      @user.delete
+        profile_ids = WorkflowProfile.where(user_id: @user.id).pluck(:id)
+        revision_ids = WorkflowProfileRevision.where(workflow_profile_id: profile_ids).pluck(:id)
+        WorkflowProfile.where(id: profile_ids).update_all(current_revision_id: nil)
+        WorkflowProfileModelSelection.where(workflow_profile_revision_id: revision_ids).delete_all
+        WorkflowProfileRevision.where(id: revision_ids).delete_all
+        WorkflowProfile.where(id: profile_ids).delete_all
+        @models.each(&:delete)
+        @user.delete
+      end
     end
   end
 end

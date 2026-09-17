@@ -32,9 +32,6 @@ CREATE FUNCTION public.enforce_document_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
-  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
-
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -104,6 +101,7 @@ BEGIN
       FROM experiment_reference_revisions snapshots
       JOIN translation_reference_revisions revisions ON revisions.id = snapshots.translation_reference_revision_id
       JOIN experiments ON experiments.id = snapshots.experiment_id
+
       WHERE experiments.document_id = NEW.id
       ORDER BY reference_id
     ) references_to_lock;
@@ -135,25 +133,47 @@ $$;
 
 
 --
+-- Name: enforce_evaluation_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_evaluation_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  parent_experiment_id bigint;
+  candidate_experiment_id bigint;
+BEGIN
+  SELECT experiment_id INTO candidate_experiment_id FROM translation_runs WHERE id = NEW.translation_run_id;
+  IF TG_TABLE_NAME = 'review_evaluations' THEN
+    SELECT rounds.experiment_id INTO parent_experiment_id
+      FROM review_runs runs JOIN review_rounds rounds ON rounds.id = runs.review_round_id
+     WHERE runs.id = NEW.review_run_id;
+  ELSE
+    SELECT review_rounds.experiment_id INTO parent_experiment_id
+      FROM judge_runs runs
+      JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
+      JOIN review_rounds ON review_rounds.id = rounds.review_round_id
+     WHERE runs.id = NEW.judge_run_id;
+  END IF;
+  IF parent_experiment_id IS NULL OR candidate_experiment_id IS NULL OR parent_experiment_id <> candidate_experiment_id THEN
+    RAISE EXCEPTION 'Evaluation candidate must belong to the reviewed experiment';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_experiment_glossary_owner(); Type: FUNCTION; Schema: public; Owner: -
 --
 
 CREATE FUNCTION public.enforce_experiment_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE
-  project_id bigint;
-  glossary_id bigint;
 BEGIN
   IF NEW.glossary_revision_id IS NULL THEN
     RETURN NEW;
   END IF;
-
-  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
-  SELECT documents.project_id INTO project_id FROM documents WHERE documents.id = NEW.document_id;
-  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
-  SELECT glossary_revisions.glossary_id INTO glossary_id FROM glossary_revisions WHERE glossary_revisions.id = NEW.glossary_revision_id;
-  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || glossary_id::text, 0));
 
   IF NOT EXISTS (
     SELECT 1
@@ -274,6 +294,51 @@ $$;
 
 
 --
+-- Name: enforce_final_version_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_final_version_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  run_translation_id bigint;
+BEGIN
+  IF NEW.source_finalization_run_id IS NULL THEN RETURN NEW; END IF;
+  SELECT rounds.final_translation_id INTO run_translation_id
+    FROM finalization_runs runs
+    JOIN finalization_rounds rounds ON rounds.id = runs.finalization_round_id
+   WHERE runs.id = NEW.source_finalization_run_id;
+  IF run_translation_id IS NULL OR run_translation_id <> NEW.final_translation_id THEN
+    RAISE EXCEPTION 'Finalization source run must belong to the final translation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_final_version_sequence(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_final_version_sequence() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  next_version integer;
+BEGIN
+  PERFORM 1 FROM final_translations WHERE id = NEW.final_translation_id FOR UPDATE;
+  SELECT COALESCE(MAX(version_number), 0) + 1 INTO next_version
+    FROM final_translation_versions
+   WHERE final_translation_id = NEW.final_translation_id;
+  IF NEW.version_number <> next_version THEN
+    RAISE EXCEPTION 'Final translation version must be the next monotonic value';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_glossary_entry_set_seal(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -312,8 +377,6 @@ CREATE FUNCTION public.enforce_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || NEW.id::text, 0));
-
   IF EXISTS (
     SELECT 1
     FROM glossary_revisions
@@ -327,6 +390,42 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_judge_winner_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_judge_winner_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  judged_experiment_id bigint;
+  winner_experiment_id bigint;
+BEGIN
+  IF NEW.winner_translation_run_id IS NULL THEN RETURN NEW; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM translation_runs
+     WHERE id = NEW.winner_translation_run_id AND status = 'completed'
+  ) THEN
+    RAISE EXCEPTION 'Judge winner must be a completed translation';
+  END IF;
+  IF TG_TABLE_NAME = 'judge_rounds' THEN
+    SELECT experiment_id INTO judged_experiment_id FROM review_rounds WHERE id = NEW.review_round_id;
+  ELSE
+    SELECT reviews.experiment_id INTO judged_experiment_id
+      FROM judge_rounds rounds
+      JOIN review_rounds reviews ON reviews.id = rounds.review_round_id
+     WHERE rounds.id = NEW.judge_round_id;
+  END IF;
+  SELECT experiment_id INTO winner_experiment_id
+    FROM translation_runs WHERE id = NEW.winner_translation_run_id;
+  IF judged_experiment_id IS NULL OR winner_experiment_id IS NULL OR judged_experiment_id <> winner_experiment_id THEN
+    RAISE EXCEPTION 'Judge winner must belong to the judged experiment';
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -414,6 +513,56 @@ $$;
 
 
 --
+-- Name: enforce_owned_workflow_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_owned_workflow_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  left_owner_id bigint;
+  right_owner_id bigint;
+BEGIN
+  IF TG_TABLE_NAME = 'pipeline_runs' THEN
+    SELECT projects.user_id INTO left_owner_id
+      FROM experiments JOIN documents ON documents.id = experiments.document_id
+      JOIN projects ON projects.id = documents.project_id
+     WHERE experiments.id = NEW.experiment_id;
+    SELECT profiles.user_id INTO right_owner_id
+      FROM workflow_profile_revisions revisions
+      JOIN workflow_profiles profiles ON profiles.id = revisions.workflow_profile_id
+     WHERE revisions.id = NEW.workflow_profile_revision_id;
+    IF NEW.finalization_round_id IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM finalization_rounds rounds
+      JOIN final_translations translations ON translations.id = rounds.final_translation_id
+      WHERE rounds.id = NEW.finalization_round_id AND translations.experiment_id = NEW.experiment_id
+    ) THEN
+      RAISE EXCEPTION 'Pipeline finalization round must belong to its experiment';
+    END IF;
+  ELSIF TG_TABLE_NAME = 'source_imports' THEN
+    IF NEW.resulting_document_id IS NULL THEN RETURN NEW; END IF;
+    left_owner_id := NEW.user_id;
+    SELECT projects.user_id INTO right_owner_id
+      FROM documents JOIN projects ON projects.id = documents.project_id
+     WHERE documents.id = NEW.resulting_document_id;
+  ELSE
+    IF NEW.experiment_id IS NULL THEN RETURN NEW; END IF;
+    left_owner_id := NEW.user_id;
+    SELECT projects.user_id INTO right_owner_id
+      FROM experiments JOIN documents ON documents.id = experiments.document_id
+      JOIN projects ON projects.id = documents.project_id
+     WHERE experiments.id = NEW.experiment_id;
+  END IF;
+
+  IF left_owner_id IS NULL OR right_owner_id IS NULL OR left_owner_id <> right_owner_id THEN
+    RAISE EXCEPTION 'Referenced workflow records must have the same owner';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_project_glossary_owner(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -421,8 +570,6 @@ CREATE FUNCTION public.enforce_project_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
-
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -522,6 +669,140 @@ $$;
 
 
 --
+-- Name: enforce_provider_attempt_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_provider_attempt_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  parent_exists boolean;
+  expected_stage text;
+BEGIN
+  CASE NEW.provider_run_type
+  WHEN 'TranslationRun' THEN
+    expected_stage := 'translation';
+    SELECT TRUE INTO parent_exists FROM translation_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'TranslationSegmentRun' THEN
+    expected_stage := 'translation';
+    SELECT TRUE INTO parent_exists FROM translation_segment_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'ReviewRun' THEN
+    expected_stage := 'review';
+    SELECT TRUE INTO parent_exists FROM review_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'ReviewSegmentRun' THEN
+    expected_stage := 'review';
+    SELECT TRUE INTO parent_exists FROM review_segment_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'JudgeRun' THEN
+    expected_stage := 'judge';
+    SELECT TRUE INTO parent_exists FROM judge_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'JudgeSegmentRun' THEN
+    expected_stage := 'judge';
+    SELECT TRUE INTO parent_exists FROM judge_segment_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'FinalizationRun' THEN
+    expected_stage := 'finalization';
+    SELECT TRUE INTO parent_exists FROM finalization_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  WHEN 'FinalizationSegmentRun' THEN
+    expected_stage := 'finalization';
+    SELECT TRUE INTO parent_exists FROM finalization_segment_runs
+     WHERE id = NEW.provider_run_id FOR KEY SHARE;
+  ELSE
+    RAISE EXCEPTION 'Unsupported provider run type';
+  END CASE;
+
+  IF parent_exists IS DISTINCT FROM TRUE OR NEW.stage <> expected_stage THEN
+    RAISE EXCEPTION 'Provider attempt run and stage must match';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_revision_sequence(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_revision_sequence() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  parent_id bigint;
+  next_version integer;
+BEGIN
+  parent_id := (to_jsonb(NEW)->>TG_ARGV[1])::bigint;
+  EXECUTE format('SELECT 1 FROM %I WHERE id = $1 FOR UPDATE', TG_ARGV[0]) USING parent_id;
+  EXECUTE format(
+    'SELECT COALESCE(MAX(version), 0) + 1 FROM %I WHERE %I = $1',
+    TG_TABLE_NAME, TG_ARGV[1]
+  ) INTO next_version USING parent_id;
+  IF NEW.version <> next_version THEN
+    RAISE EXCEPTION 'Revision version must be the next monotonic value';
+  END IF;
+  RETURN NEW;
+END;
+$_$;
+
+
+--
+-- Name: enforce_segment_lineage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_segment_lineage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  parent_experiment_id bigint;
+  segment_experiment_id bigint;
+BEGIN
+  SELECT plans.experiment_id
+    INTO segment_experiment_id
+    FROM experiment_segments segments
+    JOIN document_execution_plans plans ON plans.id = segments.document_execution_plan_id
+   WHERE segments.id = NEW.experiment_segment_id;
+
+  CASE TG_TABLE_NAME
+  WHEN 'translation_segment_runs' THEN
+    SELECT experiment_id INTO parent_experiment_id FROM translation_runs WHERE id = NEW.translation_run_id;
+  WHEN 'review_segment_runs' THEN
+    SELECT rounds.experiment_id INTO parent_experiment_id
+      FROM review_runs runs JOIN review_rounds rounds ON rounds.id = runs.review_round_id
+     WHERE runs.id = NEW.review_run_id;
+  WHEN 'judge_segment_runs' THEN
+    SELECT review_rounds.experiment_id INTO parent_experiment_id
+      FROM judge_runs runs
+      JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
+      JOIN review_rounds ON review_rounds.id = rounds.review_round_id
+     WHERE runs.id = NEW.judge_run_id;
+  WHEN 'finalization_segment_runs' THEN
+    SELECT translations.experiment_id INTO parent_experiment_id
+      FROM finalization_runs runs
+      JOIN finalization_rounds rounds ON rounds.id = runs.finalization_round_id
+      JOIN final_translations translations ON translations.id = rounds.final_translation_id
+     WHERE runs.id = NEW.finalization_run_id;
+  WHEN 'final_translation_version_segments' THEN
+    SELECT translations.experiment_id INTO parent_experiment_id
+      FROM final_translation_versions versions
+      JOIN final_translations translations ON translations.id = versions.final_translation_id
+     WHERE versions.id = NEW.final_translation_version_id;
+  ELSE
+    RAISE EXCEPTION 'Unsupported segmented lineage table';
+  END CASE;
+
+  IF parent_experiment_id IS NULL OR segment_experiment_id IS NULL OR parent_experiment_id <> segment_experiment_id THEN
+    RAISE EXCEPTION 'Segment must belong to the parent experiment';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_translation_reference_owner(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -552,34 +833,6 @@ $$;
 
 
 --
--- Name: glossary_revision_configuration_digest(bigint); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.glossary_revision_configuration_digest(revision_id bigint) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
-    ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
-    ',"entries":[' || COALESCE((
-      SELECT string_agg(
-        '{"position":' || position ||
-        ',"source_term":' || to_json(source_term)::text ||
-        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-        ',' ORDER BY position
-      )
-      FROM glossary_entries
-      WHERE glossary_revision_id = glossary_revisions.id
-    ), '') || ']}',
-    'sha256'
-  ), 'hex')
-  FROM glossary_revisions
-  WHERE id = revision_id;
-$$;
-
-
---
 -- Name: methodology_revision_configuration_digest(text, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -592,6 +845,22 @@ CREATE FUNCTION public.methodology_revision_configuration_digest(source_language
     ',"guidance":' || to_json(guidance)::text || '}',
     'sha256'
   ), 'hex');
+$$;
+
+
+--
+-- Name: prevent_completed_record_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_completed_record_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.status = 'completed' THEN
+    RAISE EXCEPTION 'Completed % rows are immutable', TG_TABLE_NAME;
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
 $$;
 
 
@@ -658,6 +927,19 @@ $$;
 
 
 --
+-- Name: prevent_immutable_row_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_immutable_row_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION '% rows are immutable', TG_TABLE_NAME;
+END;
+$$;
+
+
+--
 -- Name: prevent_methodology_profile_revision_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -674,6 +956,59 @@ BEGIN
     USING ERRCODE = 'check_violation';
 END;
 $$;
+
+
+--
+-- Name: prevent_provider_attempt_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_provider_attempt_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' OR OLD.status IN ('completed', 'failed') THEN
+    RAISE EXCEPTION 'Historical provider attempts are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: prevent_terminal_evaluation_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_terminal_evaluation_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  old_parent_id bigint;
+  new_parent_id bigint;
+  parent_status text;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    old_parent_id := (to_jsonb(OLD)->>TG_ARGV[1])::bigint;
+    EXECUTE format('SELECT status FROM %I WHERE id = $1 FOR UPDATE', TG_ARGV[0])
+      INTO parent_status USING old_parent_id;
+    IF parent_status = 'completed' THEN
+      RAISE EXCEPTION 'Completed evaluation results are immutable';
+    END IF;
+  END IF;
+
+  IF TG_OP <> 'DELETE' THEN
+    new_parent_id := (to_jsonb(NEW)->>TG_ARGV[1])::bigint;
+    IF TG_OP = 'INSERT' OR new_parent_id <> old_parent_id THEN
+      EXECUTE format('SELECT status FROM %I WHERE id = $1 FOR UPDATE', TG_ARGV[0])
+        INTO parent_status USING new_parent_id;
+      IF parent_status = 'completed' THEN
+        RAISE EXCEPTION 'Completed evaluation results are immutable';
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$_$;
 
 
 --
@@ -696,6 +1031,25 @@ $$;
 
 
 --
+-- Name: restrict_provider_run_deletion(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.restrict_provider_run_deletion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM ai_provider_attempts
+    WHERE provider_run_type = TG_ARGV[0] AND provider_run_id = OLD.id
+  ) THEN
+    RAISE EXCEPTION 'Provider runs with attempt history cannot be deleted';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+
+--
 -- Name: seal_glossary_revision_entry_set(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -703,15 +1057,29 @@ CREATE FUNCTION public.seal_glossary_revision_entry_set() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
-  entry_count integer;
+  canonical_configuration text;
+  canonical_digest text;
 BEGIN
-  SELECT count(*) INTO entry_count FROM glossary_entries WHERE glossary_revision_id = NEW.id;
-  IF entry_count NOT BETWEEN 1 AND 100 THEN
-    RAISE EXCEPTION 'Glossary revisions must have 1-100 entries'
-      USING ERRCODE = 'check_violation';
-  END IF;
+  SELECT
+    '{"source_language":' || to_json(source_language)::text ||
+    ',"target_language":' || to_json(target_language)::text ||
+    ',"entries":[' || COALESCE((
+      SELECT string_agg(
+        '{"position":' || position ||
+        ',"source_term":' || to_json(source_term)::text ||
+        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
+        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
+        ',' ORDER BY position
+      )
+      FROM glossary_entries
+      WHERE glossary_revision_id = NEW.id
+    ), '') || ']}'
+  INTO canonical_configuration
+  FROM glossary_revisions
+  WHERE id = NEW.id;
 
-  IF NEW.configuration_digest <> glossary_revision_configuration_digest(NEW.id) THEN
+  canonical_digest := encode(digest(canonical_configuration, 'sha256'), 'hex');
+  IF NEW.configuration_digest <> canonical_digest THEN
     RAISE EXCEPTION 'Glossary revision configuration digest does not match its entries'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -877,13 +1245,19 @@ CREATE TABLE public.ai_provider_attempts (
     CONSTRAINT ai_provider_attempts_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT ai_provider_attempts_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT ai_provider_attempts_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
+    CONSTRAINT ai_provider_attempts_display_name_snapshot_check CHECK (((char_length((display_name_snapshot)::text) >= 1) AND (char_length((display_name_snapshot)::text) <= 150))),
     CONSTRAINT ai_provider_attempts_duration_check CHECK (((completed_at IS NULL) OR (completed_at >= started_at))),
+    CONSTRAINT ai_provider_attempts_error_code_format_check CHECK (((error_code IS NULL) OR (((char_length((error_code)::text) >= 1) AND (char_length((error_code)::text) <= 80)) AND ((error_code)::text ~ '^[a-z0-9_.:-]+$'::text)))),
+    CONSTRAINT ai_provider_attempts_gateway_snapshot_check CHECK (((char_length((gateway_snapshot)::text) >= 1) AND (char_length((gateway_snapshot)::text) <= 50))),
+    CONSTRAINT ai_provider_attempts_identifier_snapshot_check CHECK (((char_length((model_identifier_snapshot)::text) >= 1) AND (char_length((model_identifier_snapshot)::text) <= 255))),
     CONSTRAINT ai_provider_attempts_lifecycle_check CHECK (((((status)::text = 'running'::text) AND (completed_at IS NULL) AND (error_code IS NULL)) OR (((status)::text = 'completed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NULL)) OR (((status)::text = 'failed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NOT NULL)))),
     CONSTRAINT ai_provider_attempts_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
+    CONSTRAINT ai_provider_attempts_provider_snapshot_check CHECK (((char_length((provider_snapshot)::text) >= 1) AND (char_length((provider_snapshot)::text) <= 100))),
     CONSTRAINT ai_provider_attempts_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT ai_provider_attempts_run_type_check CHECK (((provider_run_type)::text = ANY (ARRAY[('TranslationRun'::character varying)::text, ('TranslationSegmentRun'::character varying)::text, ('ReviewRun'::character varying)::text, ('ReviewSegmentRun'::character varying)::text, ('JudgeRun'::character varying)::text, ('JudgeSegmentRun'::character varying)::text, ('FinalizationRun'::character varying)::text, ('FinalizationSegmentRun'::character varying)::text]))),
-    CONSTRAINT ai_provider_attempts_stage_check CHECK (((stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text]))),
-    CONSTRAINT ai_provider_attempts_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_run_type_check CHECK (((provider_run_type)::text = ANY ((ARRAY['TranslationRun'::character varying, 'TranslationSegmentRun'::character varying, 'ReviewRun'::character varying, 'ReviewSegmentRun'::character varying, 'JudgeRun'::character varying, 'JudgeSegmentRun'::character varying, 'FinalizationRun'::character varying, 'FinalizationSegmentRun'::character varying])::text[]))),
+    CONSTRAINT ai_provider_attempts_stage_check CHECK (((stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying])::text[]))),
+    CONSTRAINT ai_provider_attempts_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT ai_provider_attempts_token_consistency_check CHECK (((total_tokens IS NULL) OR (((prompt_tokens IS NULL) OR (prompt_tokens <= total_tokens)) AND ((completion_tokens IS NULL) OR (completion_tokens <= total_tokens)) AND ((cached_tokens IS NULL) OR (cached_tokens <= total_tokens)) AND ((reasoning_tokens IS NULL) OR (reasoning_tokens <= total_tokens))))),
     CONSTRAINT ai_provider_attempts_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -977,8 +1351,8 @@ CREATE TABLE public.documents (
     source_sha256 character varying,
     extraction_version character varying,
     CONSTRAINT documents_original_byte_size_check CHECK (((original_byte_size IS NULL) OR ((original_byte_size >= 0) AND (original_byte_size <= 10485760)))),
-    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text])))),
-    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY (ARRAY[('pasted_text'::character varying)::text, ('uploaded_file'::character varying)::text]))),
+    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
+    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY ((ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying])::text[]))),
     CONSTRAINT documents_source_sha256_check CHECK (((source_sha256 IS NULL) OR (char_length((source_sha256)::text) = 64)))
 );
 
@@ -1164,7 +1538,8 @@ CREATE TABLE public.final_translation_versions (
     CONSTRAINT final_translation_versions_change_note_check CHECK (((change_note IS NULL) OR (char_length((change_note)::text) <= 500))),
     CONSTRAINT final_translation_versions_content_check CHECK (((char_length(btrim(content)) > 0) AND (char_length(content) <= 100000))),
     CONSTRAINT final_translation_versions_number_check CHECK ((version_number > 0)),
-    CONSTRAINT final_translation_versions_origin_check CHECK (((origin)::text = ANY (ARRAY[('seed'::character varying)::text, ('manual'::character varying)::text, ('ai_applied'::character varying)::text, ('restored'::character varying)::text])))
+    CONSTRAINT final_translation_versions_origin_check CHECK (((origin)::text = ANY (ARRAY[('seed'::character varying)::text, ('manual'::character varying)::text, ('ai_applied'::character varying)::text, ('restored'::character varying)::text]))),
+    CONSTRAINT final_translation_versions_source_origin_check CHECK ((((origin)::text = 'ai_applied'::text) = (source_finalization_run_id IS NOT NULL)))
 );
 
 
@@ -1381,7 +1756,7 @@ CREATE TABLE public.finalization_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT finalization_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_change_summary_check CHECK (((jsonb_typeof(change_summary) = 'array'::text) AND (octet_length((change_summary)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
@@ -1389,11 +1764,11 @@ CREATE TABLE public.finalization_segment_runs (
     CONSTRAINT finalization_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT finalization_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT finalization_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_proposal_length_check CHECK (((proposed_translation IS NULL) OR (char_length(proposed_translation) <= 20000))),
     CONSTRAINT finalization_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT finalization_segment_runs_terminology_notes_check CHECK (((jsonb_typeof(terminology_notes) = 'array'::text) AND (octet_length((terminology_notes)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_warnings_check CHECK (((jsonb_typeof(warnings) = 'array'::text) AND (octet_length((warnings)::text) <= 50000)))
@@ -1727,7 +2102,7 @@ CREATE TABLE public.judge_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT judge_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT judge_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT judge_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -1735,10 +2110,10 @@ CREATE TABLE public.judge_segment_runs (
     CONSTRAINT judge_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT judge_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT judge_segment_runs_judgment_check CHECK (((jsonb_typeof(judgment) = 'object'::text) AND (octet_length((judgment)::text) <= 100000))),
-    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT judge_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT judge_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -1897,12 +2272,12 @@ CREATE TABLE public.pipeline_events (
     reason_code character varying,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
+    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
     CONSTRAINT pipeline_events_key_check CHECK (((char_length((event_key)::text) >= 1) AND (char_length((event_key)::text) <= 120))),
     CONSTRAINT pipeline_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND (octet_length((metadata)::text) <= 2048))),
     CONSTRAINT pipeline_events_reason_check CHECK (((reason_code IS NULL) OR (char_length((reason_code)::text) <= 80))),
     CONSTRAINT pipeline_events_sequence_check CHECK ((sequence_number > 0)),
-    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
+    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
     CONSTRAINT pipeline_events_type_check CHECK (((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 80)))
 );
 
@@ -1958,16 +2333,16 @@ CREATE TABLE public.pipeline_runs (
     CONSTRAINT pipeline_runs_authorized_count_check CHECK ((((provider_work_plan = '{}'::jsonb) AND (authorized_initial_provider_run_count = (((translator_count + reviewer_count) + judge_count) + finalizer_count))) OR ((provider_work_plan <> '{}'::jsonb) AND (jsonb_typeof((provider_work_plan -> 'roles'::text)) = 'object'::text) AND (((provider_work_plan ->> 'authorized_initial_provider_request_slots'::text))::integer = authorized_initial_provider_run_count) AND (authorized_initial_provider_run_count >= (((translator_count + reviewer_count) + judge_count) + finalizer_count))))),
     CONSTRAINT pipeline_runs_blocked_message_check CHECK (((blocked_message IS NULL) OR (char_length((blocked_message)::text) <= 500))),
     CONSTRAINT pipeline_runs_blocked_reason_check CHECK (((blocked_reason_code IS NULL) OR (char_length((blocked_reason_code)::text) <= 80))),
-    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text])))),
+    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying])::text[])))),
     CONSTRAINT pipeline_runs_blocked_state_check CHECK ((((status)::text = 'blocked'::text) = ((blocked_stage IS NOT NULL) AND (blocked_reason_code IS NOT NULL)))),
     CONSTRAINT pipeline_runs_completion_finalizer_check CHECK (((((completion_mode)::text = 'winner_draft'::text) AND (finalizer_count = 0)) OR (((completion_mode)::text = 'refinement_proposals'::text) AND (finalizer_count > 0)))),
-    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
-    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text]))),
+    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
+    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[]))),
     CONSTRAINT pipeline_runs_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT pipeline_runs_provider_work_plan_check CHECK (((jsonb_typeof(provider_work_plan) = 'object'::text) AND (octet_length((provider_work_plan)::text) <= 16384))),
     CONSTRAINT pipeline_runs_ready_timestamp_check CHECK ((((status)::text = 'ready_for_editor'::text) = (ready_for_editor_at IS NOT NULL))),
-    CONSTRAINT pipeline_runs_role_counts_check CHECK (((translator_count >= 2) AND (translator_count <= 6) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
-    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('blocked'::character varying)::text, ('ready_for_editor'::character varying)::text, ('stopped'::character varying)::text]))),
+    CONSTRAINT pipeline_runs_role_counts_check CHECK ((((translator_count >= 2) AND (translator_count <= 6)) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
+    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'blocked'::character varying, 'ready_for_editor'::character varying, 'stopped'::character varying])::text[]))),
     CONSTRAINT pipeline_runs_stopped_timestamp_check CHECK ((((status)::text = 'stopped'::text) = (stopped_at IS NOT NULL)))
 );
 
@@ -2215,7 +2590,7 @@ CREATE TABLE public.review_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT review_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT review_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT review_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -2223,10 +2598,10 @@ CREATE TABLE public.review_segment_runs (
     CONSTRAINT review_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT review_segment_runs_evaluations_check CHECK (((jsonb_typeof(evaluations) = 'array'::text) AND (octet_length((evaluations)::text) <= 100000))),
     CONSTRAINT review_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT review_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT review_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT review_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -2284,10 +2659,10 @@ CREATE TABLE public.source_imports (
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
-    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text])))),
+    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
-    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text, ('consumed'::character varying)::text])))
+    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying])::text[])))
 );
 
 
@@ -2492,7 +2867,7 @@ CREATE TABLE public.translation_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT translation_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT translation_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT translation_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -2500,10 +2875,10 @@ CREATE TABLE public.translation_segment_runs (
     CONSTRAINT translation_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT translation_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT translation_segment_runs_output_length_check CHECK (((translated_text IS NULL) OR (char_length(translated_text) <= 20000))),
-    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT translation_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT translation_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -2544,7 +2919,7 @@ CREATE TABLE public.translation_workspace_submissions (
     CONSTRAINT translation_workspace_submissions_digest_check CHECK ((char_length((token_digest)::text) = 64)),
     CONSTRAINT translation_workspace_submissions_expiry_check CHECK ((expires_at > created_at)),
     CONSTRAINT translation_workspace_submissions_lifecycle_check CHECK (((((status)::text = 'available'::text) AND (consumed_at IS NULL) AND (experiment_id IS NULL)) OR (((status)::text = 'consumed'::text) AND (consumed_at IS NOT NULL) AND (experiment_id IS NOT NULL)))),
-    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY (ARRAY[('available'::character varying)::text, ('consumed'::character varying)::text])))
+    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'consumed'::character varying])::text[])))
 );
 
 
@@ -2621,7 +2996,7 @@ CREATE TABLE public.workflow_profile_model_selections (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT workflow_profile_model_selections_position_check CHECK (("position" > 0)),
-    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY (ARRAY[('translator'::character varying)::text, ('reviewer'::character varying)::text, ('judge'::character varying)::text, ('finalizer'::character varying)::text]))),
+    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY ((ARRAY['translator'::character varying, 'reviewer'::character varying, 'judge'::character varying, 'finalizer'::character varying])::text[]))),
     CONSTRAINT workflow_profile_selections_display_name_check CHECK (((char_length((display_name_snapshot)::text) >= 1) AND (char_length((display_name_snapshot)::text) <= 150))),
     CONSTRAINT workflow_profile_selections_gateway_check CHECK (((char_length((gateway_snapshot)::text) >= 1) AND (char_length((gateway_snapshot)::text) <= 50))),
     CONSTRAINT workflow_profile_selections_identifier_check CHECK (((char_length((model_identifier_snapshot)::text) >= 1) AND (char_length((model_identifier_snapshot)::text) <= 255))),
@@ -2662,7 +3037,7 @@ CREATE TABLE public.workflow_profile_revisions (
     configuration_digest character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
+    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
     CONSTRAINT workflow_profile_revisions_description_check CHECK (((description IS NULL) OR (char_length((description)::text) <= 500))),
     CONSTRAINT workflow_profile_revisions_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT workflow_profile_revisions_name_check CHECK (((char_length(btrim((name)::text)) >= 1) AND (char_length(btrim((name)::text)) <= 150))),
@@ -3411,6 +3786,13 @@ CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active
 
 
 --
+-- Name: index_active_storage_blobs_for_cleanup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_active_storage_blobs_for_cleanup ON public.active_storage_blobs USING btree (created_at, id);
+
+
+--
 -- Name: index_active_storage_blobs_on_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3443,6 +3825,13 @@ CREATE INDEX index_ai_provider_attempts_on_status_and_completed_at_and_id ON pub
 --
 
 CREATE UNIQUE INDEX index_document_execution_plans_on_experiment_id ON public.document_execution_plans USING btree (experiment_id);
+
+
+--
+-- Name: index_documents_on_project_and_recent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_documents_on_project_and_recent ON public.documents USING btree (project_id, created_at DESC, id DESC);
 
 
 --
@@ -3628,6 +4017,13 @@ CREATE INDEX index_finalization_runs_on_pending_since ON public.finalization_run
 
 
 --
+-- Name: index_finalization_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_finalization_runs_on_recent_failures ON public.finalization_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_finalization_runs_on_round_and_model; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3663,6 +4059,13 @@ CREATE INDEX index_finalization_segment_runs_on_pending_since ON public.finaliza
 
 
 --
+-- Name: index_finalization_segment_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_finalization_segment_runs_on_recent_failures ON public.finalization_segment_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_finalization_segment_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3670,17 +4073,17 @@ CREATE INDEX index_finalization_segment_runs_on_running_last_claimed_at ON publi
 
 
 --
+-- Name: index_glossaries_on_owner_and_recent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_glossaries_on_owner_and_recent ON public.glossaries USING btree (user_id, active DESC, updated_at DESC, id DESC);
+
+
+--
 -- Name: index_glossaries_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_glossaries_on_user_id ON public.glossaries USING btree (user_id);
-
-
---
--- Name: index_glossaries_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_glossaries_on_user_id_and_active ON public.glossaries USING btree (user_id, active);
 
 
 --
@@ -3817,6 +4220,13 @@ CREATE INDEX index_judge_runs_on_pending_since ON public.judge_runs USING btree 
 
 
 --
+-- Name: index_judge_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_judge_runs_on_recent_failures ON public.judge_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_judge_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3852,6 +4262,13 @@ CREATE INDEX index_judge_segment_runs_on_pending_since ON public.judge_segment_r
 
 
 --
+-- Name: index_judge_segment_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_judge_segment_runs_on_recent_failures ON public.judge_segment_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_judge_segment_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3880,17 +4297,17 @@ CREATE INDEX index_methodology_profile_revisions_on_methodology_profile_id ON pu
 
 
 --
+-- Name: index_methodology_profiles_on_owner_and_recent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_methodology_profiles_on_owner_and_recent ON public.methodology_profiles USING btree (user_id, active DESC, updated_at DESC, id DESC);
+
+
+--
 -- Name: index_methodology_profiles_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_methodology_profiles_on_user_id ON public.methodology_profiles USING btree (user_id);
-
-
---
--- Name: index_methodology_profiles_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_methodology_profiles_on_user_id_and_active ON public.methodology_profiles USING btree (user_id, active);
 
 
 --
@@ -4027,6 +4444,13 @@ CREATE INDEX index_review_runs_on_pending_since ON public.review_runs USING btre
 
 
 --
+-- Name: index_review_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_review_runs_on_recent_failures ON public.review_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_review_runs_on_review_round_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4076,6 +4500,13 @@ CREATE INDEX index_review_segment_runs_on_pending_since ON public.review_segment
 
 
 --
+-- Name: index_review_segment_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_review_segment_runs_on_recent_failures ON public.review_segment_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_review_segment_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4083,17 +4514,17 @@ CREATE INDEX index_review_segment_runs_on_running_last_claimed_at ON public.revi
 
 
 --
+-- Name: index_source_imports_for_cleanup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_source_imports_for_cleanup ON public.source_imports USING btree (status, expires_at, id);
+
+
+--
 -- Name: index_source_imports_on_resulting_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_source_imports_on_resulting_document_id ON public.source_imports USING btree (resulting_document_id) WHERE (resulting_document_id IS NOT NULL);
-
-
---
--- Name: index_source_imports_on_status_and_expires_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_source_imports_on_status_and_expires_at ON public.source_imports USING btree (status, expires_at);
 
 
 --
@@ -4132,17 +4563,17 @@ CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_versi
 
 
 --
+-- Name: index_translation_references_on_owner_and_recent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_references_on_owner_and_recent ON public.translation_references USING btree (user_id, active DESC, updated_at DESC, id DESC);
+
+
+--
 -- Name: index_translation_references_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_translation_references_on_user_id ON public.translation_references USING btree (user_id);
-
-
---
--- Name: index_translation_references_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX index_translation_references_on_user_id_and_active ON public.translation_references USING btree (user_id, active);
 
 
 --
@@ -4181,6 +4612,13 @@ CREATE INDEX index_translation_runs_on_pending_since ON public.translation_runs 
 
 
 --
+-- Name: index_translation_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_runs_on_recent_failures ON public.translation_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
+
+
+--
 -- Name: index_translation_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4206,6 +4644,13 @@ CREATE UNIQUE INDEX index_translation_segment_runs_on_parent_and_segment ON publ
 --
 
 CREATE INDEX index_translation_segment_runs_on_pending_since ON public.translation_segment_runs USING btree (pending_since) WHERE ((status)::text = 'pending'::text);
+
+
+--
+-- Name: index_translation_segment_runs_on_recent_failures; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_segment_runs_on_recent_failures ON public.translation_segment_runs USING btree (completed_at, id) INCLUDE (error_code) WHERE ((status)::text = 'failed'::text);
 
 
 --
@@ -4286,6 +4731,13 @@ CREATE INDEX index_workflow_profile_revisions_on_workflow_profile_id ON public.w
 
 
 --
+-- Name: index_workflow_profiles_on_owner_and_recent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_workflow_profiles_on_owner_and_recent ON public.workflow_profiles USING btree (user_id, active DESC, updated_at DESC, id DESC);
+
+
+--
 -- Name: index_workflow_profiles_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4293,10 +4745,17 @@ CREATE INDEX index_workflow_profiles_on_user_id ON public.workflow_profiles USIN
 
 
 --
--- Name: index_workflow_profiles_on_user_id_and_active; Type: INDEX; Schema: public; Owner: -
+-- Name: index_workspace_submissions_for_cleanup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_workflow_profiles_on_user_id_and_active ON public.workflow_profiles USING btree (user_id, active);
+CREATE INDEX index_workspace_submissions_for_cleanup ON public.translation_workspace_submissions USING btree (status, expires_at, id);
+
+
+--
+-- Name: ai_provider_attempts enforce_ai_provider_attempt_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_ai_provider_attempt_lineage BEFORE INSERT OR UPDATE OF provider_run_type, provider_run_id, stage ON public.ai_provider_attempts FOR EACH ROW EXECUTE FUNCTION public.enforce_provider_attempt_lineage();
 
 
 --
@@ -4324,7 +4783,7 @@ CREATE TRIGGER enforce_document_reference_snapshots_trigger BEFORE UPDATE OF pro
 -- Name: experiments enforce_experiment_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER enforce_experiment_glossary_owner_trigger AFTER INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
+CREATE TRIGGER enforce_experiment_glossary_owner_trigger BEFORE INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
 
 
 --
@@ -4342,6 +4801,34 @@ CREATE TRIGGER enforce_experiment_reference_snapshots_trigger BEFORE UPDATE OF d
 
 
 --
+-- Name: final_translation_version_segments enforce_final_version_segment_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_final_version_segment_lineage BEFORE INSERT OR UPDATE OF final_translation_version_id, experiment_segment_id ON public.final_translation_version_segments FOR EACH ROW EXECUTE FUNCTION public.enforce_segment_lineage();
+
+
+--
+-- Name: final_translation_versions enforce_final_version_sequence; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_final_version_sequence BEFORE INSERT ON public.final_translation_versions FOR EACH ROW EXECUTE FUNCTION public.enforce_final_version_sequence();
+
+
+--
+-- Name: final_translation_versions enforce_final_version_source_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_final_version_source_lineage BEFORE INSERT OR UPDATE OF final_translation_id, source_finalization_run_id ON public.final_translation_versions FOR EACH ROW EXECUTE FUNCTION public.enforce_final_version_lineage();
+
+
+--
+-- Name: finalization_segment_runs enforce_finalization_segment_runs_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_finalization_segment_runs_lineage BEFORE INSERT OR UPDATE OF finalization_run_id, experiment_segment_id ON public.finalization_segment_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_segment_lineage();
+
+
+--
 -- Name: glossary_entries enforce_glossary_entry_set_seal_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4356,6 +4843,41 @@ CREATE TRIGGER enforce_glossary_owner_trigger BEFORE UPDATE OF user_id ON public
 
 
 --
+-- Name: glossary_revisions enforce_glossary_revisions_sequence; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_glossary_revisions_sequence BEFORE INSERT ON public.glossary_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_sequence('glossaries', 'glossary_id');
+
+
+--
+-- Name: judge_evaluations enforce_judge_evaluation_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_judge_evaluation_lineage BEFORE INSERT OR UPDATE OF judge_run_id, translation_run_id ON public.judge_evaluations FOR EACH ROW EXECUTE FUNCTION public.enforce_evaluation_lineage();
+
+
+--
+-- Name: judge_rounds enforce_judge_round_winner_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_judge_round_winner_lineage BEFORE INSERT OR UPDATE OF review_round_id, winner_translation_run_id ON public.judge_rounds FOR EACH ROW EXECUTE FUNCTION public.enforce_judge_winner_lineage();
+
+
+--
+-- Name: judge_runs enforce_judge_run_winner_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_judge_run_winner_lineage BEFORE INSERT OR UPDATE OF judge_round_id, winner_translation_run_id ON public.judge_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_judge_winner_lineage();
+
+
+--
+-- Name: judge_segment_runs enforce_judge_segment_runs_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_judge_segment_runs_lineage BEFORE INSERT OR UPDATE OF judge_run_id, experiment_segment_id ON public.judge_segment_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_segment_lineage();
+
+
+--
 -- Name: methodology_profiles enforce_methodology_profile_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4363,10 +4885,24 @@ CREATE TRIGGER enforce_methodology_profile_owner_trigger BEFORE UPDATE OF user_i
 
 
 --
+-- Name: methodology_profile_revisions enforce_methodology_profile_revisions_sequence; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_methodology_profile_revisions_sequence BEFORE INSERT ON public.methodology_profile_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_sequence('methodology_profiles', 'methodology_profile_id');
+
+
+--
 -- Name: experiment_reference_revisions enforce_new_experiment_reference_snapshot_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER enforce_new_experiment_reference_snapshot_trigger BEFORE INSERT ON public.experiment_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_new_experiment_reference_snapshot();
+
+
+--
+-- Name: pipeline_runs enforce_pipeline_owner_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_pipeline_owner_lineage BEFORE INSERT OR UPDATE OF experiment_id, workflow_profile_revision_id, finalization_round_id ON public.pipeline_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_workflow_lineage();
 
 
 --
@@ -4391,10 +4927,164 @@ CREATE TRIGGER enforce_project_reference_snapshots_trigger BEFORE UPDATE OF user
 
 
 --
+-- Name: review_evaluations enforce_review_evaluation_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_review_evaluation_lineage BEFORE INSERT OR UPDATE OF review_run_id, translation_run_id ON public.review_evaluations FOR EACH ROW EXECUTE FUNCTION public.enforce_evaluation_lineage();
+
+
+--
+-- Name: review_segment_runs enforce_review_segment_runs_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_review_segment_runs_lineage BEFORE INSERT OR UPDATE OF review_run_id, experiment_segment_id ON public.review_segment_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_segment_lineage();
+
+
+--
+-- Name: source_imports enforce_source_import_owner_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_source_import_owner_lineage BEFORE INSERT OR UPDATE OF user_id, resulting_document_id ON public.source_imports FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_workflow_lineage();
+
+
+--
 -- Name: translation_references enforce_translation_reference_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER enforce_translation_reference_owner_trigger BEFORE UPDATE OF user_id ON public.translation_references FOR EACH ROW EXECUTE FUNCTION public.enforce_translation_reference_owner();
+
+
+--
+-- Name: translation_reference_revisions enforce_translation_reference_revisions_sequence; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_translation_reference_revisions_sequence BEFORE INSERT ON public.translation_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_sequence('translation_references', 'translation_reference_id');
+
+
+--
+-- Name: translation_segment_runs enforce_translation_segment_runs_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_translation_segment_runs_lineage BEFORE INSERT OR UPDATE OF translation_run_id, experiment_segment_id ON public.translation_segment_runs FOR EACH ROW EXECUTE FUNCTION public.enforce_segment_lineage();
+
+
+--
+-- Name: workflow_profile_revisions enforce_workflow_profile_revisions_sequence; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_workflow_profile_revisions_sequence BEFORE INSERT ON public.workflow_profile_revisions FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_sequence('workflow_profiles', 'workflow_profile_id');
+
+
+--
+-- Name: translation_workspace_submissions enforce_workspace_submission_owner_lineage; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_workspace_submission_owner_lineage BEFORE INSERT OR UPDATE OF user_id, experiment_id ON public.translation_workspace_submissions FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_workflow_lineage();
+
+
+--
+-- Name: ai_provider_attempts prevent_ai_provider_attempt_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_ai_provider_attempt_mutation BEFORE DELETE OR UPDATE ON public.ai_provider_attempts FOR EACH ROW EXECUTE FUNCTION public.prevent_provider_attempt_mutation();
+
+
+--
+-- Name: finalization_rounds prevent_completed_finalization_rounds_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_finalization_rounds_mutation BEFORE DELETE OR UPDATE ON public.finalization_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: finalization_runs prevent_completed_finalization_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_finalization_runs_mutation BEFORE DELETE OR UPDATE ON public.finalization_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: finalization_segment_runs prevent_completed_finalization_segment_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_finalization_segment_runs_mutation BEFORE DELETE OR UPDATE ON public.finalization_segment_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: judge_evaluations prevent_completed_judge_evaluation_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_judge_evaluation_mutation BEFORE INSERT OR DELETE OR UPDATE ON public.judge_evaluations FOR EACH ROW EXECUTE FUNCTION public.prevent_terminal_evaluation_mutation('judge_runs', 'judge_run_id');
+
+
+--
+-- Name: judge_rounds prevent_completed_judge_rounds_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_judge_rounds_mutation BEFORE DELETE OR UPDATE ON public.judge_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: judge_runs prevent_completed_judge_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_judge_runs_mutation BEFORE DELETE OR UPDATE ON public.judge_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: judge_segment_runs prevent_completed_judge_segment_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_judge_segment_runs_mutation BEFORE DELETE OR UPDATE ON public.judge_segment_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: review_evaluations prevent_completed_review_evaluation_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_review_evaluation_mutation BEFORE INSERT OR DELETE OR UPDATE ON public.review_evaluations FOR EACH ROW EXECUTE FUNCTION public.prevent_terminal_evaluation_mutation('review_runs', 'review_run_id');
+
+
+--
+-- Name: review_rounds prevent_completed_review_rounds_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_review_rounds_mutation BEFORE DELETE OR UPDATE ON public.review_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: review_runs prevent_completed_review_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_review_runs_mutation BEFORE DELETE OR UPDATE ON public.review_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: review_segment_runs prevent_completed_review_segment_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_review_segment_runs_mutation BEFORE DELETE OR UPDATE ON public.review_segment_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: translation_runs prevent_completed_translation_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_translation_runs_mutation BEFORE DELETE OR UPDATE ON public.translation_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: translation_segment_runs prevent_completed_translation_segment_runs_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_completed_translation_segment_runs_mutation BEFORE DELETE OR UPDATE ON public.translation_segment_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_completed_record_mutation();
+
+
+--
+-- Name: document_execution_plans prevent_document_execution_plans_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_document_execution_plans_mutation BEFORE DELETE OR UPDATE ON public.document_execution_plans FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
 
 
 --
@@ -4412,6 +5102,27 @@ CREATE TRIGGER prevent_experiment_reference_snapshot_mutation_trigger BEFORE DEL
 
 
 --
+-- Name: experiment_segments prevent_experiment_segments_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_experiment_segments_mutation BEFORE DELETE OR UPDATE ON public.experiment_segments FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
+-- Name: final_translation_version_segments prevent_final_translation_version_segments_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_final_translation_version_segments_mutation BEFORE DELETE OR UPDATE ON public.final_translation_version_segments FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
+-- Name: final_translation_versions prevent_final_translation_versions_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_final_translation_versions_mutation BEFORE DELETE OR UPDATE ON public.final_translation_versions FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
 -- Name: glossary_revisions prevent_glossary_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4426,10 +5137,87 @@ CREATE TRIGGER prevent_methodology_profile_revision_mutation_trigger BEFORE DELE
 
 
 --
+-- Name: pipeline_events prevent_pipeline_events_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_pipeline_events_mutation BEFORE DELETE OR UPDATE ON public.pipeline_events FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
 -- Name: translation_reference_revisions prevent_translation_reference_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER prevent_translation_reference_revision_mutation_trigger BEFORE DELETE OR UPDATE ON public.translation_reference_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_translation_reference_revision_mutation();
+
+
+--
+-- Name: workflow_profile_model_selections prevent_workflow_profile_model_selections_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_workflow_profile_model_selections_mutation BEFORE DELETE OR UPDATE ON public.workflow_profile_model_selections FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
+-- Name: workflow_profile_revisions prevent_workflow_profile_revisions_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_workflow_profile_revisions_mutation BEFORE DELETE OR UPDATE ON public.workflow_profile_revisions FOR EACH ROW EXECUTE FUNCTION public.prevent_immutable_row_mutation();
+
+
+--
+-- Name: finalization_runs restrict_finalization_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_finalization_runs_attempt_deletion BEFORE DELETE ON public.finalization_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('FinalizationRun');
+
+
+--
+-- Name: finalization_segment_runs restrict_finalization_segment_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_finalization_segment_runs_attempt_deletion BEFORE DELETE ON public.finalization_segment_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('FinalizationSegmentRun');
+
+
+--
+-- Name: judge_runs restrict_judge_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_judge_runs_attempt_deletion BEFORE DELETE ON public.judge_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('JudgeRun');
+
+
+--
+-- Name: judge_segment_runs restrict_judge_segment_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_judge_segment_runs_attempt_deletion BEFORE DELETE ON public.judge_segment_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('JudgeSegmentRun');
+
+
+--
+-- Name: review_runs restrict_review_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_review_runs_attempt_deletion BEFORE DELETE ON public.review_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('ReviewRun');
+
+
+--
+-- Name: review_segment_runs restrict_review_segment_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_review_segment_runs_attempt_deletion BEFORE DELETE ON public.review_segment_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('ReviewSegmentRun');
+
+
+--
+-- Name: translation_runs restrict_translation_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_translation_runs_attempt_deletion BEFORE DELETE ON public.translation_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('TranslationRun');
+
+
+--
+-- Name: translation_segment_runs restrict_translation_segment_runs_attempt_deletion; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER restrict_translation_segment_runs_attempt_deletion BEFORE DELETE ON public.translation_segment_runs FOR EACH ROW EXECUTE FUNCTION public.restrict_provider_run_deletion('TranslationSegmentRun');
 
 
 --
@@ -5014,6 +5802,9 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260914090300'),
+('20260914090200'),
+('20260914090100'),
 ('20260914090000'),
 ('20260907090000'),
 ('20260906090000'),

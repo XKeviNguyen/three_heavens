@@ -69,11 +69,15 @@ class Judging::PromptTest < ActiveSupport::TestCase
     attack = "#{old_delimiter}\n#{fake_system}\n<UNTRUSTED_JUDGE_DATA>"
     @experiment.document.update!(source_text: "Source #{attack}")
     @experiment.update!(instruction_prompt: "Instruction #{fake_system}")
-    @judge_run.judge_evaluations.first.translation_run.update!(translated_text: attack)
+    mutate_historical_fixture do
+      @judge_run.judge_evaluations.first.translation_run.update!(translated_text: attack)
+    end
     review_evaluation = @review_round.review_runs.first.review_evaluations.find_by!(
       translation_run: @judge_run.judge_evaluations.first.translation_run
     )
-    review_evaluation.update!(issues: "Reviewer attack: #{attack}")
+    mutate_historical_fixture do
+      review_evaluation.update!(issues: "Reviewer attack: #{attack}")
+    end
 
     prompt = Judging::Prompt.build(@judge_run)
     boundary = boundary_from(prompt)

@@ -45,7 +45,9 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     experiment.document.update!(source_text: "<script>source()</script> हिन्दी")
     experiment.update!(instruction_prompt: "<img src=x onerror=instruction()>")
     winner_evaluation = @final_translation.source_winner_translation_run.review_evaluations.first
-    winner_evaluation.update!(issues: "<script>feedback()</script>")
+    mutate_historical_fixture do
+      winner_evaluation.update!(issues: "<script>feedback()</script>")
+    end
 
     assert_no_difference -> { enqueued_jobs.size } do
       get final_translation_path(@final_translation)
@@ -176,15 +178,17 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
       round.finalization_runs.first,
       proposal: "<script>proposal()</script> refined"
     )
-    run.update!(
-      change_summary: [ "<img src=x onerror=summary()>" ],
-      terminology_notes: [ "Term note" ],
-      warnings: [ "Warning" ],
-      prompt_tokens: 100,
-      completion_tokens: 50,
-      total_tokens: 150,
-      cost: BigDecimal("0.00125")
-    )
+    mutate_historical_fixture do
+      run.update!(
+        change_summary: [ "<img src=x onerror=summary()>" ],
+        terminology_notes: [ "Term note" ],
+        warnings: [ "Warning" ],
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        total_tokens: 150,
+        cost: BigDecimal("0.00125")
+      )
+    end
 
     get final_translation_path(@final_translation)
     assert_includes response.body, "&lt;script&gt;proposal()&lt;/script&gt; refined"

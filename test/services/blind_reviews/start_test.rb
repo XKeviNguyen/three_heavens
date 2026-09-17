@@ -119,7 +119,7 @@ class BlindReviews::StartTest < ActiveSupport::TestCase
   end
 
   test "requires at least two completed nonblank translations" do
-    @second_candidate.update!(translated_text: " ")
+    mutate_historical_fixture { @second_candidate.update!(translated_text: " ") }
 
     assert_raises BlindReviews::Start::InsufficientCandidatesError do
       start_with(@reviewers.first(1))

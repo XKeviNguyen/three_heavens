@@ -84,8 +84,10 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
         }
       }
     )
-    missing_experiment.translation_runs.first.update_columns(status: "failed", cost: BigDecimal("9"), total_tokens: 9_999)
-    bad_runs[@candidate].update_columns(completed_at: Time.utc(2026, 1, 1, 12, 0, 4))
+    mutate_historical_fixture do
+      missing_experiment.translation_runs.first.update_columns(status: "failed", cost: BigDecimal("9"), total_tokens: 9_999)
+      bad_runs[@candidate].update_columns(completed_at: Time.utc(2026, 1, 1, 12, 0, 4))
+    end
 
     stats = stats_for(@candidate)
 
@@ -161,16 +163,18 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
   end
 
   test "null quality scores are missing rather than zero" do
-    ReviewEvaluation.joins(:review_run)
-      .where(translation_run: @runs[@candidate], review_runs: { status: "completed" })
-      .order(:id)
-      .first
-      .update_column(:overall_score, nil)
-    JudgeEvaluation.joins(:judge_run)
-      .where(translation_run: @runs[@candidate], judge_runs: { status: "completed" })
-      .order(:id)
-      .first
-      .update_column(:overall_score, nil)
+    mutate_historical_fixture do
+      ReviewEvaluation.joins(:review_run)
+        .where(translation_run: @runs[@candidate], review_runs: { status: "completed" })
+        .order(:id)
+        .first
+        .update_column(:overall_score, nil)
+      JudgeEvaluation.joins(:judge_run)
+        .where(translation_run: @runs[@candidate], judge_runs: { status: "completed" })
+        .order(:id)
+        .first
+        .update_column(:overall_score, nil)
+    end
 
     stats = stats_for(@candidate)
 
