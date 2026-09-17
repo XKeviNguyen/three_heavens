@@ -32,6 +32,9 @@ CREATE FUNCTION public.enforce_document_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.project_id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -170,10 +173,19 @@ $$;
 CREATE FUNCTION public.enforce_experiment_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+DECLARE
+  project_id bigint;
+  glossary_id bigint;
 BEGIN
   IF NEW.glossary_revision_id IS NULL THEN
     RETURN NEW;
   END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('document:' || NEW.document_id::text, 0));
+  SELECT documents.project_id INTO project_id FROM documents WHERE documents.id = NEW.document_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || project_id::text, 0));
+  SELECT glossary_revisions.glossary_id INTO glossary_id FROM glossary_revisions WHERE glossary_revisions.id = NEW.glossary_revision_id;
+  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || glossary_id::text, 0));
 
   IF NOT EXISTS (
     SELECT 1
@@ -377,6 +389,8 @@ CREATE FUNCTION public.enforce_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('glossary:' || NEW.id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM glossary_revisions
@@ -570,6 +584,8 @@ CREATE FUNCTION public.enforce_project_glossary_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('project:' || NEW.id::text, 0));
+
   IF EXISTS (
     SELECT 1
     FROM experiments
@@ -833,6 +849,34 @@ $$;
 
 
 --
+-- Name: glossary_revision_configuration_digest(bigint); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.glossary_revision_configuration_digest(revision_id bigint) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT encode(digest(
+    '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
+    ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
+    ',"entries":[' || COALESCE((
+      SELECT string_agg(
+        '{"position":' || position ||
+        ',"source_term":' || to_json(source_term)::text ||
+        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
+        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
+        ',' ORDER BY position
+      )
+      FROM glossary_entries
+      WHERE glossary_revision_id = glossary_revisions.id
+    ), '') || ']}',
+    'sha256'
+  ), 'hex')
+  FROM glossary_revisions
+  WHERE id = revision_id;
+$$;
+
+
+--
 -- Name: methodology_revision_configuration_digest(text, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1057,29 +1101,15 @@ CREATE FUNCTION public.seal_glossary_revision_entry_set() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
-  canonical_configuration text;
-  canonical_digest text;
+  entry_count integer;
 BEGIN
-  SELECT
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"entries":[' || COALESCE((
-      SELECT string_agg(
-        '{"position":' || position ||
-        ',"source_term":' || to_json(source_term)::text ||
-        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-        ',' ORDER BY position
-      )
-      FROM glossary_entries
-      WHERE glossary_revision_id = NEW.id
-    ), '') || ']}'
-  INTO canonical_configuration
-  FROM glossary_revisions
-  WHERE id = NEW.id;
+  SELECT count(*) INTO entry_count FROM glossary_entries WHERE glossary_revision_id = NEW.id;
+  IF entry_count NOT BETWEEN 1 AND 100 THEN
+    RAISE EXCEPTION 'Glossary revisions must have 1-100 entries'
+      USING ERRCODE = 'check_violation';
+  END IF;
 
-  canonical_digest := encode(digest(canonical_configuration, 'sha256'), 'hex');
-  IF NEW.configuration_digest <> canonical_digest THEN
+  IF NEW.configuration_digest <> glossary_revision_configuration_digest(NEW.id) THEN
     RAISE EXCEPTION 'Glossary revision configuration digest does not match its entries'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -4783,7 +4813,7 @@ CREATE TRIGGER enforce_document_reference_snapshots_trigger BEFORE UPDATE OF pro
 -- Name: experiments enforce_experiment_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER enforce_experiment_glossary_owner_trigger BEFORE INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
+CREATE TRIGGER enforce_experiment_glossary_owner_trigger AFTER INSERT OR UPDATE OF document_id, glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.enforce_experiment_glossary_owner();
 
 
 --
