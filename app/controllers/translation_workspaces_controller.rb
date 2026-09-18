@@ -46,6 +46,7 @@ class TranslationWorkspacesController < ApplicationController
 
   def options
     new
+    rebuild_paged_provider_work_plan unless performed?
     render :new unless performed?
   end
 
@@ -123,6 +124,35 @@ class TranslationWorkspacesController < ApplicationController
     @translation_workspace.workflow_profile_revision_id = nil
     @translation_workspace.automatic_plan_digest = nil
     @translation_workspace.model_ids = repeatable_translation_model_ids(historical)
+  end
+
+  def rebuild_paged_provider_work_plan
+    return unless @translation_workspace.workflow_mode == "automatic"
+
+    profile = @workflow_profiles.find do |candidate|
+      candidate.current_revision_id.to_s == @translation_workspace.workflow_profile_revision_id.to_s
+    end
+    unless profile
+      reset_paged_provider_authorization
+      @translation_workspace.errors.add(:workflow_profile_revision_id, "is not available")
+      return
+    end
+
+    submitted_digest = @translation_workspace.automatic_plan_digest.to_s
+    @translation_workspace.prepare_provider_work_plan_preview(revision: profile.current_revision)
+    current_digest = @translation_workspace.automatic_plan_digest.to_s
+    return if submitted_digest.length == current_digest.length &&
+      ActiveSupport::SecurityUtils.secure_compare(submitted_digest, current_digest)
+
+    @translation_workspace.automatic_confirmation = "0"
+  rescue Ai::ContextBudget::Error => error
+    reset_paged_provider_authorization
+    @translation_workspace.errors.add(:workflow_profile_revision_id, error.message)
+  end
+
+  def reset_paged_provider_authorization
+    @translation_workspace.automatic_confirmation = "0"
+    @translation_workspace.automatic_plan_digest = nil
   end
 
   def repeat_attributes(historical)

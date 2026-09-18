@@ -16,6 +16,12 @@ class BackendIntegrityTest < ActiveSupport::TestCase
 
     connection.execute(provider_attempt_insert_sql(run.id, stage: "translation", attempt_number: 92))
     attempt = AiProviderAttempt.find_by!(provider_run: run, attempt_number: 92)
+    assert_database_rejects do
+      connection.execute("UPDATE ai_provider_attempts SET attempt_number = 999 WHERE id = #{attempt.id}")
+    end
+    assert_database_rejects do
+      connection.execute("UPDATE ai_provider_attempts SET display_name_snapshot = 'rewritten' WHERE id = #{attempt.id}")
+    end
     attempt.update!(status: :failed, completed_at: Time.current, error_code: "provider_failure")
 
     assert_database_rejects do
@@ -111,34 +117,61 @@ class BackendIntegrityTest < ActiveSupport::TestCase
   end
 
   test "database enforces monotonic final versions and judge winner lineage" do
-    review_round = ReviewRound.create!(experiment: experiments(:two))
-    pending_candidate = experiments(:two).translation_runs.create!(
-      llm_model: llm_models(:openrouter_claude),
-      status: :pending
+    review_round = create_completed_review_round
+    judge_round = review_round.create_judge_round!(status: :running)
+    judge_run = judge_round.judge_runs.create!(judge_llm_model: llm_models(:openrouter_gpt))
+    candidates = review_round.experiment.translation_runs.order(:id).to_a
+    candidates.each_with_index do |candidate, index|
+      judge_run.judge_evaluations.create!(
+        translation_run: candidate,
+        anonymous_label: BlindReviews::CandidateLabel.for(index)
+      )
+    end
+    unevaluated_candidate = review_round.experiment.translation_runs.create!(
+      llm_model: create_judge_model,
+      status: :completed,
+      translated_text: "Unevaluated translation",
+      completed_at: Time.current
     )
-    assert pending_candidate.pending?
     assert_database_rejects do
-      ApplicationRecord.connection.execute(<<~SQL.squish)
-        INSERT INTO judge_rounds (
-          review_round_id, winner_translation_run_id, status,
-          aggregate_rankings, created_at, updated_at
-        ) VALUES (
-          #{review_round.id}, #{pending_candidate.id}, 'completed',
-          '[]', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        )
-      SQL
+      ApplicationRecord.connection.execute(
+        "UPDATE judge_runs SET winner_translation_run_id = #{unevaluated_candidate.id} WHERE id = #{judge_run.id}"
+      )
+    end
+    assert_database_rejects do
+      ApplicationRecord.connection.execute(
+        "UPDATE judge_rounds SET winner_translation_run_id = #{unevaluated_candidate.id} WHERE id = #{judge_round.id}"
+      )
+    end
+    judge_run.judge_evaluations.order(:anonymous_label).each_with_index do |evaluation, index|
+      evaluation.update!(
+        rank: index + 1,
+        overall_score: 90 - index,
+        rationale: "Ranked rationale",
+        strengths: "Ranked strengths",
+        risks: "Ranked risks"
+      )
+    end
+    rank_two_candidate = judge_run.judge_evaluations.find_by!(rank: 2).translation_run
+    assert_database_rejects do
+      ApplicationRecord.connection.execute(
+        "UPDATE judge_runs SET winner_translation_run_id = #{rank_two_candidate.id} WHERE id = #{judge_run.id}"
+      )
     end
 
-    judge_round = JudgeRound.new(
-      review_round: review_round,
+    complete_judge_run(judge_run)
+    aggregate = Judging::Aggregate.call(judge_round)
+    judge_round.update!(
       status: :completed,
-      winner_translation_run: translation_runs(:two)
+      winner_translation_run_id: aggregate.winner_translation_run_id,
+      aggregate_rankings: aggregate.rankings,
+      aggregation_explanation: aggregate.explanation
     )
-    judge_round.save!(validate: false)
+
     final_translation = FinalTranslation.new(
-      experiment: experiments(:two),
+      experiment: review_round.experiment,
       judge_round: judge_round,
-      source_winner_translation_run: translation_runs(:two),
+      source_winner_translation_run: judge_round.winner_translation_run,
       status: :draft
     )
     final_translation.save!(validate: false)
@@ -155,6 +188,47 @@ class BackendIntegrityTest < ActiveSupport::TestCase
       winner_translation_run: translation_runs(:two)
     )
     assert_database_rejects { cross_winner.save!(validate: false) }
+  end
+
+  test "database blocks parent lineage changes after segment children exist" do
+    project = users(:normal).projects.create!(
+      name: "Segment parent integrity",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    source = "Đoạn dài。\n\n" * 1_500
+    document = project.documents.create!(title: "Segmented source", source_text: source)
+    experiment = document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    plan = LongDocuments::Planner.call(experiment)
+    run = experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude))
+    run.translation_segment_runs.create!(
+      experiment_segment: plan.segments.first,
+      context_window_tokens_snapshot: 64_000,
+      max_output_tokens_snapshot: 4_096,
+      estimated_input_tokens: 1_000,
+      reserved_output_tokens: 4_096,
+      context_safety_margin_tokens: 1_024,
+      budget_policy_version: Ai::ContextBudget::POLICY_VERSION
+    )
+
+    assert_database_rejects { run.update_column(:experiment_id, experiments(:two).id) }
+
+    trigger_names = %w[
+      prevent_translation_runs_segment_parent_change
+      prevent_review_runs_segment_parent_change
+      prevent_review_rounds_segment_parent_change
+      prevent_judge_runs_segment_parent_change
+      prevent_judge_rounds_segment_parent_change
+      prevent_finalization_runs_segment_parent_change
+      prevent_finalization_rounds_segment_parent_change
+      prevent_final_translations_segment_parent_change
+    ]
+    quoted_names = trigger_names.map { |name| ApplicationRecord.connection.quote(name) }.join(", ")
+    installed = ApplicationRecord.connection.select_value(<<~SQL.squish)
+      SELECT COUNT(*) FROM pg_trigger
+      WHERE tgname IN (#{quoted_names}) AND NOT tgisinternal
+    SQL
+    assert_equal trigger_names.size, installed
   end
 
   private

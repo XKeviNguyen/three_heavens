@@ -53,6 +53,7 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
       enforce_final_version_lineage
       enforce_owned_workflow_lineage
       enforce_evaluation_lineage
+      prevent_segment_parent_lineage_change
       enforce_segment_lineage
       restrict_provider_run_deletion
       enforce_provider_attempt_lineage
@@ -201,12 +202,28 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
           JOIN review_rounds reviews ON reviews.id = rounds.review_round_id
           JOIN translation_runs winners ON winners.id = rounds.winner_translation_run_id
           WHERE reviews.experiment_id <> winners.experiment_id OR winners.status <> 'completed'
+             OR NOT EXISTS (
+               SELECT 1 FROM judge_evaluations evaluations
+               JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
+               WHERE runs.judge_round_id = rounds.id
+                 AND evaluations.translation_run_id = rounds.winner_translation_run_id
+             )
         ) OR EXISTS (
           SELECT 1 FROM judge_runs runs
           JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
           JOIN review_rounds reviews ON reviews.id = rounds.review_round_id
           JOIN translation_runs winners ON winners.id = runs.winner_translation_run_id
           WHERE reviews.experiment_id <> winners.experiment_id OR winners.status <> 'completed'
+             OR NOT EXISTS (
+               SELECT 1 FROM judge_evaluations evaluations
+               WHERE evaluations.judge_run_id = runs.id
+                 AND evaluations.translation_run_id = runs.winner_translation_run_id
+                 AND evaluations.rank = 1
+                 AND evaluations.overall_score IS NOT NULL
+                 AND BTRIM(evaluations.rationale) <> ''
+                 AND BTRIM(evaluations.strengths) <> ''
+                 AND BTRIM(evaluations.risks) <> ''
+             )
         ) THEN
           RAISE EXCEPTION 'Existing judge winners violate experiment lineage';
         END IF;
@@ -353,6 +370,18 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
       BEGIN
         IF TG_OP = 'DELETE' OR OLD.status IN ('completed', 'failed') THEN
           RAISE EXCEPTION 'Historical provider attempts are immutable';
+        END IF;
+        IF OLD.provider_run_type IS DISTINCT FROM NEW.provider_run_type OR
+           OLD.provider_run_id IS DISTINCT FROM NEW.provider_run_id OR
+           OLD.attempt_number IS DISTINCT FROM NEW.attempt_number OR
+           OLD.stage IS DISTINCT FROM NEW.stage OR
+           OLD.gateway_snapshot IS DISTINCT FROM NEW.gateway_snapshot OR
+           OLD.provider_snapshot IS DISTINCT FROM NEW.provider_snapshot OR
+           OLD.model_identifier_snapshot IS DISTINCT FROM NEW.model_identifier_snapshot OR
+           OLD.display_name_snapshot IS DISTINCT FROM NEW.display_name_snapshot OR
+           OLD.started_at IS DISTINCT FROM NEW.started_at OR
+           OLD.created_at IS DISTINCT FROM NEW.created_at THEN
+          RAISE EXCEPTION 'Provider attempt identity and routing snapshots are immutable';
         END IF;
         RETURN NEW;
       END;
@@ -522,16 +551,111 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
         END IF;
         IF TG_TABLE_NAME = 'judge_rounds' THEN
           SELECT experiment_id INTO judged_experiment_id FROM review_rounds WHERE id = NEW.review_round_id;
+          IF NOT EXISTS (
+            SELECT 1
+              FROM judge_evaluations evaluations
+              JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
+             WHERE runs.judge_round_id = NEW.id
+               AND evaluations.translation_run_id = NEW.winner_translation_run_id
+          ) THEN
+            RAISE EXCEPTION 'Judge round winner must be an evaluated candidate';
+          END IF;
         ELSE
           SELECT reviews.experiment_id INTO judged_experiment_id
             FROM judge_rounds rounds
             JOIN review_rounds reviews ON reviews.id = rounds.review_round_id
            WHERE rounds.id = NEW.judge_round_id;
+          IF NOT EXISTS (
+            SELECT 1
+              FROM judge_evaluations evaluations
+             WHERE evaluations.judge_run_id = NEW.id
+               AND evaluations.translation_run_id = NEW.winner_translation_run_id
+               AND evaluations.rank = 1
+               AND evaluations.overall_score IS NOT NULL
+               AND BTRIM(evaluations.rationale) <> ''
+               AND BTRIM(evaluations.strengths) <> ''
+               AND BTRIM(evaluations.risks) <> ''
+          ) THEN
+            RAISE EXCEPTION 'Judge run winner must be its complete rank-one evaluation';
+          END IF;
         END IF;
         SELECT experiment_id INTO winner_experiment_id
           FROM translation_runs WHERE id = NEW.winner_translation_run_id;
         IF judged_experiment_id IS NULL OR winner_experiment_id IS NULL OR judged_experiment_id <> winner_experiment_id THEN
           RAISE EXCEPTION 'Judge winner must belong to the judged experiment';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+      CREATE FUNCTION prevent_segment_parent_lineage_change()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        child_exists boolean;
+      BEGIN
+        IF (to_jsonb(OLD)->>TG_ARGV[0]) IS NOT DISTINCT FROM (to_jsonb(NEW)->>TG_ARGV[0]) THEN
+          RETURN NEW;
+        END IF;
+
+        CASE TG_TABLE_NAME
+        WHEN 'translation_runs' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM translation_segment_runs WHERE translation_run_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'review_runs' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM review_segment_runs WHERE review_run_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'review_rounds' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM review_segment_runs segments
+            JOIN review_runs runs ON runs.id = segments.review_run_id
+            WHERE runs.review_round_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM judge_segment_runs segments
+            JOIN judge_runs runs ON runs.id = segments.judge_run_id
+            JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
+            WHERE rounds.review_round_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'judge_runs' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM judge_segment_runs WHERE judge_run_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'judge_rounds' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM judge_segment_runs segments
+            JOIN judge_runs runs ON runs.id = segments.judge_run_id
+            WHERE runs.judge_round_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'finalization_runs' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM finalization_segment_runs WHERE finalization_run_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'finalization_rounds' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM finalization_segment_runs segments
+            JOIN finalization_runs runs ON runs.id = segments.finalization_run_id
+            WHERE runs.finalization_round_id = OLD.id
+          ) INTO child_exists;
+        WHEN 'final_translations' THEN
+          SELECT EXISTS (
+            SELECT 1 FROM finalization_segment_runs segments
+            JOIN finalization_runs runs ON runs.id = segments.finalization_run_id
+            JOIN finalization_rounds rounds ON rounds.id = runs.finalization_round_id
+            WHERE rounds.final_translation_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM final_translation_version_segments segments
+            JOIN final_translation_versions versions ON versions.id = segments.final_translation_version_id
+            WHERE versions.final_translation_id = OLD.id
+          ) INTO child_exists;
+        ELSE
+          RAISE EXCEPTION 'Unsupported segmented lineage parent table';
+        END CASE;
+
+        IF child_exists THEN
+          RAISE EXCEPTION 'Segment lineage parent cannot change after child runs exist';
         END IF;
         RETURN NEW;
       END;
@@ -669,6 +793,24 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
     end
     create_trigger(:final_translation_version_segments, "enforce_final_version_segment_lineage", "BEFORE INSERT OR UPDATE OF final_translation_version_id, experiment_segment_id", "enforce_segment_lineage()")
 
+    {
+      translation_runs: :experiment_id,
+      review_runs: :review_round_id,
+      review_rounds: :experiment_id,
+      judge_runs: :judge_round_id,
+      judge_rounds: :review_round_id,
+      finalization_runs: :finalization_round_id,
+      finalization_rounds: :final_translation_id,
+      final_translations: :experiment_id
+    }.each do |table, column|
+      create_trigger(
+        table,
+        "prevent_#{table}_segment_parent_change",
+        "BEFORE UPDATE OF #{column}",
+        "prevent_segment_parent_lineage_change('#{column}')"
+      )
+    end
+
     create_trigger(:review_evaluations, "enforce_review_evaluation_lineage", "BEFORE INSERT OR UPDATE OF review_run_id, translation_run_id", "enforce_evaluation_lineage()")
     create_trigger(:judge_evaluations, "enforce_judge_evaluation_lineage", "BEFORE INSERT OR UPDATE OF judge_run_id, translation_run_id", "enforce_evaluation_lineage()")
     create_trigger(:review_evaluations, "prevent_completed_review_evaluation_mutation", "BEFORE INSERT OR UPDATE OR DELETE", "prevent_terminal_evaluation_mutation('review_runs', 'review_run_id')")
@@ -723,6 +865,10 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
     names += %i[translation_segment_runs review_segment_runs judge_segment_runs finalization_segment_runs].map do |table|
       [ table, "enforce_#{table}_lineage" ]
     end
+    names += %i[
+      translation_runs review_runs review_rounds judge_runs judge_rounds
+      finalization_runs finalization_rounds final_translations
+    ].map { |table| [ table, "prevent_#{table}_segment_parent_change" ] }
     names + %i[
       workflow_profile_revisions glossary_revisions methodology_profile_revisions translation_reference_revisions
     ].map { |table| [ table, "enforce_#{table}_sequence" ] }
