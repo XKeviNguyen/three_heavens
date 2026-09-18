@@ -1,6 +1,5 @@
 class FinalTranslationsController < ApplicationController
-  FINALIZATION_HISTORY_LIMIT = 25
-  VERSION_HISTORY_LIMIT = 100
+  HISTORY_PAGE_SIZE = 25
   before_action :set_final_translation, except: :create
 
   def create
@@ -130,17 +129,14 @@ class FinalTranslationsController < ApplicationController
       ],
       judge_round: :review_round
     ).find(@final_translation.id)
-    @versions = @final_translation.versions
-      .includes(source_finalization_run: :finalizer_llm_model)
-      .limit(VERSION_HISTORY_LIMIT)
-    @versions_truncated = @final_translation.versions.offset(VERSION_HISTORY_LIMIT).exists?
-    @finalization_rounds = @final_translation.finalization_rounds
+    versions_scope = @final_translation.versions.reorder(created_at: :desc, id: :desc)
+    versions_page, @versions_pagination = paginated_history(versions_scope, page_param: :version_page)
+    @versions = versions_page.includes(source_finalization_run: :finalizer_llm_model).to_a
+    rounds_scope = @final_translation.finalization_rounds.order(created_at: :desc, id: :desc)
+    rounds_page, @finalization_pagination = paginated_history(rounds_scope, page_param: :refinement_page)
+    @finalization_rounds = rounds_page
       .includes(:base_version, finalization_runs: [ :finalizer_llm_model, :finalization_segment_runs ])
-      .order(created_at: :desc, id: :desc)
-      .limit(FINALIZATION_HISTORY_LIMIT)
       .to_a
-    @finalization_rounds_truncated = @final_translation.finalization_rounds
-      .offset(FINALIZATION_HISTORY_LIMIT).exists?
     @has_running_refinement = @final_translation.finalization_rounds.running.exists?
     visible_run_ids = @finalization_rounds.flat_map { |round| round.finalization_runs.map(&:id) }
     @applied_versions_by_run = @final_translation.versions
@@ -150,6 +146,26 @@ class FinalTranslationsController < ApplicationController
     winner = @final_translation.source_winner_translation_run
     @winner_review_evaluations = winner.review_evaluations.includes(:review_run).order(:created_at, :id)
     @winner_judge_evaluations = winner.judge_evaluations.includes(:judge_run).order(:created_at, :id)
+  end
+
+  def paginated_history(scope, page_param:)
+    total_count = scope.count
+    total_pages = [ (total_count.to_f / HISTORY_PAGE_SIZE).ceil, 1 ].max
+    current_page = normalized_history_page(params[page_param], total_pages)
+    pagination = {
+      current_page: current_page,
+      total_pages: total_pages,
+      total_count: total_count
+    }
+    page = scope.offset((current_page - 1) * HISTORY_PAGE_SIZE).limit(HISTORY_PAGE_SIZE)
+    [ page, pagination ]
+  end
+
+  def normalized_history_page(value, total_pages)
+    requested = Integer(value.presence || 1, 10)
+    requested.clamp(1, total_pages)
+  rescue ArgumentError, TypeError
+    1
   end
 
   def render_workspace_error(error, status)

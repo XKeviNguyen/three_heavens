@@ -26,7 +26,6 @@ class TranslationWorkspacesController < ApplicationController
     source_import = load_source_import(source_import_id_param)
     project_binding = source_import_project_token_param
     validate_source_import_project_binding!(source_import:, project:, token: project_binding)
-    load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new({
       user: current_user,
       source_import: source_import,
@@ -34,6 +33,7 @@ class TranslationWorkspacesController < ApplicationController
       source_text: source_import&.extracted_text,
       document_title: source_import && File.basename(source_import.original_filename, ".*")
     }, existing_project: project)
+    load_available_models(project:, workspace: @translation_workspace)
     if source_import && !source_import.available?
       @translation_workspace.errors.add(:source_import_id, source_import.availability_message)
     end
@@ -52,12 +52,12 @@ class TranslationWorkspacesController < ApplicationController
     ).find(params[:experiment_id])
     @repeated_from_experiment = historical
     project = historical.document.project
-    load_available_models(project: project)
     attributes = repeat_attributes(historical)
     @translation_workspace = TranslationWorkspace.new(
       attributes.merge(user: current_user),
       existing_project: project
     )
+    load_available_models(project: project, workspace: @translation_workspace)
     revision = repeatable_pipeline_revision(historical)
     prepare_repeat_preview(revision, historical) if revision
     render :new
@@ -72,11 +72,11 @@ class TranslationWorkspacesController < ApplicationController
       project:,
       token: attributes[:source_import_project_token]
     )
-    load_available_models(project:)
     @translation_workspace = TranslationWorkspace.new(
       attributes.merge(user: current_user, source_import:),
       existing_project: project
     )
+    load_available_models(project:, workspace: @translation_workspace)
 
     if @translation_workspace.submit
       destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
@@ -172,11 +172,11 @@ class TranslationWorkspacesController < ApplicationController
     request.request_id.to_s.gsub(/[^A-Za-z0-9_-]/, "").first(100).presence || SecureRandom.uuid
   end
 
-  def load_available_models(project: nil)
+  def load_available_models(project: nil, workspace: nil)
     @available_models = LlmModel.active_openrouter.order(:display_name, :id)
-    @workflow_profiles = current_user.workflow_profiles.active.includes(
+    workflow_scope = current_user.workflow_profiles.active.includes(
       current_revision: { model_selections: :llm_model }
-    ).order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
+    )
     glossary_scope = current_user.glossaries.active
     methodology_scope = current_user.methodology_profiles.active
     reference_scope = current_user.translation_references.active
@@ -208,12 +208,41 @@ class TranslationWorkspacesController < ApplicationController
         target_language:
       )
     end
-    @glossaries = glossary_scope.includes(current_revision: :entries)
-      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
-    @methodology_profiles = methodology_scope.includes(:current_revision)
-      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
-    @translation_references = reference_scope.includes(:current_revision)
-      .order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT)
+    @workflow_profiles = bounded_configuration_options(
+      workflow_scope,
+      selected_revision_ids: workspace&.workflow_profile_revision_id,
+      selected_limit: 1
+    )
+    @glossaries = bounded_configuration_options(
+      glossary_scope.includes(current_revision: :entries),
+      selected_revision_ids: workspace&.glossary_revision_id,
+      selected_limit: 1
+    )
+    @methodology_profiles = bounded_configuration_options(
+      methodology_scope.includes(:current_revision),
+      selected_revision_ids: workspace&.methodology_profile_revision_id,
+      selected_limit: 1
+    )
+    @translation_references = bounded_configuration_options(
+      reference_scope.includes(:current_revision),
+      selected_revision_ids: workspace&.translation_reference_revision_ids,
+      selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES
+    )
+  end
+
+  def bounded_configuration_options(scope, selected_revision_ids:, selected_limit:)
+    recent = scope.order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT).to_a
+    revision_ids = Array(selected_revision_ids).filter_map do |value|
+      value.to_i if value.to_s.match?(/\A[1-9]\d*\z/)
+    end.uniq.first(selected_limit)
+    return recent if revision_ids.empty?
+
+    selected = scope.where(current_revision_id: revision_ids)
+      .where.not(id: recent.map(&:id))
+      .order(updated_at: :desc, id: :desc)
+      .limit(selected_limit)
+      .to_a
+    (recent + selected).sort_by { |record| [ record.updated_at, record.id ] }.reverse
   end
 
   def translation_workspace_params

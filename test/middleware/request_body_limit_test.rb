@@ -1,6 +1,17 @@
 require "test_helper"
 
 class RequestBodyLimitTest < ActiveSupport::TestCase
+  test "allows the supported two-file upload plus multipart overhead" do
+    called = false
+    middleware = RequestBodyLimit.new(lambda { |_environment| called = true; [ 204, {}, [] ] })
+    supported_length = (2 * SourceImports::Limits::MAX_UPLOAD_BYTES) +
+      RequestBodyLimit::MULTIPART_OVERHEAD_BYTES
+
+    assert_equal 204, middleware.call("CONTENT_LENGTH" => supported_length.to_s).first
+    assert called
+    assert_equal supported_length, RequestBodyLimit::MAX_BYTES
+  end
+
   test "rejects declared oversized bodies before calling the application" do
     called = false
     middleware = RequestBodyLimit.new(lambda { |_environment| called = true; [ 200, {}, [] ] })

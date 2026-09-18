@@ -286,17 +286,12 @@
         </article>
       <% end %>
     </div>
-    <% if @finalization_rounds_truncated %>
-      <p class="mt-5 text-sm text-slate-500">Showing the <%= FinalTranslationsController::FINALIZATION_HISTORY_LIMIT %> most recent refinement rounds.</p>
-    <% end %>
+    <div class="mt-5"><%= render "shared/pagination", pagination: @finalization_pagination, label: "Refinement rounds", page_param: :refinement_page %></div>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <h2 class="text-xl font-semibold text-slate-950">Revision history</h2>
     <p class="mt-2 text-sm text-slate-600">Historical versions are immutable. Restoring one always creates a new revision.</p>
-    <% if @versions_truncated %>
-      <p class="mt-2 text-sm text-slate-500">Showing the <%= FinalTranslationsController::VERSION_HISTORY_LIMIT %> most recent versions.</p>
-    <% end %>
     <div class="mt-5 space-y-3">
       <% @versions.each do |version| %>
         <article class="rounded-lg border <%= version.id == current.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200' %> p-4">
@@ -321,6 +316,7 @@
         </article>
       <% end %>
     </div>
+    <div class="mt-5"><%= render "shared/pagination", pagination: @versions_pagination, label: "Versions", page_param: :version_page %></div>
   </section>
 
   <section class="rounded-xl border <%= @final_translation.finalized? ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' %> p-6 shadow-sm">
