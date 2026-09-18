@@ -144,10 +144,17 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
 
   test "revision history paginates and keeps older versions inspectable and restorable" do
     seed = @final_translation.current_version
-    25.times do |index|
+    24.times do |index|
       FinalTranslations::SaveRevision.call(
         final_translation: @final_translation,
         content: "Manual version #{index + 2}",
+        expected_version_number: @final_translation.reload.current_version.version_number
+      )
+    end
+    travel_to 1.year.ago do
+      FinalTranslations::SaveRevision.call(
+        final_translation: @final_translation,
+        content: "Backdated current version",
         expected_version_number: @final_translation.reload.current_version.version_number
       )
     end
@@ -155,6 +162,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     get final_translation_path(@final_translation)
     assert_response :success
     assert_select "nav[aria-label='Versions pagination']", text: /Page 1 of 2.*26 versions/m
+    assert_select "article", text: /Version 26 · Manual.*Current version/m
     assert_select "article", text: /Version 1 · Seed/, count: 0
 
     get final_translation_path(@final_translation, version_page: 999)

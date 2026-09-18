@@ -112,6 +112,50 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
       create_translation_reference(title: "Newer reference #{index}")
     end
 
+    {
+      workflow_profile_page: [ "Workflow profiles", "translation_workspace[workflow_profile_revision_id]", selected_profile.current_revision_id ],
+      glossary_page: [ "Glossaries", "translation_workspace[glossary_revision_id]", selected_glossary.current_revision_id ],
+      methodology_profile_page: [ "Methodology profiles", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
+      translation_reference_page: [ "Translation references", "translation_workspace[translation_reference_revision_ids][]", selected_reference.current_revision_id ]
+    }.each do |page_param, (label, input_name, revision_id)|
+      get root_path(page_param => 2)
+      assert_response :success
+      assert_select "nav[aria-label='#{label} pagination']", text: /Page 2 of 2/
+      assert_select "input[name='#{input_name}'][value='#{revision_id}']", count: 1
+    end
+
+    get root_path
+    assert_select "button[formaction='#{translation_workspace_options_path}'][formmethod='post'][name='workflow_profile_page'][value='2'][formnovalidate]", count: 1
+
+    preserved_token = css_select("input[name='translation_workspace[submission_token]']").first["value"]
+    assert_no_difference [ -> { Experiment.count }, -> { enqueued_jobs.size } ] do
+      post translation_workspace_options_path, params: {
+        workflow_profile_page: "2",
+        translation_workspace: {
+          submission_token: preserved_token,
+          project_id: @project.id.to_s,
+          document_title: "Preserved while paging",
+          source_text: "Preserved source",
+          experiment_name: "Preserved experiment",
+          instruction_prompt: "Preserved instruction",
+          glossary_revision_id: selected_glossary.current_revision_id.to_s,
+          methodology_profile_revision_id: selected_methodology.current_revision_id.to_s,
+          translation_reference_revision_ids: [ selected_reference.current_revision_id.to_s ],
+          guidance_preference: "reference_examples",
+          workflow_mode: "automatic",
+          workflow_profile_revision_id: selected_profile.current_revision_id.to_s,
+          automatic_confirmation: "0",
+          automatic_plan_digest: ""
+        }
+      }
+    end
+    assert_response :success
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "Preserved source"
+    assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][value='#{selected_profile.current_revision_id}'][checked]", count: 1
+    assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{selected_glossary.current_revision_id}'][checked]", count: 1
+    assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{selected_methodology.current_revision_id}'][checked]", count: 1
+    assert_select "input[name='translation_workspace[translation_reference_revision_ids][]'][value='#{selected_reference.current_revision_id}'][checked]", count: 1
+
     get repeat_experiment_path(historical)
 
     assert_response :success

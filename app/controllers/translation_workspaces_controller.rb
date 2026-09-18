@@ -22,23 +22,31 @@ class TranslationWorkspacesController < ApplicationController
   ].freeze
 
   def new
-    project = find_owned_project(project_id_param)
-    source_import = load_source_import(source_import_id_param)
-    project_binding = source_import_project_token_param
+    attributes = pagination_workspace_params
+    project = find_owned_project(attributes ? attributes[:project_id] : project_id_param)
+    source_import = load_source_import(attributes ? attributes[:source_import_id] : source_import_id_param)
+    project_binding = attributes ? attributes[:source_import_project_token] : source_import_project_token_param
     validate_source_import_project_binding!(source_import:, project:, token: project_binding)
-    @translation_workspace = TranslationWorkspace.new({
-      user: current_user,
-      source_import: source_import,
+    workspace_attributes = attributes || {
       source_import_project_token: project_binding,
       source_text: source_import&.extracted_text,
       document_title: source_import && File.basename(source_import.original_filename, ".*")
-    }, existing_project: project)
+    }
+    @translation_workspace = TranslationWorkspace.new(
+      workspace_attributes.merge(user: current_user, source_import: source_import),
+      existing_project: project
+    )
     load_available_models(project:, workspace: @translation_workspace)
     if source_import && !source_import.available?
       @translation_workspace.errors.add(:source_import_id, source_import.availability_message)
     end
   rescue ActionController::BadRequest
     head :bad_request
+  end
+
+  def options
+    new
+    render :new unless performed?
   end
 
   def repeat
@@ -208,41 +216,66 @@ class TranslationWorkspacesController < ApplicationController
         target_language:
       )
     end
-    @workflow_profiles = bounded_configuration_options(
+    @workflow_profiles, @workflow_profiles_pagination = paginated_configuration_options(
       workflow_scope,
       selected_revision_ids: workspace&.workflow_profile_revision_id,
-      selected_limit: 1
+      selected_limit: 1,
+      page_param: :workflow_profile_page
     )
-    @glossaries = bounded_configuration_options(
+    @glossaries, @glossaries_pagination = paginated_configuration_options(
       glossary_scope.includes(current_revision: :entries),
       selected_revision_ids: workspace&.glossary_revision_id,
-      selected_limit: 1
+      selected_limit: 1,
+      page_param: :glossary_page
     )
-    @methodology_profiles = bounded_configuration_options(
+    @methodology_profiles, @methodology_profiles_pagination = paginated_configuration_options(
       methodology_scope.includes(:current_revision),
       selected_revision_ids: workspace&.methodology_profile_revision_id,
-      selected_limit: 1
+      selected_limit: 1,
+      page_param: :methodology_profile_page
     )
-    @translation_references = bounded_configuration_options(
+    @translation_references, @translation_references_pagination = paginated_configuration_options(
       reference_scope.includes(:current_revision),
       selected_revision_ids: workspace&.translation_reference_revision_ids,
-      selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES
+      selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES,
+      page_param: :translation_reference_page
     )
   end
 
-  def bounded_configuration_options(scope, selected_revision_ids:, selected_limit:)
-    recent = scope.order(updated_at: :desc, id: :desc).limit(CONFIGURATION_OPTION_LIMIT).to_a
+  def paginated_configuration_options(scope, selected_revision_ids:, selected_limit:, page_param:)
+    total_count = scope.count
+    total_pages = [ (total_count.to_f / CONFIGURATION_OPTION_LIMIT).ceil, 1 ].max
+    current_page = normalized_configuration_page(params[page_param], total_pages)
+    page = scope.order(updated_at: :desc, id: :desc)
+      .offset((current_page - 1) * CONFIGURATION_OPTION_LIMIT)
+      .limit(CONFIGURATION_OPTION_LIMIT)
+      .to_a
     revision_ids = Array(selected_revision_ids).filter_map do |value|
       value.to_i if value.to_s.match?(/\A[1-9]\d*\z/)
     end.uniq.first(selected_limit)
-    return recent if revision_ids.empty?
+    if revision_ids.any?
+      selected = scope.where(current_revision_id: revision_ids)
+        .where.not(id: page.map(&:id))
+        .order(updated_at: :desc, id: :desc)
+        .limit(selected_limit)
+        .to_a
+      page = (page + selected).sort_by { |record| [ record.updated_at, record.id ] }.reverse
+    end
+    pagination = { current_page: current_page, total_pages: total_pages, total_count: total_count }
+    [ page, pagination ]
+  end
 
-    selected = scope.where(current_revision_id: revision_ids)
-      .where.not(id: recent.map(&:id))
-      .order(updated_at: :desc, id: :desc)
-      .limit(selected_limit)
-      .to_a
-    (recent + selected).sort_by { |record| [ record.updated_at, record.id ] }.reverse
+  def normalized_configuration_page(value, total_pages)
+    requested = Integer(value.presence || 1, 10)
+    requested.clamp(1, total_pages)
+  rescue ArgumentError, TypeError
+    1
+  end
+
+  def pagination_workspace_params
+    return unless params[:translation_workspace].present?
+
+    translation_workspace_params
   end
 
   def translation_workspace_params

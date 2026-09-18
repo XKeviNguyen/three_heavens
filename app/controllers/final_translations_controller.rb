@@ -129,7 +129,7 @@ class FinalTranslationsController < ApplicationController
       ],
       judge_round: :review_round
     ).find(@final_translation.id)
-    versions_scope = @final_translation.versions.reorder(created_at: :desc, id: :desc)
+    versions_scope = @final_translation.versions.reorder(version_number: :desc)
     versions_page, @versions_pagination = paginated_history(versions_scope, page_param: :version_page)
     @versions = versions_page.includes(source_finalization_run: :finalizer_llm_model).to_a
     rounds_scope = @final_translation.finalization_rounds.order(created_at: :desc, id: :desc)

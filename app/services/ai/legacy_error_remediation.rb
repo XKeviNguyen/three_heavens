@@ -22,13 +22,14 @@ module Ai
 
     def call
       candidates = candidate_rows
-      return Result.new(candidate_count: candidates.size, remediated_count: 0) unless execute
+      candidate_count = candidates.sum { |_run_class, ids| ids.size }
+      return Result.new(candidate_count: candidate_count, remediated_count: 0) unless execute
 
       remediated = candidates.sum do |run_class, ids|
         run_class.failed.where(id: ids).where.not(error_message: SAFE_MESSAGE)
           .update_all(error_message: SAFE_MESSAGE, updated_at: Time.current)
       end
-      Result.new(candidate_count: candidates.sum { |_run_class, ids| ids.size }, remediated_count: remediated)
+      Result.new(candidate_count: candidate_count, remediated_count: remediated)
     end
 
     private

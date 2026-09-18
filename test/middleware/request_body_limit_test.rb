@@ -12,6 +12,12 @@ class RequestBodyLimitTest < ActiveSupport::TestCase
     assert_equal supported_length, RequestBodyLimit::MAX_BYTES
   end
 
+  test "deployed proxy uses the same request ceiling" do
+    deploy_line = Rails.root.join("config/deploy.yml").each_line.find { |line| line.include?("max_request_body:") }
+
+    assert_equal RequestBodyLimit::MAX_BYTES, Integer(deploy_line.split.last.delete("_"), 10)
+  end
+
   test "rejects declared oversized bodies before calling the application" do
     called = false
     middleware = RequestBodyLimit.new(lambda { |_environment| called = true; [ 200, {}, [] ] })
