@@ -109,6 +109,72 @@ module OpenRouter
       assert_empty image_only.roles
     end
 
+    test "default HTTP transport returns the streamed response body" do
+      http = FakeHttp.new('{"data":[]}')
+
+      with_http_class(http) do
+        result = OpenRouter::Catalog.new(cache: memory_cache).call
+
+        assert_empty result.models
+      end
+    end
+
+    test "default HTTP transport rejects a non-success status" do
+      http = FakeHttp.new("nope", success: false)
+
+      with_http_class(http) do
+        assert_raises(OpenRouter::Catalog::Error) do
+          OpenRouter::Catalog.new(cache: memory_cache).call
+        end
+      end
+    end
+
+    FakeResponse = Struct.new(:payload) do
+      def is_a?(klass)
+        klass == Net::HTTPSuccess
+      end
+
+      def decode_content=(_value)
+      end
+
+      def read_body
+        yield payload
+      end
+    end
+
+    class FakeHttp
+      def initialize(payload, success: true)
+        @response = success ? FakeResponse.new(payload) : NonSuccess.new
+      end
+
+      def use_ssl=(_value)
+      end
+
+      def open_timeout=(_value)
+      end
+
+      def read_timeout=(_value)
+      end
+
+      def write_timeout=(_value)
+      end
+
+      def start
+        yield self
+      end
+
+      def request(_request)
+        yield @response
+        @response
+      end
+
+      class NonSuccess
+        def is_a?(_klass)
+          false
+        end
+      end
+    end
+
     test "uses the injected cache for the TTL window" do
       calls = 0
       cache = memory_cache
@@ -127,6 +193,14 @@ module OpenRouter
     end
 
     private
+
+    def with_http_class(fake)
+      original = Net::HTTP.method(:new)
+      Net::HTTP.define_singleton_method(:new) { |*_arguments| fake }
+      yield
+    ensure
+      Net::HTTP.define_singleton_method(:new, original)
+    end
 
     def memory_cache
       ActiveSupport::Cache::MemoryStore.new

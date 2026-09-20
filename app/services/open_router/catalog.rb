@@ -118,18 +118,24 @@ module OpenRouter
       http.write_timeout = WRITE_TIMEOUT if http.respond_to?(:write_timeout=)
       request = Net::HTTP::Get.new(ENDPOINT)
       request["Accept"] = "application/json"
+      request["Accept-Encoding"] = "identity"
 
+      body = nil
       http.start do |connection|
         connection.request(request) do |response|
           raise Error unless response.is_a?(Net::HTTPSuccess)
+
+          # Streaming read_body does not inflate compressed chunks unless
+          # decoding is explicitly enabled.
+          response.decode_content = true if response.respond_to?(:decode_content=)
 
           body = +""
           response.read_body do |chunk|
             body << chunk
             raise Error if body.bytesize > MAX_RESPONSE_BYTES
           end
-          body
         end
+        body
       end
     rescue Error
       raise
