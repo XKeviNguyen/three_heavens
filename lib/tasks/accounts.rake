@@ -1,5 +1,5 @@
 namespace :accounts do
-  desc "Create or update the admin account from environment variables"
+  desc "Create or update the admin account from environment variables or an interactive prompt"
   task bootstrap_admin: :environment do
     Accounts::BootstrapAdmin.call
     puts "Admin account bootstrapped successfully."

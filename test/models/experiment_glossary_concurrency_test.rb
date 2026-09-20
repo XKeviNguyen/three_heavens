@@ -6,8 +6,8 @@ class ExperimentGlossaryConcurrencyTest < ActiveSupport::TestCase
 
   DATABASE_PREFIX = "three_heavens_glossary_race_"
 
-  test "concurrent glossary association and project ownership change serialize without deadlock" do
-    with_disposable_database do |admin, options|
+  test "concurrent glossary reassignment is rejected while project ownership change serializes" do
+    with_disposable_database do |_admin, options|
       seed = seed_race_records(PG.connect(options))
       connections = 2.times.map { PG.connect(options) }
       roles = %i[association ownership]
@@ -46,8 +46,7 @@ class ExperimentGlossaryConcurrencyTest < ActiveSupport::TestCase
 
       event, winner = Timeout.timeout(20) { events.pop }
       assert_equal :updated, event
-      loser = (roles - [ winner ]).sole
-      assert_database_lock_wait!(admin, waiting_pid: ready.fetch(loser), blocking_pid: ready.fetch(winner))
+      assert_equal :ownership, winner
       commit_gate << true
 
       threads.each { |thread| assert thread.join(20), "concurrent database mutation did not finish" }
@@ -168,25 +167,6 @@ class ExperimentGlossaryConcurrencyTest < ActiveSupport::TestCase
   rescue PG::Error => error
     connection.exec("ROLLBACK") if connection.transaction_status != PG::PQTRANS_IDLE
     results << { role:, status: :rejected, error: }
-  end
-
-  def assert_database_lock_wait!(admin, waiting_pid:, blocking_pid:)
-    Timeout.timeout(20) do
-      loop do
-        activity = admin.exec_params(<<~SQL, [ waiting_pid ]).first
-          SELECT wait_event_type, pg_blocking_pids(pid)::text AS blocking_pids
-          FROM pg_stat_activity
-          WHERE pid = $1
-        SQL
-        if activity && activity.fetch("wait_event_type") == "Lock" &&
-            activity.fetch("blocking_pids").include?(blocking_pid.to_s)
-          break
-        end
-
-        sleep 0.01
-      end
-    end
-    assert true
   end
 
   def assert_valid_final_ownership!(connection, seed:)

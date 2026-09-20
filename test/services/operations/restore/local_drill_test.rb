@@ -70,19 +70,19 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
       SQL
       assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
         SELECT count(*) FROM pg_proc
-        WHERE proname = 'prevent_segment_parent_lineage_change'
+        WHERE proname = 'prevent_parent_lineage_mutation'
       SQL
       assert_equal 8, ActiveRecord::Base.connection.select_value(<<~SQL)
         SELECT count(*) FROM pg_trigger
         WHERE tgname IN (
-          'prevent_translation_runs_segment_parent_change',
-          'prevent_review_runs_segment_parent_change',
-          'prevent_review_rounds_segment_parent_change',
-          'prevent_judge_runs_segment_parent_change',
-          'prevent_judge_rounds_segment_parent_change',
-          'prevent_finalization_runs_segment_parent_change',
-          'prevent_finalization_rounds_segment_parent_change',
-          'prevent_final_translations_segment_parent_change'
+          'prevent_translation_runs_parent_mutation',
+          'prevent_review_runs_parent_mutation',
+          'prevent_review_rounds_parent_mutation',
+          'prevent_judge_runs_parent_mutation',
+          'prevent_judge_rounds_parent_mutation',
+          'prevent_finalization_runs_parent_mutation',
+          'prevent_finalization_rounds_parent_mutation',
+          'prevent_final_translations_parent_mutation'
         ) AND NOT tgisinternal
       SQL
     end
