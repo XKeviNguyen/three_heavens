@@ -216,14 +216,14 @@ class BackendIntegrityTest < ActiveSupport::TestCase
     assert_database_rejects { run.update_column(:experiment_id, experiments(:two).id) }
 
     trigger_names = %w[
-      prevent_translation_runs_segment_parent_change
-      prevent_review_runs_segment_parent_change
-      prevent_review_rounds_segment_parent_change
-      prevent_judge_runs_segment_parent_change
-      prevent_judge_rounds_segment_parent_change
-      prevent_finalization_runs_segment_parent_change
-      prevent_finalization_rounds_segment_parent_change
-      prevent_final_translations_segment_parent_change
+      prevent_translation_runs_parent_mutation
+      prevent_review_runs_parent_mutation
+      prevent_review_rounds_parent_mutation
+      prevent_judge_runs_parent_mutation
+      prevent_judge_rounds_parent_mutation
+      prevent_finalization_runs_parent_mutation
+      prevent_finalization_rounds_parent_mutation
+      prevent_final_translations_parent_mutation
     ]
     quoted_names = trigger_names.map { |name| ApplicationRecord.connection.quote(name) }.join(", ")
     installed = ApplicationRecord.connection.select_value(<<~SQL.squish)
@@ -231,6 +231,118 @@ class BackendIntegrityTest < ActiveSupport::TestCase
       WHERE tgname IN (#{quoted_names}) AND NOT tgisinternal
     SQL
     assert_equal trigger_names.size, installed
+  end
+
+  test "database rejects parent reassignment even before any child records exist" do
+    owner = users(:normal)
+    project = owner.projects.create!(
+      name: "Parent lineage",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    other_project = owner.projects.create!(
+      name: "Parent lineage sibling",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    foreign_project = users(:other).projects.create!(
+      name: "Parent lineage foreign",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+
+    document = project.documents.create!(title: "Parent lineage source", source_text: "Nguồn")
+    other_document = other_project.documents.create!(title: "Sibling source", source_text: "Nguồn")
+    foreign_document = foreign_project.documents.create!(title: "Foreign source", source_text: "Nguồn")
+    bare_document = project.documents.create!(title: "Bare source", source_text: "Nguồn")
+    experiment = document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    other_experiment = other_document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    foreign_experiment = foreign_document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    bare_experiment = bare_document.experiments.create!(instruction_prompt: "Translate faithfully.")
+
+    run = experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude))
+    assert_historical_parent_rejected { run.update_column(:experiment_id, other_experiment.id) }
+    assert_historical_parent_rejected { run.update_column(:experiment_id, foreign_experiment.id) }
+    run.update!(status: :running, started_at: Time.current)
+    assert run.reload.running?
+
+    review_round = experiment.create_review_round!(status: :running)
+    review_run = review_round.review_runs.create!(reviewer_llm_model: llm_models(:openrouter_claude))
+    sibling_review_round = other_experiment.create_review_round!(status: :running)
+    assert_historical_parent_rejected { review_run.update_column(:review_round_id, sibling_review_round.id) }
+    assert_historical_parent_rejected { review_round.update_column(:experiment_id, bare_experiment.id) }
+
+    judge_round = review_round.create_judge_round!(status: :running)
+    judge_run = judge_round.judge_runs.create!(judge_llm_model: llm_models(:openrouter_gpt))
+    sibling_judge_round = sibling_review_round.create_judge_round!(status: :running)
+    bare_review_round = bare_experiment.create_review_round!(status: :running)
+    assert_historical_parent_rejected { judge_run.update_column(:judge_round_id, sibling_judge_round.id) }
+    assert_historical_parent_rejected { judge_round.update_column(:review_round_id, bare_review_round.id) }
+
+    final_translation = create_final_translation_workspace
+    sibling_final_translation = create_final_translation_workspace
+    round = Finalizations::Start.call(
+      final_translation: final_translation,
+      finalizer_ids: [ create_finalizer.id ]
+    )
+    sibling_round = Finalizations::Start.call(
+      final_translation: sibling_final_translation,
+      finalizer_ids: [ create_finalizer.id ]
+    )
+    finalization_run = round.finalization_runs.first
+    assert_historical_parent_rejected { finalization_run.update_column(:finalization_round_id, sibling_round.id) }
+    assert_historical_parent_rejected do
+      round.update_column(:final_translation_id, sibling_final_translation.id)
+    end
+    assert_historical_parent_rejected do
+      final_translation.update_column(:experiment_id, sibling_final_translation.experiment_id)
+    end
+  end
+
+  test "database rejects experiment glossary revision changes after creation" do
+    owner = users(:normal)
+    project = owner.projects.create!(
+      name: "Glossary immutability",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    first_glossary = Glossaries::Create.call(
+      user: owner,
+      attributes: {
+        "name" => "First glossary",
+        "source_language" => "Vietnamese",
+        "target_language" => "Japanese",
+        "entries" => [ { "source_term" => "faith", "preferred_target_term" => "信仰" } ]
+      }
+    )
+    second_glossary = Glossaries::Create.call(
+      user: owner,
+      attributes: {
+        "name" => "Second glossary",
+        "source_language" => "Vietnamese",
+        "target_language" => "Japanese",
+        "entries" => [ { "source_term" => "grace", "preferred_target_term" => "恵み" } ]
+      }
+    )
+    document = project.documents.create!(title: "Glossary source", source_text: "Nguồn")
+    experiment = document.experiments.create!(
+      instruction_prompt: "Translate faithfully.",
+      glossary_revision: first_glossary.current_revision
+    )
+    bare_experiment = document.experiments.create!(instruction_prompt: "Translate without a glossary.")
+
+    assert_glossary_revision_rejected do
+      experiment.update_column(:glossary_revision_id, second_glossary.current_revision.id)
+    end
+    assert_glossary_revision_rejected { experiment.update_column(:glossary_revision_id, nil) }
+    assert_glossary_revision_rejected do
+      bare_experiment.update_column(:glossary_revision_id, first_glossary.current_revision.id)
+    end
+
+    experiment.update!(instruction_prompt: "Updated with glossary.")
+    bare_experiment.update!(instruction_prompt: "Updated without glossary.")
+    assert_equal first_glossary.current_revision_id, experiment.reload.glossary_revision_id
+    assert_nil bare_experiment.reload.glossary_revision_id
   end
 
   test "database blocks parent lineage changes after evaluation children exist" do
@@ -339,6 +451,18 @@ class BackendIntegrityTest < ActiveSupport::TestCase
     assert_raises ActiveRecord::StatementInvalid do
       ApplicationRecord.transaction(requires_new: true, &block)
     end
+  end
+
+  def assert_historical_parent_rejected(&block)
+    error = assert_database_rejects(&block)
+    assert_includes error.message, "Historical parent lineage cannot change after creation"
+    error
+  end
+
+  def assert_glossary_revision_rejected(&block)
+    error = assert_database_rejects(&block)
+    assert_includes error.message, "Experiment glossary revision cannot change after creation"
+    error
   end
 
   def provider_attempt_insert_sql(run_id, stage:, attempt_number:)

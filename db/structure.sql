@@ -1048,6 +1048,23 @@ $$;
 
 
 --
+-- Name: prevent_experiment_glossary_revision_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_experiment_glossary_revision_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.glossary_revision_id IS DISTINCT FROM NEW.glossary_revision_id THEN
+    RAISE EXCEPTION 'Experiment glossary revision cannot change after creation'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: prevent_experiment_guidance_preference_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1142,6 +1159,23 @@ $$;
 
 
 --
+-- Name: prevent_parent_lineage_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_parent_lineage_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF (to_jsonb(OLD)->>TG_ARGV[0]) IS DISTINCT FROM (to_jsonb(NEW)->>TG_ARGV[0]) THEN
+    RAISE EXCEPTION 'Historical parent lineage cannot change after creation'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: prevent_provider_attempt_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1163,110 +1197,6 @@ BEGIN
      OLD.started_at IS DISTINCT FROM NEW.started_at OR
      OLD.created_at IS DISTINCT FROM NEW.created_at THEN
     RAISE EXCEPTION 'Provider attempt identity and routing snapshots are immutable';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-
---
--- Name: prevent_segment_parent_lineage_change(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.prevent_segment_parent_lineage_change() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  child_exists boolean;
-BEGIN
-  IF (to_jsonb(OLD)->>TG_ARGV[0]) IS NOT DISTINCT FROM (to_jsonb(NEW)->>TG_ARGV[0]) THEN
-    RETURN NEW;
-  END IF;
-
-  CASE TG_TABLE_NAME
-  WHEN 'translation_runs' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM translation_segment_runs WHERE translation_run_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM review_evaluations WHERE translation_run_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM judge_evaluations WHERE translation_run_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'review_runs' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM review_segment_runs WHERE review_run_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM review_evaluations WHERE review_run_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'review_rounds' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM review_segment_runs segments
-      JOIN review_runs runs ON runs.id = segments.review_run_id
-      WHERE runs.review_round_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM judge_segment_runs segments
-      JOIN judge_runs runs ON runs.id = segments.judge_run_id
-      JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
-      WHERE rounds.review_round_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM review_evaluations evaluations
-      JOIN review_runs runs ON runs.id = evaluations.review_run_id
-      WHERE runs.review_round_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM judge_evaluations evaluations
-      JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
-      JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
-      WHERE rounds.review_round_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'judge_runs' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM judge_segment_runs WHERE judge_run_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM judge_evaluations WHERE judge_run_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'judge_rounds' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM judge_segment_runs segments
-      JOIN judge_runs runs ON runs.id = segments.judge_run_id
-      WHERE runs.judge_round_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM judge_evaluations evaluations
-      JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
-      WHERE runs.judge_round_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'finalization_runs' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM finalization_segment_runs WHERE finalization_run_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM final_translation_versions WHERE source_finalization_run_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'finalization_rounds' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM finalization_segment_runs segments
-      JOIN finalization_runs runs ON runs.id = segments.finalization_run_id
-      WHERE runs.finalization_round_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM final_translation_versions versions
-      JOIN finalization_runs runs ON runs.id = versions.source_finalization_run_id
-      WHERE runs.finalization_round_id = OLD.id
-    ) INTO child_exists;
-  WHEN 'final_translations' THEN
-    SELECT EXISTS (
-      SELECT 1 FROM finalization_segment_runs segments
-      JOIN finalization_runs runs ON runs.id = segments.finalization_run_id
-      JOIN finalization_rounds rounds ON rounds.id = runs.finalization_round_id
-      WHERE rounds.final_translation_id = OLD.id
-    ) OR EXISTS (
-      SELECT 1 FROM final_translation_version_segments segments
-      JOIN final_translation_versions versions ON versions.id = segments.final_translation_version_id
-      WHERE versions.final_translation_id = OLD.id
-    ) INTO child_exists;
-  ELSE
-    RAISE EXCEPTION 'Unsupported segmented lineage parent table';
-  END CASE;
-
-  IF child_exists THEN
-    RAISE EXCEPTION 'Historical lineage parent cannot change after child records exist';
   END IF;
   RETURN NEW;
 END;
@@ -5373,6 +5303,13 @@ CREATE TRIGGER prevent_document_execution_plans_mutation BEFORE DELETE OR UPDATE
 
 
 --
+-- Name: experiments prevent_experiment_glossary_revision_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_experiment_glossary_revision_mutation_trigger BEFORE UPDATE OF glossary_revision_id ON public.experiments FOR EACH ROW EXECUTE FUNCTION public.prevent_experiment_glossary_revision_mutation();
+
+
+--
 -- Name: experiments prevent_experiment_guidance_preference_mutation_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -5408,24 +5345,24 @@ CREATE TRIGGER prevent_final_translation_versions_mutation BEFORE DELETE OR UPDA
 
 
 --
--- Name: final_translations prevent_final_translations_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: final_translations prevent_final_translations_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_final_translations_segment_parent_change BEFORE UPDATE OF experiment_id ON public.final_translations FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('experiment_id');
-
-
---
--- Name: finalization_rounds prevent_finalization_rounds_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER prevent_finalization_rounds_segment_parent_change BEFORE UPDATE OF final_translation_id ON public.finalization_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('final_translation_id');
+CREATE TRIGGER prevent_final_translations_parent_mutation BEFORE UPDATE OF experiment_id ON public.final_translations FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('experiment_id');
 
 
 --
--- Name: finalization_runs prevent_finalization_runs_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: finalization_rounds prevent_finalization_rounds_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_finalization_runs_segment_parent_change BEFORE UPDATE OF finalization_round_id ON public.finalization_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('finalization_round_id');
+CREATE TRIGGER prevent_finalization_rounds_parent_mutation BEFORE UPDATE OF final_translation_id ON public.finalization_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('final_translation_id');
+
+
+--
+-- Name: finalization_runs prevent_finalization_runs_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER prevent_finalization_runs_parent_mutation BEFORE UPDATE OF finalization_round_id ON public.finalization_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('finalization_round_id');
 
 
 --
@@ -5436,17 +5373,17 @@ CREATE TRIGGER prevent_glossary_revision_mutation_trigger BEFORE DELETE OR UPDAT
 
 
 --
--- Name: judge_rounds prevent_judge_rounds_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: judge_rounds prevent_judge_rounds_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_judge_rounds_segment_parent_change BEFORE UPDATE OF review_round_id ON public.judge_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('review_round_id');
+CREATE TRIGGER prevent_judge_rounds_parent_mutation BEFORE UPDATE OF review_round_id ON public.judge_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('review_round_id');
 
 
 --
--- Name: judge_runs prevent_judge_runs_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: judge_runs prevent_judge_runs_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_judge_runs_segment_parent_change BEFORE UPDATE OF judge_round_id ON public.judge_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('judge_round_id');
+CREATE TRIGGER prevent_judge_runs_parent_mutation BEFORE UPDATE OF judge_round_id ON public.judge_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('judge_round_id');
 
 
 --
@@ -5464,17 +5401,17 @@ CREATE TRIGGER prevent_pipeline_events_mutation BEFORE DELETE OR UPDATE ON publi
 
 
 --
--- Name: review_rounds prevent_review_rounds_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: review_rounds prevent_review_rounds_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_review_rounds_segment_parent_change BEFORE UPDATE OF experiment_id ON public.review_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('experiment_id');
+CREATE TRIGGER prevent_review_rounds_parent_mutation BEFORE UPDATE OF experiment_id ON public.review_rounds FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('experiment_id');
 
 
 --
--- Name: review_runs prevent_review_runs_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: review_runs prevent_review_runs_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_review_runs_segment_parent_change BEFORE UPDATE OF review_round_id ON public.review_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('review_round_id');
+CREATE TRIGGER prevent_review_runs_parent_mutation BEFORE UPDATE OF review_round_id ON public.review_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('review_round_id');
 
 
 --
@@ -5485,10 +5422,10 @@ CREATE TRIGGER prevent_translation_reference_revision_mutation_trigger BEFORE DE
 
 
 --
--- Name: translation_runs prevent_translation_runs_segment_parent_change; Type: TRIGGER; Schema: public; Owner: -
+-- Name: translation_runs prevent_translation_runs_parent_mutation; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER prevent_translation_runs_segment_parent_change BEFORE UPDATE OF experiment_id ON public.translation_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_segment_parent_lineage_change('experiment_id');
+CREATE TRIGGER prevent_translation_runs_parent_mutation BEFORE UPDATE OF experiment_id ON public.translation_runs FOR EACH ROW EXECUTE FUNCTION public.prevent_parent_lineage_mutation('experiment_id');
 
 
 --
@@ -6143,6 +6080,8 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260920090100'),
+('20260920090000'),
 ('20260914090300'),
 ('20260914090200'),
 ('20260914090100'),

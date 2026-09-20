@@ -75,13 +75,19 @@ bin/rails db:prepare
 
 The PostgreSQL Docker volume contains persistent development data. Never run `docker compose down -v` unless intentionally destroying that local database.
 
-Create or promote the first administrator without placing a password in shell history:
+Create or promote the first administrator:
 
 ```sh
 bin/rails accounts:bootstrap_admin
 ```
 
-The task prompts securely for the required account data.
+From an interactive terminal the task prompts for the administrator email and
+reads the password and its confirmation without echoing either value. For
+automation, set `THREE_HEAVENS_ADMIN_EMAIL` and `THREE_HEAVENS_ADMIN_PASSWORD`
+through the process environment or an approved secret manager; the task never
+prints the password, and a non-interactive run without both values fails instead
+of waiting for input. Never place the literal password in shell history or a
+command line.
 
 ## Recoverable AI workflows
 
