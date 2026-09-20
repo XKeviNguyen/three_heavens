@@ -3,7 +3,7 @@ module Ai
     Result = Data.define(:state, :attempt)
 
     def self.call(run, active_job_id:, active_job_execution:)
-      run.with_lock do
+      result = run.with_lock do
         return Result.new(state: :terminal, attempt: nil) if run.terminal?
         return Result.new(state: :obsolete, attempt: nil) unless run.scheduled_job_id == active_job_id
         return Result.new(state: :obsolete, attempt: nil) unless run.pending? || run.running?
@@ -26,8 +26,18 @@ module Ai
           error_code: nil,
           error_message: nil
         )
+        Ai::ProviderAttempts.start!(run: run, attempt: attempt)
         Result.new(state: :claimed, attempt: attempt)
       end
+      if result.state == :claimed
+        OperationalEvents.emit(
+          "ai_execution_claimed",
+          run,
+          active_job_id: active_job_id,
+          status: "running"
+        )
+      end
+      result
     end
   end
 end

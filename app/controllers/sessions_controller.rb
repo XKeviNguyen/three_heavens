@@ -83,6 +83,8 @@ class SessionsController < ApplicationController
 
   def render_rate_limited
     response.set_header("Retry-After", LOGIN_RATE_LIMIT_WINDOW.to_i.to_s)
-    head :too_many_requests
+    @email = ""
+    flash.now[:alert] = "Too many sign-in attempts. Wait three minutes, then try again."
+    render :new, status: :too_many_requests
   end
 end

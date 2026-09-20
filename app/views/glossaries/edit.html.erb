@@ -1,0 +1,2 @@
+<% content_for :title, "Revise glossary · Three Heavens" %>
+<div class="mx-auto max-w-4xl"><header class="mb-8"><p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Glossary revision</p><h1 class="mt-2 text-3xl font-bold">Revise <%= @glossary.name %></h1><p class="mt-2 text-sm text-slate-600">Saving creates a new immutable revision. Existing experiments keep the exact revision they already use.</p></header><%= render "form", form_url: glossary_path(@glossary), form_method: :patch, submit_label: "Create new revision" %></div>

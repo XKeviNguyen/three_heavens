@@ -28,17 +28,163 @@ expense of security, correctness, maintainability, or production readiness.
 - Explain important architectural decisions and tradeoffs in the final report.
 - Do not claim that work is complete when required validation is failing.
 
-## Git and destructive-action safety
+## Autonomous Git and Pull Request workflow
 
-- Never stage, commit, push, merge, rebase, force-push, or delete branches unless
-  the user explicitly authorizes that exact action.
-- Do not switch branches or create additional branches unless explicitly asked.
-- Never delete or reset databases, schemas, Docker volumes, user data, or other
-  persistent data without explicit approval.
-- Do not use destructive Git commands to remove local changes.
-- Before editing, review `git status --short` and account for unrelated changes.
-- At handoff, report the current branch and the complete `git status --short` so
-  pre-existing and task-related changes remain visible.
+Every explicitly assigned implementation task authorizes its complete normal
+Git and Pull Request lifecycle. The user does not need to separately authorize
+routine branch creation, staging, commits, task-branch pushes, Pull Request
+operations, task-caused corrective commits, merging a green task Pull Request
+into `develop`, or deleting its successfully merged temporary branch.
+
+For each assigned implementation task, Codex is authorized by default to:
+
+- inspect repository state and fetch/prune `origin`;
+- switch to `develop`, fast-forward it from `origin/develop`, and create exactly
+  one focused `feature/*`, `fix/*`, or `chore/*` task branch from current
+  `develop`;
+- modify only files within the assigned scope, run required migrations, and run
+  appropriate tests and quality gates;
+- stage task-related files and create one or more sensible professional commits;
+- push the task branch and create a GitHub Pull Request whose base is exactly
+  `develop`;
+- write or update the Pull Request title and description, inspect its status and
+  GitHub Actions logs, and diagnose failures;
+- fix task-caused implementation or CI failures, validate, commit, and push
+  corrective changes until the explicit CI gates below pass;
+- merge a normal task Pull Request only after its base, final head commit, and
+  explicit Pull Request CI gate have been verified;
+- after merging, verify the resulting `develop` head and its push-triggered CI
+  gate before deleting either temporary task branch;
+- switch back to `develop`, fetch/prune, fast-forward it, delete the merged local
+  task branch, verify the final green integration state, and report the result.
+
+The default lifecycle is one assigned mega-task, one focused task branch, and
+one Pull Request to `develop`. Tightly related subcomponents may share that
+branch when they form one coherent architecture or product milestone.
+Corrective commits remain on the same branch and Pull Request. Do not create
+unrelated branches or begin the next product feature before the current Pull
+Request is integrated. Stop after completing the assigned integration
+milestone. The only exception is a focused corrective branch and Pull Request
+needed to restore a task-caused post-merge `develop` CI failure as described
+below; it remains part of the same integration milestone.
+
+### Explicit Pull Request CI merge gate
+
+Before Codex merges **any** normal task Pull Request into `develop`, Codex must
+verify all of the following for the Pull Request's final head commit SHA:
+
+1. The Pull Request base is exactly `develop`.
+2. Each of these five GitHub Actions jobs exists for that exact final head SHA:
+   `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`.
+3. Each of those five jobs has completed with an explicit `success` conclusion.
+
+This gate applies regardless of whether GitHub reports any checks as formally
+required or whether branch protection/rulesets are enforced. “No required checks
+configured” never permits a merge. An overall workflow badge, a result for an
+earlier commit, or a stale check is not sufficient evidence.
+
+Codex must not merge when any expected job is absent or has a status or
+conclusion of `queued`, `pending`, `in_progress`, `cancelled`, `skipped`,
+`timed_out`, `action_required`, `failure`, or anything other than explicit
+`success`. Only explicit success for all five named jobs permits autonomous merge
+into `develop`. Do not weaken CI to satisfy this gate.
+
+### Post-merge `develop` CI gate
+
+A task is not fully integrated merely because its Pull Request checks passed.
+After merging, Codex must identify the resulting `origin/develop` HEAD (the merge
+or integration commit SHA), wait for the push-triggered CI workflow for that
+exact SHA, and verify that `scan_ruby`, `scan_js`, `lint`, `test`, and
+`system-test` all exist and complete with explicit `success` conclusions.
+
+The final integration invariant is a green `origin/develop` HEAD. If its
+post-merge CI is absent, unfinished, or non-successful, do not touch `main` or
+begin unrelated feature work. Inspect the actual failure. If the just-integrated
+task caused it, create a focused corrective branch from current `develop`, fix,
+validate, commit, push, open a Pull Request back to `develop`, satisfy the exact
+five-job Pull Request gate, merge it, and repeat this post-merge verification.
+For a pre-existing or external failure, do not alter unrelated work. If it cannot
+safely be corrected within scope, preserve the state, stop, and report `develop`
+as unhealthy rather than claiming completion.
+
+Before editing, review `git status --short` and preserve all pre-existing or
+unrelated changes. Never use destructive Git commands to remove local work.
+At handoff, report the current branch and complete `git status --short`.
+
+## Integration and release branch safety
+
+`develop` is the GitHub default and normal integration branch. All ordinary
+Codex task branches and Pull Requests target `develop`.
+
+`main` is the protected conceptual release/stable branch. Codex must never:
+
+- push directly to `main` or create a normal feature Pull Request targeting it;
+- merge a Pull Request into `main` or run `gh pr merge` when its base is `main`;
+- change `main` to point at `develop`, or reset, rebase, force-update, or delete
+  `main`;
+- alter `main` merely to make development more convenient.
+
+If a task unexpectedly targets `main`, stop instead of merging. The only
+intended path into `main` is a future human-controlled `develop` to `main`
+release after external audit, even when all CI checks are green.
+
+Never force-push or rewrite published shared history. Never delete or reset
+databases, schemas, Docker volumes, user data, or other persistent data without
+explicit approval.
+
+## Codex usage efficiency
+
+- Use the smallest sufficient investigation and context. Start with targeted
+  files and searches; do not broadly scan the repository, Git history, session
+  archives, or unrelated task history when focused evidence is enough.
+- Do not launch subagents unless the user explicitly authorizes them. Avoid
+  duplicate searches, repeated verification, unnecessary retries, and rereading
+  large context unless new evidence requires it.
+- Poll CI and GitHub at reasonable intervals. Do not request another Codex
+  review for a commit SHA that already has a valid review; after a corrective
+  commit, request review only for the new exact final SHA.
+- During implementation, run focused tests while iterating. Run the complete
+  required quality gate once the change is stable, and repeat it after a
+  correction only as needed to prove final correctness. Never skip, weaken,
+  suppress, or bypass required tests, security checks, database integrity
+  checks, or CI gates to reduce usage.
+- Preserve the user's selected model and reasoning effort. When Codex controls
+  the choice, use the lowest sufficient reasoning effort and do not increase it
+  merely because a task is long. When the client offers a supported speed
+  setting, prefer Standard unless the user requests Fast or the task requires it.
+- If allowance becomes constrained during legitimate work, preserve the branch,
+  worktree, progress, and resumable state. Resume from that state rather than
+  restarting or rediscovering completed work.
+- Do not purge caches, history, memories, or project state based on unsupported
+  usage claims. Do not enable experimental features, purchase credits, consume
+  resets, change subscriptions, or alter billing settings to save usage. An open
+  process, connection, or client is not proof of model consumption.
+- Keep ordinary engineering work focused on the assigned task. Investigate
+  Codex allowance or accounting only when explicitly tasked, then finish the
+  assigned work, report the result, and stop without starting another milestone.
+
+## Unattended execution and CI ownership
+
+Assume the user may leave an assigned mega-task unattended for several hours.
+Use the repository architecture, tests, these instructions, and professional
+engineering judgment for routine implementation and Rails design choices.
+Continue through validation, Pull Request creation, task-caused correction, and
+safe integration into `develop` without pausing for routine decisions.
+
+Stop early only for a genuine blocker, such as an unavailable required secret,
+an unauthorized paid provider request, a required destructive persistent-data
+operation, unavailable GitHub permission, an unsafe external infrastructure
+action, material ambiguity that risks data loss or security, or unrelated local
+work that would have to be overwritten. Preserve state and report the blocker
+precisely.
+
+Codex owns failures caused by the task. After opening the Pull Request, inspect
+the exact job-level results and actual logs; classify failures as task-caused,
+pre-existing, or external/environmental. Fix task-caused failures, rerun relevant
+local validation, commit, push, and re-check the explicit CI gates until they are
+green. Never make CI green by weakening a quality gate: do not ignore scanner
+failures, disable jobs, remove legitimate tests, skip system tests, add
+`continue-on-error`, or suppress valid findings instead of correcting them.
 
 ## Secrets and secure development
 
@@ -120,15 +266,18 @@ expense of security, correctness, maintainability, or production readiness.
 
 ## Validation and quality gate
 
-Before declaring a coding task complete, run all of the following from the
-repository root:
+Before declaring a normal coding mega-task complete, run the complete local
+quality gate from the repository root:
 
 ```sh
 bin/rails test
+bin/rails test:system
 bin/rubocop
 bin/brakeman --no-pager
 bin/bundler-audit
+bin/importmap audit
 git diff --check
+bin/rails zeitwerk:check
 ```
 
 If the task creates one or more migrations, also run:
@@ -148,60 +297,156 @@ bin/rails db:migrate:status
 - A direct user instruction may add or narrow checks for a non-coding task; make
   that task-specific validation explicit in the final report.
 
-## Required review handoff
+## Terminal task report
 
-After every completed implementation task, automatically create two review
-files outside the Git repository under `~/Downloads`. Derive a filesystem-safe
-slug from the current branch by replacing path separators and unsafe characters
-with underscores.
+GitHub is the authoritative review artifact. Do not generate mandatory review
+or changes files in `~/Downloads`, and do not dump giant unified diffs there.
 
-Create exactly:
+After every completed task, provide a concise terminal report containing:
 
-1. `three_heavens_<branch_slug>_review.md`
-2. `three_heavens_<branch_slug>_changes.md`
+- task summary;
+- task branch, Pull Request number and URL, and commits;
+- merge commit or final `develop` SHA;
+- migrations and important architecture or security decisions;
+- exact results for `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`
+  on both the final Pull Request head and the post-merge `develop` push;
+- remaining concerns and deferred follow-ups;
+- confirmation that `main` was not modified, `.env` was not inspected, no
+  unauthorized provider request occurred, and no persistent data or volume was
+  destroyed.
 
-The review file must include:
+## Engineering operating principles
 
-- current branch
-- scope
-- architecture summary
-- important design decisions
-- files created/modified
-- migrations/schema changes
-- security decisions
-- external API behavior when relevant
-- background jobs when relevant
-- retry/error handling when relevant
-- tests added/modified
-- exact quality-gate results
-- `git status --short`
-- `git diff --stat`
-- concerns
-- tradeoffs
-- assumptions
-- deferred follow-ups
-- manual smoke-test instructions when relevant
-- explicit confirmation whether `.env` or secrets were touched
+### Prefer the smallest sufficient solution
 
-The changes file must include:
+Before adding code, abstractions, dependencies, configuration, state, or files,
+inspect whether the existing implementation can be reused, simplified, or
+corrected.
 
-- unified diffs for tracked, modified files relevant to the task
-- full contents of relevant newly created or untracked source files
-- full contents of new migrations
-- full contents of new tests
+Remove dead, duplicated, unreachable, obsolete, or superseded code when doing
+so is safe, directly related to the task, and reduces total complexity.
 
-Never include any of the following in either review file:
+Prefer improving an existing clear abstraction over creating a parallel one.
 
-- `.env` contents
-- credentials, API keys, tokens, passwords, or private keys
-- logs
-- `tmp` or cache files
-- vendor or dependency directories
-- irrelevant generated artifacts
+Introduce a new abstraction only when it:
 
-If secret-like content is unexpectedly encountered while generating the review
-files, redact it instead of copying it. Include only task-relevant changes; do
-not include unrelated worktree changes in the changes file.
+- represents a real domain concept;
+- isolates a real external/infrastructure boundary;
+- removes meaningful duplication; or
+- makes an important invariant substantially easier to enforce or test.
 
-At the end of every completed task, print the exact absolute paths to both
-review files so the user can upload them to ChatGPT for independent review.
+Do not create speculative extension points, placeholder services, unused
+configuration, generic frameworks for one concrete use case, or dependencies
+without a current product requirement.
+
+Prefer the smallest sufficient design, not merely the smallest textual diff.
+A larger root-cause fix is preferable to a smaller workaround when it reduces
+total complexity or prevents recurrence.
+
+### Model the domain before substantial implementation
+
+For non-trivial stateful behavior, determine before coding:
+
+- authoritative state versus derived state;
+- entities and ownership boundaries;
+- valid and invalid state transitions;
+- lifecycle and deletion rules;
+- concurrency and idempotency assumptions;
+- failure, retry, cancellation, and recovery semantics;
+- cost and boundedness requirements.
+
+In Rails, encode important invariants at the strongest practical layer:
+PostgreSQL constraints and indexes, model validations, enums, immutable records,
+value objects, and explicit service boundaries.
+
+Do not represent an unclear state machine as scattered conditionals.
+
+### Optimize the complete user flow
+
+For user-facing behavior reason through:
+
+user action
+→ durable state change
+→ asynchronous work if any
+→ visible feedback
+→ failure/retry behavior
+→ cancellation
+→ completion
+
+Prefer predictable behavior, useful feedback, safe recovery, and stable UI
+state over internal elegance that makes the actual product confusing or
+fragile.
+
+User experience never overrides correctness, privacy, security, data integrity,
+or explicit provider-cost authorization.
+
+### Preserve architectural boundaries
+
+Keep responsibilities explicit:
+
+- controllers: HTTP transport, authentication/authorization, parameter shape,
+  and response selection;
+- models and PostgreSQL: durable state and persistent invariants;
+- services/forms: domain workflows and application orchestration;
+- jobs: asynchronous execution, retries, and durable work boundaries;
+- queries: bounded read/analytics logic;
+- provider clients: external API behavior;
+- operations services: process, filesystem, backup, restore, and infrastructure
+  boundaries.
+
+Do not duplicate authoritative state across layers without a clear reason.
+Do not leak provider, queue, filesystem, or deployment implementation details
+into unrelated domain APIs.
+
+### Fix root causes and prove behavior
+
+For defects:
+
+1. reproduce or precisely reason about the failure;
+2. identify the violated invariant or root cause;
+3. fix it at the correct architectural boundary;
+4. add deterministic regression coverage;
+5. inspect adjacent paths that depend on the same invariant.
+
+Do not hide deterministic failures with sleeps, arbitrary retries, oversized
+queues, catch-all rescue blocks, disabled checks, or special-case bypasses.
+
+Distinguish evidence precisely:
+
+- implemented;
+- unit tested;
+- integration tested;
+- CI verified;
+- runtime verified;
+- production verified.
+
+Never claim a stronger level of verification than was actually performed.
+
+When the real runtime path cannot safely be exercised, state exactly what was
+tested and what remains unverified.
+
+### Minimize cognitive load
+
+Prefer straightforward control flow, descriptive domain names, local reasoning,
+explicit ownership, focused methods, limited mutation, and comments that
+explain why.
+
+Avoid clever code, premature genericization, unnecessary wrapper layers, hidden
+side effects, and abstractions that increase rather than reduce reader load.
+
+### Final simplification review
+
+Before finalizing a coding Pull Request, inspect the diff and ask:
+
+- Can newly added code be removed or simplified?
+- Did this change create duplicate concepts or state?
+- Is every new abstraction currently justified?
+- Is every new dependency/configuration currently consumed?
+- Is the root cause actually fixed?
+- Is the user flow correct?
+- Are important invariants encoded and regression-tested?
+- What exact evidence proves the behavior works?
+
+Do not refactor unrelated code merely for aesthetic cleanup.
+
+The objective is minimum necessary complexity, not minimum line count.

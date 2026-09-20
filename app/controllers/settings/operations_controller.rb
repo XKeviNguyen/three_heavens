@@ -4,6 +4,8 @@ module Settings
 
     def show
       @health = Operations::AiWorkflowHealth.call
+      @system_health = Operations::SystemHealth.call
+      @release_sha = Operations::ReleaseIdentity.call
     end
 
     def reconcile_stale

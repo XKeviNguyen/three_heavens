@@ -11,7 +11,7 @@ class JudgeRunJob < ApplicationJob
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
-           attempts: 5 do |job, error|
+           attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION do |job, error|
     job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 
@@ -32,9 +32,17 @@ class JudgeRunJob < ApplicationJob
     @claimed_attempt = claim_result.attempt
 
     prompt = Judging::Prompt.build(judge_run)
+    budget = Ai::RunContextBudget.call(
+      run: judge_run,
+      model: judge_run.judge_llm_model,
+      prompt: prompt,
+      stage: :judge,
+      source_character_count: judge_run.judge_round.experiment.document.source_text.length
+    )
     result = client_for(judge_run.judge_llm_model).judge_completion(
       model_identifier: judge_run.judge_llm_model.model_identifier,
-      **prompt
+      **prompt,
+      max_tokens: budget.reserved_output_tokens
     )
     evaluation = Judging::ResponseValidator.call(
       content: result.content,
@@ -89,12 +97,15 @@ class JudgeRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        cost_complete: !result.cost.nil?,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil
       )
     end
 
+    Ai::OperationalEvents.emit("ai_run_completed", judge_run, active_job_id: job_id, status: "completed")
     Judging::ReconcileRound.call(judge_run.judge_round)
   end
 

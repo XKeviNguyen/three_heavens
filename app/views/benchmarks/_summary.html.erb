@@ -2,6 +2,7 @@
   <div class="rounded-lg bg-slate-50 p-4">
     <dt class="text-slate-500">Completed translations</dt>
     <dd class="mt-1 text-xl font-bold text-slate-950"><%= stats.completed_translation_count %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= stats.translation_participation_count %> logical participation(s) · <%= stats.failed_translation_count %> failed · <%= analytics_percent(stats.translation_failure_rate) %> failure rate</p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
     <dt class="text-slate-500">Official wins</dt>

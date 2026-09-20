@@ -1,6 +1,18 @@
 module History
   class ExperimentQuery
     PER_PAGE = 25
+    COMPLETE_COST_COUNT_SQL = {
+      nil => Arel.sql("COUNT(*) FILTER (WHERE cost_complete)"),
+      "review_runs" => Arel.sql(
+        "COUNT(*) FILTER (WHERE review_runs.cost_complete)"
+      ),
+      "judge_runs" => Arel.sql(
+        "COUNT(*) FILTER (WHERE judge_runs.cost_complete)"
+      ),
+      "finalization_runs" => Arel.sql(
+        "COUNT(*) FILTER (WHERE finalization_runs.cost_complete)"
+      )
+    }.freeze
 
     Page = Data.define(:entries, :current_page, :total_pages, :total_count, :per_page) do
       def previous_page
@@ -15,12 +27,14 @@ module History
     Entry = Data.define(
       :experiment,
       :translation_candidate_count,
+      :execution_segment_count,
       :known_system_cost,
       :cost_sample_count,
+      :cost_complete_count,
       :cost_record_count
     ) do
       def cost_telemetry_complete?
-        cost_record_count.positive? && cost_sample_count == cost_record_count
+        cost_record_count.positive? && cost_complete_count == cost_record_count
       end
 
       def cost_telemetry_incomplete?
@@ -61,15 +75,19 @@ module History
     def experiment_scope
       ownership_scope.includes(
         { document: :project },
+        :document_execution_plan,
         :translation_runs,
         :final_translation,
+        methodology_profile_revision: :methodology_profile,
+        experiment_reference_revisions: :translation_reference_revision,
+        pipeline_run: :workflow_profile_revision,
         review_round: { judge_round: { winner_translation_run: :llm_model } }
       ).order(created_at: :desc, id: :desc)
     end
 
     def cost_aggregates(experiment_ids)
       totals = Hash.new do |hash, experiment_id|
-        hash[experiment_id] = { known: BigDecimal("0"), samples: 0, records: 0 }
+        hash[experiment_id] = { known: BigDecimal("0"), samples: 0, complete: 0, records: 0 }
       end
       return totals if experiment_ids.empty?
 
@@ -83,7 +101,13 @@ module History
     def translation_cost_rows(experiment_ids)
       TranslationRun.where(experiment_id: experiment_ids)
         .group(:experiment_id)
-        .pluck(:experiment_id, Arel.sql("SUM(cost)"), Arel.sql("COUNT(cost)"), Arel.sql("COUNT(*)"))
+        .pluck(
+          :experiment_id,
+          Arel.sql("SUM(cost)"),
+          Arel.sql("COUNT(*) FILTER (WHERE cost IS NOT NULL)"),
+          complete_cost_count_sql,
+          Arel.sql("COUNT(*)")
+        )
     end
 
     def review_cost_rows(experiment_ids)
@@ -93,7 +117,8 @@ module History
         .pluck(
           "review_rounds.experiment_id",
           Arel.sql("SUM(review_runs.cost)"),
-          Arel.sql("COUNT(review_runs.cost)"),
+          Arel.sql("COUNT(*) FILTER (WHERE review_runs.cost IS NOT NULL)"),
+          complete_cost_count_sql("review_runs"),
           Arel.sql("COUNT(*)")
         )
     end
@@ -105,7 +130,8 @@ module History
         .pluck(
           "review_rounds.experiment_id",
           Arel.sql("SUM(judge_runs.cost)"),
-          Arel.sql("COUNT(judge_runs.cost)"),
+          Arel.sql("COUNT(*) FILTER (WHERE judge_runs.cost IS NOT NULL)"),
+          complete_cost_count_sql("judge_runs"),
           Arel.sql("COUNT(*)")
         )
     end
@@ -117,18 +143,24 @@ module History
         .pluck(
           "final_translations.experiment_id",
           Arel.sql("SUM(finalization_runs.cost)"),
-          Arel.sql("COUNT(finalization_runs.cost)"),
+          Arel.sql("COUNT(*) FILTER (WHERE finalization_runs.cost IS NOT NULL)"),
+          complete_cost_count_sql("finalization_runs"),
           Arel.sql("COUNT(*)")
         )
     end
 
     def merge_cost_rows(totals, rows)
-      rows.each do |experiment_id, known, samples, records|
+      rows.each do |experiment_id, known, samples, complete, records|
         total = totals[experiment_id]
         total[:known] += BigDecimal(known.to_s) unless known.nil?
         total[:samples] += samples
+        total[:complete] += complete
         total[:records] += records
       end
+    end
+
+    def complete_cost_count_sql(table = nil)
+      COMPLETE_COST_COUNT_SQL.fetch(table)
     end
 
     def build_entry(experiment, costs)
@@ -136,8 +168,10 @@ module History
       Entry.new(
         experiment: experiment,
         translation_candidate_count: experiment.translation_runs.size,
+        execution_segment_count: experiment.document_execution_plan&.segment_count || 1,
         known_system_cost: cost[:samples].positive? ? cost[:known] : nil,
         cost_sample_count: cost[:samples],
+        cost_complete_count: cost[:complete],
         cost_record_count: cost[:records]
       )
     end

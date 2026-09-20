@@ -2,6 +2,61 @@
 
 Three Heavens is a Rails 8.1 application for authenticated, owner-scoped AI translation experiments, blind review, judge aggregation, and final translation refinement. PostgreSQL 17 is the source of truth; Solid Queue, Solid Cache, and Solid Cable use dedicated PostgreSQL databases in production.
 
+## Automatic translation pipelines
+
+Workflow Profiles are private, reusable configurations for translator, reviewer, judge, and optional finalizer models. Each edit appends an immutable revision with model-routing snapshots and a deterministic SHA-256 configuration digest; historical revisions are never rewritten.
+
+The translation workspace remains manual by default. In automatic mode, the owner selects the exact current profile revision and explicitly confirms the configured initial provider run slots for that launch. This authorization covers automatic translation, blind review, judging, creation of the official winner draft, and—only in `refinement_proposals` mode—creation of AI refinement proposals. `winner_draft` stops after creating the draft. Both modes stop at the human editorial checkpoint: proposals are never applied, draft content is never changed, and a translation is never finalized automatically.
+
+Every manual or automatic workspace form carries an owner-scoped, one-time opaque submission identity. Replaying or concurrently submitting the same form returns its existing experiment or pipeline without scheduling duplicate provider work. Invalid forms remain retryable with the same identity; unused identities expire after 24 hours and are removed in bounded cleanup batches.
+
+Automatic progression can incur provider cost, and built-in bounded provider retries may add requests. Terminal failures block the pipeline and retain the existing explicit owner retry controls; a successful retry lets the already-authorized pipeline continue. Stopping automation prevents future stages but cannot cancel provider work already queued or running, removes no history, and does not prevent manual continuation.
+
+`PipelineReconciliationJob` scans a bounded indexed batch every 10 minutes in production to recover missed advancement after queue failures, crashes, or restarts. A dedicated least-recently-reconciled cursor and row locks prevent permanently blocked pipelines from starving newer work. It processes only running or blocked automatic pipelines and never manual, stopped, or ready-for-editor workflows. This is intentionally separate from the provider-free stale-AI watchdog. Operators may invoke the same safe bounded service with `bin/rails pipelines:reconcile`; output contains aggregate counts only.
+
+## Long-document execution and context safety
+
+Documents remain authoritative whole source records up to 100,000 characters. When a source exceeds the single-request target, Three Heavens derives an immutable, versioned sequence of lossless segments using paragraph, line, sentence-like punctuation, and finally Unicode-safe hard boundaries. Rejoining the ordered segment text reproduces the reviewed source exactly; segmentation never replaces or rewrites it.
+
+Translation, blind review, judging, and optional refinement then run one bounded provider request per logical model and source segment. The existing parent runs remain the candidate/reviewer/judge/finalizer records used by history, benchmarks, winner selection, and pipeline advancement. Their child segment runs are the physical provider calls, retain execution lineage and detailed telemetry, and retry only failed work. Parent cost is the sum of known child cost without counting child rows again in analytics; token completeness remains explicitly unknown if any child value is missing.
+
+Administrators configure each model's context-window and maximum-output token capabilities in Settings / Models. Each scheduled provider call stores the capability snapshot and a deterministic `serialized-utf8-bytes-v2` estimate based on the fully serialized request: approximately one estimated token per UTF-8 byte plus framing allowance, the response schema, a stage output reserve, and a separate 1,024-token safety margin. This is intentionally conservative and is not claimed to match any provider tokenizer exactly. Existing unconfigured models retain a conservative 16,384/4,096-token fallback only for sources of at most 8,000 characters; long-document planning fails before provider work when capabilities are absent or insufficient.
+
+OpenRouter account or organization configuration must not force the context-compression plugin in a way that prevents per-request overrides, because Three Heavens disables it for fidelity-critical workflows.
+
+Every request sends an explicit stage completion limit, and provider responses are streamed through a 1 MiB byte ceiling before JSON parsing or persistence. Segment translations/refinements are limited to 20,000 characters and assembled documents remain limited to 100,000 characters; no output is silently truncated. Automatic pipeline authorization records the segment multiplier and exact initial provider-request slots (logical models × segments) for every stage. Built-in retries may add calls, so this is not a maximum HTTP request count.
+
+Review scores are aggregated by source-character-weighted means. Each judge uses source-character-weighted segment Borda points, then weighted mean score and stable TranslationRun ID tie-breaking; the existing cross-judge Borda aggregate still selects one official logical candidate only after every required judge completes. Refinement proposals are reassembled but remain unapplied until the human editor chooses Apply Proposal. A manual edit deliberately invalidates segment alignment for further segmented AI refinement; manual editing, restoration, finalization, and export remain available. Historical non-segmented experiments continue to render without fabricated segment history, and benchmark translation/win counts remain logical candidate counts rather than physical segment-call counts.
+
+These controls bound requests; they do not guarantee that every 100,000-character document fits every selected model or configuration. Unsupported plans fail safely before the affected stage schedules provider work.
+
+## Development workflow
+
+`develop` is the default integration branch. Normal Codex work starts from
+current `develop` on a focused task branch, and each task branch opens a Pull
+Request back to `develop`. Codex may autonomously merge a task Pull Request after
+its required checks pass. `main` is reserved for human-controlled releases:
+Codex never merges into `main`, and the final `develop` to `main` release occurs
+only after external and human audit.
+
+## V1 feature freeze
+
+V1 feature development is frozen as of the `feature/product-completion-freeze`
+milestone. Until the public V1 release, a change to this repository must be one
+of:
+
+- a real defect found by the whole-project audit;
+- a security correction;
+- a release or deployment correction;
+- a documented release-blocking usability problem.
+
+New product features, providers, integrations, and architectural expansions
+(V2 work) are out of scope until after V1 ships. The frozen V1 surface is the
+owner-scoped journey from authentication through project, source import,
+manual or automatic translation, blind review, judging, the human final editor,
+and TXT/DOCX export, plus the libraries, benchmarks, history, and
+administrator operations pages described below.
+
 ## Local development
 
 Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. The included `compose.yml` runs PostgreSQL on the loopback interface. Local Rails configuration expects these environment variable names:
@@ -20,13 +75,19 @@ bin/rails db:prepare
 
 The PostgreSQL Docker volume contains persistent development data. Never run `docker compose down -v` unless intentionally destroying that local database.
 
-Create or promote the first administrator without placing a password in shell history:
+Create or promote the first administrator:
 
 ```sh
 bin/rails accounts:bootstrap_admin
 ```
 
-The task prompts securely for the required account data.
+From an interactive terminal the task prompts for the administrator email and
+reads the password and its confirmation without echoing either value. For
+automation, set `THREE_HEAVENS_ADMIN_EMAIL` and `THREE_HEAVENS_ADMIN_PASSWORD`
+through the process environment or an approved secret manager; the task never
+prints the password, and a non-interactive run without both values fails instead
+of waiting for input. Never place the literal password in shell history or a
+command line.
 
 ## Recoverable AI workflows
 
@@ -50,9 +111,11 @@ With `SOLID_QUEUE_IN_PUMA=true`, the production Puma process supervises Solid Qu
 
 Authenticated owners may paste source text or upload `.txt`, `.md`, and `.docx` source files. Legacy `.doc`, `.docm`, RTF, HTML, ODT, PDF, images, and directly supplied archives are intentionally unsupported. PDF parsing and OCR require a separate security and product design.
 
-Uploads are limited by the application to 10 MiB, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). Kamal Proxy accepts request bodies up to 12 MiB so a 10 MiB upload plus multipart framing can reach the authoritative application check. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
+Uploads are limited by the application to 10 MiB per file, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). The Translation Reference form supports two files in one request, so Kamal Proxy accepts request bodies up to 21 MiB: two 10 MiB files plus 1 MiB of bounded multipart overhead. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
 
-DOCX processing uses a bounded ZIP reader in memory. It requires the normal OOXML package entries, rejects encrypted or macro-enabled packages, traversal-style names, excessive entry counts, excessive declared expansion, large relevant XML, and suspicious compression ratios. XML parsing is strict and network-disabled; V1 reads visible body paragraphs, runs, tabs, explicit breaks, and tables. It does not recreate Word layout, fetch relationships, extract images, execute macros, or perform OCR.
+DOCX processing accepts genuine macro-free WordprocessingML packages only. The package declaration, main-document relationship, content types, internal relationship targets, and extension/MIME/magic-byte agreement are validated before text is accepted. Processing uses a bounded ZIP reader in memory: at most 500 entries, 50 MiB declared total expansion, 16 MiB across relevant XML, 8 MiB for the main document, 2 MiB per secondary Word text part, and 1 MiB per relationships part, with duplicate/ambiguous names, traversal variants, encrypted entries, macros, embedded objects, unsafe external relationships, and suspicious compression rejected. XML parsing is strict, DTD-free, and network-disabled.
+
+Visible DOCX text is converted deterministically to plain text. Paragraphs and blank paragraphs become LF-separated lines; run boundaries do not add whitespace; tabs and explicit Word line breaks are retained; table cells use tabs and rows use line breaks; nested tables are bounded. Hyperlinks, content controls, inserted/current revisions, ordinary field results, text boxes, soft hyphens, and nonbreaking hyphens are retained where WordprocessingML provides deterministic text. Deleted, moved-away, and hidden runs are excluded. Direct Word numbering is emitted as readable list labels. Referenced footnotes and endnotes are appended once with numbered labels, and each distinct referenced header/footer is appended once with its variant label. Separator/control notes are excluded. Three Heavens does not reproduce page layout, floating-object placement, styles, images, or other formatting it does not persist.
 
 Upload and extraction create an owner-scoped `SourceImport` staging record. The owner reviews and may edit extracted text in the normal translation workspace. Upload, parsing, preview, cancellation, cleanup, and export never enqueue or call an AI provider. A successful workspace submission locks and consumes an import once, atomically creates the normal Project/Document/Experiment graph, records immutable source text and provenance, and reuses the Active Storage blob for the Document without copying file bytes.
 
@@ -62,7 +125,16 @@ Original uploads are private. Downloads pass application owner authorization, us
 bin/rails source_imports:cleanup
 ```
 
-Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or a minimal real macro-free OOXML DOCX. Exports are generated on demand and are not stored.
+Durable Projects, Documents, workflow snapshots, AI results, final translations, and final-version history are intentionally retained; Three Heavens does not silently expire user translation history. Temporary workspace submissions and SourceImports expire after 24 hours. Unattached Active Storage blobs older than seven days are collected once daily in bounded, lock-and-recheck batches, while any attached Document or SourceImport blob is preserved. Both maintenance tasks below are dry-run by default; set `EXECUTE=1` only after reviewing aggregate counts:
+
+```sh
+bin/rails backend:cleanup_unattached_blobs
+BEFORE=2026-01-01T00:00:00Z bin/rails backend:remediate_legacy_errors
+```
+
+The legacy-error task examines only failed AI runs before the explicit cutoff, never prints stored error content, replaces at most 100 rows per invocation by default with a fixed safe message, and is idempotent. Use `BATCH_SIZE` to select a smaller batch or at most 1,000 rows. Repository-controlled structured operational events go to standard output and contain only allowlisted bounded fields; production log retention belongs to the deployment log collector and must be configured there rather than by deleting durable product records.
+
+Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or as a clean macro-free OOXML DOCX generated solely from the authoritative final text. TXT contains exactly the stored text with no BOM or added prose. DOCX preserves Unicode, LF paragraph/blank-line semantics, tabs, and XML whitespace, and contains a small app-generated style plus safe core metadata; it never copies the uploaded package, relationships, provider data, or hidden private content. Three Heavens' generated DOCX subset round-trips through its importer to the same normalized text. Exports are generated on demand and are not stored.
 
 ## Health endpoints
 
@@ -70,6 +142,20 @@ Final translation owners can download the current draft or finalized version as 
 - `/ready` is web readiness: the primary database accepts a minimal `SELECT 1`.
 
 Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or exposes database errors. The primary database is the readiness contract because every authenticated web workflow depends on it, while queue/cache/cable degradation is separately visible to operators and does not necessarily make basic web serving unsafe.
+
+## Production operations
+
+The authoritative recovery set is the primary PostgreSQL database plus private Active Storage files. Cache and cable are rebuildable; the queue database is rebuilt empty during disaster recovery so old paid-work jobs are not blindly replayed. Create a versioned checksum-protected bundle with `bin/ops/backup /absolute/backup-root`, verify an isolated restore with `RESTORE_DATABASE_URL` and `RESTORE_STORAGE_PATH` plus `bin/ops/restore-verify BUNDLE_PATH`, and preview/execute local completed-bundle retention with `bin/ops/backup-prune`.
+
+Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
+
+The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
+
+Detailed executable procedures are in:
+
+- [Backup and restore](docs/operations/backup-and-restore.md)
+- [Disaster recovery](docs/operations/disaster-recovery.md)
+- [Production deployment and rollback](docs/operations/production-deploy.md)
 
 ## Production configuration
 
@@ -101,7 +187,7 @@ Production assumes TLS terminates at the trusted Kamal proxy, forces HTTPS for b
 
 Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and does not require real secrets or a live database. That build-only flag must not be used for a running production server.
 
-Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery plans must cover both all PostgreSQL databases and the persistent storage volume; a database-only backup cannot restore original source files.
+Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery cover the authoritative primary PostgreSQL database and the persistent storage volume; cache and cable are recreated, and queue state follows the documented no-stale-replay recovery policy.
 
 ## Kamal prerequisites
 
@@ -135,3 +221,28 @@ bin/rails zeitwerk:check
 ```
 
 Tests use deterministic fakes and Active Job's test adapter. They require PostgreSQL and a local Chrome/Chromium browser for system tests, but never require `OPENROUTER_API_KEY` and never make a real provider request.
+
+## Supply-chain maintenance
+
+CI actions use verified release commit SHAs with version comments, maintained by
+weekly grouped GitHub Actions Dependabot updates. Bundler updates remain weekly
+and separate. Update the setup-ruby pin when adopting a Ruby version newer than
+that action release. CI grants only `contents: read` and does not persist checkout
+credentials. Keep `pull_request` execution and all five fail-closed jobs.
+
+The Dockerfile base, Dockerfile frontend, and both CI PostgreSQL services use
+official multi-architecture index digests resolved from Docker Hub. Before each
+release, review upstream security updates and refresh these digests with
+`docker buildx imagetools inspect <image:tag>`; use the top-level digest, retaining
+the readable tag. Update both PostgreSQL services together. These image pins
+require manual review; the configured Dependabot ecosystems maintain actions and
+gems. Validate a bounded production build and all five CI jobs after updates.
+Pinning the frontend also stabilizes build checks under `check=error=true`.
+Debian packages remain unpinned to receive repository security fixes, so builds
+are not claimed to be bit-for-bit reproducible. Kamal still builds for amd64.
+
+RuboCop caches contain lint results, and setup-ruby caches installed gems keyed
+by runtime and lockfile. Neither cache should contain secrets. GitHub's branch
+and pull-request cache scopes prevent caches written by a pull request from
+being restored by the base branch; keep this workflow free of privileged
+`pull_request_target` or `workflow_run` execution of pull-request code.

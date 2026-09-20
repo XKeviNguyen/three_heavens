@@ -1,0 +1,30 @@
+module TranslationWorkspaceSubmissions
+  class Cleanup
+    Result = Data.define(:purged_count)
+
+    def self.call(cutoff: Time.current, batch_size: TranslationWorkspaceSubmission::CLEANUP_BATCH_SIZE)
+      limit = [ Integer(batch_size), TranslationWorkspaceSubmission::CLEANUP_BATCH_SIZE ].min
+      raise ArgumentError, "batch size must be positive" unless limit.positive?
+
+      purged_count = 0
+      candidate_ids(cutoff:, limit:).each do |submission_id|
+        TranslationWorkspaceSubmission.transaction do
+          submission = TranslationWorkspaceSubmission.lock.find_by(id: submission_id)
+          next unless submission&.expired?(at: cutoff)
+
+          submission.destroy!
+          purged_count += 1
+        end
+      end
+      Result.new(purged_count: purged_count)
+    end
+
+    def self.candidate_ids(cutoff:, limit:)
+      TranslationWorkspaceSubmission.expired_available(cutoff)
+                                    .order(:expires_at, :id)
+                                    .limit(limit)
+                                    .pluck(:id)
+    end
+    private_class_method :candidate_ids
+  end
+end

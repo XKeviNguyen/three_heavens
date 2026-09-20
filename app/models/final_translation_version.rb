@@ -5,6 +5,12 @@ class FinalTranslationVersion < ApplicationRecord
   belongs_to :final_translation, inverse_of: :versions
   belongs_to :source_finalization_run, class_name: "FinalizationRun", optional: true
 
+  has_many :segments,
+           -> { joins(:experiment_segment).order("experiment_segments.position") },
+           class_name: "FinalTranslationVersionSegment",
+           dependent: :restrict_with_error,
+           inverse_of: :final_translation_version
+
   has_many :based_finalization_rounds,
            class_name: "FinalizationRound",
            foreign_key: :base_final_translation_version_id,

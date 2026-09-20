@@ -24,9 +24,16 @@ module Finalizations
           version_number: final_translation.versions.maximum(:version_number).to_i + 1,
           content: run.proposed_translation,
           origin: :ai_applied,
+          segment_alignment_valid: true,
           source_finalization_run: run,
           change_note: "Applied refinement proposed by #{run.finalizer_llm_model.display_name}"
         )
+        run.finalization_segment_runs.includes(:experiment_segment).each do |segment_run|
+          version.segments.create!(
+            experiment_segment: segment_run.experiment_segment,
+            content: segment_run.proposed_translation
+          )
+        end
         final_translation.update!(current_version: version)
         version
       end

@@ -12,22 +12,24 @@ class Finalizations::PromptTest < ActiveSupport::TestCase
 
   test "contains useful evidence but no candidate reviewer judge provider identity or database metadata" do
     winner = @final_translation.source_winner_translation_run
-    winner.update!(
-      provider_response_id: "candidate-provider-response-marker",
-      resolved_model_identifier: "candidate/resolved-marker",
-      prompt_tokens: 987_654,
-      cost: BigDecimal("0.87654321")
-    )
     review_run = @final_translation.experiment.review_round.review_runs.first
-    review_run.update!(
-      provider_response_id: "review-provider-response-marker",
-      resolved_model_identifier: "review/resolved-marker"
-    )
     judge_run = @final_translation.judge_round.judge_runs.first
-    judge_run.update!(
-      provider_response_id: "judge-provider-response-marker",
-      resolved_model_identifier: "judge/resolved-marker"
-    )
+    mutate_historical_fixture do
+      winner.update!(
+        provider_response_id: "candidate-provider-response-marker",
+        resolved_model_identifier: "candidate/resolved-marker",
+        prompt_tokens: 987_654,
+        cost: BigDecimal("0.87654321")
+      )
+      review_run.update!(
+        provider_response_id: "review-provider-response-marker",
+        resolved_model_identifier: "review/resolved-marker"
+      )
+      judge_run.update!(
+        provider_response_id: "judge-provider-response-marker",
+        resolved_model_identifier: "judge/resolved-marker"
+      )
+    end
     run = start_run
     prompt = Finalizations::Prompt.build(run)
     messages = prompt.values_at(:system_prompt, :user_prompt).join("\n")
@@ -78,21 +80,22 @@ class Finalizations::PromptTest < ActiveSupport::TestCase
     review_run = @final_translation.experiment.review_round.review_runs.first
     winner_review = review_run.review_evaluations.find_by!(translation_run: winner)
     loser_review = review_run.review_evaluations.find_by!(translation_run: loser)
-    winner_review.update!(issues: "WINNER_REVIEW_ISSUE")
-    loser_review.update!(issues: "LOSER_REVIEW_ISSUE")
-
     judge_run = @final_translation.judge_round.judge_runs.first
     winner_judge = judge_run.judge_evaluations.find_by!(translation_run: winner)
     loser_judge = judge_run.judge_evaluations.find_by!(translation_run: loser)
-    if winner_review.anonymous_label == winner_judge.anonymous_label
-      winner_label = winner_judge.anonymous_label
-      loser_label = loser_judge.anonymous_label
-      winner_judge.update_column(:anonymous_label, "Candidate Z")
-      loser_judge.update_column(:anonymous_label, winner_label)
-      winner_judge.update_column(:anonymous_label, loser_label)
+    mutate_historical_fixture do
+      winner_review.update!(issues: "WINNER_REVIEW_ISSUE")
+      loser_review.update!(issues: "LOSER_REVIEW_ISSUE")
+      if winner_review.anonymous_label == winner_judge.anonymous_label
+        winner_label = winner_judge.anonymous_label
+        loser_label = loser_judge.anonymous_label
+        winner_judge.update_column(:anonymous_label, "Candidate Z")
+        loser_judge.update_column(:anonymous_label, winner_label)
+        winner_judge.update_column(:anonymous_label, loser_label)
+      end
+      winner_judge.update!(rationale: "WINNER_JUDGE_RATIONALE")
+      loser_judge.update!(rationale: "LOSER_JUDGE_RATIONALE")
     end
-    winner_judge.update!(rationale: "WINNER_JUDGE_RATIONALE")
-    loser_judge.update!(rationale: "LOSER_JUDGE_RATIONALE")
     assert_not_equal winner_review.anonymous_label, winner_judge.anonymous_label
 
     data = untrusted_json(Finalizations::Prompt.build(start_run).fetch(:user_prompt))
@@ -121,11 +124,13 @@ class Finalizations::PromptTest < ActiveSupport::TestCase
       expected_version_number: 1
     )
     winner = @final_translation.source_winner_translation_run
-    winner.review_evaluations.first.update!(
-      issues: attack,
-      suggested_translation: attack
-    )
-    winner.judge_evaluations.first.update!(rationale: attack)
+    mutate_historical_fixture do
+      winner.review_evaluations.first.update!(
+        issues: attack,
+        suggested_translation: attack
+      )
+      winner.judge_evaluations.first.update!(rationale: attack)
+    end
 
     run = Finalizations::Start.call(
       final_translation: @final_translation,

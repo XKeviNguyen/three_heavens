@@ -33,7 +33,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "incomplete blind review hides the start form" do
-    @review_round.update_column(:status, "running")
+    mutate_historical_fixture { @review_round.update_column(:status, "running") }
     get review_round_path(@review_round)
 
     assert_response :success
@@ -69,12 +69,14 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     round = start_round
     run = round.judge_runs.first
     complete_judge_run(run)
-    run.update!(
-      prompt_tokens: 200,
-      completion_tokens: 100,
-      total_tokens: 300,
-      cost: BigDecimal("0.003456789")
-    )
+    mutate_historical_fixture do
+      run.update!(
+        prompt_tokens: 200,
+        completion_tokens: 100,
+        total_tokens: 300,
+        cost: BigDecimal("0.003456789")
+      )
+    end
     Judging::ReconcileRound.call(round)
 
     get judge_round_path(round)
@@ -98,7 +100,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     run.update!(
       status: :failed,
       completed_at: Time.current,
-      error_code: "provider_error",
+      error_code: "PRIVATE_PROVIDER_ERROR_CODE",
       error_message: "Bearer provider-secret <script>alert('unsafe')</script>"
     )
     Judging::ReconcileRound.call(round)
@@ -108,8 +110,9 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", "No official aggregate winner"
     assert_select "article", text: /Judge failed/
-    assert_includes response.body, "[FILTERED]"
-    assert_includes response.body, "&lt;script&gt;alert"
+    assert_includes response.body, "AI work failed."
+    assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
+    assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"
     assert_not_includes response.body, "<script>alert('unsafe')</script>"
   end
@@ -127,7 +130,9 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
       )
     end
     winner = run.judge_evaluations.find_by!(rank: 1)
-    winner.translation_run.update!(translated_text: "<script>candidate()</script>")
+    mutate_historical_fixture do
+      winner.translation_run.update!(translated_text: "<script>candidate()</script>")
+    end
     run.update!(
       status: :completed,
       winner_translation_run: winner.translation_run,

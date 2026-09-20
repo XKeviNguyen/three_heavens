@@ -21,6 +21,7 @@ class JudgeRoundsController < ApplicationController
       review_round: { experiment: { document: :project } },
       judge_runs: [
         :judge_llm_model,
+        :judge_segment_runs,
         { winner_translation_run: :llm_model },
         { judge_evaluations: { translation_run: :llm_model } }
       ]
@@ -62,6 +63,7 @@ class JudgeRoundsController < ApplicationController
       experiment: { document: :project },
       review_runs: [
         :reviewer_llm_model,
+        :review_segment_runs,
         { review_evaluations: { translation_run: :llm_model } }
       ]
     ).find(@review_round.id)

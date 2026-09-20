@@ -2,27 +2,27 @@ module Accounts
   class BootstrapAdmin
     class ConfigurationError < StandardError; end
 
-    def self.call(email: ENV["THREE_HEAVENS_ADMIN_EMAIL"], password: ENV["THREE_HEAVENS_ADMIN_PASSWORD"])
-      new(email: email, password: password).call
+    def self.call(email: nil, password: nil, environment: ENV, prompt: ConsolePrompt.new)
+      new(email: email, password: password, environment: environment, prompt: prompt).call
     end
 
-    def initialize(email:, password:)
+    def initialize(email:, password:, environment:, prompt:)
       @email = email
       @password = password
+      @environment = environment
+      @prompt = prompt
     end
 
     def call
-      unless email.present? && password.present?
-        raise ConfigurationError,
-              "Set THREE_HEAVENS_ADMIN_EMAIL and THREE_HEAVENS_ADMIN_PASSWORD"
-      end
+      resolved_email = resolve_email
+      resolved_password = resolve_password
 
-      normalized_email = User.normalize_value_for(:email, email)
+      normalized_email = User.normalize_value_for(:email, resolved_email)
       User.transaction do
         account = User.find_or_initialize_by(email: normalized_email)
         account.assign_attributes(
-          password: password,
-          password_confirmation: password,
+          password: resolved_password,
+          password_confirmation: resolved_password,
           role: :admin,
           status: :active
         )
@@ -34,7 +34,41 @@ module Accounts
 
     private
 
-    attr_reader :email, :password
+    attr_reader :email, :environment, :password, :prompt
+
+    def resolve_email
+      supplied = email.presence || environment["THREE_HEAVENS_ADMIN_EMAIL"].presence
+      return supplied if supplied
+
+      ensure_interactive!
+      value = prompt.ask("Admin email: ").to_s.strip
+      raise ConfigurationError, "Admin email cannot be blank" if value.blank?
+
+      value
+    end
+
+    def resolve_password
+      supplied = password.presence || environment["THREE_HEAVENS_ADMIN_PASSWORD"].presence
+      return supplied if supplied
+
+      ensure_interactive!
+      entered = prompt.ask_secret("Admin password: ")
+      confirmation = prompt.ask_secret("Confirm admin password: ")
+      unless entered == confirmation
+        raise ConfigurationError, "Admin password confirmation does not match"
+      end
+      raise ConfigurationError, "Admin password cannot be blank" if entered.blank?
+
+      entered
+    end
+
+    def ensure_interactive!
+      return if prompt.interactive?
+
+      raise ConfigurationError,
+            "Set THREE_HEAVENS_ADMIN_EMAIL and THREE_HEAVENS_ADMIN_PASSWORD, " \
+            "or run this task from an interactive terminal"
+    end
 
     def claim_legacy_projects!(account)
       legacy_owner_ids = User.disabled

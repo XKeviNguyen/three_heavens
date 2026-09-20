@@ -11,7 +11,7 @@ class TranslationRunJob < ApplicationJob
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
-           attempts: 5 do |job, error|
+           attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION do |job, error|
     job.send(:persist_failure_by_id, error, job.send(:claimed_attempt))
   end
 
@@ -30,11 +30,32 @@ class TranslationRunJob < ApplicationJob
 
     @claimed_attempt = claim.attempt
 
-    result = client_for(translation_run.llm_model).chat_completion(
-      model_identifier: translation_run.llm_model.model_identifier,
-      instruction_prompt: translation_run.experiment.instruction_prompt,
+    prompt = TranslationSegments::Prompt.build(
+      experiment: translation_run.experiment,
       source_text: translation_run.experiment.document.source_text
     )
+    budget = Ai::RunContextBudget.call(
+      run: translation_run,
+      model: translation_run.llm_model,
+      prompt: prompt,
+      stage: :translation,
+      source_character_count: translation_run.experiment.document.source_text.length
+    )
+
+    result = client_for(translation_run.llm_model).chat_completion(
+      model_identifier: translation_run.llm_model.model_identifier,
+      instruction_prompt: prompt.fetch(:system_prompt),
+      source_text: prompt.fetch(:user_prompt),
+      max_tokens: budget.reserved_output_tokens
+    )
+
+    unless result.content.is_a?(String) && result.content.present? &&
+           result.content.length <= Ai::UsageLimits::MAX_SOURCE_CHARACTERS
+      raise Ai::OpenRouterClient::PermanentError.new(
+        "Translation output exceeded the safe document length",
+        code: "translated_document_too_large"
+      )
+    end
 
     persist_success(translation_run, result, @claimed_attempt)
   rescue Ai::OpenRouterClient::RetryableError
@@ -75,12 +96,15 @@ class TranslationRunJob < ApplicationJob
         cached_tokens: result.cached_tokens,
         reasoning_tokens: result.reasoning_tokens,
         cost: result.cost,
+        cost_complete: !result.cost.nil?,
+        telemetry_complete: Ai::SegmentAggregation.telemetry_complete?([ result ]),
         completed_at: Time.current,
         error_code: nil,
         error_message: nil
       )
     end
 
+    Ai::OperationalEvents.emit("ai_run_completed", translation_run, active_job_id: job_id, status: "completed")
     TranslationExperiments::ReconcileExperiment.call(translation_run.experiment)
   end
 

@@ -70,6 +70,25 @@ module SourceImports
       assert_includes source_import.extracted_text, "Cell 1\tCell 2"
     end
 
+    test "accepts generic x-zip-compressed DOCX uploads only after package validation" do
+      source_import = Create.call(
+        user: users(:normal),
+        upload: uploaded_file(build_docx, filename: "source.docx", content_type: "application/x-zip-compressed")
+      )
+
+      assert source_import.ready?
+      assert_equal "docx", source_import.imported_format
+
+      malformed = zip_entries("placeholder.txt" => "not a word package")
+      error = assert_raises(Error) do
+        Create.call(
+          user: users(:normal),
+          upload: uploaded_file(malformed, filename: "broken.docx", content_type: "application/x-zip-compressed")
+        )
+      end
+      assert_equal "malformed_docx", error.code
+    end
+
     test "bounds long supported filenames by characters while preserving their extensions" do
       cases = [
         [ "a" * 300 + ".txt", "Text source", "text/plain", ".txt" ],

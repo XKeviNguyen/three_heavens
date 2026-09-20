@@ -1,0 +1,16 @@
+<% page_param = local_assigns.fetch(:page_param, :page) %>
+<% if pagination[:total_pages] > 1 %>
+  <nav class="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm sm:flex-row" aria-label="<%= label %> pagination">
+    <div class="min-w-20">
+      <% if pagination[:current_page] > 1 %>
+        <%= link_to "← Newer", url_for(request.query_parameters.merge(page_param => pagination[:current_page] - 1)), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %>
+      <% end %>
+    </div>
+    <p class="text-center text-slate-600">Page <%= pagination[:current_page] %> of <%= pagination[:total_pages] %> · <%= pluralize(pagination[:total_count], label.downcase.singularize) %></p>
+    <div class="min-w-20 text-right">
+      <% if pagination[:current_page] < pagination[:total_pages] %>
+        <%= link_to "Older →", url_for(request.query_parameters.merge(page_param => pagination[:current_page] + 1)), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %>
+      <% end %>
+    </div>
+  </nav>
+<% end %>

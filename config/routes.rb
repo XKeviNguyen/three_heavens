@@ -5,6 +5,37 @@ Rails.application.routes.draw do
   get "login", to: "sessions#new", as: :login
 
   get "history", to: "history#index", as: :history
+  resources :projects, only: %i[index show]
+  resources :workflow_profiles, except: :destroy do
+    member do
+      post :duplicate
+      patch :activate
+      patch :deactivate
+    end
+  end
+  resources :glossaries, except: :destroy do
+    member do
+      patch :activate
+      patch :deactivate
+    end
+  end
+  resources :methodology_profiles, except: :destroy do
+    member do
+      patch :activate
+      patch :deactivate
+    end
+  end
+  resources :translation_references, except: :destroy do
+    member do
+      patch :activate
+      patch :deactivate
+    end
+  end
+  resources :pipeline_runs, only: :show do
+    member do
+      patch :stop
+    end
+  end
   resources :benchmarks, only: :index
   get "benchmarks/models/:id", to: "benchmarks#show", as: :benchmark_model
 
@@ -21,6 +52,8 @@ Rails.application.routes.draw do
   end
 
   resource :translation_workspace, only: %i[new create]
+  post "translation_workspace/options", to: "translation_workspaces#options", as: :translation_workspace_options
+  get "experiments/:experiment_id/repeat", to: "translation_workspaces#repeat", as: :repeat_experiment
   resources :source_imports, only: %i[new create destroy]
   resources :documents, only: [] do
     member do

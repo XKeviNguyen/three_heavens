@@ -36,6 +36,7 @@ module SourceImports
       project_ids = Project.where(user_id: @user.id).pluck(:id)
       document_ids = Document.where(project_id: project_ids).pluck(:id)
       SourceImport.where(user_id: @user.id).destroy_all
+      TranslationWorkspaceSubmission.where(user_id: @user.id).delete_all
       Experiment.where(document_id: document_ids).delete_all
       ActiveStorage::Attachment.where(record_type: "Document", record_id: document_ids).delete_all
       Document.where(id: document_ids).delete_all
@@ -83,6 +84,7 @@ module SourceImports
         user: @user,
         source_import:,
         source_import_id: source_import.id,
+        source_import_project_token: source_import_binding(source_import),
         project_name: "Concurrent import",
         source_language: "Vietnamese",
         target_language: "Japanese",

@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+
+begin
+  options = { dry_run: true }
+  OptionParser.new do |parser|
+    parser.on("--execute") { options[:dry_run] = false }
+    parser.on("--dry-run") { options[:dry_run] = true }
+    parser.on("--keep-last N", Integer) { |value| options[:keep_last] = value }
+    parser.on("--older-than-days N", Integer) { |value| options[:older_than_days] = value }
+  end.parse!
+
+  ENV["RAILS_ENV"] ||= "production"
+  require_relative "../../config/environment"
+
+  result = Operations::Backup::Pruner.call(root: ARGV.fetch(0, ""), **options)
+  puts "Recognized completed bundles: #{result.recognized_count}"
+  puts "Selected by policy: #{result.selected_count}"
+  puts(result.dry_run ? "Dry run: nothing deleted" : "Deleted completed bundles: #{result.deleted_count}")
+  exit 0
+rescue StandardError
+  warn "Retention request failed safely or was rejected as invalid."
+  exit 1
+end

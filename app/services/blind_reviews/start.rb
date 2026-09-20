@@ -5,20 +5,23 @@ module BlindReviews
     class InsufficientCandidatesError < Error; end
     class InvalidReviewerSelectionError < Error; end
     class AlreadyStartedError < Error; end
+    class ContextBudgetError < Error; end
 
-    def self.call(experiment:, reviewer_ids:)
-      new(experiment: experiment, reviewer_ids: reviewer_ids).call
+    def self.call(experiment:, reviewer_ids:, capability_snapshots: {})
+      new(experiment: experiment, reviewer_ids: reviewer_ids, capability_snapshots: capability_snapshots).call
     end
 
-    def initialize(experiment:, reviewer_ids:, randomizer: nil)
+    def initialize(experiment:, reviewer_ids:, randomizer: nil, capability_snapshots: {})
       @experiment = experiment
       @reviewer_ids = reviewer_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
+      @capability_snapshots = capability_snapshots
     end
 
     def call
       validate_experiment!
       reviewers = resolve_reviewers!
+      plan = LongDocuments::Planner.call(experiment, create: false)
 
       review_round, schedules = ReviewRound.transaction do
         experiment.lock!
@@ -30,16 +33,20 @@ module BlindReviews
         if experiment.review_round
           [ existing_round_for!(reviewers), [] ]
         else
-          create_round!(reviewers, candidates)
+          create_round!(reviewers, candidates, plan)
         end
       end
       Ai::RunScheduler.enqueue_all(schedules)
       review_round
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError, error.message
+    rescue LongDocuments::Planner::SourceChangedError => error
+      raise ContextBudgetError, error.message
     end
 
     private
 
-    attr_reader :experiment, :reviewer_ids, :randomizer
+    attr_reader :capability_snapshots, :experiment, :reviewer_ids, :randomizer
 
     def validate_experiment!
       raise ActiveRecord::RecordNotSaved, "Experiment must be persisted" unless experiment.persisted?
@@ -93,7 +100,7 @@ module BlindReviews
             "A blind review round already exists for this experiment"
     end
 
-    def create_round!(reviewers, candidates)
+    def create_round!(reviewers, candidates, plan)
       review_round = experiment.create_review_round!(status: :running)
       schedules = []
 
@@ -105,7 +112,37 @@ module BlindReviews
             anonymous_label: CandidateLabel.for(index)
           )
         end
-        schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob)
+        if plan
+          review_run.update!(status: :running, started_at: Time.current)
+          plan.segments.each do |segment|
+            prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment)
+            budget = TranslationReferences::ContextBudget.call(
+              experiment: experiment,
+              model: reviewer,
+              stage: :review,
+              source_character_count: experiment.document.source_text.length,
+              capability_snapshot: capability_snapshots[reviewer.id],
+              prompt: prompt
+            ) { BlindReviews::Prompt.build(review_run, experiment_segment: segment, reference_examples: []) }
+            segment_run = review_run.review_segment_runs.create!(
+              experiment_segment: segment,
+              **budget.snapshot_attributes
+            )
+            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: ReviewSegmentRunJob)
+          end
+        else
+          prompt = BlindReviews::Prompt.build(review_run)
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: experiment,
+            model: reviewer,
+            stage: :review,
+            source_character_count: experiment.document.source_text.length,
+            capability_snapshot: capability_snapshots[reviewer.id],
+            prompt: prompt
+          ) { BlindReviews::Prompt.build(review_run, reference_examples: []) }
+          review_run.assign_attributes(**budget.snapshot_attributes)
+          schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob)
+        end
       end
 
       [ review_round, schedules ]

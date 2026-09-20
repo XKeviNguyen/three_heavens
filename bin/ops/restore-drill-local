@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+begin
+  ENV["RAILS_ENV"] ||= "test"
+  require_relative "../../config/environment"
+
+  result = Operations::Restore::LocalDrill.call
+  puts "Disposable restore drill complete"
+  puts "Blobs: #{result.blob_count}"
+  puts "Attachments: #{result.attachment_count}"
+  puts "Document sources: #{result.document_count}"
+  puts "Critical problems: #{result.critical_count}"
+  puts "Warnings: #{result.warning_count}"
+  exit 0
+rescue StandardError
+  warn "Disposable restore drill failed safely."
+  exit 1
+end

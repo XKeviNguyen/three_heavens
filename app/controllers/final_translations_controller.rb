@@ -1,4 +1,5 @@
 class FinalTranslationsController < ApplicationController
+  HISTORY_PAGE_SIZE = 25
   before_action :set_final_translation, except: :create
 
   def create
@@ -24,9 +25,12 @@ class FinalTranslationsController < ApplicationController
     redirect_to @final_translation, notice: "Revision saved."
   rescue FinalTranslations::StaleVersionError => error
     @submitted_content = attributes&.fetch("content", "")
+    @submitted_change_note = attributes&.fetch("change_note", nil)
+    @stale_save_conflict = true
     render_workspace_error(error, :conflict)
   rescue FinalTranslations::InvalidStateError, ActionController::ParameterMissing => error
     @submitted_content = attributes&.fetch("content", "")
+    @submitted_change_note = attributes&.fetch("change_note", nil)
     render_workspace_error(error, :unprocessable_content)
   end
 
@@ -116,19 +120,52 @@ class FinalTranslationsController < ApplicationController
   def load_workspace
     @final_translation = current_user.final_translations.includes(
       :current_version,
-      :source_winner_translation_run,
-      experiment: { document: :project },
-      judge_round: :review_round,
-      versions: { source_finalization_run: :finalizer_llm_model },
-      finalization_rounds: [
-        :base_version,
-        { finalization_runs: :finalizer_llm_model }
-      ]
+      { source_winner_translation_run: :llm_model },
+      experiment: [
+        { document: :project },
+        { glossary_revision: [ :glossary, :entries ] },
+        { methodology_profile_revision: :methodology_profile },
+        { experiment_reference_revisions: :translation_reference_revision }
+      ],
+      judge_round: :review_round
     ).find(@final_translation.id)
+    versions_scope = @final_translation.versions.reorder(version_number: :desc)
+    versions_page, @versions_pagination = paginated_history(versions_scope, page_param: :version_page)
+    @versions = versions_page.includes(source_finalization_run: :finalizer_llm_model).to_a
+    rounds_scope = @final_translation.finalization_rounds.order(created_at: :desc, id: :desc)
+    rounds_page, @finalization_pagination = paginated_history(rounds_scope, page_param: :refinement_page)
+    @finalization_rounds = rounds_page
+      .includes(:base_version, finalization_runs: [ :finalizer_llm_model, :finalization_segment_runs ])
+      .to_a
+    @has_running_refinement = @final_translation.finalization_rounds.running.exists?
+    visible_run_ids = @finalization_rounds.flat_map { |round| round.finalization_runs.map(&:id) }
+    @applied_versions_by_run = @final_translation.versions
+      .where(source_finalization_run_id: visible_run_ids)
+      .group_by(&:source_finalization_run_id)
     @finalizer_models = LlmModel.active_openrouter.order(:display_name, :id)
     winner = @final_translation.source_winner_translation_run
     @winner_review_evaluations = winner.review_evaluations.includes(:review_run).order(:created_at, :id)
     @winner_judge_evaluations = winner.judge_evaluations.includes(:judge_run).order(:created_at, :id)
+  end
+
+  def paginated_history(scope, page_param:)
+    total_count = scope.count
+    total_pages = [ (total_count.to_f / HISTORY_PAGE_SIZE).ceil, 1 ].max
+    current_page = normalized_history_page(params[page_param], total_pages)
+    pagination = {
+      current_page: current_page,
+      total_pages: total_pages,
+      total_count: total_count
+    }
+    page = scope.offset((current_page - 1) * HISTORY_PAGE_SIZE).limit(HISTORY_PAGE_SIZE)
+    [ page, pagination ]
+  end
+
+  def normalized_history_page(value, total_pages)
+    requested = Integer(value.presence || 1, 10)
+    requested.clamp(1, total_pages)
+  rescue ArgumentError, TypeError
+    1
   end
 
   def render_workspace_error(error, status)

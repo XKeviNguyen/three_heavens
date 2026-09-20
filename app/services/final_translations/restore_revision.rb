@@ -23,7 +23,7 @@ module FinalTranslations
 
         source = final_translation.versions.find(version_id)
         current = final_translation.current_version
-        return current if current.content == source.content
+        return current if equivalent_revision?(current, source)
 
         unless current.version_number == expected_version_number
           raise StaleVersionError, "The draft changed before this revision could be restored"
@@ -33,8 +33,12 @@ module FinalTranslations
           version_number: final_translation.versions.maximum(:version_number).to_i + 1,
           content: source.content,
           origin: :restored,
+          segment_alignment_valid: source.segment_alignment_valid,
           change_note: "Restored from version #{source.version_number}"
         )
+        source.segments.each do |segment|
+          restored.segments.create!(experiment_segment: segment.experiment_segment, content: segment.content)
+        end
         final_translation.update!(current_version: restored)
         restored
       end
@@ -43,5 +47,15 @@ module FinalTranslations
     private
 
     attr_reader :expected_version_number, :final_translation, :version_id
+
+    def equivalent_revision?(current, source)
+      current.content == source.content &&
+        current.segment_alignment_valid? == source.segment_alignment_valid? &&
+        segment_contents(current) == segment_contents(source)
+    end
+
+    def segment_contents(version)
+      version.segments.map { |segment| [ segment.experiment_segment_id, segment.content ] }
+    end
   end
 end

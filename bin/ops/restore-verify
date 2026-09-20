@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+begin
+  ENV["RAILS_ENV"] ||= "production"
+  require_relative "../../config/environment"
+
+  result = Operations::Restore::Verification.call(
+    bundle_path: ARGV.fetch(0, ""),
+    database_url: ENV["RESTORE_DATABASE_URL"],
+    storage_path: ENV["RESTORE_STORAGE_PATH"]
+  )
+  integrity = result.integrity
+  puts "Restore verification complete"
+  puts "Blobs: #{integrity.blob_count}"
+  puts "Attachments: #{integrity.attachment_count}"
+  puts "Disk objects found: #{integrity.found_disk_objects}"
+  puts "Missing disk objects: #{integrity.missing_disk_objects}"
+  puts "Unreferenced disk objects: #{integrity.unreferenced_disk_objects}"
+  puts "Critical problems: #{integrity.critical_count}"
+  puts "Warnings: #{integrity.warning_count}"
+  exit 0
+rescue StandardError
+  warn "Restore verification failed safely. No live database or storage was replaced."
+  exit 1
+end

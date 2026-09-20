@@ -4,18 +4,24 @@ module Operations
       "Translations" => TranslationRun,
       "Reviews" => ReviewRun,
       "Judgments" => JudgeRun,
-      "Finalizations" => FinalizationRun
+      "Finalizations" => FinalizationRun,
+      "Translation segments" => TranslationSegmentRun,
+      "Review segments" => ReviewSegmentRun,
+      "Judge segments" => JudgeSegmentRun,
+      "Finalization segments" => FinalizationSegmentRun
     }.freeze
     STATUSES = %w[pending running failed].freeze
     FAILURE_WINDOW = 7.days
     FAILURE_LIMIT = 20
     SAFE_FAILURE_CODES = %w[
-      enqueue_failed invalid_response malformed_json missing_api_key model_unavailable
-      network_error provider_failure stale_execution stale_pending
+      context_budget_exceeded enqueue_failed invalid_response malformed_json missing_api_key
+      model_capability_unconfigured model_unavailable network_error provider_failure
+      response_too_large segment_execution_failed stale_execution stale_pending
+      translated_document_too_large translated_segment_too_large
     ].freeze
     HTTP_FAILURE_CODE = /\A(?:http_)?([45]\d{2})\z/
 
-    Snapshot = Data.define(:workflows, :failure_codes, :stale_threshold_minutes)
+    Snapshot = Data.define(:workflows, :failure_codes, :stale_threshold_minutes, :pipelines)
 
     def self.call(now: Time.current)
       cutoff = Ai::StaleExecutionPolicy.cutoff(now: now)
@@ -48,7 +54,8 @@ module Operations
       Snapshot.new(
         workflows: workflows.freeze,
         failure_codes: failure_codes.freeze,
-        stale_threshold_minutes: (Ai::StaleExecutionPolicy.threshold / 1.minute).to_i
+        stale_threshold_minutes: (Ai::StaleExecutionPolicy.threshold / 1.minute).to_i,
+        pipelines: pipeline_summary(now)
       )
     end
 
@@ -60,5 +67,18 @@ module Operations
       http_status ? "http_#{http_status}" : "provider_failure"
     end
     private_class_method :safe_failure_code
+
+    def self.pipeline_summary(now)
+      counts = PipelineRun.group(:status).count
+      {
+        running_count: counts.fetch("running", 0),
+        blocked_count: counts.fetch("blocked", 0),
+        ready_for_editor_count: counts.fetch("ready_for_editor", 0),
+        configuration_blocked_count: PipelineRun.blocked.where(blocked_reason_code: "configuration_unavailable").count,
+        by_stage: PipelineRun.where(status: %w[running blocked]).group(:current_stage).count.sort.to_h,
+        oldest_running_age_seconds: PipelineRun.running.minimum(:started_at)&.then { |started_at| (now - started_at).to_i }
+      }.freeze
+    end
+    private_class_method :pipeline_summary
   end
 end

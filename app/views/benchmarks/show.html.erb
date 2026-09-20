@@ -56,11 +56,11 @@
     <p class="mt-2 text-sm leading-6 text-slate-600">OpenRouter may serve a different resolved identifier than the requested catalog model. Unknown/unreported values are kept explicit. Cost totals below include completed translations with reported cost.</p>
     <div class="mt-5 overflow-x-auto">
       <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-        <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-3 py-3">Resolved identifier</th><th class="px-3 py-3">Runs</th><th class="px-3 py-3">Completed</th><th class="px-3 py-3">Wins</th><th class="px-3 py-3">Judge score</th><th class="px-3 py-3">Known cost</th></tr></thead>
+        <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-3 py-3">Resolved identifier</th><th scope="col" class="px-3 py-3">Runs</th><th scope="col" class="px-3 py-3">Completed</th><th scope="col" class="px-3 py-3">Wins</th><th scope="col" class="px-3 py-3">Judge score</th><th scope="col" class="px-3 py-3">Known cost</th></tr></thead>
         <tbody class="divide-y divide-slate-100">
           <% @history.resolved_models.each do |resolved| %>
             <tr>
-              <th class="px-3 py-4 font-mono text-xs text-slate-800"><%= resolved.resolved_model_identifier || "Unknown/unreported" %></th>
+              <th scope="row" class="px-3 py-4 font-mono text-xs text-slate-800"><%= resolved.resolved_model_identifier || "Unknown/unreported" %></th>
               <td class="px-3 py-4"><%= resolved.sample_count %></td>
               <td class="px-3 py-4"><%= resolved.completed_count %></td>
               <td class="px-3 py-4"><%= resolved.official_wins %></td>

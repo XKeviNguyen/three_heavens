@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+
+begin
+  ENV["RAILS_ENV"] ||= "production"
+  require_relative "../../config/environment"
+
+  base_url = ARGV.first.presence || ENV["SMOKE_BASE_URL"].presence || "https://#{ENV.fetch('APP_HOST')}"
+  result = Operations::PostDeploySmoke.call(base_url: base_url)
+  result.checks.each { |check| puts "#{check.name}: #{check.status}" }
+  puts(result.successful? ? "Post-deploy smoke passed" : "Post-deploy smoke failed")
+  exit(result.successful? ? 0 : 1)
+rescue StandardError
+  warn "Post-deploy smoke failed safely."
+  exit 1
+end

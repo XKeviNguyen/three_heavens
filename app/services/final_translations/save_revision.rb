@@ -30,6 +30,7 @@ module FinalTranslations
           version_number: next_version_number,
           content: content,
           origin: :manual,
+          segment_alignment_valid: final_translation.experiment.document_execution_plan.nil?,
           change_note: change_note
         )
         final_translation.update!(current_version: version)

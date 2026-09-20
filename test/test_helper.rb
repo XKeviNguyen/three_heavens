@@ -12,7 +12,11 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
-    # Add more helper methods to be used by all tests here...
+    # Terminal history is database-sealed. A few presentation/query tests need
+    # intentionally malformed historical fixtures without weakening production.
+    def mutate_historical_fixture(&block)
+      ActiveRecord::Base.connection.disable_referential_integrity(&block)
+    end
   end
 end
 
@@ -29,6 +33,10 @@ module AuthenticationTestHelper
 
   def sign_out
     delete session_path
+  end
+
+  def issue_translation_workspace_token(user: users(:normal), at: Time.current)
+    TranslationWorkspaceSubmission.issue!(user: user, at: at).public_token
   end
 
   private

@@ -2,7 +2,7 @@
               url: llm_model.new_record? ? settings_models_path : settings_model_path(llm_model),
               class: "space-y-6" do |form| %>
   <% if llm_model.errors.any? %>
-    <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="model-form-errors-heading">
+    <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="model-form-errors-heading" role="alert">
       <h2 id="model-form-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
         <% llm_model.errors.each do |error| %>
@@ -33,11 +33,21 @@
           <p class="mt-2 text-xs text-slate-500">Use the OpenRouter catalog identifier. It becomes immutable after first historical use.</p>
         <% end %>
       </div>
+      <div>
+        <%= form.label :context_window_tokens, "Context window (tokens)", class: "block text-sm font-medium text-slate-700" %>
+        <%= form.number_field :context_window_tokens, min: LlmModel::MIN_CONTEXT_WINDOW_TOKENS, max: LlmModel::MAX_CONTEXT_WINDOW_TOKENS, step: 1, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        <p class="mt-2 text-xs text-slate-500">Required for long-document planning. Leave blank only for conservative small-document compatibility.</p>
+      </div>
+      <div>
+        <%= form.label :max_output_tokens, "Maximum output (tokens)", class: "block text-sm font-medium text-slate-700" %>
+        <%= form.number_field :max_output_tokens, min: LlmModel::MIN_OUTPUT_TOKENS, max: LlmModel::MAX_OUTPUT_TOKENS, step: 1, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+        <p class="mt-2 text-xs text-slate-500">This capability must satisfy the full stage-specific completion reserve or provider work fails before scheduling.</p>
+      </div>
     </div>
   </section>
 
   <div class="flex flex-wrap items-center justify-between gap-4">
     <%= link_to "Cancel", settings_models_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %>
-    <%= form.submit llm_model.new_record? ? "Add active model" : "Save metadata", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800" %>
+    <%= form.submit llm_model.new_record? ? "Add active model" : "Save metadata", class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800", data: { turbo_submits_with: "Saving model…" } %>
   </div>
 <% end %>

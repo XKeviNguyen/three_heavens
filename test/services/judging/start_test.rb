@@ -62,12 +62,12 @@ class Judging::StartTest < ActiveSupport::TestCase
 
   test "rejects incomplete review and experiment lifecycle states" do
     %i[pending running failed].each do |status|
-      @review_round.update_column(:status, status)
+      mutate_historical_fixture { @review_round.update_column(:status, status) }
       assert_raises Judging::Start::InvalidReviewStateError do
         start_with(@judges.first)
       end
     end
-    @review_round.update_column(:status, "completed")
+    mutate_historical_fixture { @review_round.update_column(:status, "completed") }
     @review_round.experiment.update!(status: :running)
     assert_raises Judging::Start::InvalidReviewStateError do
       start_with(@judges.first)
@@ -76,14 +76,14 @@ class Judging::StartTest < ActiveSupport::TestCase
 
   test "requires two candidates and complete correctly mapped review feedback" do
     candidate = @review_round.experiment.translation_runs.second
-    candidate.update!(translated_text: "")
+    mutate_historical_fixture { candidate.update!(translated_text: "") }
     assert_raises Judging::Start::InsufficientCandidatesError do
       start_with(@judges.first)
     end
 
-    candidate.update!(translated_text: "Restored")
+    mutate_historical_fixture { candidate.update!(translated_text: "Restored") }
     evaluation = @review_round.review_runs.first.review_evaluations.second
-    evaluation.update_column(:overall_score, nil)
+    mutate_historical_fixture { evaluation.update_column(:overall_score, nil) }
     assert_raises Judging::Start::IncompleteReviewDataError do
       start_with(@judges.first)
     end
@@ -101,16 +101,14 @@ class Judging::StartTest < ActiveSupport::TestCase
     end
   end
 
-  test "rejects cross-experiment review mappings" do
+  test "database rejects cross-experiment review mappings" do
     other_review = create_completed_review_round(candidate_texts: [ "Other one", "Other two" ])
     evaluation = @review_round.review_runs.first.review_evaluations.first
-    evaluation.update_column(
-      :translation_run_id,
-      other_review.experiment.translation_runs.first.id
-    )
-
-    assert_raises Judging::Start::IncompleteReviewDataError do
-      start_with(@judges.first)
+    assert_raises ActiveRecord::StatementInvalid do
+      evaluation.update_column(
+        :translation_run_id,
+        other_review.experiment.translation_runs.first.id
+      )
     end
   end
 

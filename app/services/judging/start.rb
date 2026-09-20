@@ -6,20 +6,23 @@ module Judging
     class IncompleteReviewDataError < Error; end
     class InvalidJudgeSelectionError < Error; end
     class AlreadyStartedError < Error; end
+    class ContextBudgetError < Error; end
 
-    def self.call(review_round:, judge_ids:)
-      new(review_round: review_round, judge_ids: judge_ids).call
+    def self.call(review_round:, judge_ids:, capability_snapshots: {})
+      new(review_round: review_round, judge_ids: judge_ids, capability_snapshots: capability_snapshots).call
     end
 
-    def initialize(review_round:, judge_ids:, randomizer: nil)
+    def initialize(review_round:, judge_ids:, randomizer: nil, capability_snapshots: {})
       @review_round = review_round
       @judge_ids = judge_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
+      @capability_snapshots = capability_snapshots
     end
 
     def call
       validate_review_round!
       judges = resolve_judges!
+      plan = LongDocuments::Planner.call(review_round.experiment, create: false)
 
       judge_round, schedules = JudgeRound.transaction do
         review_round.experiment.lock!
@@ -33,16 +36,20 @@ module Judging
         if review_round.judge_round
           [ existing_round_for!(judges), [] ]
         else
-          create_round!(judges, candidates)
+          create_round!(judges, candidates, plan)
         end
       end
       Ai::RunScheduler.enqueue_all(schedules)
       judge_round
+    rescue Ai::ContextBudget::Error => error
+      raise ContextBudgetError, error.message
+    rescue LongDocuments::Planner::SourceChangedError => error
+      raise ContextBudgetError, error.message
     end
 
     private
 
-    attr_reader :judge_ids, :randomizer, :review_round
+    attr_reader :capability_snapshots, :judge_ids, :randomizer, :review_round
 
     def validate_review_round!
       unless review_round.persisted? && review_round.experiment.persisted?
@@ -115,7 +122,7 @@ module Judging
             "A judge round already exists for this blind review"
     end
 
-    def create_round!(judges, candidates)
+    def create_round!(judges, candidates, plan)
       judge_round = review_round.create_judge_round!(status: :running)
       schedules = []
 
@@ -127,7 +134,37 @@ module Judging
             anonymous_label: BlindReviews::CandidateLabel.for(index)
           )
         end
-        schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob)
+        if plan
+          judge_run.update!(status: :running, started_at: Time.current)
+          plan.segments.each do |segment|
+            prompt = Judging::Prompt.build(judge_run, experiment_segment: segment)
+            budget = TranslationReferences::ContextBudget.call(
+              experiment: review_round.experiment,
+              model: judge,
+              stage: :judge,
+              source_character_count: review_round.experiment.document.source_text.length,
+              capability_snapshot: capability_snapshots[judge.id],
+              prompt: prompt
+            ) { Judging::Prompt.build(judge_run, experiment_segment: segment, reference_examples: []) }
+            segment_run = judge_run.judge_segment_runs.create!(
+              experiment_segment: segment,
+              **budget.snapshot_attributes
+            )
+            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: JudgeSegmentRunJob)
+          end
+        else
+          prompt = Judging::Prompt.build(judge_run)
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: review_round.experiment,
+            model: judge,
+            stage: :judge,
+            source_character_count: review_round.experiment.document.source_text.length,
+            capability_snapshot: capability_snapshots[judge.id],
+            prompt: prompt
+          ) { Judging::Prompt.build(judge_run, reference_examples: []) }
+          judge_run.assign_attributes(**budget.snapshot_attributes)
+          schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob)
+        end
       end
 
       [ judge_round, schedules ]

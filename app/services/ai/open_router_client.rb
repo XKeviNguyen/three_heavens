@@ -9,6 +9,13 @@ module Ai
     DEFAULT_OPEN_TIMEOUT = 5
     DEFAULT_READ_TIMEOUT = 60
     DEFAULT_WRITE_TIMEOUT = 10
+    MAX_RESPONSE_BYTES = 1_048_576
+    CONTEXT_COMPRESSION_DISABLED = [
+      { id: "context-compression", enabled: false }.freeze
+    ].freeze
+    ACCEPTED_FINISH_REASON = "stop"
+
+    BoundedResponse = Data.define(:code, :body)
 
     Result = Data.define(
       :content,
@@ -34,6 +41,16 @@ module Ai
     class RetryableError < Error; end
     class PermanentError < Error; end
 
+    def self.serialize_request(model_identifier:, messages:, **options)
+      request = {
+        model: model_identifier,
+        messages: messages,
+        usage: { include: true }
+      }.merge(options)
+      request[:plugins] = CONTEXT_COMPRESSION_DISABLED
+      JSON.generate(request)
+    end
+
     def initialize(
       http_factory: nil,
       open_timeout: DEFAULT_OPEN_TIMEOUT,
@@ -52,51 +69,55 @@ module Ai
       )
     end
 
-    def chat_completion(model_identifier:, instruction_prompt:, source_text:)
+    def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens: nil)
       response = perform_request(
         model_identifier: model_identifier,
         messages: [
           { role: "system", content: instruction_prompt },
           { role: "user", content: source_text }
-        ]
+        ],
+        **max_tokens_option(max_tokens)
       )
 
       parse_response(response)
     end
 
-    def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def review_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "blind_translation_review"
+        schema_name: "blind_translation_review",
+        max_tokens: max_tokens
       )
     end
 
-    def judge_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def judge_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "blind_translation_judgment"
+        schema_name: "blind_translation_judgment",
+        max_tokens: max_tokens
       )
     end
 
-    def finalization_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:)
+    def finalization_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, max_tokens: nil)
       structured_completion(
         model_identifier: model_identifier,
         system_prompt: system_prompt,
         user_prompt: user_prompt,
         response_schema: response_schema,
-        schema_name: "final_translation_refinement"
+        schema_name: "final_translation_refinement",
+        max_tokens: max_tokens
       )
     end
 
     private
 
-    def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:)
+    def structured_completion(model_identifier:, system_prompt:, user_prompt:, response_schema:, schema_name:, max_tokens:)
       response = perform_request(
         model_identifier: model_identifier,
         messages: [
@@ -111,7 +132,8 @@ module Ai
             schema: response_schema
           }
         },
-        provider: { require_parameters: true }
+        provider: { require_parameters: true },
+        **max_tokens_option(max_tokens)
       )
 
       parse_response(response)
@@ -121,10 +143,9 @@ module Ai
       request = Net::HTTP::Post.new(ENDPOINT)
       request["Authorization"] = "Bearer #{@api_key}"
       request["Content-Type"] = "application/json"
-      request.body = JSON.generate(
-        model: model_identifier,
+      request.body = self.class.serialize_request(
+        model_identifier: model_identifier,
         messages: messages,
-        usage: { include: true },
         **options
       )
 
@@ -133,7 +154,13 @@ module Ai
       http.open_timeout = @open_timeout
       http.read_timeout = @read_timeout
       http.write_timeout = @write_timeout if http.respond_to?(:write_timeout=)
-      http.start { |connection| connection.request(request) }
+      bounded_response = nil
+      raw_response = http.start do |connection|
+        connection.request(request) do |response|
+          bounded_response = read_bounded_response(response)
+        end
+      end
+      bounded_response || read_materialized_response(raw_response)
     rescue Net::OpenTimeout,
            Net::ReadTimeout,
            Net::WriteTimeout,
@@ -147,7 +174,42 @@ module Ai
       raise RetryableError.new(
         "OpenRouter network request failed: #{error.class}",
         code: "network_error"
+      ), cause: nil
+    end
+
+    def read_bounded_response(response)
+      validate_content_length!(response)
+      body = String.new(encoding: Encoding::BINARY)
+      response.read_body do |chunk|
+        raise_response_too_large! if chunk.bytesize > MAX_RESPONSE_BYTES - body.bytesize
+
+        body << chunk
+      end
+      BoundedResponse.new(code: response.code, body: body)
+    end
+
+    def read_materialized_response(response)
+      body = response.body.to_s
+      raise_response_too_large! if body.bytesize > MAX_RESPONSE_BYTES
+      BoundedResponse.new(code: response.code, body: body)
+    end
+
+    def validate_content_length!(response)
+      return unless response.respond_to?(:[])
+
+      length = Integer(response["content-length"], exception: false)
+      raise_response_too_large! if length && length > MAX_RESPONSE_BYTES
+    end
+
+    def raise_response_too_large!
+      raise PermanentError.new(
+        "OpenRouter response exceeded the safe size limit",
+        code: "response_too_large"
       )
+    end
+
+    def max_tokens_option(value)
+      value ? { max_tokens: Integer(value) } : {}
     end
 
     def parse_response(response)
@@ -155,10 +217,17 @@ module Ai
       body = parse_json(response.body, retryable: retryable_status?(status))
 
       unless status.between?(200, 299)
-        raise error_for_response(status, body)
+        raise error_for_response(status)
       end
 
       choice = body.fetch("choices").first
+      unless choice&.fetch("finish_reason", nil) == ACCEPTED_FINISH_REASON
+        raise PermanentError.new(
+          "The AI response was incomplete",
+          code: "incomplete_response"
+        )
+      end
+
       content = choice&.dig("message", "content")
       raise invalid_response("assistant content is missing") unless content.is_a?(String)
 
@@ -181,32 +250,28 @@ module Ai
         ),
         cost: optional_decimal(usage["cost"])
       )
-    rescue KeyError, NoMethodError, TypeError => error
-      raise invalid_response(error.message)
+    rescue KeyError, NoMethodError, TypeError
+      raise invalid_response("unexpected response shape"), cause: nil
     end
 
     def parse_json(body, retryable:)
       JSON.parse(body.to_s)
-    rescue JSON::ParserError => error
+    rescue JSON::ParserError
       error_class = retryable ? RetryableError : PermanentError
       raise error_class.new(
         "OpenRouter returned malformed JSON",
         code: "malformed_json"
-      ), cause: error
+      ), cause: nil
     end
 
-    def error_for_response(status, body)
-      provider_error = body["error"].is_a?(Hash) ? body["error"] : {}
-      code = provider_error["code"].presence || "http_#{status}"
-      detail = Ai::ErrorSanitizer.call(
-        provider_error["message"].presence || "request failed",
-        secrets: [ @api_key ]
-      )
+    def error_for_response(status)
+      # Provider errors may echo prompts, credentials, or reasoning. Only the
+      # HTTP status is safe to retain in job failures, logs, and owner pages.
       error_class = retryable_status?(status) ? RetryableError : PermanentError
 
       error_class.new(
-        "OpenRouter request failed (HTTP #{status}): #{detail}",
-        code: code.to_s.first(255)
+        "OpenRouter request failed (HTTP #{status})",
+        code: "http_#{status}"
       )
     end
 
@@ -226,7 +291,7 @@ module Ai
 
       Integer(value)
     rescue ArgumentError
-      raise invalid_response("invalid token count")
+      raise invalid_response("invalid token count"), cause: nil
     end
 
     def optional_decimal(value)
@@ -234,7 +299,7 @@ module Ai
 
       BigDecimal(value.to_s)
     rescue ArgumentError
-      raise invalid_response("invalid cost")
+      raise invalid_response("invalid cost"), cause: nil
     end
   end
 end

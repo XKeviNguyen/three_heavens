@@ -14,6 +14,11 @@ production:
     class: StaleAiWorkReconciliationJob
     queue: operations
     schedule: every 15 minutes
+  reconcile_authorized_pipelines:
+    class: PipelineReconciliationJob
+    queue: operations
+    args: [100]
+    schedule: every 10 minutes
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
@@ -21,3 +26,11 @@ production:
     class: SourceImportCleanupJob
     queue: operations
     schedule: every hour at minute 27
+  cleanup_abandoned_workspace_submissions:
+    class: TranslationWorkspaceSubmissionCleanupJob
+    queue: operations
+    schedule: every hour at minute 37
+  cleanup_unattached_active_storage_blobs:
+    class: ActiveStorageCleanupJob
+    queue: operations
+    schedule: every day at 2:47am
