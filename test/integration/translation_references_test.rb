@@ -69,6 +69,25 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_equal "DOCX approved", revisions[2].approved_translation
   end
 
+  test "an individually oversized file is rejected below the global two-file request ceiling" do
+    oversized = "a" * (SourceImports::Limits::MAX_UPLOAD_BYTES + 1)
+
+    assert_no_difference -> { TranslationReference.count } do
+      post translation_references_path, params: {
+        translation_reference: {
+          title: "Oversized source",
+          source_language: "Vietnamese",
+          target_language: "Japanese",
+          source_file: uploaded_file(oversized, filename: "oversized.txt", content_type: "text/plain"),
+          approved_translation: "Approved"
+        }
+      }
+    end
+
+    assert_response :unprocessable_content
+    assert_includes response.body, "10 MiB limit"
+  end
+
   test "ambiguous paste plus file and unsafe DOCX are rejected without AI work" do
     macro_docx = build_docx(entries: { "word/vbaProject.bin" => "macro" })
 

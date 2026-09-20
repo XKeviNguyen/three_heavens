@@ -76,7 +76,9 @@ class PipelineJobsTest < ActiveJob::TestCase
   test "least recently reconciled cursor prevents blocked rows from starving later recoverable work" do
     blocked = 3.times.map do
       experiment = completed_experiment
-      experiment.translation_runs.first.update!(status: :failed, translated_text: nil, completed_at: Time.current)
+      mutate_historical_fixture do
+        experiment.translation_runs.first.update!(status: :failed, translated_text: nil, completed_at: Time.current)
+      end
       experiment.update!(status: :failed)
       create_pipeline_run(experiment: experiment).tap do |pipeline|
         Pipelines::Advance.call(pipeline_run: pipeline)

@@ -213,9 +213,11 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
         recommended_corrections: "<b>correction</b>"
       )
     end
-    run.review_evaluations.first.translation_run.update!(
-      translated_text: "<script>candidate()</script>"
-    )
+    mutate_historical_fixture do
+      run.review_evaluations.first.translation_run.update!(
+        translated_text: "<script>candidate()</script>"
+      )
+    end
     run.update!(status: :completed, completed_at: Time.current)
     round.update!(status: :completed)
 
@@ -235,7 +237,9 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "Start blind cross-review", count: 0
 
     @experiment.update!(status: :completed)
-    @experiment.translation_runs.second.update!(translated_text: "")
+    mutate_historical_fixture do
+      @experiment.translation_runs.second.update!(translated_text: "")
+    end
     get experiment_path(@experiment)
     assert_select "h2", text: "Start blind cross-review", count: 0
   end

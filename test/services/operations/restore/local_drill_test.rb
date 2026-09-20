@@ -68,6 +68,23 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
         SELECT count(*) FROM pg_proc
         WHERE proname = 'methodology_revision_configuration_digest'
       SQL
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_proc
+        WHERE proname = 'prevent_segment_parent_lineage_change'
+      SQL
+      assert_equal 8, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_trigger
+        WHERE tgname IN (
+          'prevent_translation_runs_segment_parent_change',
+          'prevent_review_runs_segment_parent_change',
+          'prevent_review_rounds_segment_parent_change',
+          'prevent_judge_runs_segment_parent_change',
+          'prevent_judge_rounds_segment_parent_change',
+          'prevent_finalization_runs_segment_parent_change',
+          'prevent_finalization_rounds_segment_parent_change',
+          'prevent_final_translations_segment_parent_change'
+        ) AND NOT tgisinternal
+      SQL
     end
   ensure
     ActiveStorage::Blob.service = original_storage_service if original_storage_service

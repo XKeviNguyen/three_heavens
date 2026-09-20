@@ -4,6 +4,7 @@ class Operations::SystemHealthTest < ActiveSupport::TestCase
   test "reports independent generic health and bounded metrics" do
     snapshot = Operations::SystemHealth.call(
       primary_check: -> { 1 },
+      schema_check: -> { { pending_count: 0 } },
       cache_check: -> { raise "postgresql://user:password@private-cache" },
       queue_check: -> { { pending_count: 4, failed_count: 2, private_host: "secret" } },
       cable_check: -> { 1 },
@@ -25,6 +26,7 @@ class Operations::SystemHealthTest < ActiveSupport::TestCase
   test "reports healthy when all dependencies succeed" do
     snapshot = Operations::SystemHealth.call(
       primary_check: -> { 1 },
+      schema_check: -> { { pending_count: 0 } },
       cache_check: -> { 1 },
       queue_check: -> { { pending_count: 0, failed_count: 0 } },
       cable_check: -> { 1 },

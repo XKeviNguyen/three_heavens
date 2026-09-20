@@ -394,8 +394,10 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
   test "cost summary preserves unknown telemetry without join multiplication" do
     experiment = create_completed_experiment
     runs = experiment.translation_runs.order(:id)
-    runs.first.update!(cost: BigDecimal("0.25"), cost_complete: true)
-    runs.second.update!(cost: nil, cost_complete: false)
+    mutate_historical_fixture do
+      runs.first.update!(cost: BigDecimal("0.25"), cost_complete: true)
+      runs.second.update!(cost: nil, cost_complete: false)
+    end
 
     summary = Pipelines::CostSummary.call(experiment: experiment)
     assert_equal BigDecimal("0.25"), summary.known_cost
@@ -404,7 +406,7 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     assert_equal 2, summary.record_count
     assert summary.incomplete?
 
-    runs.update_all(cost: nil, cost_complete: false)
+    mutate_historical_fixture { runs.update_all(cost: nil, cost_complete: false) }
     all_unknown = Pipelines::CostSummary.call(experiment: experiment)
     assert_nil all_unknown.known_cost
     assert_equal 0, all_unknown.known_count
@@ -473,7 +475,9 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
 
   def create_failed_experiment
     experiment = create_completed_experiment
-    experiment.translation_runs.first.update!(status: :failed, translated_text: nil, completed_at: Time.current)
+    mutate_historical_fixture do
+      experiment.translation_runs.first.update!(status: :failed, translated_text: nil, completed_at: Time.current)
+    end
     experiment.update!(status: :failed)
     experiment
   end

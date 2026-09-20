@@ -17,6 +17,7 @@ module Operations
 
     def initialize(
       primary_check: -> { ActiveRecord::Base.connection.select_value("SELECT 1") },
+      schema_check: -> { schema_metrics },
       cache_check: -> { SolidCache::Entry.connection.select_value("SELECT 1") },
       queue_check: -> { queue_metrics },
       cable_check: -> { SolidCable::Message.connection.select_value("SELECT 1") },
@@ -24,6 +25,7 @@ module Operations
     )
       @checks = {
         "primary_database" => primary_check,
+        "schema_migrations" => schema_check,
         "cache_database" => cache_check,
         "queue_database" => queue_check,
         "cable_database" => cable_check,
@@ -66,6 +68,11 @@ module Operations
         pending_count: SolidQueue::ReadyExecution.limit(MAX_QUEUE_METRIC + 1).count,
         failed_count: SolidQueue::FailedExecution.limit(MAX_QUEUE_METRIC + 1).count
       }
+    end
+
+    def schema_metrics
+      pending = ActiveRecord::Base.connection_pool.migration_context.needs_migration?
+      { pending_count: pending ? 1 : 0, status: pending ? "unavailable" : "healthy" }
     end
 
     def storage_metrics

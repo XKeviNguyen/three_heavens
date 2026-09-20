@@ -12,7 +12,11 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
-    # Add more helper methods to be used by all tests here...
+    # Terminal history is database-sealed. A few presentation/query tests need
+    # intentionally malformed historical fixtures without weakening production.
+    def mutate_historical_fixture(&block)
+      ActiveRecord::Base.connection.disable_referential_integrity(&block)
+    end
   end
 end
 

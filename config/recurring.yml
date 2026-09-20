@@ -30,3 +30,7 @@ production:
     class: TranslationWorkspaceSubmissionCleanupJob
     queue: operations
     schedule: every hour at minute 37
+  cleanup_unattached_active_storage_blobs:
+    class: ActiveStorageCleanupJob
+    queue: operations
+    schedule: every day at 2:47am

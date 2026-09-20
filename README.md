@@ -87,7 +87,7 @@ With `SOLID_QUEUE_IN_PUMA=true`, the production Puma process supervises Solid Qu
 
 Authenticated owners may paste source text or upload `.txt`, `.md`, and `.docx` source files. Legacy `.doc`, `.docm`, RTF, HTML, ODT, PDF, images, and directly supplied archives are intentionally unsupported. PDF parsing and OCR require a separate security and product design.
 
-Uploads are limited by the application to 10 MiB, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). Kamal Proxy accepts request bodies up to 12 MiB so a 10 MiB upload plus multipart framing can reach the authoritative application check. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
+Uploads are limited by the application to 10 MiB per file, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). The Translation Reference form supports two files in one request, so Kamal Proxy accepts request bodies up to 21 MiB: two 10 MiB files plus 1 MiB of bounded multipart overhead. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
 
 DOCX processing accepts genuine macro-free WordprocessingML packages only. The package declaration, main-document relationship, content types, internal relationship targets, and extension/MIME/magic-byte agreement are validated before text is accepted. Processing uses a bounded ZIP reader in memory: at most 500 entries, 50 MiB declared total expansion, 16 MiB across relevant XML, 8 MiB for the main document, 2 MiB per secondary Word text part, and 1 MiB per relationships part, with duplicate/ambiguous names, traversal variants, encrypted entries, macros, embedded objects, unsafe external relationships, and suspicious compression rejected. XML parsing is strict, DTD-free, and network-disabled.
 
@@ -100,6 +100,15 @@ Original uploads are private. Downloads pass application owner authorization, us
 ```sh
 bin/rails source_imports:cleanup
 ```
+
+Durable Projects, Documents, workflow snapshots, AI results, final translations, and final-version history are intentionally retained; Three Heavens does not silently expire user translation history. Temporary workspace submissions and SourceImports expire after 24 hours. Unattached Active Storage blobs older than seven days are collected once daily in bounded, lock-and-recheck batches, while any attached Document or SourceImport blob is preserved. Both maintenance tasks below are dry-run by default; set `EXECUTE=1` only after reviewing aggregate counts:
+
+```sh
+bin/rails backend:cleanup_unattached_blobs
+BEFORE=2026-01-01T00:00:00Z bin/rails backend:remediate_legacy_errors
+```
+
+The legacy-error task examines only failed AI runs before the explicit cutoff, never prints stored error content, replaces at most 100 rows per invocation by default with a fixed safe message, and is idempotent. Use `BATCH_SIZE` to select a smaller batch or at most 1,000 rows. Repository-controlled structured operational events go to standard output and contain only allowlisted bounded fields; production log retention belongs to the deployment log collector and must be configured there rather than by deleting durable product records.
 
 Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or as a clean macro-free OOXML DOCX generated solely from the authoritative final text. TXT contains exactly the stored text with no BOM or added prose. DOCX preserves Unicode, LF paragraph/blank-line semantics, tabs, and XML whitespace, and contains a small app-generated style plus safe core metadata; it never copies the uploaded package, relationships, provider data, or hidden private content. Three Heavens' generated DOCX subset round-trips through its importer to the same normalized text. Exports are generated on demand and are not stored.
 
@@ -115,6 +124,8 @@ Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or ex
 The authoritative recovery set is the primary PostgreSQL database plus private Active Storage files. Cache and cable are rebuildable; the queue database is rebuilt empty during disaster recovery so old paid-work jobs are not blindly replayed. Create a versioned checksum-protected bundle with `bin/ops/backup /absolute/backup-root`, verify an isolated restore with `RESTORE_DATABASE_URL` and `RESTORE_STORAGE_PATH` plus `bin/ops/restore-verify BUNDLE_PATH`, and preview/execute local completed-bundle retention with `bin/ops/backup-prune`.
 
 Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
+
+The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
 
 Detailed executable procedures are in:
 
