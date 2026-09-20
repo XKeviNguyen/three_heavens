@@ -59,6 +59,17 @@ export default class extends Controller {
     this.select(event.currentTarget)
   }
 
+  toggle(event) {
+    event.preventDefault()
+    if (this.listTarget.classList.contains("hidden")) {
+      this.filter()
+      this.open()
+      this.inputTarget.focus()
+    } else {
+      this.close()
+    }
+  }
+
   move(delta) {
     if (this.listTarget.classList.contains("hidden")) this.filter()
     if (this.visibleOptions.length === 0) return

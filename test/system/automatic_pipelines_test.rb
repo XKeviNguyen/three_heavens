@@ -51,14 +51,14 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     fill_workspace
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: false
-    choose "Automatic pipeline"
+    choose "Automatic"
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: false
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
     click_button "Start translation"
     assert_text "Automatic confirmation must be accepted for each launch"
-    assert_field "Automatic pipeline", checked: true
+    assert_field "Automatic", checked: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     assert_equal 0, PipelineRun.count
 

@@ -61,7 +61,7 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "Add a translation to this Project"
-    assert_select "p", text: "Klingon → Japanese"
+    assert_select "#workspace-source-languages", text: /Klingon.*Japanese/
     assert_select "input[name='translation_workspace[source_language]']", count: 0
   end
 end

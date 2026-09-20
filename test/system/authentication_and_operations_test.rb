@@ -53,7 +53,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   test "owner uploads previews edits and consumes a TXT source without AI during preview" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     click_button "Upload file"
-    assert_text "Upload a source file"
+    assert_text "Drop a file here"
 
     source = Tempfile.new([ "browser-source", ".txt" ])
     source.binmode
@@ -63,7 +63,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_no_enqueued_jobs only: TranslationRunJob do
       attach_file "Source file", source.path
       click_button "Upload and review"
-      assert_text "Uploaded source ready for review"
+      assert_text "imported successfully"
       assert_field "Reviewed source text", with: "Browser upload\n日本語"
     end
 
@@ -92,6 +92,32 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
   test "normal pasted source workflow still starts an experiment" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
+    create_browser_glossary
+    FileUtils.mkdir_p(Rails.root.join("tmp/ux_review"))
+
+    page.current_window.resize_to(1440, 1000)
+    visit root_path
+    assert_selector "aside#app-sidebar", visible: true
+    assert_selector "aside#app-sidebar", text: "Three Heavens"
+    assert_no_selector "button[data-action='sidebar#open']", visible: true
+    page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-new-translation.png"))
+
+    find("input[name='translation_workspace[source_language]']").click
+    assert_selector "li[role='option'][data-value='Japanese']", visible: true
+    find("input[name='translation_workspace[target_language]']").click
+    assert_selector "li[role='option'][data-value='Vietnamese']", visible: true
+
+    assert_selector "#workspace-manual-models div[role='option']", minimum: 10
+    assert_selector "#workspace-manual-models button", text: "Add", minimum: 1
+    scroll_to find("#workspace-manual-models")
+    page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-model-browser.png"))
+
+    first("#workspace-glossary a", text: "Edit terminology").click
+    assert_selector "input[name='glossary[entries][][source_term]']", visible: true
+    scroll_to find("#workspace-glossary")
+    page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-terminology.png"))
+    click_link "Cancel"
+
     fill_in "Project name", with: "Pasted browser project"
     fill_in "Source language", with: "Vietnamese"
     fill_in "Target language", with: "Japanese"
@@ -121,6 +147,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
       overflow = page.evaluate_script("document.documentElement.scrollWidth - document.documentElement.clientWidth")
       assert_operator overflow, :<=, 0, "Expected no horizontal overflow at #{width}px, saw #{overflow}px"
       page.save_screenshot(Rails.root.join("tmp/screenshots/responsive-#{width}.png"))
+      page.save_screenshot(Rails.root.join("tmp/ux_review/tablet-1024.png")) if width == 1024
+      page.save_screenshot(Rails.root.join("tmp/ux_review/mobile-375.png")) if width == 375
     end
 
     page.current_window.resize_to(320, 844)
@@ -131,6 +159,22 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_no_selector "aside#app-sidebar", visible: true
     assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
     page.current_window.resize_to(1400, 1000)
+  end
+
+  def create_browser_glossary
+    Glossaries::Create.call(
+      user: users(:normal),
+      attributes: {
+        name: "Japanese Sermon Terms",
+        description: "Browser review glossary",
+        source_language: "Vietnamese",
+        target_language: "Japanese",
+        entries: [
+          { source_term: "Đức Thánh Linh", preferred_target_term: "聖霊なる神", note: "" },
+          { source_term: "Ngôi Lời", preferred_target_term: "御言なる神", note: "" }
+        ]
+      }
+    )
   end
 
   test "owner edits approves reopens and downloads a final translation without provider work" do

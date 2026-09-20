@@ -18,11 +18,11 @@
     <h2 class="text-lg font-semibold text-slate-950">Search OpenRouter</h2>
     <p class="mt-1 text-sm text-slate-600">Find a compatible text model and add it with trusted catalog metadata. Discovery is read-only and makes no paid provider request.</p>
     <%= form_with url: catalog_settings_models_path, method: :post, class: "mt-4" do %>
-      <%= render "shared/model_picker",
+      <%= render "shared/model_browser",
             role: "translator",
             name: "model_identifier",
             max: 1,
-            label: "Model",
+            label: "Browse OpenRouter",
             hint: "Search the live OpenRouter catalog and add a model with canonical metadata.",
             selected: [] %>
       <%= submit_tag "Add and activate model", class: "mt-4 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>

@@ -33,11 +33,11 @@
       <legend class="px-1 text-lg font-semibold text-slate-950"><%= role.humanize.pluralize %></legend>
       <p class="mt-1 text-sm text-slate-600"><%= role_guidance.fetch(role) %>. Ordering is deterministic.</p>
       <div class="mt-4">
-        <%= render "shared/model_picker",
+        <%= render "shared/model_browser",
               role: role,
               name: "workflow_profile[#{role}_identifiers][]",
               max: role_limits.fetch(role),
-              label: "Search OpenRouter #{role.humanize.downcase} models",
+              label: "#{role.humanize} models",
               hint: role_hints.fetch(role),
               selected: [] %>
       </div>

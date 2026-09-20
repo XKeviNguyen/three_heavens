@@ -270,6 +270,15 @@ class TranslationWorkspacesController < ApplicationController
       selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES,
       page_param: :translation_reference_page
     )
+    @terminology_summary = terminology_summary(workspace)
+  end
+
+  def terminology_summary(workspace)
+    return if workspace&.glossary_revision_id.blank?
+
+    GlossaryRevision.joins(:glossary)
+      .where(glossaries: { user_id: current_user.id }, id: workspace.glossary_revision_id)
+      .pick(:name)
   end
 
   def paginated_configuration_options(scope, selected_revision_ids:, selected_limit:, page_param:)
