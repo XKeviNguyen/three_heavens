@@ -66,7 +66,7 @@
       <div class="mt-5 overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
           <thead class="text-xs uppercase tracking-wide text-slate-500">
-            <tr><th class="px-3 py-3">Model role</th><th class="px-3 py-3">Self scores</th><th class="px-3 py-3">Other scores</th><th class="px-3 py-3">Self-score difference</th><th class="px-3 py-3">Aggregate agreement</th></tr>
+            <tr><th scope="col" class="px-3 py-3">Model role</th><th scope="col" class="px-3 py-3">Self scores</th><th scope="col" class="px-3 py-3">Other scores</th><th scope="col" class="px-3 py-3">Self-score difference</th><th scope="col" class="px-3 py-3">Aggregate agreement</th></tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
             <% @model_stats.each do |stats| %>
@@ -74,7 +74,7 @@
               <% judge = stats.judge_diagnostics %>
               <% next unless reviewer || judge %>
               <tr>
-                <th class="px-3 py-4 font-semibold text-slate-950"><%= link_to stats.model.display_name, benchmark_model_path(stats.model), class: "hover:text-blue-700" %></th>
+                <th scope="row" class="px-3 py-4 font-semibold text-slate-950"><%= link_to stats.model.display_name, benchmark_model_path(stats.model), class: "hover:text-blue-700" %></th>
                 <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.self_average_score)} (n=#{reviewer.self_sample_count})" : "N/A" %></td>
                 <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.other_average_score)} (n=#{reviewer.other_sample_count})" : "N/A" %></td>
                 <td class="px-3 py-4 font-semibold text-slate-950"><%= analytics_number(reviewer&.self_score_difference) %></td>

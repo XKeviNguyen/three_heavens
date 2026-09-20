@@ -39,6 +39,24 @@ its required checks pass. `main` is reserved for human-controlled releases:
 Codex never merges into `main`, and the final `develop` to `main` release occurs
 only after external and human audit.
 
+## V1 feature freeze
+
+V1 feature development is frozen as of the `feature/product-completion-freeze`
+milestone. Until the public V1 release, a change to this repository must be one
+of:
+
+- a real defect found by the whole-project audit;
+- a security correction;
+- a release or deployment correction;
+- a documented release-blocking usability problem.
+
+New product features, providers, integrations, and architectural expansions
+(V2 work) are out of scope until after V1 ships. The frozen V1 surface is the
+owner-scoped journey from authentication through project, source import,
+manual or automatic translation, blind review, judging, the human final editor,
+and TXT/DOCX export, plus the libraries, benchmarks, history, and
+administrator operations pages described below.
+
 ## Local development
 
 Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. The included `compose.yml` runs PostgreSQL on the loopback interface. Local Rails configuration expects these environment variable names:
