@@ -11,97 +11,101 @@
 
     <%= yield :head %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
   <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
     <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white transition focus:translate-y-0">Skip to main content</a>
-    <header class="border-b border-slate-200 bg-white shadow-sm">
-      <div class="mx-auto max-w-7xl px-4 sm:px-6">
-        <div class="flex min-h-16 items-center justify-between gap-4">
-          <%= link_to authenticated? ? root_path : login_path, aria: { label: "Three Heavens home" }, class: "group flex shrink-0 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
-            <span class="flex size-9 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white shadow-sm" aria-hidden="true">TH</span>
-            <span class="hidden sm:block"><span class="block font-semibold tracking-tight text-slate-950">Three Heavens</span><span class="block text-xs text-slate-500">Translation workspace</span></span>
+
+    <% if authenticated? %>
+      <div data-controller="sidebar" class="min-h-screen">
+        <header class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+          <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+            <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>
+            Menu
+          </button>
+          <%= link_to root_path, aria: { label: "Three Heavens home" }, class: "flex min-w-0 items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
+            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-xs font-bold text-white" aria-hidden="true">TH</span>
+            <span class="truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
           <% end %>
+          <span class="size-11" aria-hidden="true"></span>
+        </header>
 
-          <% if authenticated? %>
-            <nav class="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-              <%= navigation_link "Workspace", new_translation_workspace_path, section: :workspace %>
-              <%= navigation_link "Projects", projects_path, section: :projects %>
-              <%= navigation_link "History", history_path, section: :history %>
-              <details class="group relative">
-                <summary class="cursor-pointer list-none rounded-md px-2 py-1.5 text-sm font-semibold <%= section_active?(:libraries) ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950' %>">Libraries <span aria-hidden="true">⌄</span></summary>
-                <div class="absolute right-0 z-20 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                  <%= navigation_link "Workflow Profiles", workflow_profiles_path, section: :libraries, compact: true, controllers: "workflow_profiles" %>
-                  <%= navigation_link "Glossaries", glossaries_path, section: :libraries, compact: true, controllers: "glossaries" %>
-                  <%= navigation_link "Methodology Profiles", methodology_profiles_path, section: :libraries, compact: true, controllers: "methodology_profiles" %>
-                  <%= navigation_link "Translation References", translation_references_path, section: :libraries, compact: true, controllers: "translation_references" %>
-                </div>
-              </details>
-              <%= navigation_link "Benchmarks", benchmarks_path, section: :benchmarks %>
-              <% if current_user.admin? %>
-                <details class="group relative">
-                  <summary class="cursor-pointer list-none rounded-md px-2 py-1.5 text-sm font-semibold <%= section_active?(:administration) ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950' %>">Admin <span aria-hidden="true">⌄</span></summary>
-                  <div class="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                    <%= navigation_link "Settings / Models", settings_models_path, section: :administration, compact: true, controllers: "settings/models" %>
-                    <%= navigation_link "Operations", settings_operations_path, section: :administration, compact: true, controllers: "settings/operations" %>
-                  </div>
-                </details>
-              <% end %>
-            </nav>
+        <aside id="app-sidebar" data-sidebar-target="panel" class="fixed inset-y-0 left-0 z-40 hidden w-64 max-w-[85vw] flex-col overflow-y-auto border-r border-slate-200 bg-white/95 backdrop-blur lg:flex" aria-label="Primary navigation">
+          <div class="flex min-h-16 items-center gap-3 border-b border-slate-100 px-5">
+            <%= link_to root_path, aria: { label: "Three Heavens home" }, class: "flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
+              <span class="min-w-0">
+                <span class="block truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
+                <span class="block truncate text-xs text-slate-500">Translation workspace</span>
+              </span>
+            <% end %>
+            <button type="button" data-action="sidebar#close" class="ml-auto inline-flex size-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 lg:hidden" aria-label="Close navigation">
+              <svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M5 5l10 10M15 5L5 15"/></svg>
+            </button>
+          </div>
 
-            <div class="flex items-center gap-3 border-l border-slate-200 pl-3">
-              <span class="hidden max-w-44 truncate text-xs text-slate-500 xl:block" title="<%= current_user.email %>"><%= current_user.email %></span>
-              <%= button_to "Log out", session_path, method: :delete, class: "rounded-md px-2 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950" %>
-            </div>
-
-            <details class="relative lg:hidden">
-              <summary class="cursor-pointer list-none rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">Menu</summary>
-              <div class="fixed left-4 right-4 top-14 z-30 rounded-xl border border-slate-200 bg-white p-3 shadow-xl sm:left-auto sm:w-80">
-                <nav class="space-y-1" aria-label="Mobile navigation">
-                  <%= navigation_link "Workspace", new_translation_workspace_path, section: :workspace, compact: true %>
-                  <%= navigation_link "Projects", projects_path, section: :projects, compact: true %>
-                  <%= navigation_link "History", history_path, section: :history, compact: true %>
-                  <p class="px-3 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-slate-400">Libraries</p>
-                  <%= navigation_link "Workflow Profiles", workflow_profiles_path, section: :libraries, compact: true, controllers: "workflow_profiles" %>
-                  <%= navigation_link "Glossaries", glossaries_path, section: :libraries, compact: true, controllers: "glossaries" %>
-                  <%= navigation_link "Methodology Profiles", methodology_profiles_path, section: :libraries, compact: true, controllers: "methodology_profiles" %>
-                  <%= navigation_link "Translation References", translation_references_path, section: :libraries, compact: true, controllers: "translation_references" %>
-                  <%= navigation_link "Benchmarks", benchmarks_path, section: :benchmarks, compact: true %>
-                  <% if current_user.admin? %>
-                    <p class="px-3 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-slate-400">Administration</p>
-                    <%= navigation_link "Settings / Models", settings_models_path, section: :administration, compact: true, controllers: "settings/models" %>
-                    <%= navigation_link "Operations", settings_operations_path, section: :administration, compact: true, controllers: "settings/operations" %>
+          <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Primary navigation">
+            <% sidebar_sections.each do |section| %>
+              <div>
+                <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400"><%= section[:label] %></p>
+                <ul class="space-y-0.5">
+                  <% section[:items].each do |item| %>
+                    <li><%= sidebar_link(item, compact: true) %></li>
                   <% end %>
-                </nav>
-                <div class="mt-3 border-t border-slate-200 px-3 pt-3">
-                  <span class="block truncate text-xs text-slate-500"><%= current_user.email %></span>
-                </div>
+                </ul>
               </div>
-            </details>
-          <% end %>
+            <% end %>
+          </nav>
+
+          <div class="border-t border-slate-100 p-3">
+            <div class="flex items-center gap-2 rounded-lg px-2 py-2">
+              <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold uppercase text-slate-700" aria-hidden="true"><%= current_user.email.to_s.first(2) %></span>
+              <span class="min-w-0 flex-1 truncate text-xs text-slate-500" title="<%= current_user.email %>"><%= current_user.email %></span>
+            </div>
+            <%= button_to "Log out", session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>
+          </div>
+        </aside>
+
+        <div data-sidebar-target="scrim" data-action="click->sidebar#close" class="fixed inset-0 z-30 hidden bg-slate-900/40 lg:hidden"></div>
+
+        <div class="lg:pl-64">
+          <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-6xl px-4 py-8 outline-none sm:px-6 sm:py-10">
+            <% if notice.present? %>
+              <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status" aria-live="polite"><%= notice %></div>
+            <% end %>
+            <% if alert.present? %>
+              <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert"><%= alert %></div>
+            <% end %>
+
+            <%= yield %>
+          </main>
         </div>
       </div>
-    </header>
-
-    <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-7xl px-4 py-8 outline-none sm:px-6 sm:py-10">
-      <% if notice.present? %>
-        <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status" aria-live="polite"><%= notice %></div>
-      <% end %>
-      <% if alert.present? %>
-        <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert"><%= alert %></div>
-      <% end %>
-
-      <%= yield %>
-    </main>
+    <% else %>
+      <main id="main-content" tabindex="-1" class="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-4 py-10 outline-none sm:px-6">
+        <div class="mb-8 flex items-center gap-3">
+          <span class="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
+          <span>
+            <span class="block font-semibold tracking-tight text-slate-950">Three Heavens</span>
+            <span class="block text-xs text-slate-500">Translation workspace</span>
+          </span>
+        </div>
+        <div class="w-full">
+          <% if notice.present? %>
+            <div class="mx-auto mb-6 max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status" aria-live="polite"><%= notice %></div>
+          <% end %>
+          <% if alert.present? %>
+            <div class="mx-auto mb-6 max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert"><%= alert %></div>
+          <% end %>
+          <%= yield %>
+        </div>
+      </main>
+    <% end %>
   </body>
 </html>

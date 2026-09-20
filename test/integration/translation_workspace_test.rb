@@ -56,7 +56,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     get root_path
 
     assert_response :success
-    assert_select "h1", "Start a translation experiment"
+    assert_select "h1", "New translation"
     assert_select "form[action='#{translation_workspace_path}']"
     assert_select "input[type='checkbox'][value='#{@first_model.id}']"
     assert_select "input[type='checkbox'][value='#{@second_model.id}']"

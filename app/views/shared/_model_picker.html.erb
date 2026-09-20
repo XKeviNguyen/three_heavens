@@ -1,0 +1,49 @@
+<%# locals: role:, name:, max:, selected:, label:, hint:, description: nil, count_label: nil %>
+<% picker_id = "model-picker-#{name.parameterize}" %>
+<div data-controller="model-picker"
+     id="<%= picker_id %>"
+     data-model-picker-role-value="<%= role %>"
+     data-model-picker-name-value="<%= name %>"
+     data-model-picker-max-value="<%= max %>"
+     data-model-picker-endpoint-value="<%= open_router_catalog_path %>">
+  <div class="flex flex-wrap items-center gap-1.5">
+    <span class="block text-sm font-medium text-slate-700"><%= label %></span>
+    <%= render "shared/hint", text: hint, label: label %>
+    <span class="ml-auto text-xs font-medium text-slate-500" data-model-picker-target="count"></span>
+  </div>
+  <% if local_assigns[:description].present? %>
+    <p class="mt-1 text-xs text-slate-500"><%= description %></p>
+  <% end %>
+
+  <div class="mt-2 flex flex-wrap gap-2" data-model-picker-target="selected">
+    <% selected.each do |model| %>
+      <span data-model-chip class="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-1 text-xs text-slate-700 shadow-sm">
+        <input type="hidden" name="<%= name %>" value="<%= model[:identifier] %>">
+        <span class="truncate"><%= model[:name] %></span>
+        <button type="button"
+                data-action="model-picker#remove"
+                aria-label="Remove <%= model[:name] %>"
+                class="inline-flex size-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">×</button>
+      </span>
+    <% end %>
+  </div>
+
+  <div class="relative mt-2">
+    <input type="text"
+           data-model-picker-target="input"
+           data-action="input->model-picker#search focus->model-picker#search keydown->model-picker#keydown"
+           role="combobox"
+           aria-expanded="false"
+           aria-autocomplete="list"
+           aria-controls="<%= picker_id %>-results"
+           placeholder="Search OpenRouter models, for example gpt, claude, gemini, free"
+           autocomplete="off"
+           class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+    <ul id="<%= picker_id %>-results"
+        data-model-picker-target="list"
+        role="listbox"
+        aria-label="OpenRouter model search results"
+        class="absolute z-30 mt-1 hidden max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"></ul>
+  </div>
+  <p data-model-picker-target="status" role="status" aria-live="polite" class="mt-2 text-xs text-slate-500"></p>
+</div>

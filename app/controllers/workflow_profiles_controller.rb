@@ -2,6 +2,7 @@ class WorkflowProfilesController < ApplicationController
   MODEL_ROLES = WorkflowProfileModelSelection::ROLES.freeze
   SCALAR_KEYS = %w[name description completion_mode expected_version].freeze
   ARRAY_KEYS = MODEL_ROLES.map { |role| "#{role}_ids" }.freeze
+  IDENTIFIER_KEYS = MODEL_ROLES.map { |role| "#{role}_identifiers" }.freeze
 
   before_action :set_workflow_profile, only: %i[show edit update duplicate activate deactivate]
   before_action :load_models, only: %i[new create edit update]
@@ -17,7 +18,7 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def create
-    attributes = exact_profile_parameters!(include_expected_version: false)
+    attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: false))
     profile = WorkflowProfiles::Create.call(user: current_user, attributes: attributes)
     redirect_to profile, notice: "Workflow profile created."
   rescue WorkflowProfiles::BuildRevision::Error, ActiveRecord::RecordInvalid => error
@@ -38,7 +39,7 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def update
-    attributes = exact_profile_parameters!(include_expected_version: true)
+    attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: true))
     revision = WorkflowProfiles::Revise.call(
       workflow_profile: @workflow_profile,
       expected_version: attributes.delete("expected_version"),
@@ -92,21 +93,40 @@ class WorkflowProfilesController < ApplicationController
     raise ActionController::BadRequest, "workflow_profile must be an object" unless submitted.is_a?(ActionController::Parameters)
 
     scalar_keys = include_expected_version ? SCALAR_KEYS : SCALAR_KEYS - [ "expected_version" ]
-    allowed = scalar_keys + ARRAY_KEYS
+    allowed = scalar_keys + ARRAY_KEYS + IDENTIFIER_KEYS
     raise ActionController::BadRequest, "Unexpected parameters" if (submitted.keys - allowed).any?
 
     scalar_keys.each do |key|
       value = submitted[key]
       raise ActionController::BadRequest, "#{key} must be a scalar" unless value.nil? || value.is_a?(String)
     end
-    ARRAY_KEYS.each do |key|
+    (ARRAY_KEYS + IDENTIFIER_KEYS).each do |key|
       value = submitted[key]
       unless value.nil? || (value.is_a?(Array) && value.all? { |item| item.is_a?(String) })
         raise ActionController::BadRequest, "#{key} must be a list of scalar values"
       end
     end
 
-    submitted.permit(*scalar_keys, *ARRAY_KEYS.map { |key| { key => [] } }).to_h
+    submitted.permit(
+      *scalar_keys,
+      *ARRAY_KEYS.map { |key| { key => [] } },
+      *IDENTIFIER_KEYS.map { |key| { key => [] } }
+    ).to_h
+  end
+
+  def resolve_identifier_selections!(attributes)
+    MODEL_ROLES.each do |role|
+      identifiers = Array(attributes["#{role}_identifiers"]).map(&:to_s).reject(&:blank?).uniq
+      next if identifiers.empty?
+
+      models = identifiers.map do |identifier|
+        OpenRouter::ModelResolver.call(identifier: identifier, role: role)
+      end
+      attributes["#{role}_ids"] = (Array(attributes["#{role}_ids"]).map(&:to_s) + models.map(&:id).map(&:to_s)).uniq
+    end
+    attributes
+  rescue OpenRouter::ModelResolver::Error => error
+    raise WorkflowProfiles::BuildRevision::Error, "One or more selected models are unavailable (#{error.message})."
   end
 
   def reject_unexpected_parameters!
@@ -117,7 +137,9 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def default_form_values
-    { "completion_mode" => "winner_draft" }.merge(ARRAY_KEYS.index_with { [] })
+    { "completion_mode" => "winner_draft" }
+      .merge(ARRAY_KEYS.index_with { [] })
+      .merge(IDENTIFIER_KEYS.index_with { [] })
   end
 
   def revision_form_values(revision)
@@ -133,7 +155,7 @@ class WorkflowProfilesController < ApplicationController
     submitted = params[:workflow_profile]
     return default_form_values unless submitted.is_a?(ActionController::Parameters)
 
-    default_form_values.merge(submitted.to_unsafe_h.slice(*(SCALAR_KEYS + ARRAY_KEYS)))
+    default_form_values.merge(submitted.to_unsafe_h.slice(*(SCALAR_KEYS + ARRAY_KEYS + IDENTIFIER_KEYS)))
   end
 
   def error_messages(error)

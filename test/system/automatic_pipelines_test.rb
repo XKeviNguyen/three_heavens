@@ -56,7 +56,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
-    click_button "Start translation runs"
+    click_button "Start translation"
     assert_text "Automatic confirmation must be accepted for each launch"
     assert_field "Automatic pipeline", checked: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
@@ -64,7 +64,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
 
     check "translation_workspace_automatic_confirmation"
     assert_enqueued_jobs 2, only: TranslationRunJob do
-      click_button "Start translation runs"
+      click_button "Start translation"
       assert_text "Automatic translation pipeline started."
     end
     pipeline = PipelineRun.order(:id).last
@@ -125,7 +125,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     fill_in "Target language", with: "Japanese"
     fill_in "Document title", with: "Automatic system source"
     fill_in "Source text", with: "Source for deterministic browser test"
-    fill_in "Experiment name", with: "Automatic system experiment"
-    fill_in "Translation instruction", with: "Translate faithfully."
+    fill_in "Translation name", with: "Automatic system experiment"
+    fill_in "Instructions for the translation", with: "Translate faithfully."
   end
 end

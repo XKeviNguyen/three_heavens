@@ -24,7 +24,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "OpenRouter model catalog"
-    assert_select "a[href='#{settings_models_path}']", "Settings / Models"
+    assert_select "a[href='#{settings_models_path}']", "Models"
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Translations:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Reviews as reviewer:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Judgments as judge:\s*1/m

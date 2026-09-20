@@ -1,0 +1,38 @@
+<%# locals: form:, method:, label:, value:, hint:, placeholder: nil, required: true %>
+<% required = local_assigns.fetch(:required, true) %>
+<% field_id = "#{form.object_name}_#{method}" %>
+<div>
+  <div class="flex items-center gap-1.5">
+    <%= form.label method, label, class: "block text-sm font-medium text-slate-700" %>
+    <%= render "shared/hint", text: hint, label: label %>
+  </div>
+  <div class="relative mt-2" data-controller="combobox">
+    <%= form.text_field method,
+          value: value,
+          required: required,
+          maxlength: 100,
+          autocomplete: "off",
+          placeholder: local_assigns[:placeholder],
+          role: "combobox",
+          aria: { expanded: "false", autocomplete: "list", controls: "#{field_id}-list" },
+          data: {
+            combobox_target: "input",
+            action: "input->combobox#filter focus->combobox#filter keydown->combobox#keydown"
+          },
+          class: "block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+    <ul id="<%= field_id %>-list"
+        data-combobox-target="list"
+        role="listbox"
+        aria-label="<%= label %> suggestions"
+        class="absolute z-20 mt-1 hidden max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+      <% TranslationLanguage::COMMON.each_with_index do |language, index| %>
+        <li id="<%= field_id %>-option-<%= index %>"
+            role="option"
+            data-combobox-target="option"
+            data-value="<%= language %>"
+            data-action="mousedown->combobox#choose"
+            class="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-blue-50"><%= language %></li>
+      <% end %>
+    </ul>
+  </div>
+</div>

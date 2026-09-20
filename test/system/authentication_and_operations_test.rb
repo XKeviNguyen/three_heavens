@@ -16,8 +16,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   test "normal user signs in and cannot access admin settings" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
 
-    assert_text "Start a translation experiment"
-    assert_no_link "Settings / Models"
+    assert_text "New translation"
+    assert_no_link "Models"
     visit settings_models_path
     assert_text "You are not authorized to access administration settings."
     assert_current_path root_path
@@ -26,10 +26,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   test "admin reaches model settings and operations" do
     sign_in_in_browser(users(:admin), "admin secure password value")
 
-    find("summary", text: /Menu|Admin/).click
-    click_link "Settings / Models"
+    click_link "Models"
     assert_text "OpenRouter model catalog"
-    find("summary", text: /Menu|Admin/).click
     click_link "Operations"
     assert_text "AI workflow operations"
   end
@@ -54,7 +52,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
   test "owner uploads previews edits and consumes a TXT source without AI during preview" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
-    click_link "Upload source file"
+    click_button "Upload file"
     assert_text "Upload a source file"
 
     source = Tempfile.new([ "browser-source", ".txt" ])
@@ -64,7 +62,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
     assert_no_enqueued_jobs only: TranslationRunJob do
       attach_file "Source file", source.path
-      click_button "Upload and preview"
+      click_button "Upload and review"
       assert_text "Uploaded source ready for review"
       assert_field "Reviewed source text", with: "Browser upload\n日本語"
     end
@@ -74,12 +72,12 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     fill_in "Source language", with: "Vietnamese"
     fill_in "Target language", with: "Japanese"
     fill_in "Document title", with: "Browser source"
-    fill_in "Experiment name", with: "Browser secure import"
-    fill_in "Translation instruction", with: "Translate faithfully."
+    fill_in "Translation name", with: "Browser secure import"
+    fill_in "Instructions for the translation", with: "Translate faithfully."
     check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
-      click_button "Start translation runs"
+      click_button "Start translation"
       assert_text "Translation experiment"
       assert_text "Reviewed browser source"
       assert_link "Original source file"
@@ -99,25 +97,39 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     fill_in "Target language", with: "Japanese"
     fill_in "Document title", with: "Pasted source"
     fill_in "Source text", with: "Pasted text remains supported"
-    fill_in "Experiment name", with: "Pasted browser experiment"
-    fill_in "Translation instruction", with: "Translate faithfully."
+    fill_in "Translation name", with: "Pasted browser experiment"
+    fill_in "Instructions for the translation", with: "Translate faithfully."
     check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
-      click_button "Start translation runs"
+      click_button "Start translation"
       assert_text "Translation experiment"
       assert_text "Pasted text remains supported"
     end
 
     assert Document.order(:id).last.pasted_text?
+    [ [ 320, 844 ], [ 375, 812 ], [ 768, 1024 ], [ 1024, 800 ], [ 1280, 900 ], [ 1440, 1000 ], [ 1920, 1080 ] ].each do |width, height|
+      page.current_window.resize_to(width, height)
+      visit root_path
+      assert_selector "h1", text: "New translation"
+      if width >= 1024
+        assert_selector "aside#app-sidebar", visible: true
+        assert_no_selector "button[data-action='sidebar#open']", visible: true
+      else
+        assert_selector "button[data-action='sidebar#open']", visible: true
+      end
+      overflow = page.evaluate_script("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+      assert_operator overflow, :<=, 0, "Expected no horizontal overflow at #{width}px, saw #{overflow}px"
+      page.save_screenshot(Rails.root.join("tmp/screenshots/responsive-#{width}.png"))
+    end
+
     page.current_window.resize_to(320, 844)
-    visit projects_path
-    assert_selector "summary", text: "Menu"
-    find("summary", text: "Menu").click
+    visit root_path
+    find("button[data-action='sidebar#open']").click
     assert_link "Projects"
-    viewport_width = page.evaluate_script("document.documentElement.clientWidth")
-    assert_operator viewport_width, :<=, 500
-    assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, viewport_width
+    page.driver.browser.action.send_keys(:escape).perform
+    assert_no_selector "aside#app-sidebar", visible: true
+    assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
     page.current_window.resize_to(1400, 1000)
   end
 

@@ -1,12 +1,56 @@
 module ApplicationHelper
-  NAVIGATION_SECTIONS = {
-    workspace: %w[translation_workspaces source_imports],
-    projects: %w[projects documents experiments review_rounds judge_rounds final_translations pipeline_runs],
-    history: %w[history],
-    libraries: %w[workflow_profiles glossaries methodology_profiles translation_references],
-    benchmarks: %w[benchmarks],
-    administration: %w[settings/models settings/operations]
-  }.freeze
+  SIDEBAR_SECTIONS = [
+    {
+      label: "Work",
+      items: [
+        { label: "New translation", path: :new_translation_workspace_path, controllers: %w[translation_workspaces source_imports workspace_terminology] },
+        { label: "Projects", path: :projects_path, controllers: %w[projects documents experiments review_rounds judge_rounds final_translations pipeline_runs] },
+        { label: "History", path: :history_path, controllers: %w[history] }
+      ]
+    },
+    {
+      label: "Library",
+      items: [
+        { label: "Terminology", path: :glossaries_path, controllers: %w[glossaries] },
+        { label: "References", path: :translation_references_path, controllers: %w[translation_references] },
+        { label: "Methodology", path: :methodology_profiles_path, controllers: %w[methodology_profiles] },
+        { label: "Workflows", path: :workflow_profiles_path, controllers: %w[workflow_profiles] }
+      ]
+    },
+    {
+      label: "Insights",
+      items: [
+        { label: "Benchmarks", path: :benchmarks_path, controllers: %w[benchmarks] }
+      ]
+    },
+    {
+      label: "Admin",
+      admin: true,
+      items: [
+        { label: "Models", path: :settings_models_path, controllers: %w[settings/models open_router_catalog] },
+        { label: "Operations", path: :settings_operations_path, controllers: %w[settings/operations] }
+      ]
+    }
+  ].freeze
+
+  def sidebar_sections
+    SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }
+  end
+
+  def sidebar_item_active?(item)
+    item[:controllers].include?(controller_path)
+  end
+
+  def sidebar_link(item, compact: false)
+    active = sidebar_item_active?(item)
+    classes = if compact
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+    else
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+    end
+
+    link_to item[:label], public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {})
+  end
 
   def status_badge_classes(status)
     case status.to_s

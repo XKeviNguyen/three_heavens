@@ -155,7 +155,7 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{selected_glossary.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{selected_methodology.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[translation_reference_revision_ids][]'][value='#{selected_reference.current_revision_id}'][checked]", count: 1
-    assert_select "h3", text: "Exact provider-work authorization"
+    assert_select "h3", text: "Paid-work authorization"
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])", count: 1
     rebuilt_digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, rebuilt_digest)

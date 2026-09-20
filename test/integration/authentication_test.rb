@@ -14,7 +14,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_not_equal cookie_before, cookies[session_cookie_name]
     follow_redirect!
     assert_response :success
-    assert_select "header", text: /user@example\.test/
+    assert_select "body", text: /user@example\.test/
   end
 
   test "bad password and unknown account return the same safe error" do
@@ -25,7 +25,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       submit_login session: { email: email, password: password }
 
       assert_response :unprocessable_content
-      assert_select "header", text: /user@example\.test/, count: 0
+      assert_select "body", text: /user@example\.test/, count: 0
       css_select("[role='alert']").first.text.strip
     end
 

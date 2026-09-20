@@ -14,6 +14,7 @@ class TranslationWorkspace
                 :experiment_name,
                 :instruction_prompt,
                 :model_ids,
+                :model_identifiers,
                 :workflow_mode,
                 :workflow_profile_revision_id,
                 :glossary_revision_id,
@@ -42,6 +43,7 @@ class TranslationWorkspace
     self.project_id ||= existing_project&.id
     apply_authoritative_project_attributes(existing_project) if existing_project
     self.model_ids = [] if model_ids.nil?
+    self.model_identifiers = [] if model_identifiers.nil?
     self.translation_reference_revision_ids = [] if translation_reference_revision_ids.nil?
     self.guidance_preference = "reference_examples" if guidance_preference.blank?
     self.workflow_mode = "manual" if workflow_mode.blank?
@@ -112,6 +114,13 @@ class TranslationWorkspace
 
   def existing_project?
     project_id.present?
+  end
+
+  def model_identifier_selections
+    Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq.map do |identifier|
+      model = LlmModel.find_by(gateway: "openrouter", model_identifier: identifier)
+      { identifier: identifier, name: model&.display_name || identifier }
+    end
   end
 
   def prepare_provider_work_plan_preview(revision:)
@@ -220,18 +229,54 @@ class TranslationWorkspace
       return
     end
 
+    saved_models = resolve_saved_models
+    return if saved_models.nil?
+
+    resolved_models = resolve_catalog_models
+    return if resolved_models.nil?
+
+    @llm_models = (saved_models + resolved_models).uniq(&:id).sort_by(&:id)
+
+    if @llm_models.empty?
+      errors.add(:model_ids, "Select at least one valid translation model")
+      return
+    end
+    return unless @llm_models.length > Ai::UsageLimits::MAX_TRANSLATION_MODELS
+
+    errors.add(:model_ids, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models")
+  end
+
+  def resolve_saved_models
+    return [] if Array(model_ids).all?(&:blank?)
+
     selected_ids = Ai::UsageLimits.normalize_model_ids(
       model_ids,
       maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
       label: "Translation models"
     )
-    @llm_models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
+    models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
 
-    return if @llm_models.map(&:id) == selected_ids.sort
+    unless models.map(&:id) == selected_ids.sort
+      errors.add(:model_ids, "contain an inactive or unsupported model")
+      return nil
+    end
 
-    errors.add(:model_ids, "contain an inactive or unsupported model")
+    models
   rescue Ai::UsageLimits::InvalidSelection => error
     errors.add(:model_ids, error.message)
+    nil
+  end
+
+  def resolve_catalog_models
+    identifiers = Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq
+    return [] if identifiers.empty?
+
+    identifiers.map do |identifier|
+      OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+    rescue OpenRouter::ModelResolver::Error
+      errors.add(:model_identifiers, "contain an unavailable or unsupported model")
+      return nil
+    end
   end
 
   def validate_automatic_selection

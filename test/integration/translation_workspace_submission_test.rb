@@ -84,7 +84,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
       end
     end
     assert_response :unprocessable_content
-    assert_select "h3", text: "Exact provider-work authorization"
+    assert_select "h3", text: "Paid-work authorization"
     segment_count = LongDocuments::Segmenter.call(source).size
     request_slots = profile.current_revision.model_selections.count * segment_count
     assert_select "p", text: /#{segment_count} source segment\(s\) require #{request_slots} initial provider request slots and authorize at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} requests/

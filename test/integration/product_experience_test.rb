@@ -17,8 +17,8 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#main-content']", "Skip to main content"
     assert_select "main#main-content[tabindex='-1']"
     assert_select "nav[aria-label='Primary navigation']"
-    assert_select "nav[aria-label='Mobile navigation']"
-    assert_select "a[aria-current='page']", text: "Workspace", minimum: 1
+    assert_select "button[data-action='sidebar#open'][aria-controls='app-sidebar']"
+    assert_select "a[aria-current='page']", text: "New translation", minimum: 1
 
     get projects_path
     assert_select "a[aria-current='page']", text: "Projects", minimum: 1
