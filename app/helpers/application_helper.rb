@@ -38,6 +38,32 @@ module ApplicationHelper
     NAVIGATION_SECTIONS.fetch(section).include?(controller_path)
   end
 
+  WORKSPACE_ERROR_SECTIONS = {
+    "source_import_id" => "workspace-source-import",
+    "source_import_project_token" => "workspace-source-import",
+    "project_id" => "workspace-project",
+    "project_name" => "workspace-project",
+    "source_language" => "workspace-project",
+    "target_language" => "workspace-project",
+    "document_title" => "workspace-source",
+    "source_text" => "workspace-source",
+    "experiment_name" => "workspace-experiment",
+    "instruction_prompt" => "workspace-experiment",
+    "glossary_revision_id" => "workspace-glossary",
+    "translation_reference_revision_ids" => "workspace-references",
+    "guidance_preference" => "workspace-guidance",
+    "methodology_profile_revision_id" => "workspace-methodology",
+    "workflow_mode" => "workspace-workflow-mode",
+    "workflow_profile_revision_id" => "workspace-automatic",
+    "automatic_confirmation" => "workspace-automatic",
+    "automatic_plan_digest" => "workspace-automatic",
+    "model_ids" => "workspace-manual-models"
+  }.freeze
+
+  def workspace_error_anchor(attribute)
+    WORKSPACE_ERROR_SECTIONS.fetch(attribute.to_s, "workspace-form")
+  end
+
   def workflow_step_state(experiment, step)
     review_round = experiment.review_round
     judge_round = review_round&.judge_round

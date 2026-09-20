@@ -167,6 +167,37 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[project_name]'][value='Vietnamese Sermons']"
   end
 
+  test "workspace validation errors link to the section that needs correction" do
+    assert_no_workspace_records_created do
+      post translation_workspace_path,
+           params: {
+             translation_workspace: valid_attributes.merge(
+               project_name: "",
+               source_text: "",
+               model_ids: [],
+               glossary_revision_id: "999999999",
+               translation_reference_revision_ids: [ "999999999" ]
+             )
+           }
+    end
+
+    assert_response :unprocessable_content
+    assert_select "form#workspace-form"
+    assert_select "section[aria-labelledby='form-errors-heading']" do
+      assert_select "a[href='#workspace-project']", text: /Project name.*blank/
+      assert_select "a[href='#workspace-source']", text: /Source text.*blank/
+      assert_select "a[href='#workspace-manual-models']", text: /Select at least one valid translation model/i
+      assert_select "a[href='#workspace-glossary']", text: /Glossary revision.*not available/
+      assert_select "a[href='#workspace-references']", text: /unavailable reference/
+    end
+
+    assert_select "section#workspace-project"
+    assert_select "section#workspace-source"
+    assert_select "fieldset#workspace-manual-models"
+    assert_select "fieldset#workspace-glossary"
+    assert_select "fieldset#workspace-references"
+  end
+
   test "malformed workspace and model ID parameter shapes are rejected without side effects" do
     payloads = [
       {},
