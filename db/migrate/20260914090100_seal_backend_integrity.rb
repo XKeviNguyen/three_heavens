@@ -319,9 +319,126 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
       LANGUAGE plpgsql
       AS $$
       BEGIN
-        IF OLD.status = 'completed' THEN
-          RAISE EXCEPTION 'Completed % rows are immutable', TG_TABLE_NAME;
+        IF TG_OP <> 'INSERT' THEN
+          IF OLD.status = 'completed' THEN
+            RAISE EXCEPTION 'Completed % rows are immutable', TG_TABLE_NAME;
+          END IF;
         END IF;
+
+        IF TG_OP <> 'DELETE' THEN
+          IF NEW.status IS NOT DISTINCT FROM 'completed' THEN
+            CASE TG_TABLE_NAME
+            WHEN 'review_runs' THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM review_evaluations WHERE review_run_id = NEW.id
+              ) OR EXISTS (
+                SELECT 1 FROM review_evaluations
+                WHERE review_run_id = NEW.id
+                  AND (faithfulness_score IS NULL OR naturalness_score IS NULL
+                    OR terminology_score IS NULL OR instruction_adherence_score IS NULL
+                    OR overall_score IS NULL OR strengths IS NULL OR issues IS NULL
+                    OR recommended_corrections IS NULL)
+              ) THEN
+                RAISE EXCEPTION 'Completed review runs require complete evaluations';
+              END IF;
+            WHEN 'judge_runs' THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM judge_evaluations WHERE judge_run_id = NEW.id
+              ) OR EXISTS (
+                SELECT 1 FROM judge_evaluations
+                WHERE judge_run_id = NEW.id
+                  AND (rank IS NULL OR overall_score IS NULL
+                    OR BTRIM(rationale) = '' OR BTRIM(strengths) = '' OR BTRIM(risks) = '')
+              ) THEN
+                RAISE EXCEPTION 'Completed judge runs require complete evaluations';
+              END IF;
+              IF (SELECT COUNT(DISTINCT rank) FROM judge_evaluations WHERE judge_run_id = NEW.id)
+                   <> (SELECT COUNT(*) FROM judge_evaluations WHERE judge_run_id = NEW.id)
+                 OR (SELECT MIN(rank) FROM judge_evaluations WHERE judge_run_id = NEW.id) <> 1
+                 OR (SELECT MAX(rank) FROM judge_evaluations WHERE judge_run_id = NEW.id)
+                   <> (SELECT COUNT(*) FROM judge_evaluations WHERE judge_run_id = NEW.id) THEN
+                RAISE EXCEPTION 'Completed judge runs require one complete ranking';
+              END IF;
+              IF NEW.winner_translation_run_id IS NULL
+                 OR NEW.confidence_score IS NULL
+                 OR NEW.winner_rationale IS NULL
+                 OR BTRIM(NEW.winner_rationale) = ''
+                 OR NOT EXISTS (
+                   SELECT 1 FROM judge_evaluations
+                   WHERE judge_run_id = NEW.id AND rank = 1
+                     AND translation_run_id = NEW.winner_translation_run_id
+                 ) THEN
+                RAISE EXCEPTION 'Completed judge runs require a complete rank-one winner';
+              END IF;
+            WHEN 'finalization_runs' THEN
+              IF NEW.proposed_translation IS NULL OR BTRIM(NEW.proposed_translation) = '' THEN
+                RAISE EXCEPTION 'Completed finalization runs require a proposal';
+              END IF;
+              IF EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(NEW.change_summary || NEW.terminology_notes || NEW.warnings) AS items(item)
+                WHERE jsonb_typeof(items.item) <> 'string'
+              ) THEN
+                RAISE EXCEPTION 'Completed finalization runs require string proposal lists';
+              END IF;
+            WHEN 'review_rounds' THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM review_runs WHERE review_round_id = NEW.id
+              ) OR EXISTS (
+                SELECT 1 FROM review_runs
+                WHERE review_round_id = NEW.id AND status NOT IN ('completed', 'failed')
+              ) THEN
+                RAISE EXCEPTION 'Completed review rounds require terminal review runs';
+              END IF;
+              IF EXISTS (
+                SELECT 1 FROM review_runs WHERE review_round_id = NEW.id AND status = 'failed'
+              ) THEN
+                RAISE EXCEPTION 'Completed review rounds cannot contain failed review runs';
+              END IF;
+            WHEN 'judge_rounds' THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM judge_runs WHERE judge_round_id = NEW.id
+              ) OR EXISTS (
+                SELECT 1 FROM judge_runs
+                WHERE judge_round_id = NEW.id AND status NOT IN ('completed', 'failed')
+              ) THEN
+                RAISE EXCEPTION 'Completed judge rounds require terminal judge runs';
+              END IF;
+              IF EXISTS (
+                SELECT 1 FROM judge_runs WHERE judge_round_id = NEW.id AND status = 'failed'
+              ) THEN
+                RAISE EXCEPTION 'Completed judge rounds cannot contain failed judge runs';
+              END IF;
+              IF NEW.winner_translation_run_id IS NULL
+                 OR NOT EXISTS (
+                   SELECT 1 FROM judge_evaluations evaluations
+                   JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
+                   WHERE runs.judge_round_id = NEW.id
+                     AND evaluations.translation_run_id = NEW.winner_translation_run_id
+                 ) THEN
+                RAISE EXCEPTION 'Completed judge rounds require an evaluated winner';
+              END IF;
+            WHEN 'finalization_rounds' THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM finalization_runs WHERE finalization_round_id = NEW.id
+              ) OR EXISTS (
+                SELECT 1 FROM finalization_runs
+                WHERE finalization_round_id = NEW.id AND status NOT IN ('completed', 'failed')
+              ) THEN
+                RAISE EXCEPTION 'Completed finalization rounds require terminal finalization runs';
+              END IF;
+              IF EXISTS (
+                SELECT 1 FROM finalization_runs
+                WHERE finalization_round_id = NEW.id AND status = 'failed'
+              ) THEN
+                RAISE EXCEPTION 'Completed finalization rounds cannot contain failed finalization runs';
+              END IF;
+            ELSE
+              NULL;
+            END CASE;
+          END IF;
+        END IF;
+
         RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
       END;
       $$;
@@ -603,10 +720,16 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
         WHEN 'translation_runs' THEN
           SELECT EXISTS (
             SELECT 1 FROM translation_segment_runs WHERE translation_run_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM review_evaluations WHERE translation_run_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM judge_evaluations WHERE translation_run_id = OLD.id
           ) INTO child_exists;
         WHEN 'review_runs' THEN
           SELECT EXISTS (
             SELECT 1 FROM review_segment_runs WHERE review_run_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM review_evaluations WHERE review_run_id = OLD.id
           ) INTO child_exists;
         WHEN 'review_rounds' THEN
           SELECT EXISTS (
@@ -618,25 +741,46 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
             JOIN judge_runs runs ON runs.id = segments.judge_run_id
             JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
             WHERE rounds.review_round_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM review_evaluations evaluations
+            JOIN review_runs runs ON runs.id = evaluations.review_run_id
+            WHERE runs.review_round_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM judge_evaluations evaluations
+            JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
+            JOIN judge_rounds rounds ON rounds.id = runs.judge_round_id
+            WHERE rounds.review_round_id = OLD.id
           ) INTO child_exists;
         WHEN 'judge_runs' THEN
           SELECT EXISTS (
             SELECT 1 FROM judge_segment_runs WHERE judge_run_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM judge_evaluations WHERE judge_run_id = OLD.id
           ) INTO child_exists;
         WHEN 'judge_rounds' THEN
           SELECT EXISTS (
             SELECT 1 FROM judge_segment_runs segments
             JOIN judge_runs runs ON runs.id = segments.judge_run_id
             WHERE runs.judge_round_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM judge_evaluations evaluations
+            JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
+            WHERE runs.judge_round_id = OLD.id
           ) INTO child_exists;
         WHEN 'finalization_runs' THEN
           SELECT EXISTS (
             SELECT 1 FROM finalization_segment_runs WHERE finalization_run_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM final_translation_versions WHERE source_finalization_run_id = OLD.id
           ) INTO child_exists;
         WHEN 'finalization_rounds' THEN
           SELECT EXISTS (
             SELECT 1 FROM finalization_segment_runs segments
             JOIN finalization_runs runs ON runs.id = segments.finalization_run_id
+            WHERE runs.finalization_round_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM final_translation_versions versions
+            JOIN finalization_runs runs ON runs.id = versions.source_finalization_run_id
             WHERE runs.finalization_round_id = OLD.id
           ) INTO child_exists;
         WHEN 'final_translations' THEN
@@ -655,7 +799,7 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
         END CASE;
 
         IF child_exists THEN
-          RAISE EXCEPTION 'Segment lineage parent cannot change after child runs exist';
+          RAISE EXCEPTION 'Historical lineage parent cannot change after child records exist';
         END IF;
         RETURN NEW;
       END;
@@ -777,7 +921,7 @@ class SealBackendIntegrity < ActiveRecord::Migration[8.1]
     end
 
     (PROVIDER_RUNS.keys + COMPLETED_RECORD_TABLES).each do |table|
-      create_trigger(table, "prevent_completed_#{table}_mutation", "BEFORE UPDATE OR DELETE", "prevent_completed_record_mutation()")
+      create_trigger(table, "prevent_completed_#{table}_mutation", "BEFORE INSERT OR UPDATE OR DELETE", "prevent_completed_record_mutation()")
     end
 
     create_trigger(:ai_provider_attempts, "prevent_ai_provider_attempt_mutation", "BEFORE UPDATE OR DELETE", "prevent_provider_attempt_mutation()")

@@ -125,7 +125,7 @@ The authoritative recovery set is the primary PostgreSQL database plus private A
 
 Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
 
-The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests with a declared body larger than 21 MiB are rejected before parsing; the trusted edge proxy must enforce the same 21 MiB limit, including for chunked requests without `Content-Length`.
+The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
 
 Detailed executable procedures are in:
 

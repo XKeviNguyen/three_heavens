@@ -13,9 +13,13 @@ module ThreeHeavens
     config.load_defaults 8.1
 
     # Reject declared oversized request bodies before multipart parsing or
-    # application allocation. The edge proxy must enforce the same limit for
-    # chunked requests that do not carry Content-Length.
+    # application allocation, and bound the bytes read from requests without a
+    # Content-Length. The outer instance wraps rack.input before Rack and
+    # Action Dispatch can read it. The inner instance sits immediately inside
+    # ActionDispatch::ShowExceptions so a bounded read during controller
+    # parameter parsing still returns 413 instead of a generic error response.
     config.middleware.insert_before 0, RequestBodyLimit
+    config.middleware.insert_after ActionDispatch::ShowExceptions, RequestBodyLimit
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

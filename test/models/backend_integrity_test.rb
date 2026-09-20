@@ -1,9 +1,11 @@
 require "test_helper"
 require_relative "../support/judging_test_helper"
+require_relative "../support/final_translation_test_helper"
 require_relative "../support/workflow_profile_test_helper"
 
 class BackendIntegrityTest < ActiveSupport::TestCase
   include JudgingTestHelper
+  include FinalTranslationTestHelper
   include WorkflowProfileTestHelper
 
   test "database rejects malformed provider attempt lineage and terminal mutation" do
@@ -229,6 +231,106 @@ class BackendIntegrityTest < ActiveSupport::TestCase
       WHERE tgname IN (#{quoted_names}) AND NOT tgisinternal
     SQL
     assert_equal trigger_names.size, installed
+  end
+
+  test "database blocks parent lineage changes after evaluation children exist" do
+    project = users(:normal).projects.create!(
+      name: "Evaluation parent integrity",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    document = project.documents.create!(title: "Evaluation parent source", source_text: "Nguồn")
+    experiment = document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    candidate = experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude))
+    review_round = experiment.create_review_round!(status: :running)
+    review_run = review_round.review_runs.create!(reviewer_llm_model: llm_models(:openrouter_claude))
+    review_run.review_evaluations.create!(
+      translation_run: candidate,
+      anonymous_label: BlindReviews::CandidateLabel.for(0)
+    )
+    judge_round = review_round.create_judge_round!(status: :running)
+    judge_run = judge_round.judge_runs.create!(judge_llm_model: llm_models(:openrouter_gpt))
+    judge_run.judge_evaluations.create!(
+      translation_run: candidate,
+      anonymous_label: BlindReviews::CandidateLabel.for(1)
+    )
+    foreign_round = ReviewRound.create!(experiment: experiments(:two))
+    foreign_judge_round = foreign_round.create_judge_round!(status: :running)
+
+    assert_database_rejects { review_run.update_column(:review_round_id, foreign_round.id) }
+    assert_database_rejects { review_round.update_column(:experiment_id, experiments(:two).id) }
+    assert_database_rejects { candidate.update_column(:experiment_id, experiments(:two).id) }
+    assert_database_rejects { judge_run.update_column(:judge_round_id, foreign_judge_round.id) }
+    assert_database_rejects { judge_round.update_column(:review_round_id, foreign_round.id) }
+  end
+
+  test "database validates completion invariants before sealing records" do
+    project = users(:normal).projects.create!(
+      name: "Completion integrity",
+      source_language: "Vietnamese",
+      target_language: "Japanese"
+    )
+    document = project.documents.create!(title: "Completion source", source_text: "Nguồn")
+    experiment = document.experiments.create!(instruction_prompt: "Translate faithfully.")
+    review_round = experiment.create_review_round!(status: :running)
+    review_run = review_round.review_runs.create!(reviewer_llm_model: llm_models(:openrouter_claude))
+
+    assert_database_rejects { review_round.update_column(:status, "completed") }
+    assert_database_rejects { review_run.update_column(:status, "completed") }
+    review_round.reload
+    review_run.reload
+
+    candidate = experiment.translation_runs.create!(
+      llm_model: llm_models(:openrouter_gpt),
+      status: :completed,
+      translated_text: "Translated",
+      completed_at: Time.current
+    )
+    review_run.review_evaluations.create!(
+      translation_run: candidate,
+      anonymous_label: BlindReviews::CandidateLabel.for(0),
+      faithfulness_score: 9,
+      naturalness_score: 9,
+      terminology_score: 9,
+      instruction_adherence_score: 9,
+      overall_score: 9,
+      strengths: "Strength",
+      issues: "Issue",
+      recommended_corrections: "Correction"
+    )
+    review_run.update!(status: :completed, completed_at: Time.current)
+    review_round.update!(status: :completed)
+    assert review_round.reload.completed?
+
+    judge_round = review_round.create_judge_round!(status: :running)
+    judge_run = judge_round.judge_runs.create!(judge_llm_model: create_judge_model)
+    judge_run.judge_evaluations.create!(
+      translation_run: candidate,
+      anonymous_label: BlindReviews::CandidateLabel.for(0)
+    )
+    assert_database_rejects { judge_run.update_column(:status, "completed") }
+    assert_database_rejects { judge_round.update_column(:status, "completed") }
+  end
+
+  test "database rejects directly inserted completed records" do
+    assert_database_rejects do
+      ReviewRound.new(experiment: experiments(:two), status: :completed).save!(validate: false)
+    end
+  end
+
+  test "database requires a proposal before sealing a finalization run" do
+    final_translation = create_final_translation_workspace
+    round = Finalizations::Start.call(
+      final_translation: final_translation,
+      finalizer_ids: [ create_finalizer.id ]
+    )
+    run = round.finalization_runs.first
+
+    assert_database_rejects { run.update_column(:status, "completed") }
+    run.reload
+
+    complete_finalization_run(run)
+    assert run.reload.completed?
   end
 
   private

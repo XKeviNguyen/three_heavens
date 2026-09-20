@@ -8,7 +8,7 @@
 4. Confirm the `three_heavens_storage:/rails/storage` Kamal volume is attached and writable by uid/gid 1000.
 5. Confirm `/up`, `/ready`, queue processing, and the old environment's admin Operations diagnostics are healthy enough for deployment.
 6. Determine code/schema rollback compatibility. Do not deploy a destructive same-release schema removal. Use expand, deploy compatible code, migrate/backfill, then contract in a later independently backed-up release.
-7. Configure the edge proxy to reject request bodies larger than 21 MiB, including chunked requests without `Content-Length`, matching the application-side declared-length guard. This permits the supported Translation Reference request containing two files of at most 10 MiB each plus 1 MiB of multipart overhead; per-file application validation remains authoritative.
+7. Configure the edge proxy to reject request bodies larger than 21 MiB. This permits the supported Translation Reference request containing two files of at most 10 MiB each plus 1 MiB of multipart overhead; per-file application validation remains authoritative. The application rejects declared bodies above 21 MiB before parsing and bounds undeclared bodies to 21 MiB while reading them, but the proxy remains the first line of defense for chunked requests without `Content-Length`.
 
 ## Deploy
 
