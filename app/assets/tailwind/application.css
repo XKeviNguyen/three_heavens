@@ -31,3 +31,248 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Focus Workspace V2: semantic light workspace palette and layout. */
+:root {
+  --workspace-canvas: #f5f5f7;
+  --workspace-sidebar: #f2f2f7;
+  --workspace-surface: #fff;
+  --workspace-surface-subtle: #fafafa;
+  --workspace-text: #1d1d1f;
+  --workspace-secondary: #6e6e73;
+  --workspace-tertiary: #76767b;
+  --workspace-border: #e5e5ea;
+  --workspace-border-strong: #d1d1d6;
+  --workspace-accent: #0071e3;
+  --workspace-accent-hover: #006bd6;
+  --workspace-accent-soft: #eaf3ff;
+  --workspace-success: #1e7a34;
+  --workspace-success-soft: #eaf8ee;
+  --workspace-warning: #9a5700;
+  --workspace-warning-soft: #fff5e5;
+  --workspace-danger: #c9342f;
+  --workspace-danger-soft: #fff0f0;
+}
+
+body:has(#workspace-form) {
+  background: var(--workspace-canvas);
+  color: var(--workspace-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body:has(#workspace-form) #app-sidebar {
+  width: 248px;
+  background: var(--workspace-sidebar);
+  border-color: var(--workspace-border);
+  backdrop-filter: none;
+}
+
+body:has(#workspace-form) #app-sidebar a[aria-current="page"] {
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-accent-hover);
+}
+
+body:has(#workspace-form) #main-content {
+  max-width: 1600px;
+  padding: 24px 20px 120px;
+}
+
+body:has(#workspace-form) .lg\:pl-64 {
+  padding-left: 248px;
+}
+
+body:has(#workspace-form) #workspace-form > #workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+#workspace-layout > div {
+  min-width: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+#workspace-layout > div > section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#workspace-layout > div > section + section {
+  margin-top: 24px;
+}
+
+#workspace-layout h2 {
+  color: var(--workspace-text);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+#workspace-layout h3,
+#workspace-layout legend {
+  color: var(--workspace-text);
+}
+
+#workspace-source-languages {
+  margin-top: 0;
+  align-items: end;
+}
+
+#workspace-source-languages > div:last-child {
+  margin-top: 12px;
+}
+
+#workspace-form input[type="text"],
+#workspace-form textarea,
+#workspace-form select {
+  border-color: var(--workspace-border-strong);
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+#workspace-form input[type="text"]:focus,
+#workspace-form textarea:focus,
+#workspace-form select:focus {
+  border-color: var(--workspace-accent);
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 1px;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+#workspace-source {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+#workspace-source textarea[name="translation_workspace[source_text]"] {
+  min-height: 440px;
+  background: var(--workspace-surface);
+  padding: 16px;
+  font-size: 15px;
+  line-height: 23px;
+  border-radius: 10px;
+  resize: vertical;
+}
+
+#workspace-experiment,
+#workspace-layout > div > section:last-child {
+  padding-top: 20px !important;
+  border-top: 1px solid var(--workspace-border) !important;
+}
+
+#workspace-experiment > div:last-child {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#workspace-glossary > div > turbo-frame > div {
+  background: var(--workspace-surface-subtle);
+  border: 1px solid var(--workspace-border);
+  box-shadow: none;
+}
+
+#workspace-layout > aside {
+  min-width: 0;
+  position: static;
+}
+
+#workspace-layout > aside > section {
+  background: var(--workspace-surface-subtle);
+  border: 1px solid var(--workspace-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+#workspace-manual-models [data-model-browser-target="selected"] > div {
+  border-radius: 8px;
+}
+
+#workspace-manual-models [data-model-browser-target="list"] {
+  max-height: 360px;
+}
+
+#workspace-manual-models [data-model-browser-target="list"] button {
+  background: var(--workspace-surface);
+  border: 1px solid var(--workspace-border-strong);
+  color: var(--workspace-accent-hover);
+}
+
+#workspace-manual-models [data-model-browser-target="list"] button:hover {
+  background: var(--workspace-accent-soft);
+}
+
+#workspace-manual-models [data-model-browser-target="selected"] button {
+  color: var(--workspace-secondary);
+}
+
+#workspace-manual-models [data-model-browser-target="selected"] button:hover {
+  color: var(--workspace-danger);
+}
+
+#workspace-manual-models [data-model-browser-target="selected"] {
+  background: transparent;
+}
+
+#workspace-launch {
+  position: fixed;
+  z-index: 25;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: 76px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--workspace-border);
+  background: #fff;
+  box-shadow: 0 -1px 6px rgb(0 0 0 / .04);
+}
+
+#workspace-launch input[type="submit"] {
+  background: var(--workspace-accent);
+}
+
+#workspace-launch input[type="submit"]:hover {
+  background: var(--workspace-accent-hover);
+}
+
+@media (min-width: 1024px) {
+  #workspace-launch { left: 248px; }
+}
+
+@media (min-width: 1180px) {
+  body:has(#workspace-form) #workspace-form > #workspace-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
+  }
+  #workspace-layout > aside {
+    position: sticky;
+    top: 20px;
+    align-self: start;
+  }
+}
+
+@media (min-width: 1440px) {
+  body:has(#workspace-form) #workspace-form > #workspace-layout {
+    grid-template-columns: minmax(0, 1fr) 376px;
+  }
+}
+
+@media (max-width: 1023px) {
+  body:has(#workspace-form) .lg\:pl-64 { padding-left: 0; }
+  body:has(#workspace-form) #main-content { padding: 20px 16px 110px; }
+  body:has(#workspace-form) #app-sidebar { width: min(20rem, 85vw); }
+}
+
+@media (max-width: 600px) {
+  #workspace-source-languages { gap: 12px; }
+  #workspace-source-languages > button { margin: 0; }
+  #workspace-source textarea[name="translation_workspace[source_text]"] { min-height: 320px; }
+  #workspace-launch { min-height: 72px; padding: 10px 16px; }
+  #workspace-launch p:last-child { display: none; }
+}

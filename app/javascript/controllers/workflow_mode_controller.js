@@ -19,7 +19,7 @@ export default class extends Controller {
   toggleSection(section, visible) {
     section.hidden = !visible
     section.querySelectorAll("input, select, textarea").forEach((control) => {
-      if (control.type !== "hidden") control.disabled = !visible
+      control.disabled = !visible
     })
   }
 

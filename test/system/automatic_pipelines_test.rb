@@ -51,20 +51,20 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     fill_workspace
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: false
-    choose "Automatic pipeline"
+    choose "Automatic"
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: false
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
-    click_button "Start translation runs"
+    click_button "Start translation"
     assert_text "Automatic confirmation must be accepted for each launch"
-    assert_field "Automatic pipeline", checked: true
+    assert_field "Automatic", checked: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     assert_equal 0, PipelineRun.count
 
     check "translation_workspace_automatic_confirmation"
     assert_enqueued_jobs 2, only: TranslationRunJob do
-      click_button "Start translation runs"
+      click_button "Start translation"
       assert_text "Automatic translation pipeline started."
     end
     pipeline = PipelineRun.order(:id).last
@@ -110,13 +110,20 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
   end
 
   def select_role_models(finalizer: false)
-    first = llm_models(:openrouter_claude)
-    second = llm_models(:openrouter_gpt)
-    check "workflow_profile_translator_ids_#{first.id}"
-    check "workflow_profile_translator_ids_#{second.id}"
-    check "workflow_profile_reviewer_ids_#{first.id}"
-    check "workflow_profile_judge_ids_#{second.id}"
-    check "workflow_profile_finalizer_ids_#{first.id}" if finalizer
+    add_catalog_models("Translators", 2)
+    add_catalog_models("Reviewers", 1)
+    add_catalog_models("Judges", 1)
+    add_catalog_models("Finalizers", 1) if finalizer
+  end
+
+  def add_catalog_models(role_label, count)
+    within find("fieldset", text: role_label, match: :first) do
+      find("input[placeholder='Search OpenRouter models…']").click
+      count.times do
+        assert_selector "button", text: "Add", exact_text: true
+        first("button", text: "Add", exact_text: true).click
+      end
+    end
   end
 
   def fill_workspace
@@ -125,7 +132,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     fill_in "Target language", with: "Japanese"
     fill_in "Document title", with: "Automatic system source"
     fill_in "Source text", with: "Source for deterministic browser test"
-    fill_in "Experiment name", with: "Automatic system experiment"
-    fill_in "Translation instruction", with: "Translate faithfully."
+    fill_in "Translation name", with: "Automatic system experiment"
+    fill_in "Instructions for the translation", with: "Translate faithfully."
   end
 end

@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "support/open_router_catalog_fixture"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   driven_by :selenium,
@@ -15,6 +16,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       options.browser_name
     )
     options.binary = paths.fetch("browser_path")
+  end
+
+  setup do
+    # Each browser example starts with an independent login throttle window.
+    ActionController::Base.cache_store.clear
+    @original_catalog_transport = OpenRouter::Catalog.transport
+    OpenRouter::Catalog.transport = -> { OpenRouterCatalogFixture.to_json }
+  end
+
+  teardown do
+    OpenRouter::Catalog.transport = @original_catalog_transport
   end
 
   Selenium::WebDriver.logger.level = :warn

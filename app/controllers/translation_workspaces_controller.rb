@@ -270,6 +270,15 @@ class TranslationWorkspacesController < ApplicationController
       selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES,
       page_param: :translation_reference_page
     )
+    @terminology_summary = terminology_summary(workspace)
+  end
+
+  def terminology_summary(workspace)
+    return if workspace&.glossary_revision_id.blank?
+
+    GlossaryRevision.joins(:glossary)
+      .where(glossaries: { user_id: current_user.id }, id: workspace.glossary_revision_id)
+      .pick(:name)
   end
 
   def paginated_configuration_options(scope, selected_revision_ids:, selected_limit:, page_param:)
@@ -315,7 +324,7 @@ class TranslationWorkspacesController < ApplicationController
     end
     # The legacy form object exposes a virtual `user` attribute. Ignore it at
     # this boundary and always inject current_user server-side.
-    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "translation_reference_revision_ids", "user" ])
+    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "model_identifiers", "translation_reference_revision_ids", "user" ])
     raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
 
     SCALAR_ATTRIBUTES.each do |attribute|
@@ -334,13 +343,17 @@ class TranslationWorkspacesController < ApplicationController
       raise ActionController::BadRequest, "model_ids must be a list of scalar values"
     end
 
+    model_identifiers = submitted[:model_identifiers]
+    unless model_identifiers.nil? || (model_identifiers.is_a?(Array) && model_identifiers.all? { |id| id.is_a?(String) })
+      raise ActionController::BadRequest, "model_identifiers must be a list of scalar values"
+    end
 
     reference_ids = submitted[:translation_reference_revision_ids]
     unless reference_ids.nil? || (reference_ids.is_a?(Array) && reference_ids.all? { |id| id.is_a?(String) })
       raise ActionController::BadRequest, "translation_reference_revision_ids must be a list of scalar values"
     end
 
-    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [], translation_reference_revision_ids: [])
+    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [], model_identifiers: [], translation_reference_revision_ids: [])
   end
 
   def load_source_import(id)

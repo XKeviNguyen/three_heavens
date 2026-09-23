@@ -44,6 +44,9 @@ Rails.application.routes.draw do
       post :reconcile_stale
     end
     resources :models, except: %i[show destroy] do
+      collection do
+        post :catalog, action: :create_from_catalog
+      end
       member do
         patch :activate
         patch :deactivate
@@ -53,6 +56,16 @@ Rails.application.routes.draw do
 
   resource :translation_workspace, only: %i[new create]
   post "translation_workspace/options", to: "translation_workspaces#options", as: :translation_workspace_options
+
+  get "open_router_catalog", to: "open_router_catalog#index", as: :open_router_catalog
+
+  scope "workspace_terminology" do
+    get "panel", to: "workspace_terminology#panel", as: :workspace_terminology_panel
+    get "new", to: "workspace_terminology#new", as: :new_workspace_terminology
+    post "", to: "workspace_terminology#create"
+    get "edit", to: "workspace_terminology#edit", as: :edit_workspace_terminology
+    patch "", to: "workspace_terminology#update", as: :workspace_terminology
+  end
   get "experiments/:experiment_id/repeat", to: "translation_workspaces#repeat", as: :repeat_experiment
   resources :source_imports, only: %i[new create destroy]
   resources :documents, only: [] do

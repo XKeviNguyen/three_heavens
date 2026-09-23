@@ -1,0 +1,84 @@
+<%= turbo_frame_tag "workspace-terminology-editor" do %>
+  <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4" data-controller="glossary-entries" data-glossary-entries-maximum-value="<%= GlossaryRevision::MAXIMUM_ENTRIES %>">
+    <h3 class="text-sm font-semibold text-slate-900">Edit terminology · <%= @glossary.name %></h3>
+    <p class="mt-1 text-xs text-slate-500">Saving creates a new immutable revision. Previous revisions and translations that used them stay unchanged. Editing terminology never triggers AI work.</p>
+
+    <% if @form_errors.present? %>
+      <section class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3" role="alert">
+        <ul class="list-disc space-y-1 pl-5 text-xs text-red-800"><% @form_errors.each do |message| %><li><%= message %></li><% end %></ul>
+      </section>
+    <% end %>
+
+    <%= form_with url: workspace_terminology_path, method: :patch, scope: :glossary, class: "mt-4 space-y-4" do |form| %>
+      <%= hidden_field_tag :glossary_id, @glossary.id %>
+      <%= form.hidden_field :expected_version, value: @glossary.current_revision.version %>
+
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-semibold text-slate-700">Terminology mappings</p>
+        <span class="text-xs text-slate-500" data-glossary-entries-target="count"></span>
+      </div>
+
+      <div class="space-y-3" data-glossary-entries-target="list">
+        <% @glossary.current_revision.entries.each do |entry| %>
+          <fieldset class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2" data-glossary-entries-target="entry">
+            <div class="flex items-center justify-between md:col-span-2">
+              <legend class="text-xs font-semibold text-slate-700">Term</legend>
+              <button class="text-xs font-semibold text-red-700 disabled:text-slate-400" data-action="glossary-entries#remove" data-glossary-entries-target="remove" type="button">Remove</button>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600">Source term</label>
+              <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][source_term]" required type="text" value="<%= entry.source_term %>">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600">Preferred target term</label>
+              <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][preferred_target_term]" required type="text" value="<%= entry.preferred_target_term %>">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-slate-600">Note (optional)</label>
+              <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="500" name="glossary[entries][][note]" type="text" value="<%= entry.note %>">
+            </div>
+          </fieldset>
+        <% end %>
+        <% if @append_entry %>
+          <fieldset class="grid gap-3 rounded-xl border border-blue-200 bg-white p-3 md:grid-cols-2" data-glossary-entries-target="entry">
+            <div class="flex items-center justify-between md:col-span-2">
+              <legend class="text-xs font-semibold text-slate-700">New term</legend>
+              <button class="text-xs font-semibold text-red-700 disabled:text-slate-400" data-action="glossary-entries#remove" data-glossary-entries-target="remove" type="button">Remove</button>
+            </div>
+            <div><label class="block text-xs font-medium text-slate-600">Source term</label><input autofocus class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][source_term]" required type="text"></div>
+            <div><label class="block text-xs font-medium text-slate-600">Preferred target term</label><input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][preferred_target_term]" required type="text"></div>
+            <div class="md:col-span-2"><label class="block text-xs font-medium text-slate-600">Note (optional)</label><input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="500" name="glossary[entries][][note]" type="text"></div>
+          </fieldset>
+        <% end %>
+      </div>
+
+      <template data-glossary-entries-target="template">
+        <fieldset class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2" data-glossary-entries-target="entry">
+          <div class="flex items-center justify-between md:col-span-2">
+            <legend class="text-xs font-semibold text-slate-700">Term</legend>
+            <button class="text-xs font-semibold text-red-700 disabled:text-slate-400" data-action="glossary-entries#remove" data-glossary-entries-target="remove" type="button">Remove</button>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600">Source term</label>
+            <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][source_term]" required type="text">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600">Preferred target term</label>
+            <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][preferred_target_term]" required type="text">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-slate-600">Note (optional)</label>
+            <input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="500" name="glossary[entries][][note]" type="text">
+          </div>
+        </fieldset>
+      </template>
+
+      <button class="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400" data-action="glossary-entries#add" type="button">Add term</button>
+
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" data-action="terminology-sheet#close" class="text-xs font-semibold text-slate-600 hover:text-slate-950">Cancel</button>
+        <%= form.submit "Save terminology", class: "rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving terminology…" } %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,20 @@
+<% hint_id = local_assigns[:id] || "hint-#{SecureRandom.hex(4)}" %>
+<% hint_label = local_assigns[:label] || "this field" %>
+<span class="relative inline-flex align-middle" data-controller="hint">
+  <button type="button"
+          data-hint-target="trigger"
+          data-action="mouseenter->hint#show mouseleave->hint#hide focusin->hint#showUnlessTouch focusout->hint#resetFocus click->hint#toggle keydown.esc->hint#escape"
+          aria-expanded="false"
+          aria-describedby="<%= hint_id %>"
+          aria-label="More information about <%= hint_label %>"
+          class="inline-flex size-5 items-center justify-center rounded-full text-slate-400 transition hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1">
+    <svg class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5"/>
+      <path stroke-linecap="round" d="M10 9.2v4.3"/>
+      <circle cx="10" cy="6.5" r="0.9" fill="currentColor" stroke="none"/>
+    </svg>
+  </button>
+  <span id="<%= hint_id %>" role="tooltip" data-hint-target="tooltip" class="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-64 max-w-[min(18rem,calc(100vw-2.5rem))] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-normal leading-relaxed text-slate-700 shadow-lg">
+    <%= text %>
+  </span>
+</span>

@@ -35,7 +35,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Original\ntext"
     assert_select "input[name='translation_workspace[source_import_id]'][value='#{source_import.id}']"
-    assert_select "a", text: "Cancel this import"
+    assert_select "button[data-action='workspace-upload#remove']", text: "Remove import"
     assert_no_enqueued_jobs only: TranslationRunJob
 
     blob_id = source_import.source_file.blob_id
@@ -336,7 +336,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     binding = source_import_binding(source_import)
     get new_translation_workspace_path(source_import_id: source_import.id, source_import_project_token: binding)
     assert_response :success
-    assert_select "h2", text: /no longer available/i
+    assert_select "h2", text: "Please correct the following:"
     assert_select "li", text: /Source import.*has expired/i
 
     assert_no_workspace_records_created do
@@ -428,6 +428,11 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     consume_import(consumed)
     delete source_import_path(consumed)
     assert_redirected_to root_path
+    assert SourceImport.exists?(consumed.id)
+
+    delete source_import_path(consumed, format: :json)
+    assert_response :conflict
+    assert_equal "This source import can no longer be canceled.", response.parsed_body["error"]
     assert SourceImport.exists?(consumed.id)
   end
 

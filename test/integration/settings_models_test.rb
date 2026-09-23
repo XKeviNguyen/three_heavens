@@ -24,7 +24,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "OpenRouter model catalog"
-    assert_select "a[href='#{settings_models_path}']", "Settings / Models"
+    assert_select "a[href='#{settings_models_path}']", "Models"
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Translations:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Reviews as reviewer:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Judgments as judge:\s*1/m
@@ -63,6 +63,31 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
     assert_select "li", text: /Model identifier cannot be changed after the model has historical usage/
     assert_equal "test/finalizer-only-usage", finalizer.reload.model_identifier
+  end
+
+  test "catalog Add explicitly reactivates an inactive historical model without duplication" do
+    model = llm_models(:openrouter_claude)
+    model.update!(active: false)
+    entry = {
+      "id" => model.model_identifier,
+      "name" => model.display_name,
+      "context_length" => 128_000,
+      "architecture" => { "input_modalities" => [ "text" ], "output_modalities" => [ "text" ] },
+      "top_provider" => { "max_completion_tokens" => 8_192 },
+      "pricing" => { "prompt" => "0.000001", "completion" => "0.000002" },
+      "supported_parameters" => [ "max_tokens", "response_format" ]
+    }
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => [ entry ]) }
+
+    assert_no_difference -> { LlmModel.count } do
+      post catalog_settings_models_path, params: { model_identifier: model.model_identifier }
+    end
+
+    assert_redirected_to settings_models_path
+    assert model.reload.active?
+    assert_match(/activated/, flash[:notice])
+  ensure
+    OpenRouter::Catalog.transport = nil
   end
 
   test "creates a trimmed active OpenRouter model" do
@@ -342,7 +367,8 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
   def assert_model_is_available_in_all_selectors(model, reviewer_experiment:, judge_review_round:)
     get root_path
-    assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 1
+    assert_select "#workspace-manual-models input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
+    assert_select "#workspace-manual-models[data-available='true']", count: 1
 
     get experiment_path(reviewer_experiment)
     assert_select "h2", "Start blind cross-review"

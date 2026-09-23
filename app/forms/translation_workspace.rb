@@ -14,6 +14,7 @@ class TranslationWorkspace
                 :experiment_name,
                 :instruction_prompt,
                 :model_ids,
+                :model_identifiers,
                 :workflow_mode,
                 :workflow_profile_revision_id,
                 :glossary_revision_id,
@@ -42,6 +43,7 @@ class TranslationWorkspace
     self.project_id ||= existing_project&.id
     apply_authoritative_project_attributes(existing_project) if existing_project
     self.model_ids = [] if model_ids.nil?
+    self.model_identifiers = [] if model_identifiers.nil?
     self.translation_reference_revision_ids = [] if translation_reference_revision_ids.nil?
     self.guidance_preference = "reference_examples" if guidance_preference.blank?
     self.workflow_mode = "manual" if workflow_mode.blank?
@@ -62,6 +64,7 @@ class TranslationWorkspace
       next false unless lock_methodology_selection
       next false unless lock_reference_selections
 
+      @llm_models = @llm_models.map { |model| OpenRouter::ModelResolver.materialize!(model) } unless automatic_mode?
       project.save! if project.new_record?
       locked_import = lock_source_import
       if locked_import
@@ -92,7 +95,8 @@ class TranslationWorkspace
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
          Pipelines::Start::Error,
-         SourceImports::Error => error
+         SourceImports::Error,
+         OpenRouter::ModelResolver::Error => error
     if error.is_a?(SourceImports::Error)
       errors.add(:source_import_id, error.message)
       return false
@@ -112,6 +116,26 @@ class TranslationWorkspace
 
   def existing_project?
     project_id.present?
+  end
+
+  def model_identifier_selections
+    catalog_selections = Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq.map do |identifier|
+      model = LlmModel.find_by(gateway: "openrouter", model_identifier: identifier)
+      { identifier: identifier, name: model&.display_name || identifier }
+    end
+
+    saved_selections = LlmModel.active_openrouter.where(id: Array(model_ids).filter_map do |id|
+      id.to_i if id.to_s.match?(/\A[1-9]\d*\z/)
+    end).map do |model|
+      {
+        identifier: model.model_identifier,
+        name: model.display_name,
+        input_name: "translation_workspace[model_ids][]",
+        input_value: model.id
+      }
+    end
+
+    (catalog_selections + saved_selections).uniq { |selection| selection[:identifier] }
   end
 
   def prepare_provider_work_plan_preview(revision:)
@@ -220,18 +244,67 @@ class TranslationWorkspace
       return
     end
 
+    identifiers = Array(model_identifiers).map(&:to_s).reject(&:blank?)
+    saved_ids = Array(model_ids).reject(&:blank?)
+    selected_count = (identifiers + saved_ids).length
+    if selected_count.zero?
+      errors.add(:model_ids, "Select at least one valid translation model")
+      return
+    end
+    if selected_count > Ai::UsageLimits::MAX_TRANSLATION_MODELS
+      errors.add(:model_ids, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models")
+      return
+    end
+    if identifiers.uniq.length != identifiers.length
+      errors.add(:model_identifiers, "cannot contain duplicate models")
+      return
+    end
+
+    saved_models = resolve_saved_models
+    return if saved_models.nil?
+
+    resolved_models = resolve_catalog_models
+    return if resolved_models.nil?
+
+    @llm_models = (saved_models + resolved_models).uniq(&:model_identifier)
+    if @llm_models.empty?
+      errors.add(:model_ids, "Select at least one valid translation model")
+    end
+  end
+
+  def resolve_saved_models
+    return [] if Array(model_ids).all?(&:blank?)
+
     selected_ids = Ai::UsageLimits.normalize_model_ids(
       model_ids,
       maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
       label: "Translation models"
     )
-    @llm_models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
+    models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
 
-    return if @llm_models.map(&:id) == selected_ids.sort
+    unless models.map(&:id) == selected_ids.sort
+      errors.add(:model_ids, "contain an inactive or unsupported model")
+      return nil
+    end
 
-    errors.add(:model_ids, "contain an inactive or unsupported model")
+    models
   rescue Ai::UsageLimits::InvalidSelection => error
     errors.add(:model_ids, error.message)
+    nil
+  end
+
+  def resolve_catalog_models
+    identifiers = Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq
+    return [] if identifiers.empty?
+
+    identifiers.map do |identifier|
+      model = OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+      raise OpenRouter::ModelResolver::InactiveModelError if !model.active? && model.persisted?
+      model
+    rescue OpenRouter::ModelResolver::Error
+      errors.add(:model_identifiers, "contain an unavailable or unsupported model")
+      return nil
+    end
   end
 
   def validate_automatic_selection

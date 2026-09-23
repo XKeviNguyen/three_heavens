@@ -14,20 +14,38 @@ class SourceImportsController < ApplicationController
       upload: submitted.fetch(:source_file)
     )
     project_binding = SourceImports::ProjectBinding.issue(source_import: @source_import, project: @project)
-    redirect_to new_translation_workspace_path(
-      source_import_id: @source_import.id,
-      project_id: @project&.id,
-      source_import_project_token: project_binding
-    ),
-                notice: "Source text extracted. Review and edit it before starting translation."
+    if request.format.json?
+      render json: {
+        id: @source_import.id,
+        original_filename: @source_import.original_filename,
+        imported_format: @source_import.imported_format,
+        byte_size: @source_import.byte_size,
+        extracted_text: @source_import.extracted_text,
+        project_binding: project_binding
+      }, status: :created
+    else
+      redirect_to new_translation_workspace_path(
+        source_import_id: @source_import.id,
+        project_id: @project&.id,
+        source_import_project_token: project_binding
+      ), notice: "Source text extracted. Review and edit it before starting translation."
+    end
   rescue SourceImports::Error => error
     @source_import = SourceImport.new
-    flash.now[:alert] = error.message
-    render :new, status: :unprocessable_content
+    if request.format.json?
+      render json: { error: error.message }, status: :unprocessable_content
+    else
+      flash.now[:alert] = error.message
+      render :new, status: :unprocessable_content
+    end
   rescue ActionController::ParameterMissing, ActionController::BadRequest
     @source_import = SourceImport.new
-    flash.now[:alert] = "The upload request is invalid. Choose one source file and try again."
-    render :new, status: :bad_request
+    if request.format.json?
+      render json: { error: "The upload request is invalid. Choose one source file and try again." }, status: :bad_request
+    else
+      flash.now[:alert] = "The upload request is invalid. Choose one source file and try again."
+      render :new, status: :bad_request
+    end
   end
 
   def destroy
@@ -35,12 +53,20 @@ class SourceImportsController < ApplicationController
     SourceImport.transaction do
       source_import.lock!
       unless source_import.status.in?(%w[pending ready failed])
-        redirect_to root_path, alert: "This source import can no longer be canceled."
+        if request.format.json?
+          render json: { error: "This source import can no longer be canceled." }, status: :conflict
+        else
+          redirect_to root_path, alert: "This source import can no longer be canceled."
+        end
         return
       end
       source_import.destroy!
     end
-    redirect_to root_path, notice: "Source import canceled."
+    if request.format.json?
+      head :no_content
+    else
+      redirect_to root_path, notice: "Source import canceled."
+    end
   end
 
   private
