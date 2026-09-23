@@ -27,11 +27,21 @@ class TranslationWorkspacesController < ApplicationController
     source_import = load_source_import(attributes ? attributes[:source_import_id] : source_import_id_param)
     project_binding = attributes ? attributes[:source_import_project_token] : source_import_project_token_param
     validate_source_import_project_binding!(source_import:, project:, token: project_binding)
-    workspace_attributes = attributes || {
-      source_import_project_token: project_binding,
-      source_text: source_import&.extracted_text,
-      document_title: source_import && File.basename(source_import.original_filename, ".*")
-    }
+    load_draft(project)
+    @draft_id = params[:translation_workspace_draft_id].to_s if request.post?
+    @draft_version = params[:translation_workspace_draft_version].to_s if request.post?
+    @draft_needs_save = source_import.present? || attributes.present?
+    restored_attributes = restored_draft_attributes(project) unless attributes
+    workspace_attributes = attributes || restored_attributes || {}
+    if source_import
+      workspace_attributes = workspace_attributes.merge(
+        source_import_id: source_import.id,
+        source_import_project_token: project_binding,
+        source_text: source_import.extracted_text,
+        document_title: File.basename(source_import.original_filename, ".*")
+      )
+    end
+    source_import ||= load_source_import(workspace_attributes[:source_import_id]) if workspace_attributes[:source_import_id].present?
     @translation_workspace = TranslationWorkspace.new(
       workspace_attributes.merge(user: current_user, source_import: source_import),
       existing_project: project
@@ -60,6 +70,7 @@ class TranslationWorkspacesController < ApplicationController
       document: :project
     ).find(params[:experiment_id])
     @repeated_from_experiment = historical
+    @draft_needs_save = true
     project = historical.document.project
     attributes = repeat_attributes(historical)
     @translation_workspace = TranslationWorkspace.new(
@@ -86,8 +97,12 @@ class TranslationWorkspacesController < ApplicationController
       existing_project: project
     )
     load_available_models(project:, workspace: @translation_workspace)
+    load_draft(project)
+    @draft_id = params[:translation_workspace_draft_id].to_s
+    @draft_version = params[:translation_workspace_draft_version].to_s
 
     if @translation_workspace.submit
+      consume_draft(project)
       destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
       Operations::EventLogger.emit(
         @translation_workspace.replayed? ? "workspace_launch_replayed" : "workspace_launch_succeeded",
@@ -106,6 +121,7 @@ class TranslationWorkspacesController < ApplicationController
       end
       redirect_to destination, notice: notice
     else
+      @draft_needs_save = true
       render :new, status: :unprocessable_content
     end
   rescue ActionController::ParameterMissing, ActionController::BadRequest
@@ -113,6 +129,32 @@ class TranslationWorkspacesController < ApplicationController
   end
 
   private
+
+  def load_draft(project)
+    @draft = current_user.translation_workspace_drafts.current.find_by(
+      context_key: TranslationWorkspaceDraft.context_key(project)
+    )
+  end
+
+  def restored_draft_attributes(project)
+    return unless @draft
+
+    result = TranslationWorkspaceDrafts::Restore.call(draft: @draft, user: current_user, project:)
+    @draft_configuration_notice = result.configuration_notice
+    @draft_import_notice = result.import_notice
+    @draft_restored = true
+    result.attributes
+  end
+
+  def consume_draft(project)
+    public_id = params[:translation_workspace_draft_id]
+    version = params[:translation_workspace_draft_version]
+    return if public_id.blank? || !version.to_s.match?(/\A\d+\z/)
+
+    current_user.translation_workspace_drafts
+      .where(public_id:, context_key: TranslationWorkspaceDraft.context_key(project), lock_version: version.to_i)
+      .delete_all
+  end
 
   def prepare_repeat_preview(revision, historical)
     @translation_workspace.prepare_provider_work_plan_preview(revision: revision)

@@ -1,6 +1,6 @@
 <% content_for :title, "New translation · Three Heavens" %>
 
-<div class="mx-auto w-full max-w-[94rem]" data-controller="workspace-guard" data-action="turbo:submit-start->workspace-guard#submitStart turbo:submit-end->workspace-guard#submitEnd">
+<div class="mx-auto w-full max-w-[94rem]" data-controller="workspace-guard" data-workspace-guard-save-url-value="<%= translation_workspace_draft_path %>" data-workspace-guard-reset-url-value="<%= new_translation_workspace_path(project_id: @translation_workspace.project_id.presence) %>" data-workspace-guard-draft-id-value="<%= @draft_id || @draft&.public_id %>" data-workspace-guard-version-value="<%= @draft_version || @draft&.lock_version || 0 %>" data-workspace-guard-needs-save-value="<%= @draft_needs_save || @draft_configuration_notice.present? || @draft_import_notice.present? || (@draft.present? && !@draft_restored) %>" data-action="input->workspace-guard#changed change->workspace-guard#changed workspace-models:changed->workspace-guard#changed turbo:submit-start->workspace-guard#submitStart turbo:submit-end->workspace-guard#submitEnd">
   <header class="mb-6 flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <p class="text-xs font-semibold uppercase tracking-wider text-blue-700">Translation</p>
@@ -13,9 +13,13 @@
   <% if @repeated_from_experiment %>
     <section class="mb-5 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm text-blue-950"><p class="font-semibold">Prefilled from a previous translation</p><p class="mt-1">The previous translation remains unchanged. Review every field and explicitly authorize any paid work.</p></section>
   <% end %>
+  <% if @draft_configuration_notice %><p class="mb-3 text-sm text-amber-800" role="status"><%= @draft_configuration_notice %></p><% end %>
+  <% if @draft_import_notice %><p class="mb-3 text-sm text-amber-800" role="status"><%= @draft_import_notice %></p><% end %>
   <% if @repeat_configuration_notice %><p class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
 
-  <%= form_with model: @translation_workspace, url: translation_workspace_path, id: "workspace-form", data: { workspace_guard_target: "form", workspace_summary_panel_url_value: workspace_terminology_panel_path, controller: "workflow-mode workspace-summary", action: "input->workspace-summary#update change->workspace-summary#changed combobox:change->workspace-summary#update workspace-source:changed->workspace-summary#update workspace-models:changed->workspace-summary#update turbo:frame-load->workspace-summary#update" } do |form| %>
+  <%= form_with model: @translation_workspace, url: translation_workspace_path, id: "workspace-form", data: { workspace_guard_target: "form", workspace_summary_panel_url_value: workspace_terminology_panel_path, controller: "workflow-mode workspace-summary", action: "submit->workspace-guard#beforeSubmit input->workspace-summary#update change->workspace-summary#changed combobox:change->workspace-summary#update workspace-source:changed->workspace-summary#update workspace-models:changed->workspace-summary#update turbo:frame-load->workspace-summary#update" } do |form| %>
+    <%= hidden_field_tag :translation_workspace_draft_id, @draft_id || @draft&.public_id %>
+    <%= hidden_field_tag :translation_workspace_draft_version, @draft_version || @draft&.lock_version %>
     <%= form.hidden_field :submission_token %>
     <% if @translation_workspace.existing_project? %><%= form.hidden_field :project_id %><% end %>
     <%= form.hidden_field :source_import_id, value: @translation_workspace.source_import_id %>
@@ -124,6 +128,8 @@
     <section id="workspace-launch" aria-label="Review and start" class="flex items-center gap-4">
       <div class="min-w-0 flex-1">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Review and start</p>
+        <p data-workspace-guard-target="status" class="mt-1 text-xs text-slate-500" role="status" aria-live="polite"><%= @draft_restored ? "Draft restored · Saved moments ago" : "" %></p>
+        <button type="button" data-action="workspace-guard#discard" class="mt-1 text-xs text-slate-500 underline hover:text-slate-800">Discard draft</button>
         <p class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
           <span data-workspace-summary-target="language"><%= [ @translation_workspace.source_language.presence || @translation_workspace.project&.source_language, @translation_workspace.target_language.presence || @translation_workspace.project&.target_language ].compact.join(" → ").presence || "Languages not set" %></span>
           <span data-workspace-summary-target="source"><%= @translation_workspace.source_import ? @translation_workspace.source_import.original_filename : "Pasted text" %></span>
