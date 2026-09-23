@@ -71,6 +71,49 @@ class WorkspaceCatalogModelsTest < ActionDispatch::IntegrationTest
     assert_select "li", text: /Select no more than/
   end
 
+  test "validation and invalid launches do not materialize catalog models" do
+    catalog_id = catalog_entry["id"]
+    invalid_submissions = [
+      workspace_attributes.merge(model_identifiers: []),
+      workspace_attributes.merge(model_identifiers: [ "../../etc/passwd" ]),
+      workspace_attributes.merge(model_identifiers: [ catalog_id ], document_title: ""),
+      workspace_attributes.merge(model_identifiers: [ catalog_id ], instruction_prompt: "")
+    ]
+
+    invalid_submissions.each do |attributes|
+      assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count } ] do
+        post translation_workspace_path, params: {
+          translation_workspace: attributes.merge(submission_token: issue_translation_workspace_token)
+        }
+      end
+      assert_response :unprocessable_content
+    end
+
+    form = TranslationWorkspace.new(
+      workspace_attributes.merge(
+        document_title: "",
+        model_identifiers: [ catalog_id ],
+        user: @user
+      )
+    )
+    assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count } ] do
+      refute form.valid?
+    end
+  end
+
+  test "seven valid catalog identifiers never materialize model rows" do
+    entries = Array.new(7) { |index| catalog_entry.merge("id" => "vendor/bounded-#{index}") }
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => entries) }
+    assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count } ] do
+      post translation_workspace_path, params: {
+        translation_workspace: workspace_attributes.merge(
+          model_identifiers: entries.map { |entry| entry["id"] }
+        )
+      }
+    end
+    assert_response :unprocessable_content
+  end
+
   private
 
   def workspace_attributes

@@ -53,7 +53,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   test "owner uploads previews edits and consumes a TXT source without AI during preview" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     click_button "Upload file"
-    assert_text "Drop a file here"
+    assert_text "Source file"
 
     source = Tempfile.new([ "browser-source", ".txt" ])
     source.binmode
@@ -63,7 +63,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_no_enqueued_jobs only: TranslationRunJob do
       attach_file "Source file", source.path
       click_button "Upload and review"
-      assert_text "imported successfully"
+      assert_selector "#workspace-source-import", text: /browser-source/
       assert_field "Reviewed source text", with: "Browser upload\n日本語"
     end
 
@@ -75,6 +75,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     fill_in "Translation name", with: "Browser secure import"
     fill_in "Instructions for the translation", with: "Translate faithfully."
     within "#workspace-manual-models" do
+      find("input[placeholder='Search OpenRouter models…']").click
+      assert_selector "button", text: "Add"
       first("button", text: "Add").click
     end
 
@@ -133,10 +135,11 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     find("input[value='#{glossary.current_revision_id}']", visible: :all).choose
     assert_selector "[data-workspace-summary-target='terminology']", text: "Japanese Sermon Terms"
     first("#workspace-glossary a", text: "Edit").click
-    assert_selector "input[name='glossary[entries][][source_term]']", visible: true
+    assert_selector "#workspace-terminology-editor input[name='glossary[entries][][source_term]']", visible: :all
+    assert_selector "dialog[open] input[name='glossary[entries][][source_term]']", visible: true
     scroll_to find("#workspace-glossary")
     page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-terminology.png"))
-    click_link "Cancel"
+    click_button "Cancel"
 
     fill_in "Project name", with: "Pasted browser project"
     fill_in "Source language", with: "Vietnamese"

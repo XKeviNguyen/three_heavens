@@ -11,7 +11,7 @@ class WorkspaceTerminologyTest < ActionDispatch::IntegrationTest
     get edit_workspace_terminology_path(glossary_id: @glossary.id)
 
     assert_response :success
-    assert_select "turbo-frame#workspace-terminology" do
+    assert_select "turbo-frame#workspace-terminology-editor" do
       assert_select "form[action='#{workspace_terminology_path}']"
       assert_select "input[name='glossary_id'][value='#{@glossary.id}']"
       assert_select "input[name='glossary[entries][][source_term]'][value='Sabbath']"
@@ -23,7 +23,7 @@ class WorkspaceTerminologyTest < ActionDispatch::IntegrationTest
     get new_workspace_terminology_path(source_language: "Vietnamese", target_language: "Japanese")
 
     assert_response :success
-    assert_select "turbo-frame#workspace-terminology" do
+    assert_select "turbo-frame#workspace-terminology-editor" do
       assert_select "form[action='#{workspace_terminology_path}']"
       assert_select "input[name='glossary[source_language]'][value='Vietnamese']"
       assert_select "input[name='glossary[target_language]'][value='Japanese']"

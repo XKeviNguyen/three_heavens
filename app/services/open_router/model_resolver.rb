@@ -1,6 +1,6 @@
 module OpenRouter
   # Resolves a browser-submitted OpenRouter model identifier against the trusted
-  # normalized catalog and returns the canonical persisted LlmModel.
+  # normalized catalog without writing to the database.
   #
   # Browser input is only ever a bounded identifier string. Provider, display
   # name, context window, and output capability are always taken from the
@@ -22,6 +22,23 @@ module OpenRouter
       new(identifier: identifier, role: role, catalog: catalog).call
     end
 
+    def self.materialize!(model, activate: false)
+      LlmModel.transaction do
+        existing = LlmModel.lock.find_by(gateway: "openrouter", model_identifier: model.model_identifier)
+        if existing
+          raise InactiveModelError if !existing.active? && !activate
+
+          existing.update!(active: true) if activate && !existing.active?
+          existing
+        else
+          model.save!
+          model
+        end
+      end
+    rescue ActiveRecord::RecordInvalid => error
+      raise Error, error.message
+    end
+
     def initialize(identifier:, role:, catalog:)
       @identifier = identifier.to_s
       @role = role.to_s
@@ -38,13 +55,9 @@ module OpenRouter
       raise IncompatibleModelError unless model.public_send(eligible)
 
       existing = LlmModel.find_by(gateway: "openrouter", model_identifier: identifier)
-      if existing
-        raise InactiveModelError unless existing.active?
+      return existing if existing
 
-        return existing
-      end
-
-      LlmModel.create!(
+      LlmModel.new(
         active: true,
         gateway: "openrouter",
         provider: model.provider,
@@ -53,8 +66,6 @@ module OpenRouter
         context_window_tokens: context_tokens(model),
         max_output_tokens: output_tokens(model)
       )
-    rescue ActiveRecord::RecordInvalid => error
-      raise Error, error.message
     rescue Catalog::Error
       raise Error
     end

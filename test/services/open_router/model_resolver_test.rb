@@ -6,9 +6,12 @@ module OpenRouter
       OpenRouter::Catalog.transport = nil
     end
 
-    test "creates a persisted model from canonical catalog metadata" do
+    test "resolves canonical catalog metadata without writing until materialized" do
       model = OpenRouter::ModelResolver.call(identifier: "vendor/new-model", catalog: catalog)
 
+      refute model.persisted?
+      assert_nil LlmModel.find_by(model_identifier: "vendor/new-model")
+      model = OpenRouter::ModelResolver.materialize!(model)
       assert model.persisted?
       assert model.active?
       assert_equal "openrouter", model.gateway
@@ -32,8 +35,10 @@ module OpenRouter
       existing.update!(active: false)
 
       assert_raises(OpenRouter::ModelResolver::InactiveModelError) do
-        OpenRouter::ModelResolver.call(identifier: existing.model_identifier, catalog: catalog)
+        resolved = OpenRouter::ModelResolver.call(identifier: existing.model_identifier, catalog: catalog)
+        OpenRouter::ModelResolver.materialize!(resolved)
       end
+      refute existing.reload.active?
     end
 
     test "rejects unknown and malformed identifiers" do

@@ -3,7 +3,11 @@ class WorkspaceTerminologyController < ApplicationController
   ENTRY_KEYS = %w[source_term preferred_target_term note].freeze
 
   def panel
-    render_panel(selected_revision_id: selected_revision_id_param)
+    render partial: "workspace_terminology/panel",
+           locals: {
+             glossaries: active_glossaries,
+             selected_revision_id: selected_revision_id_param
+           }
   end
 
   def new
@@ -49,13 +53,20 @@ class WorkspaceTerminologyController < ApplicationController
   end
 
   def render_panel(selected_revision_id:, status: :ok)
-    glossaries = current_user.glossaries.active.includes(current_revision: :entries)
+    glossaries = active_glossaries
+    render turbo_stream: [
+      turbo_stream.replace(
+        "workspace-terminology",
+        partial: "workspace_terminology/panel",
+        locals: { glossaries: glossaries, selected_revision_id: selected_revision_id }
+      ),
+      turbo_stream.update("workspace-terminology-editor", "")
+    ], status: status
+  end
+
+  def active_glossaries
+    current_user.glossaries.active.includes(current_revision: :entries)
       .order(updated_at: :desc, id: :desc)
-    render turbo_stream: turbo_stream.replace(
-      "workspace-terminology",
-      partial: "workspace_terminology/panel",
-      locals: { glossaries: glossaries, selected_revision_id: selected_revision_id }
-    ), status: status
   end
 
   def revision_attributes

@@ -45,7 +45,7 @@ Rails.application.routes.draw do
     end
     resources :models, except: %i[show destroy] do
       collection do
-        post :catalog
+        post :catalog, action: :create_from_catalog
       end
       member do
         patch :activate

@@ -10,6 +10,7 @@ export default class extends Controller {
   static values = { role: String, name: String, max: Number, endpoint: String }
 
   connect() {
+    this.onDocumentPointerDown = this.onDocumentPointerDown.bind(this)
     this.activeIndex = -1
     this.results = []
     this.providersLoaded = false
@@ -21,10 +22,20 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("pointerdown", this.onDocumentPointerDown)
     window.clearTimeout(this.debounceTimer)
+    window.clearTimeout(this.outsideTimer)
   }
 
   onDocumentPointerDown(event) {
-    if (!this.element.contains(event.target)) this.closeList()
+    window.clearTimeout(this.outsideTimer)
+    if (this.element.contains(event.target)) return
+    // Close after the outside control receives its click; collapsing results
+    // during pointerdown can move that control out from under the pointer.
+    this.outsideTimer = window.setTimeout(() => this.closeList(), 0)
+  }
+
+  openResults() {
+    if (this.results.length > 0) this.openList()
+    else this.fetchResults()
   }
 
   search() {

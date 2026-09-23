@@ -118,7 +118,11 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
 
   def add_catalog_models(role_label, count)
     within find("fieldset", text: role_label, match: :first) do
-      count.times { first("button", text: "Add", exact_text: true).click }
+      find("input[placeholder='Search OpenRouter models…']").click
+      count.times do
+        assert_selector "button", text: "Add", exact_text: true
+        first("button", text: "Add", exact_text: true).click
+      end
     end
   end
 

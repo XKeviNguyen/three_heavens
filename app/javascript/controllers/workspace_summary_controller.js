@@ -4,8 +4,28 @@ import { Controller } from "@hotwired/stimulus"
 // remains authoritative; this controller only mirrors visible selections.
 export default class extends Controller {
   static targets = ["language", "source", "models", "terminology", "workflow"]
+  static values = { panelUrl: String }
 
   connect() {
+    this.panelObserver = new MutationObserver(() => this.update())
+    const panel = this.element.querySelector("#workspace-glossary")
+    if (panel) this.panelObserver.observe(panel, { childList: true, subtree: true })
+    this.update()
+  }
+
+  disconnect() {
+    this.panelObserver.disconnect()
+  }
+
+  changed(event) {
+    if (event.target.name === "translation_workspace[glossary_revision_id]") {
+      const details = event.target.closest("details")
+      if (details) details.open = false
+      const frame = this.element.querySelector("#workspace-terminology")
+      const url = new URL(this.panelUrlValue, window.location.origin)
+      if (event.target.value) url.searchParams.set("selected_revision_id", event.target.value)
+      frame.src = url.toString()
+    }
     this.update()
   }
 
@@ -14,7 +34,7 @@ export default class extends Controller {
     const targetLanguage = this.value("translation_workspace[target_language]")
     this.languageTarget.textContent = sourceLanguage && targetLanguage ? `${sourceLanguage} → ${targetLanguage}` : "Not set"
 
-    const importedSource = this.element.querySelector("#workspace-source-import h2")?.textContent.trim()
+    const importedSource = this.element.querySelector("#workspace-source-import [data-workspace-upload-target='filename']")?.textContent.trim()
     const uploadPanel = this.element.querySelector("[data-source-mode-target='upload']")
     this.sourceTarget.textContent = importedSource || (uploadPanel && !uploadPanel.hidden ? "Uploaded file" : "Pasted text")
 

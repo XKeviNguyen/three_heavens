@@ -19,6 +19,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   setup do
+    # Each browser example starts with an independent login throttle window.
+    ActionController::Base.cache_store.clear
     @original_catalog_transport = OpenRouter::Catalog.transport
     OpenRouter::Catalog.transport = -> { OpenRouterCatalogFixture.to_json }
   end

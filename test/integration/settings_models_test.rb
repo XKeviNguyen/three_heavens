@@ -65,6 +65,31 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_equal "test/finalizer-only-usage", finalizer.reload.model_identifier
   end
 
+  test "catalog Add explicitly reactivates an inactive historical model without duplication" do
+    model = llm_models(:openrouter_claude)
+    model.update!(active: false)
+    entry = {
+      "id" => model.model_identifier,
+      "name" => model.display_name,
+      "context_length" => 128_000,
+      "architecture" => { "input_modalities" => [ "text" ], "output_modalities" => [ "text" ] },
+      "top_provider" => { "max_completion_tokens" => 8_192 },
+      "pricing" => { "prompt" => "0.000001", "completion" => "0.000002" },
+      "supported_parameters" => [ "max_tokens", "response_format" ]
+    }
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => [ entry ]) }
+
+    assert_no_difference -> { LlmModel.count } do
+      post catalog_settings_models_path, params: { model_identifier: model.model_identifier }
+    end
+
+    assert_redirected_to settings_models_path
+    assert model.reload.active?
+    assert_match(/activated/, flash[:notice])
+  ensure
+    OpenRouter::Catalog.transport = nil
+  end
+
   test "creates a trimmed active OpenRouter model" do
     assert_difference -> { LlmModel.count }, 1 do
       post settings_models_path,

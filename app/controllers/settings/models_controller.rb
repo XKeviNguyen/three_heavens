@@ -34,8 +34,12 @@ module Settings
         raise ActionController::BadRequest, "model_identifier is invalid"
       end
 
-      model = OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
-      redirect_to settings_models_path, notice: "#{model.display_name} was added or activated from the live OpenRouter catalog."
+      resolved = OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+      was_inactive = resolved.persisted? && !resolved.active?
+      was_new = !resolved.persisted?
+      model = OpenRouter::ModelResolver.materialize!(resolved, activate: true)
+      action = was_inactive ? "activated" : (was_new ? "added and activated" : "already active")
+      redirect_to settings_models_path, notice: "#{model.display_name} was #{action}."
     rescue OpenRouter::ModelResolver::Error, OpenRouter::Catalog::Error
       redirect_to settings_models_path, alert: "The selected model could not be added from the OpenRouter catalog."
     end

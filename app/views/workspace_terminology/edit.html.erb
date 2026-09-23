@@ -1,4 +1,4 @@
-<%= turbo_frame_tag "workspace-terminology" do %>
+<%= turbo_frame_tag "workspace-terminology-editor" do %>
   <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4" data-controller="glossary-entries" data-glossary-entries-maximum-value="<%= GlossaryRevision::MAXIMUM_ENTRIES %>">
     <h3 class="text-sm font-semibold text-slate-900">Edit terminology · <%= @glossary.name %></h3>
     <p class="mt-1 text-xs text-slate-500">Saving creates a new immutable revision. Previous revisions and translations that used them stay unchanged. Editing terminology never triggers AI work.</p>
@@ -76,7 +76,7 @@
       <button class="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400" data-action="glossary-entries#add" type="button">Add term</button>
 
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <%= link_to "Cancel", workspace_terminology_panel_path, data: { turbo_frame: "workspace-terminology" }, class: "text-xs font-semibold text-slate-600 hover:text-slate-950" %>
+        <button type="button" data-action="terminology-sheet#close" class="text-xs font-semibold text-slate-600 hover:text-slate-950">Cancel</button>
         <%= form.submit "Save terminology", class: "rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving terminology…" } %>
       </div>
     <% end %>

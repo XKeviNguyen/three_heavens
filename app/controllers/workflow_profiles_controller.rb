@@ -18,8 +18,10 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def create
-    attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: false))
-    profile = WorkflowProfiles::Create.call(user: current_user, attributes: attributes)
+    profile = WorkflowProfile.transaction do
+      attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: false))
+      WorkflowProfiles::Create.call(user: current_user, attributes: attributes)
+    end
     redirect_to profile, notice: "Workflow profile created."
   rescue WorkflowProfiles::BuildRevision::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values
@@ -39,12 +41,14 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def update
-    attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: true))
-    revision = WorkflowProfiles::Revise.call(
-      workflow_profile: @workflow_profile,
-      expected_version: attributes.delete("expected_version"),
-      attributes: attributes
-    )
+    revision = WorkflowProfile.transaction do
+      attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: true))
+      WorkflowProfiles::Revise.call(
+        workflow_profile: @workflow_profile,
+        expected_version: attributes.delete("expected_version"),
+        attributes: attributes
+      )
+    end
     redirect_to @workflow_profile, notice: "Workflow profile revision #{revision.version} created."
   rescue WorkflowProfiles::Revise::StaleRevisionError => error
     @form_values = safe_submitted_values
@@ -115,14 +119,30 @@ class WorkflowProfilesController < ApplicationController
   end
 
   def resolve_identifier_selections!(attributes)
-    MODEL_ROLES.each do |role|
-      identifiers = Array(attributes["#{role}_identifiers"]).map(&:to_s).reject(&:blank?).uniq
-      next if identifiers.empty?
+    resolved_by_role = MODEL_ROLES.to_h do |role|
+      identifiers = Array(attributes["#{role}_identifiers"]).map(&:to_s).reject(&:blank?)
+      selected_count = Array(attributes["#{role}_ids"]).reject(&:blank?).length + identifiers.length
+      maximum = WorkflowProfiles::BuildRevision::ROLE_LIMITS.fetch(role)[1]
+      if selected_count > maximum
+        raise WorkflowProfiles::BuildRevision::InvalidSelectionError, "Select no more than #{maximum} #{role.pluralize}"
+      end
+      if identifiers.uniq.length != identifiers.length
+        raise WorkflowProfiles::BuildRevision::InvalidSelectionError, "#{role.pluralize.capitalize} cannot contain duplicate models"
+      end
 
       models = identifiers.map do |identifier|
-        OpenRouter::ModelResolver.call(identifier: identifier, role: role)
+        resolved = OpenRouter::ModelResolver.call(identifier: identifier, role: role)
+        raise OpenRouter::ModelResolver::InactiveModelError if resolved.persisted? && !resolved.active?
+        resolved
       end
-      attributes["#{role}_ids"] = (Array(attributes["#{role}_ids"]).map(&:to_s) + models.map(&:id).map(&:to_s)).uniq
+      [ role, models ]
+    end
+
+    resolved_by_role.each do |role, models|
+      next if models.empty?
+
+      ids = models.map { |model| OpenRouter::ModelResolver.materialize!(model).id.to_s }
+      attributes["#{role}_ids"] = Array(attributes["#{role}_ids"]).map(&:to_s) + ids
     end
     attributes
   rescue OpenRouter::ModelResolver::Error => error

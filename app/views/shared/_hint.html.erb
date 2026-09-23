@@ -2,7 +2,9 @@
 <% hint_label = local_assigns[:label] || "this field" %>
 <span class="relative inline-flex align-middle" data-controller="hint">
   <button type="button"
-          data-action="mouseenter->hint#show mouseleave->hint#hide focusin->hint#showUnlessTouch focusout->hint#hide click->hint#toggle keydown.esc->hint#hide"
+          data-hint-target="trigger"
+          data-action="mouseenter->hint#show mouseleave->hint#hide focusin->hint#showUnlessTouch focusout->hint#resetFocus click->hint#toggle keydown.esc->hint#escape"
+          aria-expanded="false"
           aria-describedby="<%= hint_id %>"
           aria-label="More information about <%= hint_label %>"
           class="inline-flex size-5 items-center justify-center rounded-full text-slate-400 transition hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1">

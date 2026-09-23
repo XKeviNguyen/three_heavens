@@ -13,8 +13,8 @@
           </span>
         </label>
         <div class="flex shrink-0 flex-wrap gap-x-3 gap-y-2 text-xs font-semibold">
-          <%= link_to "+ Add term", edit_workspace_terminology_path(glossary_id: selected_glossary.id, add: 1), data: { turbo_frame: "workspace-terminology" }, class: "text-blue-700 hover:text-blue-900" %>
-          <%= link_to "Edit terminology", edit_workspace_terminology_path(glossary_id: selected_glossary.id), data: { turbo_frame: "workspace-terminology" }, class: "text-blue-700 hover:text-blue-900" %>
+          <%= link_to "+ Add term", edit_workspace_terminology_path(glossary_id: selected_glossary.id, add: 1), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
+          <%= link_to "Edit terminology", edit_workspace_terminology_path(glossary_id: selected_glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
         </div>
       </div>
 
@@ -33,7 +33,7 @@
     <% end %>
 
     <div class="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold">
-      <%= link_to "+ Add terminology", new_workspace_terminology_path, data: { turbo_frame: "workspace-terminology" }, class: "rounded-lg border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50" %>
+      <%= link_to "+ Add terminology", new_workspace_terminology_path, data: { turbo_frame: "workspace-terminology-editor" }, class: "rounded-lg border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50" %>
       <% if glossaries.any? %>
         <details class="relative">
           <summary class="cursor-pointer list-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">Choose saved glossary <span aria-hidden="true">⌄</span></summary>
@@ -50,7 +50,7 @@
                   <%= radio_button_tag "translation_workspace[glossary_revision_id]", revision.id, false, id: "translation_workspace_glossary_revision_id_#{revision.id}", class: "mt-0.5 size-4 text-blue-600", data: { workspace_summary_name: revision.name } %>
                   <span><span class="block text-xs font-semibold text-slate-900"><%= revision.name %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500">Revision <%= revision.version %> · <%= pluralize(revision.entries.size, "term") %></span></span>
                 </label>
-                <%= link_to "Edit", edit_workspace_terminology_path(glossary_id: glossary.id), data: { turbo_frame: "workspace-terminology" }, class: "shrink-0 text-[11px] font-semibold text-blue-700 hover:text-blue-900" %>
+                <%= link_to "Edit", edit_workspace_terminology_path(glossary_id: glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "shrink-0 text-[11px] font-semibold text-blue-700 hover:text-blue-900" %>
               </div>
             <% end %>
           </div>

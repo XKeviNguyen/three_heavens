@@ -64,6 +64,7 @@ class TranslationWorkspace
       next false unless lock_methodology_selection
       next false unless lock_reference_selections
 
+      @llm_models = @llm_models.map { |model| OpenRouter::ModelResolver.materialize!(model) } unless automatic_mode?
       project.save! if project.new_record?
       locked_import = lock_source_import
       if locked_import
@@ -94,7 +95,8 @@ class TranslationWorkspace
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
          Pipelines::Start::Error,
-         SourceImports::Error => error
+         SourceImports::Error,
+         OpenRouter::ModelResolver::Error => error
     if error.is_a?(SourceImports::Error)
       errors.add(:source_import_id, error.message)
       return false
@@ -242,21 +244,32 @@ class TranslationWorkspace
       return
     end
 
+    identifiers = Array(model_identifiers).map(&:to_s).reject(&:blank?)
+    saved_ids = Array(model_ids).reject(&:blank?)
+    selected_count = (identifiers + saved_ids).length
+    if selected_count.zero?
+      errors.add(:model_ids, "Select at least one valid translation model")
+      return
+    end
+    if selected_count > Ai::UsageLimits::MAX_TRANSLATION_MODELS
+      errors.add(:model_ids, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models")
+      return
+    end
+    if identifiers.uniq.length != identifiers.length
+      errors.add(:model_identifiers, "cannot contain duplicate models")
+      return
+    end
+
     saved_models = resolve_saved_models
     return if saved_models.nil?
 
     resolved_models = resolve_catalog_models
     return if resolved_models.nil?
 
-    @llm_models = (saved_models + resolved_models).uniq(&:id).sort_by(&:id)
-
+    @llm_models = (saved_models + resolved_models).uniq(&:model_identifier)
     if @llm_models.empty?
       errors.add(:model_ids, "Select at least one valid translation model")
-      return
     end
-    return unless @llm_models.length > Ai::UsageLimits::MAX_TRANSLATION_MODELS
-
-    errors.add(:model_ids, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models")
   end
 
   def resolve_saved_models
@@ -285,7 +298,9 @@ class TranslationWorkspace
     return [] if identifiers.empty?
 
     identifiers.map do |identifier|
-      OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+      model = OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+      raise OpenRouter::ModelResolver::InactiveModelError if !model.active? && model.persisted?
+      model
     rescue OpenRouter::ModelResolver::Error
       errors.add(:model_identifiers, "contain an unavailable or unsupported model")
       return nil
