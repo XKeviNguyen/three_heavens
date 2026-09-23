@@ -13,6 +13,8 @@ export default class extends Controller {
     this.onDocumentPointerDown = this.onDocumentPointerDown.bind(this)
     this.activeIndex = -1
     this.results = []
+    this.resultsVisible = true
+    this.requestSequence ||= 0
     this.providersLoaded = false
     this.updateCount()
     this.fetchResults()
@@ -23,31 +25,37 @@ export default class extends Controller {
     document.removeEventListener("pointerdown", this.onDocumentPointerDown)
     window.clearTimeout(this.debounceTimer)
     window.clearTimeout(this.outsideTimer)
+    this.requestSequence += 1
   }
 
   onDocumentPointerDown(event) {
     window.clearTimeout(this.outsideTimer)
     if (this.element.contains(event.target)) return
+    this.resultsVisible = false
     // Close after the outside control receives its click; collapsing results
     // during pointerdown can move that control out from under the pointer.
     this.outsideTimer = window.setTimeout(() => this.closeList(), 0)
   }
 
   openResults() {
+    this.resultsVisible = true
     if (this.results.length > 0) this.openList()
     else this.fetchResults()
   }
 
   search() {
+    this.resultsVisible = true
     window.clearTimeout(this.debounceTimer)
     this.debounceTimer = window.setTimeout(() => this.fetchResults(), SEARCH_DEBOUNCE_MS)
   }
 
   filter() {
+    this.resultsVisible = true
     this.fetchResults()
   }
 
   async fetchResults() {
+    const requestSequence = ++this.requestSequence
     this.setStatus("Searching OpenRouter…")
     const url = new URL(this.endpointValue, window.location.origin)
     url.searchParams.set("role", this.roleValue)
@@ -61,6 +69,7 @@ export default class extends Controller {
       const response = await fetch(url.toString(), { headers: { Accept: "application/json" } })
       if (!response.ok) throw new Error("catalog request failed")
       const payload = await response.json()
+      if (requestSequence !== this.requestSequence) return
       this.results = Array.isArray(payload.models) ? payload.models : []
       this.total = payload.total
       this.loadProviders(payload.providers || [], payload.source)
@@ -69,6 +78,7 @@ export default class extends Controller {
       const totalLabel = typeof this.total === "number" ? this.total : this.results.length
       this.setStatus(this.results.length === 0 ? "No compatible models match these filters." : `${sourceLabel}${totalLabel} compatible model(s)`)
     } catch {
+      if (requestSequence !== this.requestSequence) return
       this.results = []
       this.renderResults({ source: "error" })
       this.setStatus("OpenRouter catalog is unavailable. Try again shortly.")
@@ -108,7 +118,8 @@ export default class extends Controller {
       this.listTarget.appendChild(option)
       this.options.push(option)
     })
-    this.openList()
+    if (this.resultsVisible) this.openList()
+    else this.closeList()
   }
 
   buildOption(model, index) {

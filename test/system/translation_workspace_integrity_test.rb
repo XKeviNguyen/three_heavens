@@ -184,7 +184,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
       assert_equal "true", search[:'aria-expanded']
     end
     find_field("Project name").click
-    assert_equal "false", find("#workspace-manual-models input[placeholder='Search OpenRouter models…']")[:'aria-expanded']
+    assert_selector "#workspace-manual-models input[placeholder='Search OpenRouter models…'][aria-expanded='false']"
     within "#workspace-manual-models" do
       find("input[placeholder='Search OpenRouter models…']").click
       assert_selector "[role='option']", visible: true
@@ -326,6 +326,33 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_not tooltip.visible?
     page.execute_script("arguments[0].blur(); arguments[0].focus()", hint)
     assert tooltip.visible?
+  end
+
+  test "catalog response after an outside click does not reopen model results" do
+    visit root_path
+    browser = find("#workspace-manual-models")
+    assert_selector "#workspace-manual-models [role='option']", minimum: 1
+    page.execute_script(<<~JS)
+      window.__originalCatalogFetch = window.fetch
+      window.__releaseCatalogResponse = null
+      window.fetch = (...args) => {
+        if (!String(args[0]).includes("open_router_catalog")) return window.__originalCatalogFetch(...args)
+        return new Promise(resolve => {
+          window.__releaseCatalogResponse = () => window.__originalCatalogFetch(...args).then(resolve)
+        })
+      }
+    JS
+
+    browser.find("select[data-model-browser-target='provider']").select("anthropic")
+    assert_equal "function", page.evaluate_script("typeof window.__releaseCatalogResponse")
+    find_field("Project name").click
+    assert_selector "#workspace-manual-models input[placeholder='Search OpenRouter models…'][aria-expanded='false']"
+    page.execute_script("window.__releaseCatalogResponse()")
+    assert_selector "#workspace-manual-models [data-model-browser-target='status']", text: /compatible model/
+    assert_selector "#workspace-manual-models input[placeholder='Search OpenRouter models…'][aria-expanded='false']"
+
+    browser.find("input[placeholder='Search OpenRouter models…']").click
+    assert_selector "#workspace-manual-models [role='option']", visible: true
   end
 
   private
