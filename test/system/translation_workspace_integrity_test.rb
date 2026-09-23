@@ -30,7 +30,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     choose_language("Source language", "Vietnamese")
     choose_language("Target language", "Japanese")
     find("#workspace-glossary summary", text: "Choose saved glossary").click
-    find("input[value='#{@glossary.current_revision_id}']", visible: :all).choose
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
     find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
@@ -74,7 +74,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     fill_in "Translation name", with: "Protected translation"
     fill_in "Instructions for the translation", with: "Preserve the meaning."
     find("#workspace-glossary summary", text: "Choose saved glossary").click
-    find("input[value='#{@glossary.current_revision_id}']", visible: :all).choose
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
     find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
@@ -137,7 +137,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     fill_in "Translation name", with: "Control translation"
     fill_in "Instructions for the translation", with: "Translate with care."
     find("#workspace-glossary summary", text: "Choose saved glossary").click
-    find("input[value='#{@glossary.current_revision_id}']", visible: :all).choose
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
     find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
@@ -284,7 +284,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     fill_in "Translation name", with: "Validation translation"
     fill_in "Instructions for the translation", with: "Retain these instructions."
     find("#workspace-glossary summary", text: "Choose saved glossary").click
-    find("input[value='#{@glossary.current_revision_id}']", visible: :all).choose
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@methodology.current_revision_id}']").choose

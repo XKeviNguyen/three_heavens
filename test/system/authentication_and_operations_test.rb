@@ -132,7 +132,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-model-browser.png"))
 
     find("#workspace-glossary summary", text: "Choose saved glossary").click
-    find("input[value='#{glossary.current_revision_id}']", visible: :all).choose
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{glossary.current_revision_id}']", visible: :all).choose
     assert_selector "[data-workspace-summary-target='terminology']", text: "Japanese Sermon Terms"
     first("#workspace-glossary a", text: "Edit").click
     assert_selector "#workspace-terminology-editor input[name='glossary[entries][][source_term]']", visible: :all
