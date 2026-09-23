@@ -39,6 +39,17 @@
             </div>
           </fieldset>
         <% end %>
+        <% if @append_entry %>
+          <fieldset class="grid gap-3 rounded-xl border border-blue-200 bg-white p-3 md:grid-cols-2" data-glossary-entries-target="entry">
+            <div class="flex items-center justify-between md:col-span-2">
+              <legend class="text-xs font-semibold text-slate-700">New term</legend>
+              <button class="text-xs font-semibold text-red-700 disabled:text-slate-400" data-action="glossary-entries#remove" data-glossary-entries-target="remove" type="button">Remove</button>
+            </div>
+            <div><label class="block text-xs font-medium text-slate-600">Source term</label><input autofocus class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][source_term]" required type="text"></div>
+            <div><label class="block text-xs font-medium text-slate-600">Preferred target term</label><input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="200" name="glossary[entries][][preferred_target_term]" required type="text"></div>
+            <div class="md:col-span-2"><label class="block text-xs font-medium text-slate-600">Note (optional)</label><input class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" maxlength="500" name="glossary[entries][][note]" type="text"></div>
+          </fieldset>
+        <% end %>
       </div>
 
       <template data-glossary-entries-target="template">

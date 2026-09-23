@@ -16,5 +16,6 @@ export default class extends Controller {
     this.uploadTarget.hidden = paste
     this.pasteTabTarget.setAttribute("aria-selected", String(paste))
     this.uploadTabTarget.setAttribute("aria-selected", String(!paste))
+    this.element.dispatchEvent(new CustomEvent("workspace-source:changed", { bubbles: true }))
   }
 }

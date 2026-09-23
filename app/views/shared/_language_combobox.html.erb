@@ -11,17 +11,17 @@
           value: value,
           required: required,
           maxlength: 100,
+          placeholder: "Choose or search languages",
           autocomplete: "off",
           role: "combobox",
-          aria: { expanded: "false", autocomplete: "list", controls: "#{field_id}-list" },
+          aria: { expanded: "false", autocomplete: "list", controls: "#{field_id}-list", haspopup: "listbox" },
           data: {
             combobox_target: "input",
             action: "input->combobox#filter focus->combobox#filter keydown->combobox#keydown"
           },
           class: "block w-full min-w-0 rounded-xl border border-slate-300 bg-white py-2.5 pl-3 pr-10 text-sm text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
     <button type="button"
-            tabindex="-1"
-            data-action="mousedown->combobox#toggle"
+            data-action="click->combobox#toggle"
             aria-label="Show <%= label %> suggestions"
             class="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-xl text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
       <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 8 4 4 4-4"/></svg>
@@ -36,6 +36,7 @@
             role="option"
             data-combobox-target="option"
             data-value="<%= language[:name] %>"
+            data-search="<%= language[:name] %> <%= language[:native] %>"
             data-action="mousedown->combobox#choose"
             class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50">
           <span><%= language[:name] %></span>

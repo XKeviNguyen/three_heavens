@@ -61,6 +61,8 @@ Rails.application.routes.draw do
 
   scope "workspace_terminology" do
     get "panel", to: "workspace_terminology#panel", as: :workspace_terminology_panel
+    get "new", to: "workspace_terminology#new", as: :new_workspace_terminology
+    post "", to: "workspace_terminology#create"
     get "edit", to: "workspace_terminology#edit", as: :edit_workspace_terminology
     patch "", to: "workspace_terminology#update", as: :workspace_terminology
   end

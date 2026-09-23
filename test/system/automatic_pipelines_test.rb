@@ -110,13 +110,16 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
   end
 
   def select_role_models(finalizer: false)
-    first = llm_models(:openrouter_claude)
-    second = llm_models(:openrouter_gpt)
-    check "workflow_profile_translator_ids_#{first.id}"
-    check "workflow_profile_translator_ids_#{second.id}"
-    check "workflow_profile_reviewer_ids_#{first.id}"
-    check "workflow_profile_judge_ids_#{second.id}"
-    check "workflow_profile_finalizer_ids_#{first.id}" if finalizer
+    add_catalog_models("Translators", 2)
+    add_catalog_models("Reviewers", 1)
+    add_catalog_models("Judges", 1)
+    add_catalog_models("Finalizers", 1) if finalizer
+  end
+
+  def add_catalog_models(role_label, count)
+    within find("fieldset", text: role_label, match: :first) do
+      count.times { first("button", text: "Add", exact_text: true).click }
+    end
   end
 
   def fill_workspace

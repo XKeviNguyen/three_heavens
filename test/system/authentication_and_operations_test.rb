@@ -74,7 +74,9 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     fill_in "Document title", with: "Browser source"
     fill_in "Translation name", with: "Browser secure import"
     fill_in "Instructions for the translation", with: "Translate faithfully."
-    check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
+    within "#workspace-manual-models" do
+      first("button", text: "Add").click
+    end
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
       click_button "Start translation"
@@ -92,7 +94,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
   test "normal pasted source workflow still starts an experiment" do
     sign_in_in_browser(users(:normal), "correct horse battery staple")
-    create_browser_glossary
+    glossary = create_browser_glossary
     FileUtils.mkdir_p(Rails.root.join("tmp/ux_review"))
 
     page.current_window.resize_to(1440, 1000)
@@ -100,19 +102,37 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_selector "aside#app-sidebar", visible: true
     assert_selector "aside#app-sidebar", text: "Three Heavens"
     assert_no_selector "button[data-action='sidebar#open']", visible: true
-    page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-new-translation.png"))
+    layout_columns = page.evaluate_script("getComputedStyle(document.querySelector('#workspace-layout')).gridTemplateColumns")
+    desktop_metrics = page.evaluate_script("({ width: window.innerWidth, rootFont: getComputedStyle(document.documentElement).fontSize, media: matchMedia('(min-width: 75rem)').matches, className: document.querySelector('#workspace-layout').className, sheets: Array.from(document.styleSheets).map((sheet) => sheet.href) })")
+    assert_operator layout_columns.split.size, :>=, 2, "Expected desktop workspace split, got #{layout_columns.inspect} with #{desktop_metrics.inspect}"
 
-    find("input[name='translation_workspace[source_language]']").click
-    assert_selector "li[role='option'][data-value='Japanese']", visible: true
-    find("input[name='translation_workspace[target_language]']").click
-    assert_selector "li[role='option'][data-value='Vietnamese']", visible: true
+    source_language = find("input[name='translation_workspace[source_language]']")
+    source_language.send_keys("viet", :arrow_down, :enter)
+    assert_equal "Vietnamese", source_language.value
+    source_language.send_keys(:escape)
+    assert_no_selector "#translation_workspace_source_language-list", visible: true
+
+    target_language = find("input[name='translation_workspace[target_language]']")
+    target_language.send_keys("japan", :arrow_down, :enter)
+    assert_equal "Japanese", target_language.value
+    target_language.send_keys(:escape)
+    assert_selector "[data-workspace-summary-target='language']", text: "Vietnamese → Japanese"
+    page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-new-translation.png"))
 
     assert_selector "#workspace-manual-models div[role='option']", minimum: 10
     assert_selector "#workspace-manual-models button", text: "Add", minimum: 1
+    within "#workspace-manual-models" do
+      first("button", text: "Add").click
+      assert_text "1 model selected"
+    end
+    assert_selector "[data-workspace-summary-target='models']", text: "1 selected"
     scroll_to find("#workspace-manual-models")
     page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-model-browser.png"))
 
-    first("#workspace-glossary a", text: "Edit terminology").click
+    find("#workspace-glossary summary", text: "Choose saved glossary").click
+    find("input[value='#{glossary.current_revision_id}']", visible: :all).choose
+    assert_selector "[data-workspace-summary-target='terminology']", text: "Japanese Sermon Terms"
+    first("#workspace-glossary a", text: "Edit").click
     assert_selector "input[name='glossary[entries][][source_term]']", visible: true
     scroll_to find("#workspace-glossary")
     page.save_screenshot(Rails.root.join("tmp/ux_review/desktop-1440-terminology.png"))
@@ -125,7 +145,6 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     fill_in "Source text", with: "Pasted text remains supported"
     fill_in "Translation name", with: "Pasted browser experiment"
     fill_in "Instructions for the translation", with: "Translate faithfully."
-    check "translation_workspace_model_ids_#{llm_models(:openrouter_claude).id}"
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
       click_button "Start translation"
@@ -158,6 +177,28 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     page.driver.browser.action.send_keys(:escape).perform
     assert_no_selector "aside#app-sidebar", visible: true
     assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
+
+    page.current_window.resize_to(1440, 1000)
+    visit root_path
+    [ [ 1.25, "125" ], [ 1.5, "150" ], [ 2.0, "200" ] ].each do |scale, label|
+      page.driver.browser.execute_cdp(
+        "Emulation.setDeviceMetricsOverride",
+        width: (1440 / scale).floor,
+        height: (1000 / scale).floor,
+        deviceScaleFactor: scale,
+        mobile: false
+      )
+      assert_selector "h1", text: "New translation"
+      overflow = page.evaluate_script("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+      assert_operator overflow, :<=, 0, "Expected no horizontal overflow at #{label}% zoom, saw #{overflow}px"
+      if scale < 1.5
+        assert_selector "aside#app-sidebar", visible: true
+      else
+        assert_selector "button[data-action='sidebar#open']", visible: true
+      end
+      page.save_screenshot(Rails.root.join("tmp/ux_review/zoom-#{label}.png"))
+    end
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
     page.current_window.resize_to(1400, 1000)
   end
 

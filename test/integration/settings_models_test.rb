@@ -342,7 +342,8 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
   def assert_model_is_available_in_all_selectors(model, reviewer_experiment:, judge_review_round:)
     get root_path
-    assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 1
+    assert_select "#workspace-manual-models input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
+    assert_select "#workspace-manual-models[data-available='true']", count: 1
 
     get experiment_path(reviewer_experiment)
     assert_select "h2", "Start blind cross-review"

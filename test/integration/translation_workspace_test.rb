@@ -37,7 +37,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     @second_model = llm_models(:openrouter_gpt)
   end
 
-  test "workspace is the application root and lists only active OpenRouter models" do
+  test "workspace is the application root and uses the trusted OpenRouter catalog browser" do
     inactive_model = LlmModel.create!(
       gateway: "openrouter",
       provider: "anthropic",
@@ -58,8 +58,9 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "New translation"
     assert_select "form[action='#{translation_workspace_path}']"
-    assert_select "input[type='checkbox'][value='#{@first_model.id}']"
-    assert_select "input[type='checkbox'][value='#{@second_model.id}']"
+    assert_select "[data-controller='model-browser'][data-model-browser-endpoint-value='#{open_router_catalog_path}']"
+    assert_select "input[type='checkbox'][value='#{@first_model.id}']", count: 0
+    assert_select "input[type='checkbox'][value='#{@second_model.id}']", count: 0
     assert_select "input[type='checkbox'][value='#{inactive_model.id}']", count: 0
     assert_select "input[type='checkbox'][value='#{other_gateway_model.id}']", count: 0
   end

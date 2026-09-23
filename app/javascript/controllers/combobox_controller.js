@@ -9,16 +9,26 @@ export default class extends Controller {
   connect() {
     this.activeIndex = -1
     this.visibleOptions = []
+    this.boundCloseIfOutside = this.closeIfOutside.bind(this)
+    document.addEventListener("pointerdown", this.boundCloseIfOutside)
     this.close()
+  }
+
+  disconnect() {
+    document.removeEventListener("pointerdown", this.boundCloseIfOutside)
+  }
+
+  closeIfOutside(event) {
+    if (!this.element.contains(event.target)) this.close()
   }
 
   filter() {
     const query = this.inputTarget.value.trim().toLowerCase()
     this.visibleOptions = this.optionTargets.filter((option) => {
-      const value = (option.dataset.value || option.textContent).toLowerCase()
+      const value = (option.dataset.search || option.dataset.value || option.textContent).toLowerCase()
       const match = query === "" || value.includes(query)
       option.hidden = !match
-      option.setAttribute("aria-selected", "false")
+      option.setAttribute("aria-selected", option.dataset.value === this.inputTarget.value ? "true" : "false")
       return match
     })
     this.activeIndex = -1
@@ -89,6 +99,7 @@ export default class extends Controller {
     this.inputTarget.value = option.dataset.value || option.textContent.trim()
     this.inputTarget.dispatchEvent(new Event("input", { bubbles: true }))
     this.inputTarget.dispatchEvent(new Event("change", { bubbles: true }))
+    this.dispatch("change")
     this.close()
     this.inputTarget.focus()
   }

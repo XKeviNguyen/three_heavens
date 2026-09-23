@@ -117,10 +117,23 @@ class TranslationWorkspace
   end
 
   def model_identifier_selections
-    Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq.map do |identifier|
+    catalog_selections = Array(model_identifiers).map(&:to_s).reject(&:blank?).uniq.map do |identifier|
       model = LlmModel.find_by(gateway: "openrouter", model_identifier: identifier)
       { identifier: identifier, name: model&.display_name || identifier }
     end
+
+    saved_selections = LlmModel.active_openrouter.where(id: Array(model_ids).filter_map do |id|
+      id.to_i if id.to_s.match?(/\A[1-9]\d*\z/)
+    end).map do |model|
+      {
+        identifier: model.model_identifier,
+        name: model.display_name,
+        input_name: "translation_workspace[model_ids][]",
+        input_value: model.id
+      }
+    end
+
+    (catalog_selections + saved_selections).uniq { |selection| selection[:identifier] }
   end
 
   def prepare_provider_work_plan_preview(revision:)

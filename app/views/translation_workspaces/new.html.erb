@@ -1,24 +1,28 @@
 <% content_for :title, "New translation · Three Heavens" %>
 
-<div class="mx-auto w-full max-w-7xl">
-  <header class="mb-8">
-    <p class="text-xs font-semibold uppercase tracking-wider text-blue-700">Translation workspace</p>
-    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl"><%= @translation_workspace.existing_project? ? "Add a translation to this Project" : "New translation" %></h1>
-    <p class="mt-2 max-w-2xl text-base text-slate-600">Paste or upload a document, choose your languages and AI models, then review the best translation.</p>
-    <% if @translation_workspace.existing_project? %>
-      <p class="mt-2 text-sm text-slate-500">Adding to <span class="font-semibold text-slate-700"><%= @translation_workspace.project.name %></span>.</p>
-    <% end %>
+<div class="mx-auto w-full max-w-[94rem]">
+  <header class="mb-6 flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wider text-blue-700">Translation workspace</p>
+      <h1 class="mt-1.5 text-3xl font-bold tracking-tight text-slate-950"><%= @translation_workspace.existing_project? ? "Add a translation to this Project" : "New translation" %></h1>
+      <p class="mt-1.5 max-w-2xl text-sm leading-6 text-slate-600">Paste or upload a document, choose your languages and AI models, then review the best translation.</p>
+      <% if @translation_workspace.existing_project? %><p class="mt-1 text-xs text-slate-500">Adding to <span class="font-semibold text-slate-700"><%= @translation_workspace.project.name %></span>.</p><% end %>
+    </div>
+    <ol class="flex items-center gap-2 text-xs font-medium text-slate-500" aria-label="Translation setup progress">
+      <li class="flex items-center gap-1.5 text-blue-700"><span class="flex size-6 items-center justify-center rounded-full bg-blue-700 text-[11px] font-bold text-white">1</span> Prepare</li>
+      <li class="h-px w-5 bg-slate-300" aria-hidden="true"></li>
+      <li class="flex items-center gap-1.5"><span class="flex size-6 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold">2</span> Translate</li>
+      <li class="h-px w-5 bg-slate-300" aria-hidden="true"></li>
+      <li class="flex items-center gap-1.5"><span class="flex size-6 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold">3</span> Review</li>
+    </ol>
   </header>
 
   <% if @repeated_from_experiment %>
-    <section class="mb-8 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950">
-      <p class="font-semibold">Prefilled from a previous translation</p>
-      <p class="mt-1">The previous translation remains unchanged. Only settings that are still active and current are preselected. Review every field and explicitly authorize any paid work.</p>
-    </section>
+    <section class="mb-5 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm text-blue-950"><p class="font-semibold">Prefilled from a previous translation</p><p class="mt-1">The previous translation remains unchanged. Review every field and explicitly authorize any paid work.</p></section>
   <% end %>
-  <% if @repeat_configuration_notice %><p class="mb-8 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
+  <% if @repeat_configuration_notice %><p class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
 
-  <%= form_with model: @translation_workspace, url: translation_workspace_path, id: "workspace-form", class: "", data: { controller: "workflow-mode" } do |form| %>
+  <%= form_with model: @translation_workspace, url: translation_workspace_path, id: "workspace-form", data: { controller: "workflow-mode workspace-summary", action: "input->workspace-summary#update change->workspace-summary#update combobox:change->workspace-summary#update workspace-source:changed->workspace-summary#update workspace-models:changed->workspace-summary#update turbo:frame-load->workspace-summary#update" } do |form| %>
     <%= form.hidden_field :submission_token %>
     <% if @translation_workspace.existing_project? %><%= form.hidden_field :project_id %><% end %>
     <% if @translation_workspace.source_import %>
@@ -28,317 +32,115 @@
     <%= form.hidden_field :automatic_plan_digest %>
 
     <% if @translation_workspace.errors.any? %>
-      <section class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4" aria-labelledby="form-errors-heading" role="alert">
+      <section class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4" aria-labelledby="form-errors-heading" role="alert">
         <h2 id="form-errors-heading" class="text-sm font-semibold text-red-900">Please correct the following:</h2>
-        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
-          <% @translation_workspace.errors.each do |error| %>
-            <li><%= link_to error.full_message, "##{workspace_error_anchor(error.attribute)}", class: "underline decoration-red-300 underline-offset-2" %></li>
-          <% end %>
-        </ul>
+        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800"><% @translation_workspace.errors.each do |error| %><li><%= link_to error.full_message, "##{workspace_error_anchor(error.attribute)}", class: "underline decoration-red-300 underline-offset-2" %></li><% end %></ul>
       </section>
     <% end %>
 
-    <div class="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <div class="min-w-0 space-y-8">
-
-        <section id="workspace-project" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div class="flex items-center gap-1.5">
-            <h2 class="text-base font-semibold text-slate-950">Source</h2>
-            <%= render "shared/hint", text: "The document you want to translate and the language pair for this work.", label: "Source" %>
+    <div id="workspace-layout" class="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      <div class="min-w-0 overflow-visible rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <section id="workspace-project" class="p-5 sm:p-6 lg:p-7">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-1.5"><h2 class="text-lg font-semibold text-slate-950">Source</h2><%= render "shared/hint", text: "The document you want to translate and the language pair for this work.", label: "Source" %></div>
+            <span class="text-xs text-slate-400">Required</span>
           </div>
 
           <% if @translation_workspace.existing_project? %>
-            <div id="workspace-source-languages" class="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm">
-              <span class="font-semibold text-slate-900"><%= @translation_workspace.project.source_language %></span>
-              <span class="text-slate-400" aria-hidden="true">→</span>
-              <span class="font-semibold text-slate-900"><%= @translation_workspace.project.target_language %></span>
-              <span class="text-xs text-slate-500">Fixed for this project</span>
-            </div>
+            <div id="workspace-source-languages" class="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm"><span class="font-semibold text-slate-900"><%= @translation_workspace.project.source_language %></span><span class="text-slate-400" aria-hidden="true">→</span><span class="font-semibold text-slate-900"><%= @translation_workspace.project.target_language %></span><span class="text-xs text-slate-500">Fixed for this project</span></div>
           <% else %>
             <div id="workspace-source-languages" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end">
-              <div class="sm:col-span-1">
-                <%= render "shared/language_combobox", form: form, method: :source_language, label: "Source language", value: @translation_workspace.source_language, hint: "The language of the document you are translating." %>
-              </div>
+              <%= render "shared/language_combobox", form: form, method: :source_language, label: "Source language", value: @translation_workspace.source_language, hint: "The language of the document you are translating." %>
               <div class="hidden pb-3 text-center text-lg text-slate-400 sm:block" aria-hidden="true">→</div>
-              <div class="sm:col-span-1">
-                <%= render "shared/language_combobox", form: form, method: :target_language, label: "Target language", value: @translation_workspace.target_language, hint: "The language the finished translation should be written in." %>
-              </div>
+              <%= render "shared/language_combobox", form: form, method: :target_language, label: "Target language", value: @translation_workspace.target_language, hint: "The language the finished translation should be written in." %>
               <div class="sm:col-span-3">
-                <div class="flex items-center gap-1.5">
-                  <%= form.label :project_name, "Project name", class: "block text-sm font-medium text-slate-700" %>
-                  <%= render "shared/hint", text: "A reusable container for documents that share the same language pair.", label: "Project" %>
-                </div>
-                <%= form.text_field :project_name, required: true, maxlength: 150, class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
+                <div class="flex items-center gap-1.5"><%= form.label :project_name, "Project name", class: "block text-sm font-medium text-slate-700" %><%= render "shared/hint", text: "A reusable container for documents that share the same language pair.", label: "Project" %></div>
+                <%= form.text_field :project_name, required: true, maxlength: 150, placeholder: "e.g. Weekly sermons", class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
               </div>
             </div>
           <% end %>
 
           <section id="workspace-source" class="mt-6 border-t border-slate-100 pt-5" data-controller="source-mode">
-            <div class="flex items-center gap-1.5">
-              <h3 class="text-sm font-semibold text-slate-900">Document</h3>
-              <%= render "shared/hint", text: "Paste text or upload a TXT, Markdown, or DOCX file. Uploading never contacts an AI provider.", label: "Source document" %>
-            </div>
-
-            <div class="mt-3 inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Source input method">
-              <button type="button" role="tab" aria-selected="true" aria-controls="source-paste-panel" data-source-mode-target="pasteTab" data-action="source-mode#showPaste" class="rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-600 aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Paste text</button>
-              <button type="button" role="tab" aria-selected="false" aria-controls="source-upload-panel" data-source-mode-target="uploadTab" data-action="source-mode#showUpload" class="rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-600 aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Upload file</button>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-1.5"><h3 class="text-sm font-semibold text-slate-900">Source document</h3><%= render "shared/hint", text: "Paste text or upload a TXT, Markdown, or DOCX file. Uploading never contacts an AI provider.", label: "Source document" %></div>
+              <div class="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Source input method">
+                <button type="button" role="tab" aria-selected="true" aria-controls="source-paste-panel" data-source-mode-target="pasteTab" data-action="source-mode#showPaste" class="rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-600 aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Paste text</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="source-upload-panel" data-source-mode-target="uploadTab" data-action="source-mode#showUpload" class="rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-600 aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Upload file</button>
+              </div>
             </div>
 
             <div id="source-paste-panel" data-source-mode-target="paste" class="mt-4 space-y-4">
-              <div>
-                <div class="flex items-center gap-1.5">
-                  <%= form.label :document_title, "Document title", class: "block text-sm font-medium text-slate-700" %>
-                  <%= render "shared/hint", text: "A short name used to identify this source in projects and history.", label: "Document title" %>
-                </div>
-                <%= form.text_field :document_title, required: true, maxlength: 255, class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-              </div>
-              <div>
-                <%= form.label :source_text, (@translation_workspace.source_import ? "Reviewed source text" : "Source text"), class: "block text-sm font-medium text-slate-700" %>
-                <%= form.text_area :source_text, required: true, maxlength: Ai::UsageLimits::MAX_SOURCE_CHARACTERS, rows: 12, class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm leading-6 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-              </div>
+              <div><div class="flex items-center gap-1.5"><%= form.label :document_title, "Document title", class: "block text-sm font-medium text-slate-700" %><%= render "shared/hint", text: "A short name used to identify this source in projects and history.", label: "Document title" %></div><%= form.text_field :document_title, required: true, maxlength: 255, placeholder: "Give this document a clear title", class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %></div>
+              <div><%= form.label :source_text, (@translation_workspace.source_import ? "Reviewed source text" : "Source text"), class: "block text-sm font-medium text-slate-700" %><%= form.text_area :source_text, required: true, maxlength: Ai::UsageLimits::MAX_SOURCE_CHARACTERS, rows: 10, placeholder: "Paste the text you want to translate…", class: "mt-1.5 block w-full resize-y rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm leading-6 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %></div>
             </div>
 
-            <div id="source-upload-panel" data-source-mode-target="upload" class="mt-4" hidden>
-              <%= turbo_frame_tag "source-import-upload", src: new_source_import_path(project_id: @translation_workspace.project_id) do %>
-                <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Loading the secure upload area…</p>
-              <% end %>
-            </div>
+            <div id="source-upload-panel" data-source-mode-target="upload" class="mt-4" hidden><%= turbo_frame_tag "source-import-upload", src: new_source_import_path(project_id: @translation_workspace.project_id) do %><p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Loading the secure upload area…</p><% end %></div>
 
             <% if @translation_workspace.source_import %>
               <% source_import = @translation_workspace.source_import %>
               <div id="workspace-source-import" class="mt-4 rounded-xl border <%= source_import.available? ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50" %> p-4">
-                <% if source_import.available? %>
-                  <div class="flex items-start gap-3">
-                    <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 ring-1 ring-emerald-200" aria-hidden="true">
-                      <svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.5 2.5H6A1.5 1.5 0 0 0 4.5 4v12A1.5 1.5 0 0 0 6 17.5h8a1.5 1.5 0 0 0 1.5-1.5V6.5z"/><path stroke-linecap="round" d="M11.5 2.5V6.5h4"/></svg>
-                    </span>
-                    <div class="min-w-0">
-                      <h2 class="truncate text-sm font-semibold text-emerald-950"><%= source_import.original_filename %></h2>
-                      <p class="mt-0.5 text-xs text-emerald-800"><%= source_import.imported_format.to_s.upcase %> · <%= number_to_human_size(source_import.byte_size) %> · imported successfully</p>
-                      <p class="mt-1 text-xs text-emerald-800">Edit the extracted text above if needed. Translation runs begin only after this form is accepted.</p>
-                    </div>
-                  </div>
-                <% else %>
-                  <h2 class="text-sm font-semibold text-red-950">Uploaded source is no longer available</h2>
-                  <p class="mt-1 text-xs text-red-800"><%= source_import.availability_message %></p>
-                <% end %>
+                <% if source_import.available? %><div class="flex items-start gap-3"><span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 ring-1 ring-emerald-200" aria-hidden="true">✓</span><div class="min-w-0"><h2 class="truncate text-sm font-semibold text-emerald-950"><%= source_import.original_filename %></h2><p class="mt-0.5 text-xs text-emerald-800"><%= source_import.imported_format.to_s.upcase %> · <%= number_to_human_size(source_import.byte_size) %> · imported successfully</p><p class="mt-1 text-xs text-emerald-800">Review and edit the extracted text above before starting.</p></div></div><% else %><h2 class="text-sm font-semibold text-red-950">Uploaded source is no longer available</h2><p class="mt-1 text-xs text-red-800"><%= source_import.availability_message %></p><% end %>
                 <%= link_to "Cancel this import", source_import_path(source_import), data: { turbo_method: :delete, turbo_confirm: "Cancel this import and remove its temporary upload?" }, class: "mt-3 inline-flex text-xs font-semibold text-red-700 hover:text-red-900" %>
               </div>
             <% end %>
           </section>
         </section>
 
-        <section id="workspace-experiment" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 class="text-base font-semibold text-slate-950">Your instructions</h2>
-          <p class="mt-1 text-sm text-slate-500">Optional context that applies to every model and stage.</p>
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <div class="flex items-center gap-1.5">
-                <%= form.label :experiment_name, "Translation name (optional)", class: "block text-sm font-medium text-slate-700" %>
-                <%= render "shared/hint", text: "A private label that helps you recognize this translation later.", label: "Translation name" %>
-              </div>
-              <%= form.text_field :experiment_name, maxlength: 150, class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-            </div>
-            <div>
-              <div class="flex items-center gap-1.5">
-                <%= form.label :instruction_prompt, "Instructions for the translation", class: "block text-sm font-medium text-slate-700" %>
-                <%= render "shared/hint", text: "Tell the AI how this translation should read. These instructions apply to every model and stage.", label: "Instructions for the translation" %>
-              </div>
-              <%= form.text_area :instruction_prompt, required: true, maxlength: Ai::UsageLimits::MAX_INSTRUCTION_CHARACTERS, rows: 3, placeholder: "Tone, terminology, audience, formatting, names to preserve, or anything else the translation should follow.", class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-            </div>
+        <section id="workspace-experiment" class="border-t border-slate-200 p-5 sm:p-6 lg:p-7">
+          <h2 class="text-lg font-semibold text-slate-950">Your instructions</h2>
+          <p class="mt-1 text-sm text-slate-500">Optional context that applies to every candidate and workflow stage.</p>
+          <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+            <div><div class="flex items-center gap-1.5"><%= form.label :experiment_name, "Translation name (optional)", class: "block text-sm font-medium text-slate-700" %><%= render "shared/hint", text: "A private label that helps you recognize this translation later.", label: "Translation name" %></div><%= form.text_field :experiment_name, maxlength: 150, class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %></div>
+            <div><div class="flex items-center gap-1.5"><%= form.label :instruction_prompt, "Instructions for the translation", class: "block text-sm font-medium text-slate-700" %><%= render "shared/hint", text: "Tell the AI how this translation should read. These instructions apply to every model and stage.", label: "Instructions for the translation" %></div><%= form.text_area :instruction_prompt, required: true, maxlength: Ai::UsageLimits::MAX_INSTRUCTION_CHARACTERS, rows: 3, placeholder: "Tone, terminology, audience, formatting, names to preserve, or anything else the translation should follow.", class: "mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %></div>
           </div>
         </section>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 class="text-base font-semibold text-slate-950">Translation guidance</h2>
-          <p class="mt-1 text-sm text-slate-500">Optional owner guidance that shapes terminology, style, and wording.</p>
-
-          <fieldset id="workspace-glossary" class="min-w-0 mt-4">
-            <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-              Terminology
-              <%= render "shared/hint", text: "Preferred terms Three Heavens should preserve consistently.", label: "Terminology" %>
-            </legend>
-            <div class="mt-3">
-              <%= turbo_frame_tag "workspace-terminology" do %>
-                <%= render "workspace_terminology/panel", glossaries: @glossaries, selected_revision_id: @translation_workspace.glossary_revision_id, pagination: @glossaries_pagination %>
-              <% end %>
-            </div>
+        <section class="border-t border-slate-200 p-5 sm:p-6 lg:p-7">
+          <div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-slate-950">Translation guidance</h2><p class="mt-1 text-sm text-slate-500">Keep preferred wording close to the work; reveal advanced guidance only when needed.</p></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Optional</span></div>
+          <fieldset id="workspace-glossary" class="mt-5 min-w-0">
+            <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">Terminology <%= render "shared/hint", text: "Preferred terms Three Heavens should preserve consistently.", label: "Terminology" %></legend>
+            <div class="mt-3"><%= turbo_frame_tag "workspace-terminology" do %><%= render "workspace_terminology/panel", glossaries: @glossaries, selected_revision_id: @translation_workspace.glossary_revision_id, pagination: @glossaries_pagination %><% end %></div>
           </fieldset>
 
           <details class="mt-5 border-t border-slate-100 pt-4">
             <summary class="cursor-pointer text-sm font-semibold text-slate-800">References, methodology &amp; advanced guidance</summary>
-            <div class="mt-4 space-y-6">
+            <div class="mt-5 grid gap-7 lg:grid-cols-2">
               <fieldset id="workspace-references">
-                <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-                  References
-                  <%= render "shared/hint", text: "Approved bilingual examples the AI can follow for wording and style.", label: "References" %>
-                </legend>
-                <p class="mt-1 text-xs text-slate-500">Select up to 5 examples. The exact selected revisions apply to the whole translation.</p>
-                <div class="mt-3 space-y-2">
-                  <% @translation_references.each do |reference| %>
-                    <% revision = reference.current_revision %>
-                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/40">
-                      <%= check_box_tag "translation_workspace[translation_reference_revision_ids][]", revision.id, @translation_workspace.translation_reference_revision_ids.map(&:to_s).include?(revision.id.to_s), id: "translation_workspace_translation_reference_revision_ids_#{revision.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
-                      <span><span class="block text-sm font-medium"><%= revision.title %> · revision <%= revision.version %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span>
-                    </label>
-                  <% end %>
-                </div>
+                <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">References <%= render "shared/hint", text: "Approved bilingual examples the AI can follow for wording and style.", label: "References" %></legend>
+                <p class="mt-1 text-xs text-slate-500">Select up to 5 approved examples.</p>
+                <div class="mt-3 space-y-2"><% @translation_references.each do |reference| %><% revision = reference.current_revision %><label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/40"><%= check_box_tag "translation_workspace[translation_reference_revision_ids][]", revision.id, @translation_workspace.translation_reference_revision_ids.map(&:to_s).include?(revision.id.to_s), id: "translation_workspace_translation_reference_revision_ids_#{revision.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %><span><span class="block text-sm font-medium"><%= revision.title %> · revision <%= revision.version %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></label><% end %></div>
                 <%= render "translation_workspaces/configuration_pagination", pagination: @translation_references_pagination, label: "Translation references", page_param: :translation_reference_page %>
-                <% selected_count = @translation_workspace.translation_reference_revision_ids.count(&:present?) %>
-                <p class="mt-2 text-xs font-semibold text-slate-600"><%= selected_count %> of 5 references selected</p>
-                <% if @translation_references.empty? %><p class="mt-2 text-xs text-slate-500"><%= link_to "Create a reference", new_translation_reference_path, class: "font-semibold text-blue-700" %> to add approved bilingual examples.</p><% end %>
+                <% selected_count = @translation_workspace.translation_reference_revision_ids.count(&:present?) %><p class="mt-2 text-xs font-semibold text-slate-600"><%= selected_count %> of 5 references selected</p>
+                <% if @translation_references.empty? %><p class="mt-2 text-xs text-slate-500"><%= link_to "Create a reference", new_translation_reference_path, class: "font-semibold text-blue-700" %> to add approved examples.</p><% end %>
               </fieldset>
 
-              <fieldset id="workspace-methodology">
-                <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-                  Methodology
-                  <%= render "shared/hint", text: "Reusable guidance describing how translations should be produced.", label: "Methodology" %>
-                </legend>
-                <div class="mt-3 space-y-2">
-                  <label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, "", checked: @translation_workspace.methodology_profile_revision_id.blank?, class: "mt-1 size-4" %><span><span class="text-sm font-semibold">No methodology</span><span class="mt-0.5 block text-xs text-slate-500">Continue with only the instructions and any selected terminology.</span></span></span></label>
-                  <% @methodology_profiles.each do |profile| %>
-                    <% revision = profile.current_revision %>
-                    <label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, revision.id, checked: @translation_workspace.methodology_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></span></label>
-                  <% end %>
-                </div>
-                <%= render "translation_workspaces/configuration_pagination", pagination: @methodology_profiles_pagination, label: "Methodology profiles", page_param: :methodology_profile_page %>
-                <% if @methodology_profiles.empty? %><p class="mt-2 text-xs text-slate-500"><%= link_to "Create a methodology profile", new_methodology_profile_path, class: "font-semibold text-blue-700" %> to add reusable translation guidance.</p><% end %>
-              </fieldset>
-
-              <fieldset id="workspace-guidance">
-                <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-                  Guidance priority
-                  <%= render "shared/hint", text: "If selected guidance suggests different wording, choose which source wins.", label: "Guidance priority" %>
-                </legend>
-                <div class="mt-3 space-y-2">
-                  <% TranslationGuidance::Policy::LABELS.each do |value, label| %>
-                    <label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><%= form.radio_button :guidance_preference, value, checked: @translation_workspace.guidance_preference == value, class: "size-4" %><span class="text-sm font-semibold"><%= label %></span></label>
-                  <% end %>
-                </div>
-              </fieldset>
+              <div class="space-y-6">
+                <fieldset id="workspace-methodology">
+                  <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">Methodology <%= render "shared/hint", text: "Reusable guidance describing how translations should be produced.", label: "Methodology" %></legend>
+                  <div class="mt-3 space-y-2"><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, "", checked: @translation_workspace.methodology_profile_revision_id.blank?, class: "mt-1 size-4" %><span><span class="text-sm font-semibold">No methodology</span><span class="mt-0.5 block text-xs text-slate-500">Use instructions and terminology only.</span></span></span></label><% @methodology_profiles.each do |profile| %><% revision = profile.current_revision %><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, revision.id, checked: @translation_workspace.methodology_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></span></label><% end %></div>
+                  <%= render "translation_workspaces/configuration_pagination", pagination: @methodology_profiles_pagination, label: "Methodology profiles", page_param: :methodology_profile_page %>
+                </fieldset>
+                <fieldset id="workspace-guidance"><legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900">Guidance priority <%= render "shared/hint", text: "If selected guidance suggests different wording, choose which source wins.", label: "Guidance priority" %></legend><div class="mt-3 space-y-2"><% TranslationGuidance::Policy::LABELS.each do |value, label| %><label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><%= form.radio_button :guidance_preference, value, checked: @translation_workspace.guidance_preference == value, class: "size-4" %><span class="text-sm font-semibold"><%= label %></span></label><% end %></div></fieldset>
+              </div>
             </div>
           </details>
         </section>
-
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 class="text-base font-semibold text-slate-950">AI workflow</h2>
-          <fieldset id="workspace-workflow-mode" class="min-w-0 mt-4">
-            <legend class="sr-only">Workflow mode</legend>
-            <div class="grid gap-2 sm:grid-cols-2">
-              <label class="cursor-pointer rounded-xl border border-slate-200 p-3 has-checked:border-blue-500 has-checked:bg-blue-50/60"><%= form.radio_button :workflow_mode, "manual", checked: @translation_workspace.workflow_mode == "manual", data: { action: "workflow-mode#update" } %> <span class="ml-1.5 text-sm font-semibold">Manual</span><span class="mt-1 block text-xs text-slate-600">Choose one or more models. Each creates an independent translation candidate. You control review, judging, and editing.</span></label>
-              <label class="cursor-pointer rounded-xl border border-slate-200 p-3 has-checked:border-blue-500 has-checked:bg-blue-50/60"><%= form.radio_button :workflow_mode, "automatic", checked: @translation_workspace.workflow_mode == "automatic", data: { action: "workflow-mode#update" } %> <span class="ml-1.5 text-sm font-semibold">Automatic</span><span class="mt-1 block text-xs text-slate-600">Use a saved workflow to advance through its stages, always stopping at the human editor.</span></label>
-            </div>
-          </fieldset>
-
-          <fieldset id="workspace-manual-models" class="min-w-0 mt-6" data-workflow-mode-target="manual" data-available="<%= @available_models.any? %>">
-            <legend class="sr-only">AI models</legend>
-            <div class="flex items-center gap-1.5">
-              <h3 class="text-sm font-semibold text-slate-900">AI models</h3>
-              <%= render "shared/hint", text: "Choose independent OpenRouter models to produce translation candidates.", label: "AI models" %>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">Choose 1–<%= Ai::UsageLimits::MAX_TRANSLATION_MODELS %> independent models.</p>
-            <div class="mt-4">
-              <%= render "shared/model_browser",
-                    role: "translator",
-                    name: "translation_workspace[model_identifiers][]",
-                    max: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
-                    label: "Browse OpenRouter",
-                    hint: "Search the live OpenRouter catalog. Only models that support this translation stage are suggested.",
-                    description: "New models are added with trusted catalog metadata; existing saved models keep their history.",
-                    selected: @translation_workspace.model_identifier_selections %>
-            </div>
-            <% if @available_models.any? %>
-              <details open class="mt-4">
-                <summary class="cursor-pointer text-xs font-semibold text-slate-500">Saved models</summary>
-                <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                  <% @available_models.each do |llm_model| %>
-                    <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 p-2.5 hover:border-blue-300 hover:bg-blue-50/40">
-                      <%= check_box_tag "translation_workspace[model_ids][]", llm_model.id, @translation_workspace.model_ids.map(&:to_s).include?(llm_model.id.to_s), id: "translation_workspace_model_ids_#{llm_model.id}", class: "mt-0.5 size-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
-                      <span class="min-w-0">
-                        <span class="block truncate text-xs font-medium text-slate-800"><%= llm_model.display_name %></span>
-                        <span class="mt-0.5 block truncate font-mono text-[11px] text-slate-500"><%= llm_model.model_identifier %></span>
-                      </span>
-                    </label>
-                  <% end %>
-                </div>
-              </details>
-            <% else %>
-              <p class="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">No active saved models are available. Search the live catalog above.</p>
-            <% end %>
-          </fieldset>
-
-          <fieldset id="workspace-automatic" class="min-w-0 mt-6" data-workflow-mode-target="automatic" data-available="<%= @workflow_profiles.any? %>">
-            <legend class="sr-only">Saved workflow</legend>
-            <% if @workflow_profiles.any? %>
-              <div class="flex items-center gap-1.5">
-                <h3 class="text-sm font-semibold text-slate-900">Saved workflow</h3>
-                <%= render "shared/hint", text: "Manual lets you control each stage. Automatic advances through a saved workflow and always stops for the human editor.", label: "Workflow" %>
-              </div>
-              <div class="mt-3 space-y-2">
-                <% @workflow_profiles.each do |profile| %>
-                  <% revision = profile.current_revision %>
-                  <label class="block rounded-xl border border-slate-200 p-3">
-                    <span class="flex items-start gap-3"><%= form.radio_button :workflow_profile_revision_id, revision.id, checked: @translation_workspace.workflow_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · revision <%= revision.version %></span><span class="mt-1 block text-xs text-slate-600"><%= revision.completion_mode.humanize %> · <%= revision.role_count("translator") %> translators · <%= revision.role_count("reviewer") %> reviewers · <%= revision.role_count("judge") %> judges · <%= revision.role_count("finalizer") %> finalizers = <%= revision.authorized_initial_provider_run_count %> initial requests for a single-segment source, at most <%= revision.authorized_initial_provider_run_count * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> including built-in retries</span><span class="mt-1 block text-xs text-slate-500">Models: <%= revision.model_selections.map(&:display_name_snapshot).to_sentence %>. Stages: translation → blind review → independent judging<%= " → refinement proposals" if revision.refinement_proposals? %> → human editor.</span></span></span>
-                  </label>
-                <% end %>
-              </div>
-              <%= render "translation_workspaces/configuration_pagination", pagination: @workflow_profiles_pagination, label: "Workflow profiles", page_param: :workflow_profile_page %>
-              <% if @translation_workspace.provider_work_plan_preview %>
-                <% work_plan = @translation_workspace.provider_work_plan_preview %>
-                <section class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-                  <div class="flex items-center gap-1.5">
-                    <h3 class="font-semibold">Paid-work authorization</h3>
-                    <%= render "shared/hint", text: "Automatic AI work can create multiple paid OpenRouter requests.", label: "Paid-work authorization" %>
-                  </div>
-                  <p class="mt-1 text-xs"><%= work_plan.fetch("segment_count") %> source segment(s) require <strong><%= work_plan.fetch("authorized_initial_provider_request_slots") %></strong> initial provider request slots and authorize at most <strong><%= work_plan.fetch("maximum_automatic_provider_requests") %></strong> requests including built-in retries.</p>
-                  <ul class="mt-2 list-disc space-y-1 pl-5 text-xs">
-                    <% work_plan.fetch("roles").each do |role, details| %>
-                      <li><%= role.humanize.pluralize %>: <%= details.fetch("logical_run_count") %> logical runs × <%= work_plan.fetch("segment_count") %> segments = <%= details.fetch("provider_request_slots") %> requests</li>
-                    <% end %>
-                  </ul>
-                  <p class="mt-2 text-xs">Each slot has an exact ceiling of <%= work_plan.dig("built_in_retry_policy", "maximum_attempts_per_slot") %> attempts. The pipeline stops for the human editor; refinement is <%= work_plan.dig("roles", "finalizer", "logical_run_count").positive? ? "included as proposals only" : "not included" %>.</p>
-                </section>
-              <% end %>
-              <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-                <%= form.check_box :automatic_confirmation, { checked: @translation_workspace.automatic_confirmation == "1", class: "mt-1 size-4" }, "1", "0" %>
-                <span><span class="font-semibold">I authorize the exact bounded provider-work plan shown for this launch.</span> Automatic progression causes provider usage and cost. Each initial slot may make at most <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> attempts; terminal failures require a separate explicit manual retry. The pipeline always stops for the human editor.</span>
-              </label>
-            <% else %>
-              <p class="mt-1 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">No active workflow is available. <%= link_to "Create a workflow", new_workflow_profile_path, class: "font-semibold underline" %>, or choose the manual workflow.</p>
-            <% end %>
-          </fieldset>
-        </section>
       </div>
 
-      <aside class="min-w-0 lg:sticky lg:top-8 lg:self-start">
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Review &amp; start</h2>
-          <dl class="mt-3 space-y-2.5 text-sm">
-            <div class="flex items-start justify-between gap-3">
-              <dt class="text-slate-500">Language</dt>
-              <dd class="text-right font-medium text-slate-900"><%= [ @translation_workspace.source_language.presence || @translation_workspace.project&.source_language, @translation_workspace.target_language.presence || @translation_workspace.project&.target_language ].compact.join(" → ").presence || "Not set" %></dd>
-            </div>
-            <div class="flex items-start justify-between gap-3">
-              <dt class="text-slate-500">Source</dt>
-              <dd class="text-right font-medium text-slate-900"><%= @translation_workspace.source_import ? "Uploaded file" : "Pasted text" %></dd>
-            </div>
-            <div class="flex items-start justify-between gap-3">
-              <dt class="text-slate-500">Models</dt>
-              <dd class="text-right font-medium text-slate-900"><%= @translation_workspace.model_ids.count(&:present?) + @translation_workspace.model_identifiers.count(&:present?) %> selected</dd>
-            </div>
-            <div class="flex items-start justify-between gap-3">
-              <dt class="text-slate-500">Terminology</dt>
-              <dd class="text-right font-medium text-slate-900"><%= @terminology_summary || "None" %></dd>
-            </div>
-            <div class="flex items-start justify-between gap-3">
-              <dt class="text-slate-500">Workflow</dt>
-              <dd class="text-right font-medium text-slate-900"><%= @translation_workspace.workflow_mode == "automatic" ? "Automatic" : "Manual" %></dd>
-            </div>
+      <aside class="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start">
+        <%= render "translation_workspaces/ai_workflow", form: form %>
+        <section class="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Review &amp; start</h2>
+          <dl class="mt-4 space-y-3 text-sm">
+            <div class="flex items-start justify-between gap-3"><dt class="text-slate-400">Language</dt><dd data-workspace-summary-target="language" class="text-right font-medium"><%= [ @translation_workspace.source_language.presence || @translation_workspace.project&.source_language, @translation_workspace.target_language.presence || @translation_workspace.project&.target_language ].compact.join(" → ").presence || "Not set" %></dd></div>
+            <div class="flex items-start justify-between gap-3"><dt class="text-slate-400">Source</dt><dd data-workspace-summary-target="source" class="text-right font-medium"><%= @translation_workspace.source_import ? @translation_workspace.source_import.original_filename : "Pasted text" %></dd></div>
+            <div class="flex items-start justify-between gap-3"><dt class="text-slate-400">Models</dt><dd data-workspace-summary-target="models" class="text-right font-medium"><%= @translation_workspace.model_identifier_selections.size %> selected</dd></div>
+            <div class="flex items-start justify-between gap-3"><dt class="text-slate-400">Terminology</dt><dd data-workspace-summary-target="terminology" class="text-right font-medium"><%= @terminology_summary || "None" %></dd></div>
+            <div class="flex items-start justify-between gap-3"><dt class="text-slate-400">Workflow</dt><dd data-workspace-summary-target="workflow" class="text-right font-medium"><%= @translation_workspace.workflow_mode == "automatic" ? "Automatic" : "Manual" %></dd></div>
           </dl>
-          <p class="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Submitting is retry-safe. Paid provider work begins only after validation and, for automatic workflows, explicit authorization.</p>
-          <%= form.submit "Start translation", disabled: @available_models.empty? && @workflow_profiles.empty?, class: "mt-4 w-full rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400", data: { workflow_mode_target: "submit", turbo_submits_with: "Starting translation…" } %>
-          <p class="mt-2 text-center text-xs text-slate-500">The human final-editor checkpoint always remains.</p>
-        </div>
+          <%= form.submit "Start translation", class: "mt-5 w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600", data: { workflow_mode_target: "submit", turbo_submits_with: "Starting translation…" } %>
+          <p class="mt-3 text-center text-xs leading-5 text-slate-400">Validation runs before any provider work. The human editor always remains the final checkpoint.</p>
+        </section>
       </aside>
     </div>
   <% end %>

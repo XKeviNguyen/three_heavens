@@ -87,7 +87,8 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     assert_select "h3", text: "Paid-work authorization"
     segment_count = LongDocuments::Segmenter.call(source).size
     request_slots = profile.current_revision.model_selections.count * segment_count
-    assert_select "p", text: /#{segment_count} source segment\(s\) require #{request_slots} initial provider request slots and authorize at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} requests/
+    authorization = css_select("section").find { |section| section.at_css("h3")&.text == "Paid-work authorization" }
+    assert_match(/#{segment_count} source segment\(s\) require #{request_slots} initial request slots and authorize at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} requests/, authorization.text.squish)
     digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, digest)
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])"

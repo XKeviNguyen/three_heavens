@@ -3,10 +3,10 @@ import { Controller } from "@hotwired/stimulus"
 const SEARCH_DEBOUNCE_MS = 220
 
 // Live OpenRouter model browser. Results are always fetched from the
-// authenticated catalog endpoint; selections submit identifiers only and are
-// resolved to trusted LlmModel metadata on the server.
+// authenticated catalog endpoint. New selections submit identifiers for
+// trusted server-side resolution; existing saved selections retain their IDs.
 export default class extends Controller {
-  static targets = ["search", "list", "selected", "count", "status", "provider", "free", "sort", "meta"]
+  static targets = ["search", "list", "selected", "count", "status", "provider", "free", "sort", "meta", "empty"]
   static values = { role: String, name: String, max: Number, endpoint: String }
 
   connect() {
@@ -82,7 +82,7 @@ export default class extends Controller {
     this.options = []
 
     if (payload.source === "error") {
-      this.listTarget.appendChild(this.message("The live OpenRouter catalog is unavailable. Saved models remain available below."))
+      this.listTarget.appendChild(this.message("The live OpenRouter catalog is unavailable. Previously selected saved models remain available above."))
       this.closeList()
       return
     }
@@ -205,6 +205,7 @@ export default class extends Controller {
 
     this.selectedTarget.appendChild(card)
     this.updateCount()
+    this.dispatchSelectionChange()
     this.renderResults({ source: "live" })
     this.setStatus(`${model.name} added.`)
   }
@@ -213,6 +214,7 @@ export default class extends Controller {
     const card = event.currentTarget.closest("[data-model-card]")
     if (card) card.remove()
     this.updateCount()
+    this.dispatchSelectionChange()
     this.renderResults({ source: "live" })
     this.setStatus("Model removed.")
   }
@@ -255,17 +257,24 @@ export default class extends Controller {
   }
 
   selectedIdentifiers() {
-    return Array.from(this.selectedTarget.querySelectorAll("input[type='hidden']")).map((input) => input.value)
+    return Array.from(this.selectedTarget.querySelectorAll("[data-model-card]"))
+      .map((card) => card.dataset.identifier)
+      .filter(Boolean)
   }
 
   updateCount() {
     const count = this.selectedIdentifiers().length
     if (this.hasCountTarget) this.countTarget.textContent = `${count}/${this.maxValue}`
     if (this.hasMetaTarget) this.metaTarget.textContent = count === 1 ? "1 model selected" : `${count} models selected`
+    if (this.hasEmptyTarget) this.emptyTarget.hidden = count > 0
   }
 
   setStatus(message) {
     if (this.hasStatusTarget) this.statusTarget.textContent = message
+  }
+
+  dispatchSelectionChange() {
+    this.element.dispatchEvent(new CustomEvent("workspace-models:changed", { bubbles: true }))
   }
 
   message(text) {

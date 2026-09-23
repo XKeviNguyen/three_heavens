@@ -19,6 +19,39 @@ class WorkspaceTerminologyTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "creates and selects terminology inline without provider work" do
+    get new_workspace_terminology_path(source_language: "Vietnamese", target_language: "Japanese")
+
+    assert_response :success
+    assert_select "turbo-frame#workspace-terminology" do
+      assert_select "form[action='#{workspace_terminology_path}']"
+      assert_select "input[name='glossary[source_language]'][value='Vietnamese']"
+      assert_select "input[name='glossary[target_language]'][value='Japanese']"
+    end
+
+    assert_no_difference -> { AiProviderAttempt.count } do
+      assert_difference -> { Glossary.count }, 1 do
+        assert_difference -> { GlossaryRevision.count }, 1 do
+          post workspace_terminology_path, params: {
+            glossary: {
+              name: "Inline sermon terms",
+              description: "Created in the workspace",
+              source_language: "Vietnamese",
+              target_language: "Japanese",
+              entries: [ { source_term: "Grace", preferred_target_term: "恵み", note: "Preferred" } ]
+            }
+          }
+        end
+      end
+    end
+
+    assert_response :created
+    assert_equal "text/vnd.turbo-stream.html", response.media_type
+    assert_includes response.body, "Inline sermon terms"
+    created = Glossary.order(:id).last
+    assert_includes response.body, "value=\"#{created.current_revision_id}\""
+  end
+
   test "inline save creates a new immutable revision and preserves the old one" do
     old_revision = @glossary.current_revision
     original_entry = old_revision.entries.sole

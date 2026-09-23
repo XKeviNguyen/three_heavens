@@ -30,7 +30,7 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
     get root_path
 
     assert_response :success
-    assert_select "form[data-controller='workflow-mode']"
+    assert_select "form[data-controller~='workflow-mode'][data-controller~='workspace-summary']"
     assert_select "fieldset[data-workflow-mode-target='manual'][data-available='true']"
     assert_select "fieldset[data-workflow-mode-target='automatic'][data-available='true']"
     assert_select "input[type='submit'][data-workflow-mode-target='submit'][data-turbo-submits-with='Starting translation…']:not([disabled])"
