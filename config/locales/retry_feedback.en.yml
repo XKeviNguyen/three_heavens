@@ -1,0 +1,22 @@
+en:
+  retry_feedback:
+    translation:
+      none: No failed translation runs need retrying.
+      queue_failed: Retry could not be queued. The failed translation runs remain available for another explicit retry.
+      partial: Queued %{queued} failed translation run(s); %{failed} could not be queued and remain available for retry.
+      queued: Queued %{count} failed translation run(s) for retry.
+    reviewer:
+      none: No failed reviewer runs need retrying.
+      queue_failed: Retry could not be queued. The failed reviewer runs remain available for another explicit retry.
+      partial: Queued %{queued} failed reviewer run(s); %{failed} could not be queued and remain available for retry.
+      queued: Queued %{count} failed reviewer run(s) for retry.
+    judge:
+      none: No failed judge runs need retrying.
+      queue_failed: Retry could not be queued. The failed judge runs remain available for another explicit retry.
+      partial: Queued %{queued} failed judge run(s); %{failed} could not be queued and remain available for retry.
+      queued: Queued %{count} failed judge run(s) for retry.
+    refinement:
+      none: No failed refinement runs need retrying.
+      queue_failed: Retry could not be queued. The failed refinement runs remain available for another explicit retry.
+      partial: Queued %{queued} failed refinement run(s); %{failed} could not be queued and remain available for retry.
+      queued: Queued %{count} failed refinement run(s) for retry.

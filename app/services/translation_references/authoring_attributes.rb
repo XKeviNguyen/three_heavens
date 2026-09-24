@@ -35,7 +35,7 @@ module TranslationReferences
 
           resolved[text_key] = extract(upload) if upload.present?
         rescue SourceImports::Error, Error => error
-          errors << error.message
+          errors << (error.is_a?(SourceImports::Error) ? I18n.t("source_imports.errors.#{error.code}", default: error.message) : error.message)
         end
       end
       raise Error.new(errors.join(" "), resolved_attributes: resolved) if errors.any?

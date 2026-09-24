@@ -1,0 +1,60 @@
+en:
+  operations_ui:
+    title: Operations · Three Heavens
+    admin_settings: Admin settings
+    heading: AI workflow operations
+    intro: Aggregate operational health only. This page does not expose source text, translations, prompts, proposals, or provider response bodies.
+    diagnostics: Production system diagnostics
+    diagnostics_intro: Generic dependency state and bounded queue aggregates only. Connection details, storage paths, job arguments, and user data are never shown.
+    release: 'Release:'
+    checks:
+      primary_database: Primary database
+      schema_migrations: Schema migrations
+      cache_database: Cache database
+      queue_database: Queue database
+      cable_database: Cable database
+      active_storage: Active Storage
+    health:
+      healthy: Healthy
+      degraded: Degraded
+      unavailable: Unavailable
+    metrics:
+      pending_count: Pending count
+      failed_count: Failed count
+      writable: Writable
+      configured: Configured
+    current_work: Current work
+    stale_help: Pending work is stale when it does not begin, and running work is stale without a fresh execution claim, after %{minutes} minutes.
+    workflow: Workflow
+    stale_pending: Stale pending
+    stale_running: Stale running
+    oldest_active: Oldest active
+    ago: '%{duration} ago'
+    pipeline_health: Automatic pipeline health
+    pipeline_intro: Aggregate counts only; no owner, profile, filename, source, or translation details are exposed.
+    configuration_blocked: Configuration blocked
+    oldest_running: Oldest running
+    active_by_stage: 'Active by stage:'
+    stages:
+      translation: Translation
+      review: Review
+      judge: Judge
+      finalization: Finalization
+      editor: Editor
+    reconciliation: Stale reconciliation
+    reconciliation_intro: This marks stale pending and running records failed and reconciles parent workflows. It is idempotent and never starts a provider request; owners decide whether to retry afterward.
+    reconcile: Reconcile stale work now
+    reconcile_confirm: Mark all currently stale AI records as failed and reconcile their parent workflows? No provider work will start.
+    reconciling: Reconciling…
+    failure_codes: Recent failure codes
+    failure_intro: Sanitized aggregate codes from the last seven days.
+    no_failures: No coded failures in this window.
+    run_types:
+      translations: Translations
+      reviews: Reviews
+      judgments: Judgments
+      finalizations: Finalizations
+      translation_segments: Translation segments
+      review_segments: Review segments
+      judge_segments: Judge segments
+      finalization_segments: Finalization segments

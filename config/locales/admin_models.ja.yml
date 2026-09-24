@@ -1,0 +1,46 @@
+ja:
+  admin_models:
+    title: モデル一覧 · Three Heavens
+    edit_title: '%{name}を編集 · Three Heavens'
+    new_title: モデルを追加 · Three Heavens
+    provider_help: モデル情報のみを入力してください。APIキーや認証情報は入力しないでください。
+    identifier_locked: このモデルは過去の翻訳・レビュー・判定で使用されているため変更できません。
+    identifier_help: OpenRouterのカタログ識別子を使います。初回使用後は変更できません。
+    context_help: 長文の処理計画に必要です。空欄は短い文書向けの保守的な動作を許容する場合に限ります。
+    output_help: 各段階で必要な出力上限を満たさない場合、AI処理は開始前に停止します。
+    context_window: コンテキスト長（トークン）
+    maximum_output: 最大出力（トークン）
+    add_active: 有効なモデルを追加
+    save_metadata: モデル情報を保存
+    saving: モデルを保存中…
+    breadcrumb: 設定 / モデル
+    edit_heading: モデル情報を編集
+    gateway: 'ゲートウェイ：'
+    edit_intro: 有効・無効の切り替えは一覧の専用操作から行います。
+    settings: 設定
+    heading: OpenRouterモデル一覧
+    intro: 翻訳・レビュー・判定・最終調整に使うモデルを管理します。APIキーはサーバー環境だけで管理され、ここには表示されません。
+    add: モデルを追加
+    deactivation_help: ここではモデルを削除できません。無効にすると新しい選択肢から外れますが、過去の処理履歴はすべて残ります。
+    search: OpenRouterを検索
+    search_intro: 対応するテキストモデルを探し、公式カタログの情報で追加します。検索は読み取り専用で有料のAI処理は発生しません。
+    browse: OpenRouterを閲覧
+    browse_help: OpenRouterのカタログを検索し、正式な情報でモデルを追加します。
+    add_and_activate: モデルを追加して有効化
+    empty: OpenRouterモデルは未登録です
+    empty_intro: 最初のモデルを追加すると、新しいワークフローで選択できます。
+    model: モデル
+    provider_gateway: 提供元 / ゲートウェイ
+    usage: 利用状況
+    actions: 操作
+    capability: 'コンテキスト %{context} · 最大出力 %{output} トークン'
+    capability_missing: コンテキスト長は未設定です
+    translations: '翻訳：'
+    reviews: 'レビュー：'
+    judgments: '判定：'
+    finalizations: '最終調整：'
+    wins: '正式採用：'
+    benchmark: 統計
+    deactivate_confirm: '%{name}を無効にしますか？過去の履歴は保持されます。'
+    new_heading: OpenRouterモデルを追加
+    new_intro: 新しいモデルはすぐ有効になります。ゲートウェイと有効状態はサーバーが管理し、APIキーは環境でのみ保持します。

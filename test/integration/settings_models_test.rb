@@ -243,7 +243,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_equal "Claude Test", model.display_name
     assert_equal translation_run_ids, model.translation_run_ids
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "input[type='checkbox'][value='#{model.id}']", count: 0
 
     patch activate_settings_model_path(model), params: { active: false }
@@ -313,7 +313,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_redirected_to settings_models_path
     assert_not model.reload.active?
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
 
     get experiment_path(reviewer_experiment)
@@ -366,7 +366,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
   end
 
   def assert_model_is_available_in_all_selectors(model, reviewer_experiment:, judge_review_round:)
-    get root_path
+    get new_translation_workspace_path
     assert_select "#workspace-manual-models input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
     assert_select "#workspace-manual-models[data-available='true']", count: 1
 

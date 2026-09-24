@@ -1,0 +1,60 @@
+ja:
+  operations_ui:
+    title: 運用状況 · Three Heavens
+    admin_settings: 管理設定
+    heading: AIワークフローの運用状況
+    intro: 集計した稼働状況のみを表示します。原文、訳文、プロンプト、提案、提供元の応答本文は表示しません。
+    diagnostics: システム診断
+    diagnostics_intro: 依存サービスの状態と件数を制限したキュー統計のみを表示します。接続情報、保存先、ジョブ引数、ユーザーデータは表示しません。
+    release: 'リリース：'
+    checks:
+      primary_database: 主データベース
+      schema_migrations: スキーマ移行
+      cache_database: キャッシュDB
+      queue_database: キューDB
+      cable_database: 通信DB
+      active_storage: ファイル保存
+    health:
+      healthy: 正常
+      degraded: 一部低下
+      unavailable: 利用不可
+    metrics:
+      pending_count: 待機件数
+      failed_count: 失敗件数
+      writable: 書き込み可
+      configured: 設定済み
+    current_work: 現在の処理
+    stale_help: 待機中の処理が始まらない場合、または実行中の処理に新しい実行確認がない場合、%{minutes}分後に停滞とみなします。
+    workflow: ワークフロー
+    stale_pending: 停滞中の待機
+    stale_running: 停滞中の実行
+    oldest_active: 最も古い進行中
+    ago: '%{duration}前'
+    pipeline_health: 自動処理の状態
+    pipeline_intro: 集計件数のみを表示します。所有者、設定、ファイル名、原文、訳文の詳細は表示しません。
+    configuration_blocked: 設定による停止
+    oldest_running: 最も長い実行
+    active_by_stage: '進行中の段階：'
+    stages:
+      translation: 翻訳
+      review: レビュー
+      judge: 判定
+      finalization: 最終調整
+      editor: 編集
+    reconciliation: 停滞処理の整理
+    reconciliation_intro: 停滞した待機・実行中の記録を失敗にし、関連するワークフローを更新します。繰り返し実行しても安全で、AI処理は始まりません。再試行は所有者が判断します。
+    reconcile: 停滞処理を整理
+    reconcile_confirm: 現在停滞しているAI処理を失敗として記録し、関連するワークフローを更新しますか？AI処理は開始しません。
+    reconciling: 整理中…
+    failure_codes: 最近のエラーコード
+    failure_intro: 過去7日間の安全なコードを集計しています。
+    no_failures: この期間にコード付きの失敗はありません。
+    run_types:
+      translations: 翻訳
+      reviews: レビュー
+      judgments: 判定
+      finalizations: 最終調整
+      translation_segments: 翻訳セグメント
+      review_segments: レビューセグメント
+      judge_segments: 判定セグメント
+      finalization_segments: 最終調整セグメント

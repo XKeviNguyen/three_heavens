@@ -46,6 +46,9 @@ gem "ruby-vips", "~> 2.3"
 # Read and write bounded Office Open XML packages without shelling out.
 gem "rubyzip", "~> 3.6"
 
+# Extract bounded text from uploaded PDFs without external services.
+gem "pdf-reader", "~> 2.16.0"
+
 group :development, :test do
   gem "dotenv-rails"
 

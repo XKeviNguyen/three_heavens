@@ -1,0 +1,54 @@
+en:
+  flash_ui:
+    glossary:
+      created: Glossary created.
+      revision: Glossary revision %{version} created.
+      activated: Glossary activated.
+      archived: Glossary archived. Historical revisions remain available.
+    methodology:
+      created: Methodology profile created.
+      revision: Methodology revision %{version} created.
+      activated: Methodology profile activated.
+      archived: Methodology profile archived. Historical revisions remain available.
+    workflow:
+      created: Workflow profile created.
+      revision: Workflow profile revision %{version} created.
+      duplicated: Workflow profile duplicated.
+      activated: Workflow profile activated.
+      deactivated: Workflow profile deactivated.
+    reference:
+      created: Translation reference created.
+      revision: Translation reference revision %{version} created.
+      activated: Translation reference activated.
+      archived: Translation reference archived. Historical experiment snapshots remain available.
+    final:
+      workspace_ready: Final translation workspace is ready.
+      revision_saved: Revision saved.
+      revision_restored: Revision restored as a new version.
+      refinement_started: AI refinement started.
+      proposal_applied: AI proposal applied as a new revision.
+      finalized: Final translation finalized.
+      reopened: Final translation reopened for editing.
+    review:
+      started: Blind review started.
+    judge:
+      started: Judge selection started.
+    pipeline:
+      stopped: Future automatic advancement stopped. Already queued or running provider work was not cancelled.
+    operations:
+      reconciled: Reconciled %{count} stale AI run(s). No provider work was started.
+    model:
+      added: Model added and activated.
+      catalog_action: '%{name} was %{action}.'
+      actions:
+        activated: activated
+        added_and_activated: added and activated
+        already_active: already active
+      catalog_failed: The selected model could not be added from the OpenRouter catalog.
+      updated: Model metadata updated.
+      activated: '%{name} activated.'
+      deactivated: '%{name} deactivated. Its history was preserved.'
+    workspace:
+      replayed: This translation launch was already completed; showing its existing result.
+      automatic_started: Automatic translation pipeline started.
+      experiment_started: Translation experiment started.

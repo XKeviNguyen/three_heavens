@@ -1,7 +1,7 @@
 <%= form_with url: form_url, method: form_method, scope: :workflow_profile, class: "space-y-7" do |form| %>
   <% if @form_errors.present? %>
     <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="profile-errors-heading" role="alert">
-      <h2 id="profile-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
+      <h2 id="profile-errors-heading" class="font-semibold text-red-900"><%= t("glossaries_ui.correct_errors") %></h2>
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800"><% @form_errors.each do |message| %><li><%= message %></li><% end %></ul>
     </section>
   <% end %>
@@ -11,23 +11,23 @@
   <% end %>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-lg font-semibold text-slate-950">Profile configuration</h2>
+    <h2 class="text-lg font-semibold text-slate-950"><%= t("workflows_ui.configuration") %></h2>
     <div class="mt-5 space-y-5">
-      <div><%= form.label :name, class: "block text-sm font-medium text-slate-700" %><%= form.text_field :name, value: @form_values["name"], required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
-      <div><%= form.label :description, "Description (optional)", class: "block text-sm font-medium text-slate-700" %><%= form.text_area :description, value: @form_values["description"], maxlength: 500, rows: 3, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
+      <div><%= form.label :name, t("glossaries_ui.name"), class: "block text-sm font-medium text-slate-700" %><%= form.text_field :name, value: @form_values["name"], required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
+      <div><%= form.label :description, t("glossaries_ui.description_optional"), class: "block text-sm font-medium text-slate-700" %><%= form.text_area :description, value: @form_values["description"], maxlength: 500, rows: 3, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
       <fieldset>
-        <legend class="text-sm font-medium text-slate-700">Completion mode</legend>
+        <legend class="text-sm font-medium text-slate-700"><%= t("workflows_ui.completion_mode") %></legend>
         <div class="mt-3 grid gap-3 md:grid-cols-2">
-          <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :completion_mode, "winner_draft", checked: @form_values["completion_mode"] == "winner_draft" %> <span class="ml-2 font-semibold">Winner draft</span><span class="mt-1 block text-sm text-slate-600">Create the official draft, then stop for the human editor.</span></label>
-          <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :completion_mode, "refinement_proposals", checked: @form_values["completion_mode"] == "refinement_proposals" %> <span class="ml-2 font-semibold">Refinement proposals</span><span class="mt-1 block text-sm text-slate-600">Also create AI proposals, but never apply or finalize them.</span></label>
+          <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :completion_mode, "winner_draft", checked: @form_values["completion_mode"] == "winner_draft" %> <span class="ml-2 font-semibold"><%= t("workflow_modes.winner_draft") %></span><span class="mt-1 block text-sm text-slate-600"><%= t("workflows_ui.winner_help") %></span></label>
+          <label class="rounded-lg border border-slate-200 p-4"><%= form.radio_button :completion_mode, "refinement_proposals", checked: @form_values["completion_mode"] == "refinement_proposals" %> <span class="ml-2 font-semibold"><%= t("workflow_modes.refinement_proposals") %></span><span class="mt-1 block text-sm text-slate-600"><%= t("workflows_ui.refinement_help") %></span></label>
         </div>
       </fieldset>
     </div>
   </section>
 
-  <% role_guidance = { "translator" => "Select 2–#{Ai::UsageLimits::MAX_TRANSLATION_MODELS}", "reviewer" => "Select 1–#{Ai::UsageLimits::MAX_REVIEWERS}", "judge" => "Select 1–#{Ai::UsageLimits::MAX_JUDGES}", "finalizer" => "Select none for winner draft, or 1–#{Ai::UsageLimits::MAX_FINALIZERS} for refinement proposals" } %>
+  <% role_guidance = { "translator" => t("workflows_ui.select_range", minimum: 2, maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS), "reviewer" => t("workflows_ui.select_range", minimum: 1, maximum: Ai::UsageLimits::MAX_REVIEWERS), "judge" => t("workflows_ui.select_range", minimum: 1, maximum: Ai::UsageLimits::MAX_JUDGES), "finalizer" => t("workflows_ui.finalizer_range", maximum: Ai::UsageLimits::MAX_FINALIZERS) } %>
   <% role_limits = { "translator" => Ai::UsageLimits::MAX_TRANSLATION_MODELS, "reviewer" => Ai::UsageLimits::MAX_REVIEWERS, "judge" => Ai::UsageLimits::MAX_JUDGES, "finalizer" => Ai::UsageLimits::MAX_FINALIZERS } %>
-  <% role_hints = { "translator" => "Models that create independent translation candidates.", "reviewer" => "Models that review candidates with structured feedback.", "judge" => "Models that independently score and rank reviewed candidates.", "finalizer" => "Models that propose refinements without applying them." } %>
+  <% role_hints = { "translator" => t("workflows_ui.role_hints.translator"), "reviewer" => t("workflows_ui.role_hints.reviewer"), "judge" => t("workflows_ui.role_hints.judge"), "finalizer" => t("workflows_ui.role_hints.finalizer") } %>
   <% WorkflowProfileModelSelection::ROLES.each do |role| %>
     <% saved_ids = Array(@form_values["#{role}_ids"]).map(&:to_s) %>
     <% saved_selections = @available_models.filter_map do |model|
@@ -37,19 +37,19 @@
        end %>
     <% identifier_selections = Array(@form_values["#{role}_identifiers"]).map(&:to_s).reject(&:blank?).map { |identifier| { identifier: identifier, name: identifier } } %>
     <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <legend class="px-1 text-lg font-semibold text-slate-950"><%= role.humanize.pluralize %></legend>
-      <p class="mt-1 text-sm text-slate-600"><%= role_guidance.fetch(role) %>. Ordering is deterministic.</p>
+      <legend class="px-1 text-lg font-semibold text-slate-950"><%= t("workflows_ui.roles.#{role}") %></legend>
+      <p class="mt-1 text-sm text-slate-600"><%= t("workflows_ui.role_order", selection: role_guidance.fetch(role)) %></p>
       <div class="mt-4">
         <%= render "shared/model_browser",
               role: role,
               name: "workflow_profile[#{role}_identifiers][]",
               max: role_limits.fetch(role),
-              label: "#{role.humanize} models",
+              label: t("workflows_ui.role_models", role: t("workflows_ui.roles.#{role}")),
               hint: role_hints.fetch(role),
               selected: (saved_selections + identifier_selections).uniq { |selection| selection[:identifier] } %>
       </div>
     </fieldset>
   <% end %>
 
-  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @workflow_profile&.persisted? ? workflow_profile_path(@workflow_profile) : workflow_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving profile…" } %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @workflow_profile&.persisted? ? workflow_profile_path(@workflow_profile) : workflow_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("workflows_ui.saving") } %></div>
 <% end %>

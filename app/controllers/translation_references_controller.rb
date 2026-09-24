@@ -27,7 +27,7 @@ class TranslationReferencesController < ApplicationController
       exact_reference_parameters!(include_expected_version: false)
     )
     reference = TranslationReferences::Create.call(user: current_user, attributes: attributes)
-    redirect_to reference, notice: "Translation reference created."
+    redirect_to reference, notice: t("flash_ui.reference.created")
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values.merge(attributes || {})
     @form_values.merge!(error.resolved_attributes) if error.is_a?(TranslationReferences::AuthoringAttributes::Error)
@@ -54,7 +54,7 @@ class TranslationReferencesController < ApplicationController
       expected_version: expected_version,
       attributes: attributes
     )
-    redirect_to @translation_reference, notice: "Translation reference revision #{revision.version} created."
+    redirect_to @translation_reference, notice: t("flash_ui.reference.revision", version: revision.version)
   rescue TranslationReferences::Revise::StaleRevisionError => error
     @current_revision = @translation_reference.reload.current_revision
     @form_values = attributes.merge(
@@ -72,14 +72,14 @@ class TranslationReferencesController < ApplicationController
   def activate
     reject_unexpected_parameters!
     TranslationReferences::ChangeStatus.activate(translation_reference: @translation_reference)
-    redirect_to @translation_reference, notice: "Translation reference activated."
+    redirect_to @translation_reference, notice: t("flash_ui.reference.activated")
   end
 
   def deactivate
     reject_unexpected_parameters!
     TranslationReferences::ChangeStatus.deactivate(translation_reference: @translation_reference)
     redirect_to @translation_reference,
-                notice: "Translation reference archived. Historical experiment snapshots remain available."
+                notice: t("flash_ui.reference.archived")
   end
 
   private

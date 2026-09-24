@@ -37,7 +37,7 @@ module SourceImports
       assert_equal "docx", Detector.call(filename: "source.docx", bytes: build_docx).format
 
       assert_equal "unsupported_format", assert_raises(Error) {
-        Detector.call(filename: "source.pdf", bytes: "%PDF")
+        Detector.call(filename: "source.rtf", bytes: "text")
       }.code
       assert_equal "mismatched_type", assert_raises(Error) {
         Detector.call(filename: "source.txt", bytes: build_docx)

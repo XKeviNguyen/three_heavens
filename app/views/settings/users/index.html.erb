@@ -1,0 +1,11 @@
+<% content_for :title, t("admin_users.title") %>
+<section class="space-y-6">
+  <header><h1 class="text-3xl font-semibold"><%= t("admin_users.title") %></h1><p class="mt-2 text-slate-600"><%= t("admin_users.description") %></p></header>
+  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+    <table class="w-full min-w-[650px] text-left text-sm">
+      <thead class="bg-slate-50"><tr><th scope="col" class="p-4"><%= t("registration.email") %></th><th scope="col" class="p-4"><%= t("admin_users.status") %></th><th scope="col" class="p-4"><%= t("admin_users.verification") %></th><th scope="col" class="p-4"><%= t("admin_users.managed_ai") %></th><th scope="col" class="p-4"><%= t("admin_users.action") %></th></tr></thead>
+      <tbody><% @users.each do |user| %><tr class="border-t border-slate-100"><td class="p-4"><%= user.email %></td><td class="p-4"><%= user.status %></td><td class="p-4"><%= user.email_verified? ? t("admin_users.verified") : t("admin_users.unverified") %></td><td class="p-4"><%= user.managed_ai_access? ? t("admin_users.enabled") : t("admin_users.disabled") %></td><td class="p-4"><% if user.managed_ai_access? %><%= button_to t("admin_users.disable"), revoke_managed_ai_access_settings_user_path(user), method: :patch, class: "font-semibold text-red-700" %><% else %><%= button_to t("admin_users.enable"), grant_managed_ai_access_settings_user_path(user), method: :patch, class: "font-semibold text-blue-700" %><% end %></td></tr><% end %></tbody>
+    </table>
+  </div>
+  <%= render "shared/pagination", pagination: @pagination, label: t("admin_users.title") %>
+</section>

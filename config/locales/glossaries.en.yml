@@ -1,0 +1,56 @@
+en:
+  glossaries_ui:
+    title: Glossaries · Three Heavens
+    show_title: '%{name} · Glossary · Three Heavens'
+    edit_title: Revise glossary · Three Heavens
+    new_title: New glossary · Three Heavens
+    translation_guidance: Translation guidance
+    heading: Glossaries
+    singular: Glossary
+    index_intro: Owner-private terminology constraints with immutable revisions.
+    new: New glossary
+    empty: No glossaries yet
+    empty_intro: Create reusable terminology guidance, then select it when starting a translation.
+    create: Create a glossary
+    revision: Revision %{version}
+    entries:
+      one: 1 entry
+      other: '%{count} entries'
+    no_description: No description
+    view_history: View history
+    create_revision: Create revision
+    archive: Archive
+    activate: Activate
+    archive_confirm: Archive this glossary? Existing experiments keep their exact revision.
+    show_intro: Historical revisions are immutable. New experiments can use only the current revision of an active glossary.
+    active_workspace: Active · available in workspace
+    archived_history: Archived · history only
+    all: All glossaries
+    using: 'Using glossaries:'
+    using_intro: Choose this glossary for a matching language pair in the
+    translation_workspace: translation workspace
+    current: Current
+    technical_identity: Technical revision identity
+    preserved_by:
+      one: 1 experiment preserves this exact revision.
+      other: '%{count} experiments preserve this exact revision.'
+    revisions: Revisions
+    correct_errors: 'Please correct the following:'
+    configuration: Glossary configuration
+    name: Name
+    description_optional: Description (optional)
+    terminology_entries: Terminology entries
+    entries_intro: One atomic revision supports up to %{count} literal source-term mappings. Surrounding whitespace is trimmed; case and spelling remain exact.
+    mapping: Terminology mapping
+    remove: Remove
+    source_term: Source term
+    preferred_target_term: Preferred target term
+    note_optional: Note (optional)
+    add_mapping: Add terminology mapping
+    saving: Saving revision…
+    revision_label: Glossary revision
+    revise: Revise %{name}
+    edit_intro: Saving creates a new immutable revision. Existing experiments keep the exact revision they already use.
+    create_new_revision: Create new revision
+    new_intro: Create owner-private terminology guidance. Saving does not start provider work.
+    revision_inline: revision %{version}

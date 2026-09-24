@@ -1,0 +1,24 @@
+vi:
+  history_ui:
+    title: Lịch sử lượt dịch · Three Heavens
+    analytics: Phân tích
+    heading: Lịch sử lượt dịch
+    intro: Mới nhất trước. Chi phí hệ thống tính mỗi lượt dịch, đánh giá, chấm chọn
+      và hoàn thiện một lần. Tổng chưa đầy đủ được ghi rõ khi thiếu dữ liệu chi phí.
+    empty: Chưa có lượt dịch
+    empty_intro: Bắt đầu một lượt dịch để tạo lịch sử.
+    new_experiment: Lượt dịch mới
+    translation_candidates: Các bản dịch đề xuất
+    execution: Cách thực hiện
+    segmented: Chia đoạn (%{count} đoạn)
+    single_request: Mỗi lượt chạy một yêu cầu
+    judge_round: Vòng chấm chọn
+    official_winner: Bản được chọn
+    system_cost: Chi phí hệ thống
+    partial_cost: Tổng đã biết · dữ liệu chi phí chưa đầy đủ (%{complete}/%{total}
+      lượt hoàn tất; %{known} lượt có chi phí đã biết)
+    reported_cost: '%{count} lượt có báo cáo chi phí'
+    no_cost: Chưa có dữ liệu chi phí
+    automatic_pipeline: Quy trình tự động
+    repeat_configuration: Dùng lại cấu hình
+    final_translation_status: Bản dịch cuối (%{status})

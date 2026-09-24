@@ -27,6 +27,7 @@ module ApplicationHelper
       label: "Admin",
       admin: true,
       items: [
+        { label: "Users", path: :settings_users_path, controllers: %w[settings/users] },
         { label: "Models", path: :settings_models_path, controllers: %w[settings/models open_router_catalog] },
         { label: "Operations", path: :settings_operations_path, controllers: %w[settings/operations] }
       ]
@@ -34,7 +35,9 @@ module ApplicationHelper
   ].freeze
 
   def sidebar_sections
-    SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }
+    SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }.map do |section|
+      section.merge(label: t("navigation.sections.#{section[:label].downcase}"))
+    end
   end
 
   def sidebar_item_active?(item)
@@ -49,7 +52,7 @@ module ApplicationHelper
       "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
     end
 
-    link_to item[:label], public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {})
+    link_to t("navigation.items.#{item[:label].parameterize(separator: "_")}"), public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {})
   end
 
   def status_badge_classes(status)
@@ -146,24 +149,32 @@ module ApplicationHelper
     end
   end
 
+  def localized_status(status)
+    t("statuses.#{status}")
+  end
+
+  def localized_guidance_label(preference)
+    t("guidance_labels.#{preference}")
+  end
+
   def experiment_next_action(experiment)
     if experiment.final_translation
-      return [ "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation) ]
+      return [ t("next_actions.final_translation", status: localized_status(experiment.final_translation.status)), final_translation_path(experiment.final_translation) ]
     end
     if experiment.pipeline_run&.status.in?(%w[running blocked ready_for_editor])
-      return [ "Pipeline progress", pipeline_run_path(experiment.pipeline_run) ]
+      return [ t("next_actions.pipeline_progress"), pipeline_run_path(experiment.pipeline_run) ]
     end
 
     judge_round = experiment.review_round&.judge_round
-    return [ judge_round.completed? ? "Judge results" : "View judge progress", judge_round_path(judge_round) ] if judge_round
-    return [ experiment.review_round.completed? ? "Continue to judging" : "View blind review", review_round_path(experiment.review_round) ] if experiment.review_round
+    return [ judge_round.completed? ? t("next_actions.judge_results") : t("next_actions.view_judge_progress"), judge_round_path(judge_round) ] if judge_round
+    return [ experiment.review_round.completed? ? t("next_actions.continue_judging") : t("next_actions.view_blind_review"), review_round_path(experiment.review_round) ] if experiment.review_round
 
-    [ experiment.completed? ? "Continue to blind review" : "View translation progress", experiment_path(experiment) ]
+    [ experiment.completed? ? t("next_actions.continue_blind_review") : t("next_actions.view_translation_progress"), experiment_path(experiment) ]
   end
 
   def safe_provider_error(_message)
     # Historical rows may contain provider bodies from before safe error storage.
-    "AI work failed. Review the error code before retrying explicitly."
+    t("results_ui.provider_failure")
   end
 
   def safe_provider_error_code(code)
@@ -171,25 +182,25 @@ module ApplicationHelper
   end
 
   def analytics_number(value, precision: 2)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     number_with_precision(value, precision: precision, strip_insignificant_zeros: true)
   end
 
   def analytics_percent(value)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     "#{analytics_number(value * 100, precision: 1)}%"
   end
 
   def analytics_money(value)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     number_to_currency(value, unit: "$", precision: 10, strip_insignificant_zeros: true)
   end
 
   def analytics_duration(seconds)
-    return "N/A" if seconds.nil?
+    return t("common.not_available") if seconds.nil?
 
     if seconds < 1
       "#{analytics_number(seconds * 1_000, precision: 0)} ms"

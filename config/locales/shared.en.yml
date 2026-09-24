@@ -1,0 +1,37 @@
+en:
+  shared_ui:
+    not_found:
+      title: Page unavailable · Three Heavens
+      eyebrow: Page unavailable
+      heading: We couldn’t find that page
+      intro: It may no longer exist, or it may belong to a different account. No private record details have been disclosed.
+      workspace: Go to workspace
+      projects: View projects
+    hint:
+      field: this field
+      more: More information about %{label}
+    pagination:
+      label: '%{label} pagination'
+      newer: ← Newer
+      older: Older →
+      page: Page %{current} of %{total} · %{entries}
+    steps:
+      label: Translation workflow
+      translation: Translation
+      review: Blind review
+      judge: Judge
+      editor: Human editor
+    step_states:
+      complete: Complete
+      current: Current
+      failed: Failed
+      waiting: Waiting
+    home: Three Heavens home
+    upload:
+      title: Upload source file · Three Heavens
+      extracting: Extracting source…
+      drop: Drop a file here
+      or: or
+      choose: Choose file
+      formats: TXT · Markdown · DOCX · PDF
+      limit: Maximum supported size %{maximum} MiB. Uploading and previewing never contacts an AI provider.

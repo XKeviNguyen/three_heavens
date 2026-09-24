@@ -1,0 +1,37 @@
+ja:
+  shared_ui:
+    not_found:
+      title: ページを表示できません · Three Heavens
+      eyebrow: ページを表示できません
+      heading: ページが見つかりません
+      intro: ページが削除されたか、別のアカウントに属している可能性があります。非公開情報は表示していません。
+      workspace: ワークスペースへ
+      projects: プロジェクトを見る
+    hint:
+      field: この項目
+      more: '%{label}の説明'
+    pagination:
+      label: '%{label}のページ切り替え'
+      newer: ← 新しい項目
+      older: 古い項目 →
+      page: '%{current}/%{total}ページ · %{entries}'
+    steps:
+      label: 翻訳ワークフロー
+      translation: 翻訳
+      review: ブラインドレビュー
+      judge: 判定
+      editor: 編集者
+    step_states:
+      complete: 完了
+      current: 現在
+      failed: 失敗
+      waiting: 待機中
+    home: Three Heavensのホーム
+    upload:
+      title: 原文ファイルをアップロード · Three Heavens
+      extracting: 原文を抽出中…
+      drop: ここにファイルをドロップ
+      or: または
+      choose: ファイルを選択
+      formats: TXT · Markdown · DOCX · PDF
+      limit: 最大%{maximum} MiB。アップロードとプレビューではAIプロバイダーに送信しません。

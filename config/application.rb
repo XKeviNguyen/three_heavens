@@ -11,6 +11,8 @@ module ThreeHeavens
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
+    config.i18n.available_locales = %i[en vi ja]
+    config.i18n.default_locale = :en
 
     # Reject declared oversized request bodies before multipart parsing or
     # application allocation, and bound the bytes read from requests without a

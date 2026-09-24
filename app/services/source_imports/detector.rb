@@ -2,6 +2,7 @@ require "stringio"
 
 module SourceImports
   class Detector
+    PDF_MIME = "application/pdf"
     DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     DOCM_MIME = "application/vnd.ms-word.document.macroenabled.12"
     GENERIC_MIMES = [ "application/octet-stream", "application/zip", "application/x-zip-compressed" ].freeze
@@ -24,11 +25,19 @@ module SourceImports
       extension = File.extname(filename).downcase
       format = Limits::EXTENSIONS[extension]
       unless format
-        raise Error.new("unsupported_format", "Choose a .docx, .txt, or .md source file.")
+        raise Error.new("unsupported_format", "Choose a .pdf, .docx, .txt, or .md source file.")
       end
 
       detected = Marcel::MimeType.for(StringIO.new(bytes), name: filename)
-      if format == "docx"
+      if format == "pdf"
+        unless declared_content_type == PDF_MIME
+          raise Error.new("mismatched_type", "The selected file's type does not match its extension.")
+        end
+        unless bytes.start_with?("%PDF-".b) && detected == PDF_MIME
+          raise Error.new("mismatched_type", "The selected file is not a valid PDF document.")
+        end
+        Result.new(format:, content_type: PDF_MIME)
+      elsif format == "docx"
         validate_declared_type!([ DOCX_MIME, *GENERIC_MIMES ])
         unless bytes.start_with?("PK\x03\x04".b) && detected.in?([ DOCX_MIME, DOCM_MIME, *GENERIC_MIMES ])
           raise Error.new("mismatched_type", "The selected file is not a valid DOCX document.")

@@ -1,0 +1,108 @@
+vi:
+  results_ui:
+    back_project: Về dự án
+    back_project_arrow: ← Về dự án
+    back_review: Về phần nhận xét ẩn danh
+    back_translation: Về lần dịch
+    candidate_translation: Bản dịch ứng viên
+    corrections: Đề xuất chỉnh sửa
+    error_code: Mã lỗi
+    glossary: 'Bảng thuật ngữ:'
+    human_mapping: Đối chiếu chỉ dành cho người dùng
+    issues: Vấn đề
+    original_file: Tệp nguồn gốc
+    overall: tổng thể
+    pasted_source: Văn bản đã dán · nội dung bên dưới là bản nguồn được dùng
+    provider_requests_complete: yêu cầu AI đã hoàn tất.
+    queueing_retries: Đang xếp lịch thử lại…
+    rationale: Lý do
+    requested_model: Mô hình đã chọn
+    resolved_model: Mô hình thực tế
+    risks: Rủi ro
+    segmented: Xử lý theo đoạn
+    source_document: Tài liệu nguồn
+    strengths: Điểm mạnh
+    suggested_translation: Bản dịch cải thiện được đề xuất
+    translation_instruction: Hướng dẫn dịch
+    uploaded_file: Tệp đã tải lên
+    view_pipeline: Xem tiến độ chung
+    telemetry:
+      prompt_tokens: Token đầu vào
+      completion_tokens: Token đầu ra
+      total_tokens: Tổng token
+      cost: Chi phí
+    translation:
+      title: Lần dịch · Three Heavens
+      heading: Lần dịch
+      running: Các bản dịch vẫn đang được xử lý. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại bản dịch thất bại
+      retry_intro: Có thể thử lại %{count} lượt dịch thất bại mà không thay đổi các bản đã hoàn tất hoặc mã mô hình. Mỗi mục được chọn cho phép tối đa %{attempts} yêu cầu AI mới và có thể phát sinh thêm chi phí.
+      retry: Thử lại bản dịch thất bại
+      retry_confirm: Chỉ thử lại phần dịch thất bại? Mỗi mục có thể thực hiện tối đa %{attempts} yêu cầu AI mới và phát sinh thêm chi phí.
+      retry_unavailable: Không thể thử lại vì một mô hình từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      model_runs: Lượt chạy mô hình
+      failed: Dịch thất bại
+      run_running: Mô hình đang dịch tài liệu này.
+      run_pending: Lượt chạy đang trong hàng đợi.
+      review_exists: Lần dịch này đã có một vòng nhận xét ẩn danh.
+      view_review: Xem nhận xét ẩn danh
+      start_review: Bắt đầu nhận xét chéo ẩn danh
+      review_intro: Chọn 1–%{maximum} mô hình nhận xét. Mỗi mô hình nhận nguồn, hướng dẫn, tiêu chí và các bản dịch đã ẩn danh; không thấy danh tính mô hình dịch.
+      segment_cost: Tài liệu có %{count} đoạn. Mỗi mô hình nhận xét được chọn sẽ thực hiện %{count} yêu cầu AI ban đầu; cơ chế thử lại có thể tăng số lượt gọi.
+      active_reviewers: Mô hình nhận xét OpenRouter đang hoạt động
+      no_reviewers: Không có mô hình nhận xét OpenRouter đang hoạt động.
+      start_review_button: Bắt đầu nhận xét ẩn danh
+      start_review_confirm: Bắt đầu nhận xét ẩn danh với các mô hình đã chọn? AI sẽ bắt đầu xử lý và có thể phát sinh chi phí.
+      starting_review: Đang bắt đầu nhận xét…
+    review:
+      title: Nhận xét ẩn danh · Three Heavens
+      heading: Nhận xét chéo ẩn danh
+      running: Các mô hình vẫn đang nhận xét bản dịch. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại lượt nhận xét thất bại
+      retry_intro: Có thể thử lại %{count} lượt nhận xét thất bại. Các nhận xét đã hoàn tất và mã ứng viên ẩn danh vẫn giữ nguyên. Mỗi mục được chọn cho phép tối đa %{attempts} yêu cầu AI mới và có thể phát sinh thêm chi phí.
+      retry: Thử lại nhận xét thất bại
+      retry_confirm: Chỉ thử lại phần nhận xét thất bại? Mỗi mục có thể thực hiện tối đa %{attempts} yêu cầu AI mới và phát sinh thêm chi phí.
+      retry_unavailable: Không thể thử lại vì một mô hình nhận xét từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      runs: Lượt nhận xét
+      reviewer: Mô hình nhận xét
+      failed: Nhận xét thất bại
+      run_running: Mô hình đang nhận xét các ứng viên ẩn danh.
+      run_pending: Lượt nhận xét đang trong hàng đợi.
+      faithfulness: Độ trung thành
+      naturalness: Độ tự nhiên
+      terminology: Thuật ngữ
+      instruction_adherence: Tuân thủ hướng dẫn
+      judge_exists: Vòng nhận xét ẩn danh này đã có phần chấm điểm.
+      view_judge: Xem kết quả chấm điểm
+      start_judge: Bắt đầu chấm điểm
+      judge_intro: Chọn 1–%{maximum} mô hình chấm điểm. Mỗi mô hình nhận bản dịch và nhận xét ẩn danh; không thấy danh tính mô hình dịch hay nhận xét.
+      segment_cost: Tài liệu có %{count} đoạn. Mỗi mô hình chấm điểm được chọn sẽ thực hiện %{count} yêu cầu AI ban đầu; cơ chế thử lại có thể tăng số lượt gọi.
+      active_judges: Mô hình chấm điểm OpenRouter đang hoạt động
+      no_judges: Không có mô hình chấm điểm OpenRouter đang hoạt động.
+      start_judge_button: Bắt đầu chấm điểm
+      start_judge_confirm: Bắt đầu chấm điểm với các mô hình đã chọn? AI sẽ bắt đầu xử lý và có thể phát sinh chi phí.
+      starting_judge: Đang bắt đầu chấm điểm…
+    judge:
+      title: Chấm điểm · Three Heavens
+      heading: Chấm điểm
+      running: Các mô hình đang chấm điểm bản dịch. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại lượt chấm điểm thất bại
+      retry_intro: Có thể thử lại %{count} lượt chấm điểm thất bại. Kết quả đã hoàn tất và mã ẩn danh vẫn giữ nguyên. Chưa có bản thắng chính thức cho đến khi mọi mô hình hoàn tất và tổng hợp thành công. Mỗi mục cho phép tối đa %{attempts} yêu cầu AI mới và có thể phát sinh chi phí.
+      retry: Thử lại chấm điểm thất bại
+      retry_confirm: Chỉ thử lại phần chấm điểm thất bại? Mỗi mục có thể thực hiện tối đa %{attempts} yêu cầu AI mới và phát sinh thêm chi phí.
+      retry_unavailable: Không thể thử lại vì một mô hình chấm điểm từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      winner: Bản thắng chính thức sau tổng hợp
+      open_editor: Mở không gian biên tập cuối
+      create_editor: Tạo không gian biên tập cuối
+      opening_editor: Đang mở trình biên tập…
+      ranking: '%{points} điểm Borda · điểm trung bình %{score}/100 · %{count} mô hình chấm'
+      no_winner: Chưa có bản thắng chính thức
+      no_winner_intro: Ít nhất một lượt chấm điểm thất bại. Kết quả thành công vẫn được giữ bên dưới nhưng vòng này không công bố bản thắng chính thức.
+      runs: Lượt chấm điểm
+      judge: Mô hình chấm điểm
+      failed: Chấm điểm thất bại
+      run_running: Mô hình đang xếp hạng các ứng viên ẩn danh.
+      run_pending: Lượt chấm điểm đang trong hàng đợi.
+      judge_winner: Bản thắng theo mô hình
+      confidence: Độ tin cậy
+    provider_failure: Công việc AI thất bại. Xem mã lỗi trước khi chủ động thử lại.

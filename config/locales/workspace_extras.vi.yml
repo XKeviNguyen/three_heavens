@@ -1,0 +1,17 @@
+vi:
+  workspace_ui:
+    adding_to: Thêm vào
+    file_limits: TXT, Markdown, DOCX hoặc PDF · tối đa %{maximum} MiB
+    references_selected: Đã chọn %{count}/5 bản tham chiếu
+    references_empty_suffix: để thêm ví dụ đã duyệt.
+    models: 'Mô hình:'
+    profile_summary: '%{mode} · %{translators} dịch · %{reviewers} nhận xét · %{judges} chấm điểm · %{finalizers} hoàn thiện'
+    paid_plan: '%{segments} đoạn nguồn cần %{slots} yêu cầu ban đầu và cho phép tối đa %{maximum} yêu cầu, gồm cả thử lại
+      tích hợp.'
+    paid_plan_role: '%{role}: %{runs} lượt × %{segments} đoạn = %{requests} yêu cầu'
+    draft_import_detached: Tệp đã tải lên ban đầu không còn được đính kèm. Văn bản nguồn bạn đã rà soát vẫn được giữ lại.
+    draft_configuration_changed: Một số cấu hình đã lưu không còn khả dụng. Hãy kiểm tra các lựa chọn còn lại.
+    repeat_profile_unavailable: Hồ sơ tự động trước đây không còn dữ liệu năng lực mô hình cần thiết cho nguồn này. Lượt chạy
+      thủ công đã được điền sẵn các mô hình dịch còn hoạt động; hãy kiểm tra hoặc thay thế trước khi cho phép xử lý.
+    profile_unavailable: không còn khả dụng
+    repeat_of: Lặp lại %{name}

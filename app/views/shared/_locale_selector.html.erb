@@ -1,0 +1,5 @@
+<%= form_with url: locale_path, method: :patch, class: "flex items-center gap-2 text-sm" do |form| %>
+  <%= form.label :locale_code, t("common.interface_language"), class: "font-medium text-slate-600" %>
+  <%= form.select :locale_code, [["English", "en"], ["Tiếng Việt", "vi"], ["日本語", "ja"]], { selected: I18n.locale.to_s }, class: "rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-800" %>
+  <%= form.submit t("common.apply"), class: "rounded-lg border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" %>
+<% end %>

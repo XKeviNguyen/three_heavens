@@ -1,42 +1,42 @@
 <dl class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Completed translations</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.completed_translations") %></dt>
     <dd class="mt-1 text-xl font-bold text-slate-950"><%= stats.completed_translation_count %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.translation_participation_count %> logical participation(s) · <%= stats.failed_translation_count %> failed · <%= analytics_percent(stats.translation_failure_rate) %> failure rate</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.participation", count: stats.translation_participation_count, failed: stats.failed_translation_count, rate: analytics_percent(stats.translation_failure_rate)) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Official wins</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.official_wins") %></dt>
     <dd class="mt-1 text-xl font-bold text-slate-950"><%= stats.official_wins %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= analytics_percent(stats.official_win_rate) %> across <%= stats.completed_judged_experiment_count %> eligible completed round(s)</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.win_rate_detail", rate: analytics_percent(stats.official_win_rate), count: stats.completed_judged_experiment_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Blind-review score</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.review_score") %></dt>
     <dd class="mt-1 text-xl font-bold text-slate-950"><%= analytics_number(stats.review_average_score) %><%= "/10" if stats.review_average_score %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.review_score_sample_count %> score sample(s) · <%= stats.reviewed_candidate_count %> candidate(s)</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.score_samples", count: stats.review_score_sample_count, candidates: stats.reviewed_candidate_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Judge score</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.judge_score") %></dt>
     <dd class="mt-1 text-xl font-bold text-slate-950"><%= analytics_number(stats.judge_average_score) %><%= "/100" if stats.judge_average_score %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.judge_score_sample_count %> score sample(s) · <%= stats.judged_candidate_count %> candidate(s)</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.score_samples", count: stats.judge_score_sample_count, candidates: stats.judged_candidate_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Known translation cost</dt>
-    <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_money(stats.total_translation_cost) %> total</dd>
-    <p class="mt-1 text-xs text-slate-500"><%= analytics_money(stats.average_translation_cost) %> average · <%= stats.cost_sample_count %> completed run sample(s)</p>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.known_translation_cost") %></dt>
+    <dd class="mt-1 text-lg font-bold text-slate-950"><%= t("benchmarks_ui.total", value: analytics_money(stats.total_translation_cost)) %></dd>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.average_samples", value: analytics_money(stats.average_translation_cost), count: stats.cost_sample_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Average latency</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.average_latency") %></dt>
     <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_duration(stats.average_latency_seconds) %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.latency_sample_count %> completed run sample(s)</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.completed_samples", count: stats.latency_sample_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Average total tokens</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.average_total_tokens") %></dt>
     <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_number(stats.average_total_tokens, precision: 1) %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.token_sample_count %> completed run sample(s)</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.completed_samples", count: stats.token_sample_count) %></p>
   </div>
   <div class="rounded-lg bg-slate-50 p-4">
-    <dt class="text-slate-500">Avg cost per judge-score point</dt>
+    <dt class="text-slate-500"><%= t("benchmarks_ui.cost_per_point") %></dt>
     <dd class="mt-1 text-lg font-bold text-slate-950"><%= analytics_money(stats.average_cost_per_judge_score_point) %></dd>
-    <p class="mt-1 text-xs text-slate-500"><%= stats.cost_quality_sample_count %> positive-cost judged run sample(s) · lower is better</p>
+    <p class="mt-1 text-xs text-slate-500"><%= t("benchmarks_ui.cost_quality_samples", count: stats.cost_quality_sample_count) %></p>
   </div>
 </dl>

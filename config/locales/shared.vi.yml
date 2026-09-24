@@ -1,0 +1,37 @@
+vi:
+  shared_ui:
+    not_found:
+      title: Trang không khả dụng · Three Heavens
+      eyebrow: Trang không khả dụng
+      heading: Không tìm thấy trang này
+      intro: Trang có thể không còn tồn tại hoặc thuộc tài khoản khác. Không có thông tin riêng tư nào được tiết lộ.
+      workspace: Đến không gian dịch
+      projects: Xem dự án
+    hint:
+      field: trường này
+      more: Thông tin thêm về %{label}
+    pagination:
+      label: Phân trang %{label}
+      newer: ← Mới hơn
+      older: Cũ hơn →
+      page: Trang %{current}/%{total} · %{entries}
+    steps:
+      label: Quy trình dịch
+      translation: Dịch
+      review: Nhận xét ẩn danh
+      judge: Chấm điểm
+      editor: Người biên tập
+    step_states:
+      complete: Hoàn tất
+      current: Hiện tại
+      failed: Thất bại
+      waiting: Đang chờ
+    home: Trang chủ Three Heavens
+    upload:
+      title: Tải tệp nguồn lên · Three Heavens
+      extracting: Đang trích xuất văn bản…
+      drop: Thả tệp vào đây
+      or: hoặc
+      choose: Chọn tệp
+      formats: TXT · Markdown · DOCX · PDF
+      limit: Dung lượng tối đa %{maximum} MiB. Tải lên và xem trước không liên hệ nhà cung cấp AI.

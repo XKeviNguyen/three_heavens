@@ -1,0 +1,55 @@
+vi:
+  workflows_ui:
+    title: Cấu hình quy trình · Three Heavens
+    edit_title: Chỉnh sửa cấu hình quy trình · Three Heavens
+    new_title: Cấu hình quy trình mới · Three Heavens
+    show_title: '%{name} · Cấu hình quy trình · Three Heavens'
+    configuration: Thiết lập cấu hình
+    completion_mode: Chế độ hoàn tất
+    winner_help: Tạo bản nháp chính thức rồi dừng để người biên tập tiếp tục.
+    refinement_help: Tạo thêm đề xuất AI nhưng không tự áp dụng hay hoàn tất.
+    select_range: Chọn %{minimum}–%{maximum}
+    finalizer_range: Không chọn cho bản nháp thắng cuộc, hoặc chọn 1–%{maximum} cho đề xuất chỉnh sửa
+    role_order: '%{selection}. Thứ tự được giữ cố định.'
+    role_models: 'Mô hình %{role}'
+    role_hints:
+      translator: Mô hình tạo các bản dịch độc lập.
+      reviewer: Mô hình nhận xét bản dịch theo cấu trúc.
+      judge: Mô hình chấm điểm và xếp hạng độc lập các bản dịch đã nhận xét.
+      finalizer: Mô hình đề xuất chỉnh sửa mà không tự áp dụng.
+    roles:
+      translator: dịch
+      reviewer: nhận xét
+      judge: chấm điểm
+      finalizer: đề xuất chỉnh sửa
+    saving: Đang lưu cấu hình…
+    automation: Tự động hóa
+    create_revision: Tạo phiên bản %{version}
+    edit_intro: Phiên bản %{version} được giữ nguyên để đối chiếu và xem lại quy trình cũ.
+    heading: Cấu hình quy trình
+    singular: Cấu hình quy trình
+    index_intro: Cấu hình riêng của bạn, có thể dùng lại. Mỗi lần sửa tạo một phiên bản cố định mới.
+    new: Cấu hình quy trình mới
+    empty: Chưa có cấu hình quy trình
+    empty_intro: Tạo cấu hình để khởi chạy quy trình tự động khi bắt đầu lần dịch.
+    updated: Cập nhật %{at}
+    revision: Phiên bản
+    mode: Chế độ
+    view: Xem
+    edit: Sửa
+    duplicate: Nhân bản
+    deactivate: Tắt
+    deactivate_confirm: Tắt cấu hình này? Các quy trình cũ vẫn giữ nguyên.
+    new_intro: Lưu cấu hình không khởi chạy AI. Mỗi lần chạy quy trình cần được xác nhận riêng.
+    create: Tạo cấu hình quy trình
+    active_new: Đang hoạt động · dùng được cho quy trình mới
+    inactive_history: Đã tắt · chỉ xem lịch sử
+    all: Tất cả cấu hình
+    using: 'Sử dụng cấu hình:'
+    using_intro: Chọn cấu hình này trong
+    using_confirmation: Mỗi lần khởi chạy vẫn cần xác nhận công việc AI riêng.
+    eligible: Hiện có thể dùng
+    ineligible: Không còn dùng được
+    launched:
+      one: 1 quy trình cũ đã dùng phiên bản này.
+      other: '%{count} quy trình cũ đã dùng phiên bản này.'

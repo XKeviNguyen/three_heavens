@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="<%= I18n.locale %>">
   <head>
     <title><%= content_for(:title) || "Three Heavens" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -20,37 +20,37 @@
   </head>
 
   <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
-    <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white transition focus:translate-y-0">Skip to main content</a>
+    <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white transition focus:translate-y-0"><%= t("common.skip_to_content") %></a>
 
     <% if authenticated? %>
       <div data-controller="sidebar" class="min-h-screen">
         <header class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
           <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
             <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>
-            Menu
+            <%= t("navigation.menu") %>
           </button>
-          <%= link_to root_path, aria: { label: "Three Heavens home" }, class: "flex min-w-0 items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
+          <%= link_to root_path, aria: { label: t("shared_ui.home") }, class: "flex min-w-0 items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
             <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-xs font-bold text-white" aria-hidden="true">TH</span>
             <span class="truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
           <% end %>
           <span class="size-11" aria-hidden="true"></span>
         </header>
 
-        <aside id="app-sidebar" data-sidebar-target="panel" class="fixed inset-y-0 left-0 z-40 hidden w-64 max-w-[85vw] flex-col overflow-y-auto border-r border-slate-200 bg-white/95 backdrop-blur lg:flex" aria-label="Primary navigation">
+        <aside id="app-sidebar" data-sidebar-target="panel" class="fixed inset-y-0 left-0 z-40 hidden w-64 max-w-[85vw] flex-col overflow-y-auto border-r border-slate-200 bg-white/95 backdrop-blur lg:flex" aria-label="<%= t("navigation.primary") %>">
           <div class="flex min-h-16 items-center gap-3 border-b border-slate-100 px-5">
-            <%= link_to root_path, aria: { label: "Three Heavens home" }, class: "flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
+            <%= link_to root_path, aria: { label: t("shared_ui.home") }, class: "flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
               <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
               <span class="min-w-0">
                 <span class="block truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
-                <span class="block truncate text-xs text-slate-500">Translation workspace</span>
+                <span class="block truncate text-xs text-slate-500"><%= t("navigation.subtitle") %></span>
               </span>
             <% end %>
-            <button type="button" data-action="sidebar#close" class="ml-auto inline-flex size-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 lg:hidden" aria-label="Close navigation">
+            <button type="button" data-action="sidebar#close" class="ml-auto inline-flex size-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 lg:hidden" aria-label="<%= t("navigation.close") %>">
               <svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M5 5l10 10M15 5L5 15"/></svg>
             </button>
           </div>
 
-          <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Primary navigation">
+          <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="<%= t("navigation.primary") %>">
             <% sidebar_sections.each do |section| %>
               <div>
                 <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400"><%= section[:label] %></p>
@@ -68,7 +68,8 @@
               <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold uppercase text-slate-700" aria-hidden="true"><%= current_user.email.to_s.first(2) %></span>
               <span class="min-w-0 flex-1 truncate text-xs text-slate-500" title="<%= current_user.email %>"><%= current_user.email %></span>
             </div>
-            <%= button_to "Log out", session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>
+            <%= render "shared/locale_selector" %>
+            <%= button_to t("navigation.log_out"), session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>
           </div>
         </aside>
 
@@ -93,7 +94,7 @@
           <span class="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
           <span>
             <span class="block font-semibold tracking-tight text-slate-950">Three Heavens</span>
-            <span class="block text-xs text-slate-500">Translation workspace</span>
+            <span class="block text-xs text-slate-500"><%= t("navigation.subtitle") %></span>
           </span>
         </div>
         <div class="w-full">

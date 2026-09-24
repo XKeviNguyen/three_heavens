@@ -1,7 +1,7 @@
 <% values = @form_values || {} %>
 <% if @form_errors.present? %>
   <section class="rounded-xl border border-red-200 bg-red-50 p-5" aria-labelledby="reference-errors-heading">
-    <h2 id="reference-errors-heading" class="font-semibold text-red-900">Please correct the following:</h2>
+    <h2 id="reference-errors-heading" class="font-semibold text-red-900"><%= t("glossaries_ui.correct_errors") %></h2>
     <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
       <% @form_errors.each do |message| %><li><%= message %></li><% end %>
     </ul>
@@ -10,21 +10,21 @@
 
 <% if @current_revision %>
   <section class="rounded-xl border border-amber-300 bg-amber-50 p-5" aria-labelledby="reference-conflict-heading">
-    <h2 id="reference-conflict-heading" class="font-semibold text-amber-950">A newer revision is available</h2>
-    <p class="mt-1 text-sm text-amber-900">Compare the current revision below with your submitted values, merge the changes deliberately, then save.</p>
+    <h2 id="reference-conflict-heading" class="font-semibold text-amber-950"><%= t("references_ui.conflict") %></h2>
+    <p class="mt-1 text-sm text-amber-900"><%= t("references_ui.conflict_intro") %></p>
     <dl class="mt-4 space-y-2 text-sm text-amber-950">
-      <div><dt class="font-semibold">Current title</dt><dd><%= @current_revision.title %></dd></div>
-      <div><dt class="font-semibold">Current source language</dt><dd><%= @current_revision.source_language %></dd></div>
-      <div><dt class="font-semibold">Current target language</dt><dd><%= @current_revision.target_language %></dd></div>
-      <div><dt class="font-semibold">Current revision number</dt><dd><%= @current_revision.version %></dd></div>
+      <div><dt class="font-semibold"><%= t("references_ui.current_title") %></dt><dd><%= @current_revision.title %></dd></div>
+      <div><dt class="font-semibold"><%= t("references_ui.current_source_language") %></dt><dd><%= @current_revision.source_language %></dd></div>
+      <div><dt class="font-semibold"><%= t("references_ui.current_target_language") %></dt><dd><%= @current_revision.target_language %></dd></div>
+      <div><dt class="font-semibold"><%= t("references_ui.current_revision_number") %></dt><dd><%= @current_revision.version %></dd></div>
     </dl>
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <div>
-        <h3 class="text-sm font-semibold text-amber-950">Current source example (revision <%= @current_revision.version %>)</h3>
+        <h3 class="text-sm font-semibold text-amber-950"><%= t("references_ui.current_source_example", version: @current_revision.version) %></h3>
         <pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-amber-200 bg-white p-3 text-xs text-slate-800"><%= @current_revision.source_text %></pre>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-amber-950">Current approved translation</h3>
+        <h3 class="text-sm font-semibold text-amber-950"><%= t("references_ui.current_translation") %></h3>
         <pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-amber-200 bg-white p-3 text-xs text-slate-800"><%= @current_revision.approved_translation %></pre>
       </div>
     </div>
@@ -36,37 +36,31 @@
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
     <div class="grid gap-5 md:grid-cols-2">
       <div class="md:col-span-2">
-        <%= form.label :title, class: "block text-sm font-medium text-slate-700" %>
+        <%= form.label :title, t("references_ui.field_title"), class: "block text-sm font-medium text-slate-700" %>
         <%= form.text_field :title, value: values["title"], required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %>
       </div>
-      <div>
-        <%= form.label :source_language, class: "block text-sm font-medium text-slate-700" %>
-        <%= form.text_field :source_language, value: values["source_language"], required: true, maxlength: 100, placeholder: "e.g. English", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %>
-      </div>
-      <div>
-        <%= form.label :target_language, class: "block text-sm font-medium text-slate-700" %>
-        <%= form.text_field :target_language, value: values["target_language"], required: true, maxlength: 100, placeholder: "e.g. Japanese", class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %>
-      </div>
+      <div><%= render "shared/language_combobox", form: form, method: :source_language, label: t("language.source"), value: values["source_language"] %></div>
+      <div><%= render "shared/language_combobox", form: form, method: :target_language, label: t("language.target"), value: values["target_language"] %></div>
     </div>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-lg font-semibold text-slate-950">Source example</h2>
-    <p class="mt-1 text-sm text-slate-600">Paste text or upload one TXT, MD, or DOCX file. Do not provide both.</p>
-    <%= form.label :source_text, "Pasted source text", class: "mt-4 block text-sm font-medium text-slate-700" %>
+    <h2 class="text-lg font-semibold text-slate-950"><%= t("references_ui.source_example") %></h2>
+    <p class="mt-1 text-sm text-slate-600"><%= t("references_ui.source_upload_help") %></p>
+    <%= form.label :source_text, t("references_ui.pasted_source"), class: "mt-4 block text-sm font-medium text-slate-700" %>
     <%= form.text_area :source_text, value: values["source_text"], maxlength: TranslationReferenceRevision::MAXIMUM_SOURCE_CHARACTERS, rows: 12, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" %>
-    <%= form.label :source_file, "Or upload source file", class: "mt-4 block text-sm font-medium text-slate-700" %>
-    <%= form.file_field :source_file, accept: ".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full text-sm" %>
+    <%= form.label :source_file, t("references_ui.upload_source"), class: "mt-4 block text-sm font-medium text-slate-700" %>
+    <%= form.file_field :source_file, accept: ".txt,.md,.docx,.pdf,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full text-sm" %>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-lg font-semibold text-slate-950">Approved translation</h2>
-    <p class="mt-1 text-sm text-slate-600">Paste the approved translation or upload one TXT, MD, or DOCX file. Do not provide both.</p>
-    <%= form.label :approved_translation, "Pasted approved translation", class: "mt-4 block text-sm font-medium text-slate-700" %>
+    <h2 class="text-lg font-semibold text-slate-950"><%= t("references_ui.approved_translation") %></h2>
+    <p class="mt-1 text-sm text-slate-600"><%= t("references_ui.translation_upload_help") %></p>
+    <%= form.label :approved_translation, t("references_ui.pasted_translation"), class: "mt-4 block text-sm font-medium text-slate-700" %>
     <%= form.text_area :approved_translation, value: values["approved_translation"], maxlength: TranslationReferenceRevision::MAXIMUM_TRANSLATION_CHARACTERS, rows: 12, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" %>
-    <%= form.label :approved_translation_file, "Or upload approved translation file", class: "mt-4 block text-sm font-medium text-slate-700" %>
-    <%= form.file_field :approved_translation_file, accept: ".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full text-sm" %>
+    <%= form.label :approved_translation_file, t("references_ui.upload_translation"), class: "mt-4 block text-sm font-medium text-slate-700" %>
+    <%= form.file_field :approved_translation_file, accept: ".txt,.md,.docx,.pdf,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "mt-2 block w-full text-sm" %>
   </section>
 
-  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: "Saving reference…" } %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("references_ui.saving") } %></div>
 <% end %>

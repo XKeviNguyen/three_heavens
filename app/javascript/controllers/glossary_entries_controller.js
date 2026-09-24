@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["list", "template", "count"]
-  static values = { maximum: Number }
+  static values = { maximum: Number, countLabel: String }
 
   add() {
     if (this.listTarget.children.length >= this.maximumValue) return
@@ -22,7 +22,7 @@ export default class extends Controller {
 
   updateControls() {
     const size = this.listTarget.children.length
-    this.countTarget.textContent = `${size}/${this.maximumValue} entries`
+    this.countTarget.textContent = this.countLabelValue.replace("%{count}", String(size)).replace("%{max}", String(this.maximumValue))
     this.element.querySelectorAll("[data-glossary-entries-target='remove']").forEach((button) => {
       button.disabled = size <= 1
     })

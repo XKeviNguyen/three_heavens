@@ -186,6 +186,40 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
   end
 
 
+  test "restore drops unavailable catalog selections and translates its notice" do
+    identifiers = [ "anthropic/claude-test", "missing/model" ]
+    post translation_workspace_draft_path, params: {
+      workspace: payload("model_identifiers" => identifiers)
+    }, as: :json
+    assert_response :success
+    draft = users(:normal).translation_workspace_drafts.sole
+    catalog_key = OpenRouter::Catalog::CACHE_KEY
+    catalog_model = OpenRouter::Catalog::Model.new(
+      identifier: "anthropic/claude-test", name: "Claude Test", provider: "anthropic",
+      context_length: 16_000, max_completion_tokens: 4_096,
+      prompt_price: 0, completion_price: 0,
+      input_modalities: [ "text" ], output_modalities: [ "text" ], supported_parameters: []
+    )
+    catalog = OpenRouter::Catalog::Result.new(models: [ catalog_model ], fetched_at: Time.current)
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    Rails.cache.write(catalog_key, catalog)
+    I18n.with_locale(:vi) do
+      restored = TranslationWorkspaceDrafts::Restore.call(draft:, user: users(:normal), project: nil)
+      assert_equal [ "anthropic/claude-test" ], restored.attributes.fetch(:model_identifiers)
+      assert_equal I18n.t("workspace_ui.draft_configuration_changed"), restored.configuration_notice
+    end
+
+    Rails.cache.delete(catalog_key)
+    I18n.with_locale(:ja) do
+      restored = TranslationWorkspaceDrafts::Restore.call(draft:, user: users(:normal), project: nil)
+      assert_equal identifiers, restored.attributes.fetch(:model_identifiers)
+      assert_nil restored.configuration_notice
+    end
+  ensure
+    Rails.cache = original_cache if original_cache
+  end
+
   test "a new import keeps unrelated saved settings while replacing source fields" do
     post translation_workspace_draft_path, params: {
       workspace: payload("source_text" => "Older source", "project_name" => "Keep project")

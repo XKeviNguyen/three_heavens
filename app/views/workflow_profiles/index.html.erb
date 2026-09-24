@@ -1,22 +1,22 @@
-<% content_for :title, "Workflow Profiles · Three Heavens" %>
+<% content_for :title, t("workflows_ui.title") %>
 
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Automation</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Workflow Profiles</h1>
-      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Reusable, owner-private configurations. Every edit creates a new immutable revision.</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("workflows_ui.automation") %></p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("workflows_ui.heading") %></h1>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600"><%= t("workflows_ui.index_intro") %></p>
     </div>
-    <%= link_to "New workflow profile", new_workflow_profile_path, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+    <%= link_to t("workflows_ui.new"), new_workflow_profile_path, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
   </header>
 
   <% if @workflow_profiles.empty? %>
     <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">No workflow profiles yet</h2>
-      <p class="mt-2 text-sm text-slate-600">Create one to authorize an end-to-end automatic pipeline at experiment launch.</p>
+      <h2 class="text-lg font-semibold text-slate-950"><%= t("workflows_ui.empty") %></h2>
+      <p class="mt-2 text-sm text-slate-600"><%= t("workflows_ui.empty_intro") %></p>
     </section>
   <% else %>
-    <section class="space-y-4" aria-label="Workflow profiles">
+    <section class="space-y-4" aria-label="<%= t("workflows_ui.heading") %>">
       <% @workflow_profiles.each do |profile| %>
         <% revision = profile.current_revision %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -24,32 +24,32 @@
             <div>
               <div class="flex flex-wrap items-center gap-3">
                 <h2 class="text-xl font-semibold text-slate-950"><%= revision.name %></h2>
-                <span class="rounded-full px-3 py-1 text-xs font-semibold <%= profile.active? ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' %>"><%= profile.active? ? "Active" : "Inactive" %></span>
+                <span class="rounded-full px-3 py-1 text-xs font-semibold <%= profile.active? ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' %>"><%= localized_status(profile.active? ? :active : :inactive) %></span>
               </div>
-              <p class="mt-2 text-sm text-slate-600"><%= revision.description.presence || "No description" %></p>
+              <p class="mt-2 text-sm text-slate-600"><%= revision.description.presence || t("glossaries_ui.no_description") %></p>
             </div>
-            <p class="text-xs text-slate-500">Updated <%= l profile.updated_at, format: :long %></p>
+            <p class="text-xs text-slate-500"><%= t("workflows_ui.updated", at: l(profile.updated_at, format: :long)) %></p>
           </div>
           <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            <div><dt class="text-slate-500">Revision</dt><dd class="mt-1 font-semibold"><%= revision.version %></dd></div>
-            <div><dt class="text-slate-500">Mode</dt><dd class="mt-1 font-semibold"><%= revision.completion_mode.humanize %></dd></div>
+            <div><dt class="text-slate-500"><%= t("workflows_ui.revision") %></dt><dd class="mt-1 font-semibold"><%= revision.version %></dd></div>
+            <div><dt class="text-slate-500"><%= t("workflows_ui.mode") %></dt><dd class="mt-1 font-semibold"><%= t("workflow_modes.#{revision.completion_mode}") %></dd></div>
             <% WorkflowProfileModelSelection::ROLES.each do |role| %>
-              <div><dt class="text-slate-500"><%= role.humanize.pluralize %></dt><dd class="mt-1 font-semibold"><%= revision.role_count(role) %></dd></div>
+              <div><dt class="text-slate-500"><%= t("workflows_ui.roles.#{role}") %></dt><dd class="mt-1 font-semibold"><%= revision.role_count(role) %></dd></div>
             <% end %>
           </dl>
           <div class="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4 text-sm font-semibold">
-            <%= link_to "View", profile, class: "text-blue-700 hover:text-blue-900" %>
-            <%= link_to "Edit", edit_workflow_profile_path(profile), class: "text-blue-700 hover:text-blue-900" %>
-            <%= button_to "Duplicate", duplicate_workflow_profile_path(profile), method: :post, class: "text-blue-700 hover:text-blue-900" %>
+            <%= link_to t("workflows_ui.view"), profile, class: "text-blue-700 hover:text-blue-900" %>
+            <%= link_to t("workflows_ui.edit"), edit_workflow_profile_path(profile), class: "text-blue-700 hover:text-blue-900" %>
+            <%= button_to t("workflows_ui.duplicate"), duplicate_workflow_profile_path(profile), method: :post, class: "text-blue-700 hover:text-blue-900" %>
             <% if profile.active? %>
-              <%= button_to "Deactivate", deactivate_workflow_profile_path(profile), method: :patch, data: { turbo_confirm: "Deactivate this workflow profile? Historical pipelines remain unchanged." }, class: "text-amber-700 hover:text-amber-900" %>
+              <%= button_to t("workflows_ui.deactivate"), deactivate_workflow_profile_path(profile), method: :patch, data: { turbo_confirm: t("workflows_ui.deactivate_confirm") }, class: "text-amber-700 hover:text-amber-900" %>
             <% else %>
-              <%= button_to "Activate", activate_workflow_profile_path(profile), method: :patch, class: "text-emerald-700 hover:text-emerald-900" %>
+              <%= button_to t("glossaries_ui.activate"), activate_workflow_profile_path(profile), method: :patch, class: "text-emerald-700 hover:text-emerald-900" %>
             <% end %>
           </div>
         </article>
       <% end %>
     </section>
-    <%= render "shared/pagination", pagination: @pagination, label: "Workflow profiles" %>
+    <%= render "shared/pagination", pagination: @pagination, label: t("workflows_ui.heading") %>
   <% end %>
 </div>

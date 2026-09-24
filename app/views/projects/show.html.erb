@@ -1,26 +1,26 @@
-<% content_for :title, "#{@project.name} · Projects · Three Heavens" %>
+<% content_for :title, "#{@project.name} · #{t("projects_ui.title")}" %>
 
 <div class="space-y-8">
   <header class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Project workspace</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("projects_ui.workspace") %></p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @project.name %></h1>
-      <p class="mt-2 text-sm text-slate-600"><%= @project.source_language %> → <%= @project.target_language %> · <%= pluralize(@total_count, "document") %></p>
+      <p class="mt-2 text-sm text-slate-600"><%= @project.source_language %> → <%= @project.target_language %> · <%= t("projects_ui.document_count", count: @total_count) %></p>
     </div>
     <div class="flex flex-wrap gap-3">
-      <%= link_to "Paste text / start translation", new_translation_workspace_path(project_id: @project.id), class: "inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
-      <%= link_to "Upload source file", new_source_import_path(project_id: @project.id), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50" %>
+      <%= link_to t("projects_ui.paste_start"), new_translation_workspace_path(project_id: @project.id), class: "inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+      <%= link_to t("projects_ui.upload_source"), new_source_import_path(project_id: @project.id), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50" %>
     </div>
   </header>
 
   <% if @documents.empty? %>
     <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">No source documents yet</h2>
-      <p class="mt-2 text-sm text-slate-600">Paste text or upload one source file to start this Project's first translation experiment.</p>
-      <%= link_to "Paste source text", new_translation_workspace_path(project_id: @project.id), class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+      <h2 class="text-lg font-semibold text-slate-950"><%= t("projects_ui.no_documents") %></h2>
+      <p class="mt-2 text-sm text-slate-600"><%= t("projects_ui.no_documents_intro") %></p>
+      <%= link_to t("projects_ui.paste_source"), new_translation_workspace_path(project_id: @project.id), class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
     </section>
   <% else %>
-    <section class="space-y-6" aria-label="Project documents">
+    <section class="space-y-6" aria-label="<%= t("projects_ui.project_documents") %>">
       <% @documents.each do |document| %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
@@ -28,13 +28,13 @@
             <h2 class="mt-2 text-xl font-semibold text-slate-950"><%= document.title %></h2>
             <p class="mt-1 text-sm text-slate-600">
               <% if document.uploaded_file? %>
-                Uploaded source · <%= document.original_filename %> · <%= document.source_format.upcase %>
+                <%= t("projects_ui.uploaded_source") %> · <%= document.original_filename %> · <%= document.source_format.upcase %>
               <% else %>
-                Pasted source
+                <%= t("projects_ui.pasted_source") %>
               <% end %>
-              · <%= pluralize(document.experiments.size, "experiment") %>
+              · <%= t("projects_ui.experiment_count", count: document.experiments.size) %>
             </p>
-            <% if document.uploaded_file? %><%= link_to "Download original", download_original_document_path(document), class: "mt-2 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %><% end %>
+            <% if document.uploaded_file? %><%= link_to t("projects_ui.download_original"), download_original_document_path(document), class: "mt-2 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %><% end %>
           </div>
 
           <div class="mt-5 space-y-4">
@@ -45,29 +45,29 @@
               <section class="rounded-lg border border-slate-200 bg-slate-50 p-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 class="font-semibold text-slate-950"><%= experiment.name.presence || "Translation experiment" %></h3>
-                    <p class="mt-1 text-sm text-slate-600"><%= experiment.pipeline_run ? "Automatic workflow" : "Manual workflow" %></p>
+                    <h3 class="font-semibold text-slate-950"><%= experiment.name.presence || t("projects_ui.translation_experiment") %></h3>
+                    <p class="mt-1 text-sm text-slate-600"><%= experiment.pipeline_run ? t("projects_ui.automatic_workflow") : t("projects_ui.manual_workflow") %></p>
                   </div>
-                  <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(experiment.status) %>"><%= experiment.status.humanize %></span>
+                  <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(experiment.status) %>"><%= localized_status(experiment.status) %></span>
                 </div>
 
                 <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
-                  <% if experiment.glossary_revision %><span>Glossary: <strong><%= experiment.glossary_revision.name %> · revision <%= experiment.glossary_revision.version %></strong></span><% end %>
-                  <% if experiment.methodology_profile_revision %><span>Methodology: <strong><%= experiment.methodology_profile_revision.name %> · revision <%= experiment.methodology_profile_revision.version %></strong></span><% end %>
-                  <span>Guidance preference: <strong><%= TranslationGuidance::Policy.label(experiment.guidance_preference) %></strong></span>
-                  <% if experiment.experiment_reference_revisions.any? %><span>References: <strong><%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · revision #{snapshot.translation_reference_revision.version}" }.to_sentence %></strong></span><% end %>
-                  <span>Blind review: <strong><%= review_round&.status&.humanize || "Not started" %></strong></span>
-                  <span>Judge: <strong><%= judge_round&.status&.humanize || "Not started" %></strong></span>
-                  <span>Final translation: <strong><%= experiment.final_translation&.status&.humanize || "Not created" %></strong></span>
+                  <% if experiment.glossary_revision %><span><%= t("projects_ui.glossary") %>: <strong><%= experiment.glossary_revision.name %> · <%= t("projects_ui.revision", version: experiment.glossary_revision.version) %></strong></span><% end %>
+                  <% if experiment.methodology_profile_revision %><span><%= t("projects_ui.methodology") %>: <strong><%= experiment.methodology_profile_revision.name %> · <%= t("projects_ui.revision", version: experiment.methodology_profile_revision.version) %></strong></span><% end %>
+                  <span><%= t("projects_ui.guidance_preference") %>: <strong><%= localized_guidance_label(experiment.guidance_preference) %></strong></span>
+                  <% if experiment.experiment_reference_revisions.any? %><span><%= t("projects_ui.references") %>: <strong><%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · #{t("projects_ui.revision", version: snapshot.translation_reference_revision.version)}" }.to_sentence %></strong></span><% end %>
+                  <span><%= t("projects_ui.blind_review") %>: <strong><%= (localized_status(review_round.status) if review_round) || t("projects_ui.not_started") %></strong></span>
+                  <span><%= t("projects_ui.judge") %>: <strong><%= (localized_status(judge_round.status) if judge_round) || t("projects_ui.not_started") %></strong></span>
+                  <span><%= t("projects_ui.final_translation") %>: <strong><%= (localized_status(experiment.final_translation.status) if experiment.final_translation) || t("projects_ui.not_created") %></strong></span>
                 </div>
 
                 <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3 text-sm font-semibold">
                   <%= link_to next_action_label, next_action_path, class: "rounded-lg bg-blue-700 px-3 py-2 text-white hover:bg-blue-800" %>
-                  <% unless next_action_path == experiment_path(experiment) %><%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-                  <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to "Final translation", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% unless next_action_path == experiment_path(experiment) %><%= link_to t("projects_ui.experiment"), experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to t("projects_ui.pipeline_progress"), pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to t("projects_ui.blind_review"), review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to t("projects_ui.judge_results"), judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+                  <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to t("projects_ui.final_translation"), final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
                 </div>
               </section>
             <% end %>
@@ -76,8 +76,8 @@
       <% end %>
     </section>
 
-    <%= render "shared/pagination", pagination: { current_page: @current_page, total_pages: @total_pages, total_count: @total_count }, label: "Documents" %>
+    <%= render "shared/pagination", pagination: { current_page: @current_page, total_pages: @total_pages, total_count: @total_count }, label: t("projects_ui.documents") %>
   <% end %>
 
-  <%= link_to "← All Projects", projects_path, class: "inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+  <%= link_to t("projects_ui.all_projects"), projects_path, class: "inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900" %>
 </div>

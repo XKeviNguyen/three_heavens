@@ -1,5 +1,5 @@
-<% content_for :title, "Edit Workflow Profile · Three Heavens" %>
+<% content_for :title, t("workflows_ui.edit_title") %>
 <div class="mx-auto max-w-4xl">
-  <header class="mb-8"><p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Automation</p><h1 class="mt-2 text-3xl font-bold">Create revision <%= @workflow_profile.current_revision.version + 1 %></h1><p class="mt-2 text-sm text-slate-600">Revision <%= @workflow_profile.current_revision.version %> remains immutable for audit and historical pipelines.</p></header>
-  <%= render "form", form_url: workflow_profile_path(@workflow_profile), form_method: :patch, submit_label: "Create new revision" %>
+  <header class="mb-8"><p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("workflows_ui.automation") %></p><h1 class="mt-2 text-3xl font-bold"><%= t("workflows_ui.create_revision", version: @workflow_profile.current_revision.version + 1) %></h1><p class="mt-2 text-sm text-slate-600"><%= t("workflows_ui.edit_intro", version: @workflow_profile.current_revision.version) %></p></header>
+  <%= render "form", form_url: workflow_profile_path(@workflow_profile), form_method: :patch, submit_label: t("glossaries_ui.create_new_revision") %>
 </div>

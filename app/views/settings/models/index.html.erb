@@ -1,50 +1,50 @@
-<% content_for :title, "Model catalog · Three Heavens" %>
+<% content_for :title, t("admin_models.title") %>
 
 <div class="space-y-8">
   <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Settings</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">OpenRouter model catalog</h1>
-      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the catalog used by translation, review, judging, and finalization workflows. Provider API keys remain environment-only and are never managed here.</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("admin_models.settings") %></p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("admin_models.heading") %></h1>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600"><%= t("admin_models.intro") %></p>
     </div>
-    <%= link_to "Add model", new_settings_model_path, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>
+    <%= link_to t("admin_models.add"), new_settings_model_path, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>
   </header>
 
   <aside class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-    Models are never deleted from this area. Deactivation removes a model from future active selectors while preserving all translation, review, judge, finalization, and benchmark history.
+    <%= t("admin_models.deactivation_help") %>
   </aside>
 
   <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-lg font-semibold text-slate-950">Search OpenRouter</h2>
-    <p class="mt-1 text-sm text-slate-600">Find a compatible text model and add it with trusted catalog metadata. Discovery is read-only and makes no paid provider request.</p>
+    <h2 class="text-lg font-semibold text-slate-950"><%= t("admin_models.search") %></h2>
+    <p class="mt-1 text-sm text-slate-600"><%= t("admin_models.search_intro") %></p>
     <%= form_with url: catalog_settings_models_path, method: :post, class: "mt-4" do %>
       <%= render "shared/model_browser",
             role: "translator",
             name: "model_identifier",
             max: 1,
-            label: "Browse OpenRouter",
-            hint: "Search the live OpenRouter catalog and add a model with canonical metadata.",
+            label: t("admin_models.browse"),
+            hint: t("admin_models.browse_help"),
             selected: [] %>
-      <%= submit_tag "Add and activate model", class: "mt-4 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>
+      <%= submit_tag t("admin_models.add_and_activate"), class: "mt-4 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800" %>
     <% end %>
   </section>
 
   <% if @llm_models.empty? %>
     <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">No OpenRouter models configured</h2>
-      <p class="mt-2 text-sm text-slate-600">Add the first catalog model to make it available to future workflows.</p>
+      <h2 class="text-lg font-semibold text-slate-950"><%= t("admin_models.empty") %></h2>
+      <p class="mt-2 text-sm text-slate-600"><%= t("admin_models.empty_intro") %></p>
     </section>
   <% else %>
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="OpenRouter models">
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="<%= t("admin_models.heading") %>">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
           <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th scope="col" class="px-4 py-3">Model</th>
-              <th scope="col" class="px-4 py-3">Provider / gateway</th>
-              <th scope="col" class="px-4 py-3">Status</th>
-              <th scope="col" class="px-4 py-3">Usage</th>
-              <th scope="col" class="px-4 py-3 text-right">Actions</th>
+              <th scope="col" class="px-4 py-3"><%= t("admin_models.model") %></th>
+              <th scope="col" class="px-4 py-3"><%= t("admin_models.provider_gateway") %></th>
+              <th scope="col" class="px-4 py-3"><%= t("references_ui.status") %></th>
+              <th scope="col" class="px-4 py-3"><%= t("admin_models.usage") %></th>
+              <th scope="col" class="px-4 py-3 text-right"><%= t("admin_models.actions") %></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -54,36 +54,36 @@
                 <th scope="row" class="px-4 py-4 font-normal">
                   <p class="font-semibold text-slate-950"><%= llm_model.display_name %></p>
                   <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= llm_model.model_identifier %></p>
-                  <p class="mt-1 text-xs text-slate-500"><% if llm_model.context_window_tokens && llm_model.max_output_tokens %><%= number_with_delimiter(llm_model.context_window_tokens) %> context · <%= number_with_delimiter(llm_model.max_output_tokens) %> max output tokens<% else %>Context capability not configured<% end %></p>
+                  <p class="mt-1 text-xs text-slate-500"><% if llm_model.context_window_tokens && llm_model.max_output_tokens %><%= t("admin_models.capability", context: number_with_delimiter(llm_model.context_window_tokens), output: number_with_delimiter(llm_model.max_output_tokens)) %><% else %><%= t("admin_models.capability_missing") %><% end %></p>
                 </th>
                 <td class="px-4 py-4 text-slate-700">
                   <p><%= llm_model.provider %></p>
                   <p class="mt-1 text-xs text-slate-500"><%= llm_model.gateway %></p>
                 </td>
                 <td class="px-4 py-4">
-                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <%= llm_model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= llm_model.active? ? "Active" : "Inactive" %></span>
+                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <%= llm_model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= localized_status(llm_model.active? ? :active : :inactive) %></span>
                 </td>
                 <td class="px-4 py-4 text-xs leading-6 text-slate-700">
-                  <p>Translations: <strong><%= usage.translation_run_count %></strong></p>
-                  <p>Reviews as reviewer: <strong><%= usage.review_run_count %></strong></p>
-                  <p>Judgments as judge: <strong><%= usage.judge_run_count %></strong></p>
-                  <p>Finalizations as finalizer: <strong><%= usage.finalization_run_count %></strong></p>
-                  <p>Official wins: <strong><%= usage.official_win_count %></strong></p>
+                  <p><%= t("admin_models.translations") %> <strong><%= usage.translation_run_count %></strong></p>
+                  <p><%= t("admin_models.reviews") %> <strong><%= usage.review_run_count %></strong></p>
+                  <p><%= t("admin_models.judgments") %> <strong><%= usage.judge_run_count %></strong></p>
+                  <p><%= t("admin_models.finalizations") %> <strong><%= usage.finalization_run_count %></strong></p>
+                  <p><%= t("admin_models.wins") %> <strong><%= usage.official_win_count %></strong></p>
                 </td>
                 <td class="px-4 py-4">
                   <div class="flex flex-wrap justify-end gap-x-4 gap-y-2 font-semibold">
-                    <%= link_to "Edit", edit_settings_model_path(llm_model), class: "text-blue-700 hover:text-blue-900" %>
+                    <%= link_to t("workflows_ui.edit"), edit_settings_model_path(llm_model), class: "text-blue-700 hover:text-blue-900" %>
                     <% if usage.translation_run_count.positive? %>
-                      <%= link_to "Benchmark", benchmark_model_path(llm_model), class: "text-blue-700 hover:text-blue-900" %>
+                      <%= link_to t("admin_models.benchmark"), benchmark_model_path(llm_model), class: "text-blue-700 hover:text-blue-900" %>
                     <% end %>
                     <% if llm_model.active? %>
-                      <%= button_to "Deactivate",
+                      <%= button_to t("workflows_ui.deactivate"),
                                     deactivate_settings_model_path(llm_model),
                                     method: :patch,
                                     class: "text-amber-700 hover:text-amber-900",
-                                    form: { data: { turbo_confirm: "Deactivate #{llm_model.display_name}? Existing history will be preserved." } } %>
+                                    form: { data: { turbo_confirm: t("admin_models.deactivate_confirm", name: llm_model.display_name) } } %>
                     <% else %>
-                      <%= button_to "Activate",
+                      <%= button_to t("glossaries_ui.activate"),
                                     activate_settings_model_path(llm_model),
                                     method: :patch,
                                     class: "text-emerald-700 hover:text-emerald-900" %>

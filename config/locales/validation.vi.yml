@@ -1,0 +1,18 @@
+vi:
+  activerecord:
+    attributes:
+      user:
+        email: Email
+        password: Mật khẩu
+        password_confirmation: Xác nhận mật khẩu
+        locale: Ngôn ngữ giao diện
+  errors:
+    format: "%{attribute} %{message}"
+    messages:
+      blank: không được để trống
+      too_short: "quá ngắn (tối thiểu %{count} ký tự)"
+      too_long: "quá dài (tối đa %{count} ký tự)"
+      confirmation: không khớp với %{attribute}
+      taken: đã được sử dụng
+      invalid: không hợp lệ
+      inclusion: không nằm trong danh sách cho phép

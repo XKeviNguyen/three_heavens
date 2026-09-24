@@ -22,7 +22,7 @@ class WorkflowProfilesController < ApplicationController
       attributes = resolve_identifier_selections!(exact_profile_parameters!(include_expected_version: false))
       WorkflowProfiles::Create.call(user: current_user, attributes: attributes)
     end
-    redirect_to profile, notice: "Workflow profile created."
+    redirect_to profile, notice: t("flash_ui.workflow.created")
   rescue WorkflowProfiles::BuildRevision::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values
     @form_errors = error_messages(error)
@@ -49,7 +49,7 @@ class WorkflowProfilesController < ApplicationController
         attributes: attributes
       )
     end
-    redirect_to @workflow_profile, notice: "Workflow profile revision #{revision.version} created."
+    redirect_to @workflow_profile, notice: t("flash_ui.workflow.revision", version: revision.version)
   rescue WorkflowProfiles::Revise::StaleRevisionError => error
     @form_values = safe_submitted_values
     @form_errors = [ error.message ]
@@ -63,7 +63,7 @@ class WorkflowProfilesController < ApplicationController
   def duplicate
     reject_unexpected_parameters!
     duplicate = WorkflowProfiles::Duplicate.call(workflow_profile: @workflow_profile)
-    redirect_to duplicate, notice: "Workflow profile duplicated."
+    redirect_to duplicate, notice: t("flash_ui.workflow.duplicated")
   rescue WorkflowProfiles::BuildRevision::Error, ActiveRecord::RecordInvalid => error
     redirect_to @workflow_profile, alert: error_messages(error).join(" ")
   end
@@ -71,7 +71,7 @@ class WorkflowProfilesController < ApplicationController
   def activate
     reject_unexpected_parameters!
     WorkflowProfiles::ChangeStatus.activate(workflow_profile: @workflow_profile)
-    redirect_to @workflow_profile, notice: "Workflow profile activated."
+    redirect_to @workflow_profile, notice: t("flash_ui.workflow.activated")
   rescue WorkflowProfiles::ChangeStatus::IneligibleConfigurationError => error
     redirect_to @workflow_profile, alert: error.message
   end
@@ -79,7 +79,7 @@ class WorkflowProfilesController < ApplicationController
   def deactivate
     reject_unexpected_parameters!
     WorkflowProfiles::ChangeStatus.deactivate(workflow_profile: @workflow_profile)
-    redirect_to @workflow_profile, notice: "Workflow profile deactivated."
+    redirect_to @workflow_profile, notice: t("flash_ui.workflow.deactivated")
   end
 
   private

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+  <head>
+    <title><%= content_for(:title) || "Three Heavens" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body class="min-h-screen bg-white text-slate-900 antialiased">
+    <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 text-white focus:translate-y-0"><%= t("common.skip_to_content") %></a>
+    <% if controller_name == "landing" %>
+      <% if notice.present? %><div class="mx-auto max-w-6xl px-5 pt-3" role="status"><%= notice %></div><% end %>
+      <% if alert.present? %><div class="mx-auto max-w-6xl px-5 pt-3 text-red-800" role="alert"><%= alert %></div><% end %>
+      <%= yield %>
+    <% else %>
+      <header class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-6">
+        <%= link_to "Three Heavens", root_path, class: "text-lg font-semibold tracking-tight" %>
+        <%= render "shared/locale_selector" %>
+      </header>
+      <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-lg px-5 pb-20 pt-12 outline-none">
+        <% if notice.present? %><div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" role="status"><%= notice %></div><% end %>
+        <% if alert.present? %><div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert"><%= alert %></div><% end %>
+        <%= yield %>
+      </main>
+    <% end %>
+  </body>
+</html>

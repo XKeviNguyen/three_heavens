@@ -1,0 +1,56 @@
+vi:
+  glossaries_ui:
+    title: Bảng thuật ngữ · Three Heavens
+    show_title: '%{name} · Bảng thuật ngữ · Three Heavens'
+    edit_title: Chỉnh sửa bảng thuật ngữ · Three Heavens
+    new_title: Bảng thuật ngữ mới · Three Heavens
+    translation_guidance: Hướng dẫn dịch
+    heading: Bảng thuật ngữ
+    singular: Bảng thuật ngữ
+    index_intro: Các quy tắc thuật ngữ riêng của bạn, được lưu theo từng phiên bản cố định.
+    new: Bảng thuật ngữ mới
+    empty: Chưa có bảng thuật ngữ
+    empty_intro: Tạo hướng dẫn thuật ngữ để dùng lại khi bắt đầu bản dịch.
+    create: Tạo bảng thuật ngữ
+    revision: Phiên bản %{version}
+    entries:
+      one: 1 mục
+      other: '%{count} mục'
+    no_description: Chưa có mô tả
+    view_history: Xem lịch sử
+    create_revision: Tạo phiên bản
+    archive: Lưu trữ
+    activate: Kích hoạt
+    archive_confirm: Lưu trữ bảng thuật ngữ này? Các lần dịch cũ vẫn giữ đúng phiên bản đã dùng.
+    show_intro: Các phiên bản cũ không thể thay đổi. Lần dịch mới chỉ dùng được phiên bản hiện tại của bảng thuật ngữ đang hoạt động.
+    active_workspace: Đang hoạt động · có thể dùng trong không gian dịch
+    archived_history: Đã lưu trữ · chỉ xem lịch sử
+    all: Tất cả bảng thuật ngữ
+    using: 'Sử dụng bảng thuật ngữ:'
+    using_intro: Chọn bảng này cho cặp ngôn ngữ phù hợp trong
+    translation_workspace: không gian dịch
+    current: Hiện tại
+    technical_identity: Mã định danh phiên bản
+    preserved_by:
+      one: 1 lần dịch đang giữ nguyên phiên bản này.
+      other: '%{count} lần dịch đang giữ nguyên phiên bản này.'
+    revisions: Các phiên bản
+    correct_errors: 'Vui lòng sửa các lỗi sau:'
+    configuration: Thiết lập bảng thuật ngữ
+    name: Tên
+    description_optional: Mô tả (không bắt buộc)
+    terminology_entries: Các mục thuật ngữ
+    entries_intro: Mỗi phiên bản chứa tối đa %{count} cặp thuật ngữ. Khoảng trắng ở đầu và cuối sẽ bị xóa; chữ hoa và chính tả được giữ nguyên.
+    mapping: Cặp thuật ngữ
+    remove: Xóa
+    source_term: Thuật ngữ nguồn
+    preferred_target_term: Thuật ngữ đích ưu tiên
+    note_optional: Ghi chú (không bắt buộc)
+    add_mapping: Thêm cặp thuật ngữ
+    saving: Đang lưu phiên bản…
+    revision_label: Phiên bản bảng thuật ngữ
+    revise: Chỉnh sửa %{name}
+    edit_intro: Khi lưu, hệ thống tạo một phiên bản cố định mới. Các lần dịch cũ vẫn giữ phiên bản đã dùng.
+    create_new_revision: Tạo phiên bản mới
+    new_intro: Tạo hướng dẫn thuật ngữ riêng của bạn. Việc lưu sẽ không khởi chạy AI.
+    revision_inline: phiên bản %{version}

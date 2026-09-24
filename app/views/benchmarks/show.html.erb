@@ -1,66 +1,66 @@
-<% content_for :title, "#{@model.display_name} benchmark · Three Heavens" %>
+<% content_for :title, t("benchmarks_ui.show_title", name: @model.display_name) %>
 
 <div class="space-y-10">
   <header>
-    <%= link_to "← All benchmarks", benchmarks_path, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to t("benchmarks_ui.all"), benchmarks_path, class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
     <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Requested catalog model</p>
+        <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("results_ui.requested_model") %></p>
         <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @model.display_name %></h1>
         <p class="mt-2 text-sm text-slate-600"><%= @model.gateway %> · <%= @model.provider %></p>
         <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= @model.model_identifier %></p>
       </div>
-      <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= @model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= @model.active? ? "Active" : "Inactive" %></span>
+      <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= @model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= localized_status(@model.active? ? :active : :inactive) %></span>
     </div>
   </header>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="mb-5 text-xl font-semibold text-slate-950">Summary</h2>
+    <h2 class="mb-5 text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.summary") %></h2>
     <%= render "summary", stats: @stats %>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-xl font-semibold text-slate-950">Role diagnostics</h2>
-    <p class="mt-2 text-sm leading-6 text-slate-600">Reviewer identity comparisons use the requested catalog model, not the provider-resolved identifier. Differences are descriptive and do not establish causation. Judge agreement is agreement with the aggregate outcome, not objective correctness.</p>
+    <h2 class="text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.role_diagnostics") %></h2>
+    <p class="mt-2 text-sm leading-6 text-slate-600"><%= t("benchmarks_ui.role_intro") %></p>
 
     <div class="mt-5 grid gap-5 md:grid-cols-2">
       <% reviewer = @stats.reviewer_diagnostics %>
       <article class="rounded-lg border border-slate-200 p-5">
-        <h3 class="font-semibold text-slate-950">Potential self-review scoring difference</h3>
+        <h3 class="font-semibold text-slate-950"><%= t("benchmarks_ui.self_difference_heading") %></h3>
         <% if reviewer %>
           <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
-            <div><dt class="text-slate-500">Self</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_average_score) %> (n=<%= reviewer.self_sample_count %>)</dd></div>
-            <div><dt class="text-slate-500">Other</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.other_average_score) %> (n=<%= reviewer.other_sample_count %>)</dd></div>
-            <div><dt class="text-slate-500">Difference</dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_score_difference) %></dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.self") %></dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_average_score) %> (n=<%= reviewer.self_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.other") %></dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.other_average_score) %> (n=<%= reviewer.other_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.difference") %></dt><dd class="mt-1 font-semibold"><%= analytics_number(reviewer.self_score_difference) %></dd></div>
           </dl>
         <% else %>
-          <p class="mt-3 text-sm text-slate-600">N/A · no completed review-run scores.</p>
+          <p class="mt-3 text-sm text-slate-600"><%= t("benchmarks_ui.no_review_scores") %></p>
         <% end %>
       </article>
 
       <% judge = @stats.judge_diagnostics %>
       <article class="rounded-lg border border-slate-200 p-5">
-        <h3 class="font-semibold text-slate-950">Agreement with aggregate winner</h3>
+        <h3 class="font-semibold text-slate-950"><%= t("benchmarks_ui.agreement_heading") %></h3>
         <% if judge %>
           <p class="mt-4 text-2xl font-bold text-slate-950"><%= analytics_percent(judge.agreement_rate) %></p>
-          <p class="mt-1 text-sm text-slate-600"><%= judge.agreement_count %> agreements across <%= judge.eligible_run_count %> eligible completed judge run(s)</p>
+          <p class="mt-1 text-sm text-slate-600"><%= t("benchmarks_ui.agreement_detail", agreements: judge.agreement_count, total: judge.eligible_run_count) %></p>
         <% else %>
-          <p class="mt-3 text-sm text-slate-600">N/A · no eligible completed judge runs.</p>
+          <p class="mt-3 text-sm text-slate-600"><%= t("benchmarks_ui.no_judge_runs") %></p>
         <% end %>
       </article>
     </div>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-xl font-semibold text-slate-950">Resolved-model history</h2>
-    <p class="mt-2 text-sm leading-6 text-slate-600">OpenRouter may serve a different resolved identifier than the requested catalog model. Unknown/unreported values are kept explicit. Cost totals below include completed translations with reported cost.</p>
+    <h2 class="text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.resolved_history") %></h2>
+    <p class="mt-2 text-sm leading-6 text-slate-600"><%= t("benchmarks_ui.resolved_intro") %></p>
     <div class="mt-5 overflow-x-auto">
       <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-        <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-3 py-3">Resolved identifier</th><th scope="col" class="px-3 py-3">Runs</th><th scope="col" class="px-3 py-3">Completed</th><th scope="col" class="px-3 py-3">Wins</th><th scope="col" class="px-3 py-3">Judge score</th><th scope="col" class="px-3 py-3">Known cost</th></tr></thead>
+        <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.resolved_identifier") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.runs") %></th><th scope="col" class="px-3 py-3"><%= localized_status(:completed) %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.wins") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.judge_score") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.known_cost") %></th></tr></thead>
         <tbody class="divide-y divide-slate-100">
           <% @history.resolved_models.each do |resolved| %>
             <tr>
-              <th scope="row" class="px-3 py-4 font-mono text-xs text-slate-800"><%= resolved.resolved_model_identifier || "Unknown/unreported" %></th>
+              <th scope="row" class="px-3 py-4 font-mono text-xs text-slate-800"><%= resolved.resolved_model_identifier || t("benchmarks_ui.unknown") %></th>
               <td class="px-3 py-4"><%= resolved.sample_count %></td>
               <td class="px-3 py-4"><%= resolved.completed_count %></td>
               <td class="px-3 py-4"><%= resolved.official_wins %></td>
@@ -74,8 +74,8 @@
   </section>
 
   <section>
-    <h2 class="text-xl font-semibold text-slate-950">Recent translation history</h2>
-    <p class="mt-2 text-sm text-slate-600">The 25 most recent requested runs for this model.</p>
+    <h2 class="text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.recent_history") %></h2>
+    <p class="mt-2 text-sm text-slate-600"><%= t("benchmarks_ui.recent_intro") %></p>
     <div class="mt-5 space-y-4">
       <% @history.entries.each do |entry| %>
         <% run = entry.translation_run %>
@@ -83,20 +83,20 @@
           <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= l run.created_at, format: :long %></p>
-              <h3 class="mt-2 text-lg font-semibold text-slate-950">Translation benchmark sample</h3>
+              <h3 class="mt-2 text-lg font-semibold text-slate-950"><%= t("benchmarks_ui.sample") %></h3>
             </div>
             <div class="flex flex-wrap gap-2">
-              <span class="rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(run.status) %>"><%= run.status.humanize %></span>
-              <% if entry.official_winner %><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">Official winner</span><% end %>
+              <span class="rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(run.status) %>"><%= localized_status(run.status) %></span>
+              <% if entry.official_winner %><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800"><%= t("benchmarks_ui.official_winner") %></span><% end %>
             </div>
           </div>
           <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-6">
-            <div><dt class="text-slate-500">Resolved model</dt><dd class="mt-1 break-all font-mono text-xs"><%= run.resolved_model_identifier.presence || "Unknown/unreported" %></dd></div>
-            <div><dt class="text-slate-500">Cost</dt><dd class="mt-1 font-semibold"><%= analytics_money(run.cost) %></dd></div>
-            <div><dt class="text-slate-500">Total tokens</dt><dd class="mt-1 font-semibold"><%= run.total_tokens || "N/A" %></dd></div>
-            <div><dt class="text-slate-500">Latency</dt><dd class="mt-1 font-semibold"><%= analytics_duration(entry.latency_seconds) %></dd></div>
-            <div><dt class="text-slate-500">Blind-review score</dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.review_average_score) %> (n=<%= entry.review_score_sample_count %>)</dd></div>
-            <div><dt class="text-slate-500">Judge score</dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.judge_average_score) %> (n=<%= entry.judge_score_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500"><%= t("results_ui.resolved_model") %></dt><dd class="mt-1 break-all font-mono text-xs"><%= run.resolved_model_identifier.presence || t("benchmarks_ui.unknown") %></dd></div>
+            <div><dt class="text-slate-500"><%= t("results_ui.telemetry.cost") %></dt><dd class="mt-1 font-semibold"><%= analytics_money(run.cost) %></dd></div>
+            <div><dt class="text-slate-500"><%= t("results_ui.telemetry.total_tokens") %></dt><dd class="mt-1 font-semibold"><%= run.total_tokens || t("common.not_available") %></dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.latency") %></dt><dd class="mt-1 font-semibold"><%= analytics_duration(entry.latency_seconds) %></dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.review_score") %></dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.review_average_score) %> (n=<%= entry.review_score_sample_count %>)</dd></div>
+            <div><dt class="text-slate-500"><%= t("benchmarks_ui.judge_score") %></dt><dd class="mt-1 font-semibold"><%= analytics_number(entry.judge_average_score) %> (n=<%= entry.judge_score_sample_count %>)</dd></div>
           </dl>
         </article>
       <% end %>

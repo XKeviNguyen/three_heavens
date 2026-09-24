@@ -1,0 +1,26 @@
+vi:
+  date:
+    formats:
+      long: '%d/%m/%Y'
+  time:
+    formats:
+      long: '%d/%m/%Y %H:%M'
+  datetime:
+    distance_in_words:
+      half_a_minute: nửa phút
+      less_than_x_seconds: { one: chưa đến 1 giây, other: 'chưa đến %{count} giây' }
+      x_seconds: { one: 1 giây, other: '%{count} giây' }
+      less_than_x_minutes: { one: chưa đến 1 phút, other: 'chưa đến %{count} phút' }
+      x_minutes: { one: 1 phút, other: '%{count} phút' }
+      about_x_hours: { one: khoảng 1 giờ, other: 'khoảng %{count} giờ' }
+      x_days: { one: 1 ngày, other: '%{count} ngày' }
+      about_x_months: { one: khoảng 1 tháng, other: 'khoảng %{count} tháng' }
+      x_months: { one: 1 tháng, other: '%{count} tháng' }
+      about_x_years: { one: khoảng 1 năm, other: 'khoảng %{count} năm' }
+      over_x_years: { one: hơn 1 năm, other: 'hơn %{count} năm' }
+      almost_x_years: { one: gần 1 năm, other: 'gần %{count} năm' }
+  support:
+    array:
+      words_connector: ', '
+      two_words_connector: ' và '
+      last_word_connector: ' và '

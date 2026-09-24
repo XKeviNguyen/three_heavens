@@ -1,0 +1,54 @@
+ja:
+  flash_ui:
+    glossary:
+      created: 用語集を作成しました。
+      revision: 用語集の第%{version}版を作成しました。
+      activated: 用語集を有効にしました。
+      archived: 用語集をアーカイブしました。過去の版は引き続き閲覧できます。
+    methodology:
+      created: 翻訳方針を作成しました。
+      revision: 翻訳方針の第%{version}版を作成しました。
+      activated: 翻訳方針を有効にしました。
+      archived: 翻訳方針をアーカイブしました。過去の版は引き続き閲覧できます。
+    workflow:
+      created: ワークフロー設定を作成しました。
+      revision: ワークフロー設定の第%{version}版を作成しました。
+      duplicated: ワークフロー設定を複製しました。
+      activated: ワークフロー設定を有効にしました。
+      deactivated: ワークフロー設定を無効にしました。
+    reference:
+      created: 参考訳を作成しました。
+      revision: 参考訳の第%{version}版を作成しました。
+      activated: 参考訳を有効にしました。
+      archived: 参考訳をアーカイブしました。過去の実験で使った記録は残ります。
+    final:
+      workspace_ready: 最終訳の編集画面を開けます。
+      revision_saved: 新しい版を保存しました。
+      revision_restored: 新しい版として復元しました。
+      refinement_started: AIの修正案の作成を開始しました。
+      proposal_applied: AI提案を新しい版として適用しました。
+      finalized: 最終訳を確定しました。
+      reopened: 最終訳を再編集可能にしました。
+    review:
+      started: ブラインドレビューを開始しました。
+    judge:
+      started: 判定を開始しました。
+    pipeline:
+      stopped: 以降の自動処理を止めました。待機中・実行中のAI処理は取り消されません。
+    operations:
+      reconciled: 停滞したAI処理%{count}件を整理しました。新しいAI処理は開始していません。
+    model:
+      added: モデルを追加して有効にしました。
+      catalog_action: '%{name}：%{action}。'
+      actions:
+        activated: 有効にしました
+        added_and_activated: 追加して有効にしました
+        already_active: すでに有効です
+      catalog_failed: 選択したモデルをOpenRouterのカタログから追加できませんでした。
+      updated: モデル情報を更新しました。
+      activated: '%{name}を有効にしました。'
+      deactivated: '%{name}を無効にしました。履歴は保持されます。'
+    workspace:
+      replayed: この翻訳はすでに開始済みです。既存の結果を表示します。
+      automatic_started: 自動翻訳パイプラインを開始しました。
+      experiment_started: 翻訳実験を開始しました。

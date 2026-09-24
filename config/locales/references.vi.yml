@@ -1,0 +1,51 @@
+vi:
+  references_ui:
+    title: Bản dịch tham chiếu · Three Heavens
+    show_title: '%{title} · Bản dịch tham chiếu · Three Heavens'
+    new_title: Bản dịch tham chiếu mới · Three Heavens
+    edit_title: Chỉnh sửa bản dịch tham chiếu · Three Heavens
+    library: Thư viện bản dịch tham chiếu
+    heading: Bản tham chiếu
+    singular: Bản dịch tham chiếu
+    intro: Bản tham chiếu là ví dụ dịch bạn đã duyệt. Chúng giúp AI theo cách dùng từ và văn phong bạn chọn.
+    new: Thêm bản tham chiếu
+    empty: Chưa có bản dịch tham chiếu
+    empty_intro: Thêm một ví dụ song ngữ đã duyệt rồi chọn trong không gian dịch.
+    create: Tạo bản tham chiếu
+    field_title: Tiêu đề
+    languages: Ngôn ngữ
+    status: Trạng thái
+    updated: Cập nhật
+    archive_confirm: Lưu trữ bản tham chiếu này? Các lần dịch cũ vẫn giữ đúng bản đã chọn.
+    using: 'Sử dụng bản tham chiếu:'
+    using_intro: Chọn tối đa năm bản phù hợp trong
+    using_preserved: Mỗi lần dịch giữ nguyên các phiên bản đã chọn.
+    exact_source: Nguyên văn ví dụ nguồn
+    exact_translation: Nguyên văn bản dịch đã duyệt
+    history: Lịch sử phiên bản
+    current_digest: 'SHA-256 hiện tại:'
+    used_by:
+      one: được dùng trong 1 lần dịch
+      other: được dùng trong %{count} lần dịch
+    all: ← Tất cả bản tham chiếu
+    create_heading: Tạo bản dịch tham chiếu
+    edit_heading: Tạo phiên bản mới
+    edit_intro: Khi lưu, hệ thống tạo phiên bản cố định mới. Nếu bạn chọn tệp thay thế cho phần chưa sửa, nội dung tệp sẽ thay văn bản điền sẵn.
+    save_revision: Lưu phiên bản mới
+    conflict: Đã có phiên bản mới hơn
+    conflict_intro: So sánh phiên bản hiện tại bên dưới với nội dung bạn vừa gửi, chủ động gộp thay đổi rồi lưu.
+    current_title: Tiêu đề hiện tại
+    current_source_language: Ngôn ngữ nguồn hiện tại
+    current_target_language: Ngôn ngữ đích hiện tại
+    current_revision_number: Số phiên bản hiện tại
+    current_source_example: Ví dụ nguồn hiện tại (phiên bản %{version})
+    current_translation: Bản dịch đã duyệt hiện tại
+    source_example: Ví dụ nguồn
+    source_upload_help: Dán văn bản hoặc tải lên một tệp TXT, MD, DOCX hay PDF. Không dùng cả hai.
+    pasted_source: Văn bản nguồn đã dán
+    upload_source: Hoặc tải tệp nguồn lên
+    approved_translation: Bản dịch đã duyệt
+    translation_upload_help: Dán bản dịch đã duyệt hoặc tải lên một tệp TXT, MD, DOCX hay PDF. Không dùng cả hai.
+    pasted_translation: Bản dịch đã duyệt đã dán
+    upload_translation: Hoặc tải tệp bản dịch đã duyệt lên
+    saving: Đang lưu bản tham chiếu…

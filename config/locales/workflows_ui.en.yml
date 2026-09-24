@@ -1,0 +1,55 @@
+en:
+  workflows_ui:
+    title: Workflow Profiles · Three Heavens
+    edit_title: Edit Workflow Profile · Three Heavens
+    new_title: New Workflow Profile · Three Heavens
+    show_title: '%{name} · Workflow Profile · Three Heavens'
+    configuration: Profile configuration
+    completion_mode: Completion mode
+    winner_help: Create the official draft, then stop for the human editor.
+    refinement_help: Also create AI proposals, but never apply or finalize them.
+    select_range: Select %{minimum}–%{maximum}
+    finalizer_range: Select none for winner draft, or 1–%{maximum} for refinement proposals
+    role_order: '%{selection}. Ordering is deterministic.'
+    role_models: 'Models for %{role}'
+    role_hints:
+      translator: Models that create independent translation candidates.
+      reviewer: Models that review candidates with structured feedback.
+      judge: Models that independently score and rank reviewed candidates.
+      finalizer: Models that propose refinements without applying them.
+    roles:
+      translator: Translators
+      reviewer: Reviewers
+      judge: Judges
+      finalizer: Finalizers
+    saving: Saving profile…
+    automation: Automation
+    create_revision: Create revision %{version}
+    edit_intro: Revision %{version} remains immutable for audit and historical pipelines.
+    heading: Workflow profiles
+    singular: Workflow profile
+    index_intro: Reusable, owner-private configurations. Every edit creates a new immutable revision.
+    new: New workflow profile
+    empty: No workflow profiles yet
+    empty_intro: Create one to authorize an end-to-end automatic pipeline at experiment launch.
+    updated: Updated %{at}
+    revision: Revision
+    mode: Mode
+    view: View
+    edit: Edit
+    duplicate: Duplicate
+    deactivate: Deactivate
+    deactivate_confirm: Deactivate this workflow profile? Historical pipelines remain unchanged.
+    new_intro: Saving a profile does not authorize provider work. Every pipeline launch requires separate confirmation.
+    create: Create workflow profile
+    active_new: Active · available for new pipelines
+    inactive_history: Inactive · history only
+    all: All profiles
+    using: 'Using profiles:'
+    using_intro: Choose this profile in the
+    using_confirmation: Every launch still requires an explicit provider-work confirmation.
+    eligible: Currently eligible
+    ineligible: No longer eligible
+    launched:
+      one: 1 historical pipeline launched from this revision.
+      other: '%{count} historical pipelines launched from this revision.'

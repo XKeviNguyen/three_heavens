@@ -1,0 +1,22 @@
+ja:
+  history_ui:
+    title: 翻訳履歴 · Three Heavens
+    analytics: 分析
+    heading: 翻訳履歴
+    intro: 新しい順に表示します。システム費用は翻訳・評価・選考・仕上げの各実行を1回ずつ集計します。費用情報が欠けている場合は、合計が一部のみであることを明示します。
+    empty: 翻訳履歴はまだありません
+    empty_intro: 翻訳を始めると履歴が記録されます。
+    new_experiment: 新しい翻訳
+    translation_candidates: 翻訳候補
+    execution: 実行方式
+    segmented: 分割実行（%{count}区間）
+    single_request: 各実行につき1リクエスト
+    judge_round: 選考
+    official_winner: 採用候補
+    system_cost: システム費用
+    partial_cost: 判明分の合計 · 費用データが一部不足（%{complete}/%{total}件が完了、%{known}件の費用が判明）
+    reported_cost: '%{count}件の費用を記録'
+    no_cost: 費用データなし
+    automatic_pipeline: 自動ワークフロー
+    repeat_configuration: 設定を再利用
+    final_translation_status: 最終訳（%{status}）

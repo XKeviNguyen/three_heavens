@@ -24,7 +24,7 @@ module TranslationWorkspaceDrafts
         else
           attributes.delete(:source_import_id)
           removed = true
-          import_notice = "The original upload is no longer attached. Your reviewed source text remains."
+          import_notice = I18n.t("workspace_ui.draft_import_detached")
         end
       end
 
@@ -86,13 +86,21 @@ module TranslationWorkspaceDrafts
         identifiers = attributes[:model_identifiers]
         inactive = LlmModel.where(gateway: "openrouter", model_identifier: identifiers, active: false)
           .pluck(:model_identifier)
-        attributes[:model_identifiers] = identifiers - inactive
-        removed ||= attributes[:model_identifiers].length != identifiers.length
+        retained = identifiers - inactive
+        # Only a trusted, still-cached catalog can confirm removal. An outage
+        # leaves the selection intact for later server-side launch validation.
+        catalog = Rails.cache.read(OpenRouter::Catalog::CACHE_KEY)
+        if catalog.is_a?(OpenRouter::Catalog::Result)
+          supported = catalog.models.select(&:translation_capable?).map(&:identifier)
+          retained &= supported
+        end
+        attributes[:model_identifiers] = retained
+        removed ||= retained.length != identifiers.length
       end
 
       Result.new(
         attributes:,
-        configuration_notice: removed ? "Some saved configuration is no longer available. Review the remaining selections." : nil,
+        configuration_notice: removed ? I18n.t("workspace_ui.draft_configuration_changed") : nil,
         import_notice:
       )
     end

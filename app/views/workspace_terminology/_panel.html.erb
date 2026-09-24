@@ -9,38 +9,38 @@
           <%= radio_button_tag "translation_workspace[glossary_revision_id]", selected_revision.id, true, id: "translation_workspace_glossary_revision_id_#{selected_revision.id}", class: "mt-1 size-4 shrink-0 text-blue-600", data: { workspace_summary_name: selected_revision.name } %>
           <span class="min-w-0">
             <span class="block truncate text-sm font-semibold text-slate-950"><%= selected_revision.name %></span>
-            <span class="mt-0.5 block text-xs text-slate-500">Revision <%= selected_revision.version %> · <%= pluralize(selected_revision.entries.size, "term") %> · <%= selected_revision.source_language %> → <%= selected_revision.target_language %></span>
+            <span class="mt-0.5 block text-xs text-slate-500"><%= t("terminology_sheet.revision", version: selected_revision.version) %> · <%= t("terminology_sheet.terms_count", count: selected_revision.entries.size) %> · <%= selected_revision.source_language %> → <%= selected_revision.target_language %></span>
           </span>
         </label>
         <div class="flex shrink-0 flex-wrap gap-x-3 gap-y-2 text-xs font-semibold">
-          <%= link_to "+ Add term", edit_workspace_terminology_path(glossary_id: selected_glossary.id, add: 1), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
-          <%= link_to "Edit terminology", edit_workspace_terminology_path(glossary_id: selected_glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
+          <%= link_to t("terminology_sheet.add_link_term"), edit_workspace_terminology_path(glossary_id: selected_glossary.id, add: 1), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
+          <%= link_to t("terminology_sheet.edit_terminology"), edit_workspace_terminology_path(glossary_id: selected_glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "text-blue-700 hover:text-blue-900" %>
         </div>
       </div>
 
       <% if selected_revision.entries.any? %>
         <div class="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div class="grid grid-cols-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><span>Source</span><span>Preferred</span></div>
+          <div class="grid grid-cols-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><span><%= t("terminology_sheet.source") %></span><span><%= t("terminology_sheet.preferred") %></span></div>
           <% selected_revision.entries.first(3).each do |entry| %>
             <div class="grid grid-cols-2 gap-3 border-b border-slate-100 px-3 py-2 text-xs text-slate-700 last:border-b-0"><span><%= entry.source_term %></span><span class="font-medium text-slate-950"><%= entry.preferred_target_term %></span></div>
           <% end %>
         </div>
-        <% if selected_revision.entries.size > 3 %><p class="mt-2 text-xs text-slate-500">+ <%= selected_revision.entries.size - 3 %> more terms</p><% end %>
+        <% if selected_revision.entries.size > 3 %><p class="mt-2 text-xs text-slate-500"><%= t("terminology_sheet.more_terms", count: selected_revision.entries.size - 3) %></p><% end %>
       <% end %>
     <% else %>
-      <p class="text-sm font-semibold text-slate-950">No terminology selected</p>
-      <p class="mt-1 text-xs leading-5 text-slate-500">Add preferred wording here or choose a saved glossary. Terminology changes never trigger AI work.</p>
+      <p class="text-sm font-semibold text-slate-950"><%= t("terminology_sheet.none_selected") %></p>
+      <p class="mt-1 text-xs leading-5 text-slate-500"><%= t("terminology_sheet.panel_intro") %></p>
     <% end %>
 
     <div class="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold">
-      <%= link_to "+ Add terminology", new_workspace_terminology_path, data: { turbo_frame: "workspace-terminology-editor" }, class: "rounded-lg border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50" %>
+      <%= link_to t("terminology_sheet.add_terminology"), new_workspace_terminology_path, data: { turbo_frame: "workspace-terminology-editor" }, class: "rounded-lg border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50" %>
       <% if glossaries.any? %>
         <details class="relative">
-          <summary class="cursor-pointer list-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">Choose saved glossary <span aria-hidden="true">⌄</span></summary>
+          <summary class="cursor-pointer list-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100"><%= t("terminology_sheet.choose_saved") %> <span aria-hidden="true">⌄</span></summary>
           <div class="absolute left-0 z-20 mt-2 w-[min(22rem,75vw)] space-y-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
             <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 hover:bg-slate-50">
-              <%= radio_button_tag "translation_workspace[glossary_revision_id]", "", selected_revision_id.blank?, id: "translation_workspace_glossary_revision_id_none", class: "mt-0.5 size-4", data: { workspace_summary_name: "None" } %>
-              <span><span class="block text-xs font-semibold text-slate-900">No terminology</span><span class="mt-0.5 block text-[11px] font-normal text-slate-500">Continue without a glossary.</span></span>
+              <%= radio_button_tag "translation_workspace[glossary_revision_id]", "", selected_revision_id.blank?, id: "translation_workspace_glossary_revision_id_none", class: "mt-0.5 size-4", data: { workspace_summary_name: t("workspace_ui.summary.none") } %>
+              <span><span class="block text-xs font-semibold text-slate-900"><%= t("terminology_sheet.no_terminology") %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500"><%= t("terminology_sheet.continue_without") %></span></span>
             </label>
             <% glossaries.each do |glossary| %>
               <% revision = glossary.current_revision %>
@@ -48,19 +48,19 @@
               <div class="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-blue-50">
                 <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
                   <%= radio_button_tag "translation_workspace[glossary_revision_id]", revision.id, false, id: "translation_workspace_glossary_revision_id_#{revision.id}", class: "mt-0.5 size-4 text-blue-600", data: { workspace_summary_name: revision.name } %>
-                  <span><span class="block text-xs font-semibold text-slate-900"><%= revision.name %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500">Revision <%= revision.version %> · <%= pluralize(revision.entries.size, "term") %></span></span>
+                  <span><span class="block text-xs font-semibold text-slate-900"><%= revision.name %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500"><%= t("terminology_sheet.revision", version: revision.version) %> · <%= t("terminology_sheet.terms_count", count: revision.entries.size) %></span></span>
                 </label>
-                <%= link_to "Edit", edit_workspace_terminology_path(glossary_id: glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "shrink-0 text-[11px] font-semibold text-blue-700 hover:text-blue-900" %>
+                <%= link_to t("terminology_sheet.edit"), edit_workspace_terminology_path(glossary_id: glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "shrink-0 text-[11px] font-semibold text-blue-700 hover:text-blue-900" %>
               </div>
             <% end %>
           </div>
         </details>
       <% end %>
-      <%= link_to "Open terminology library", glossaries_path, class: "text-slate-500 hover:text-slate-900", data: { turbo_frame: "_top" } %>
+      <%= link_to t("terminology_sheet.open_library"), glossaries_path, class: "text-slate-500 hover:text-slate-900", data: { turbo_frame: "_top" } %>
     </div>
 
     <% if local_assigns[:pagination].present? %>
-      <%= render "translation_workspaces/configuration_pagination", pagination: pagination, label: "Glossaries", page_param: :glossary_page %>
+      <%= render "translation_workspaces/configuration_pagination", pagination: pagination, label: t("terminology_sheet.glossaries"), page_param: :glossary_page %>
     <% end %>
   </div>
 <% end %>

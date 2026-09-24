@@ -11,7 +11,7 @@ const ARRAYS = ["model_ids", "model_identifiers", "translation_reference_revisio
 
 export default class extends Controller {
   static targets = ["form", "dialog", "status"]
-  static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean }
+  static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object }
 
   connect() {
     this.lastSavedState = this.needsSaveValue ? null : this.state()
@@ -58,7 +58,7 @@ export default class extends Controller {
   scheduleSave() {
     window.clearTimeout(this.saveTimer)
     if (!this.dirty()) return
-    this.setStatus("Saving…")
+    this.setStatus(this.messagesValue.saving)
     this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
   }
 
@@ -72,7 +72,7 @@ export default class extends Controller {
 
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
-    this.setStatus("Saving…")
+    this.setStatus(this.messagesValue.saving)
     this.saving = this.persist(workspace)
     try {
       const result = await this.saving
@@ -82,10 +82,10 @@ export default class extends Controller {
       this.formTarget.elements.translation_workspace_draft_version.value = result.version
       this.lastSavedState = snapshot
       if (this.dirty()) this.scheduleSave()
-      else this.setStatus("Saved")
+      else this.setStatus(this.messagesValue.saved)
       return true
     } catch (error) {
-      this.setStatus(error.conflict ? "Could not save · newer draft in another tab" : "Could not save")
+      this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)
       return false
     } finally {
       this.saving = null
@@ -190,7 +190,7 @@ export default class extends Controller {
   }
 
   async discard() {
-    if (!window.confirm("Discard this saved draft and clear the workspace?")) return
+    if (!window.confirm(this.messagesValue.discardConfirm)) return
     if (this.draftIdValue) {
       const response = await fetch(this.saveUrlValue, {
         method: "DELETE", credentials: "same-origin",
@@ -202,7 +202,7 @@ export default class extends Controller {
         })
       })
       if (!response.ok) {
-        this.setStatus(response.status === 409 ? "Could not discard · newer draft in another tab" : "Could not discard")
+        this.setStatus(response.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
         return
       }
     }
