@@ -55,6 +55,7 @@ Rails.application.routes.draw do
   end
 
   resource :translation_workspace, only: %i[new create]
+  resource :translation_workspace_draft, only: %i[create destroy]
   post "translation_workspace/options", to: "translation_workspaces#options", as: :translation_workspace_options
 
   get "open_router_catalog", to: "open_router_catalog#index", as: :open_router_catalog

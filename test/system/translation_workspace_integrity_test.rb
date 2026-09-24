@@ -64,7 +64,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_nil page.evaluate_script("document.querySelector('dialog[open] form').closest('#workspace-form')")
   end
 
-  test "canceled navigation preserves a populated workspace" do
+  test "saved navigation restores a populated workspace" do
     visit root_path
     fill_in "Project name", with: "Protected project"
     choose_language("Source language", "Vietnamese")
@@ -85,38 +85,48 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
       first("button", text: "Add").click
     end
 
-    click_link "Projects"
-    assert_selector "dialog[open]", text: "Leave this translation?"
-    click_button "Stay"
-    assert_current_path root_path
-    assert_field "Project name", with: "Protected project"
-    assert_field "Source text", with: "Long source text that must not disappear."
-    assert_field "Instructions for the translation", with: "Preserve the meaning."
-    assert_selector "#workspace-manual-models [data-model-card]", count: 1
-    assert_checked_field "translation_workspace[translation_reference_revision_ids][]"
-    assert_checked_field "translation_workspace[methodology_profile_revision_id]"
-    assert_checked_field "translation_workspace[glossary_revision_id]", visible: :all
-
-    click_link "Projects"
-    click_button "Leave without saving"
-    assert_current_path projects_path
+    {
+      "References" => translation_references_path,
+      "Projects" => projects_path,
+      "History" => history_path,
+      "Terminology" => glossaries_path,
+      "Methodology" => methodology_profiles_path,
+      "Workflows" => workflow_profiles_path,
+      "Benchmarks" => benchmarks_path
+    }.each do |label, path|
+      click_link label
+      assert_current_path path
+      assert_no_selector "dialog[open]", text: "Leave this translation?"
+      click_link "New translation"
+      assert_field "Project name", with: "Protected project"
+      assert_field "Source language", with: "Vietnamese"
+      assert_field "Target language", with: "Japanese"
+      assert_field "Document title", with: "Protected source", visible: :all
+      assert_field "Source text", with: "Long source text that must not disappear.", visible: :all
+      assert_field "Translation name", with: "Protected translation"
+      assert_field "Instructions for the translation", with: "Preserve the meaning."
+      assert_selector "#workspace-manual-models [data-model-card]", count: 1, visible: :all
+      assert_checked_field "translation_workspace[translation_reference_revision_ids][]", visible: :all
+      assert_checked_field "translation_workspace[methodology_profile_revision_id]", visible: :all
+      assert_checked_field "translation_workspace[glossary_revision_id]", visible: :all
+      assert_checked_field "translation_workspace[workflow_mode]", with: "manual", visible: :all
+    end
   end
 
-  test "browser Back does not silently discard a changed workspace" do
+  test "browser Back and Forward restore a changed workspace" do
     visit projects_path
     click_link "New translation"
     assert_current_path new_translation_workspace_path
     fill_in "Project name", with: "Back protected"
 
     page.go_back
-    assert_selector "dialog[open]", text: "Leave this translation?"
-    click_button "Stay"
+    assert_selector "h1", text: "Projects"
+    assert_current_path projects_path
+    assert_no_selector "dialog[open]", text: "Leave this translation?"
+    page.go_forward
+    assert_selector "h1", text: "New translation"
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: "Back protected"
-    click_link "Projects"
-    assert_selector "dialog[open]", text: "Leave this translation?"
-    click_button "Leave without saving"
-    assert_current_path projects_path
   end
 
   test "pristine workspace navigates without a warning" do

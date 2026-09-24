@@ -3118,6 +3118,44 @@ ALTER SEQUENCE public.translation_segment_runs_id_seq OWNED BY public.translatio
 
 
 --
+-- Name: translation_workspace_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_workspace_drafts (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    public_id character varying NOT NULL,
+    context_key character varying NOT NULL,
+    workspace_payload text NOT NULL,
+    lock_version integer DEFAULT 0 NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT workspace_drafts_context_key_check CHECK ((char_length((context_key)::text) <= 80)),
+    CONSTRAINT workspace_drafts_lock_version_check CHECK ((lock_version >= 0))
+);
+
+
+--
+-- Name: translation_workspace_drafts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_workspace_drafts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_workspace_drafts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_workspace_drafts_id_seq OWNED BY public.translation_workspace_drafts.id;
+
+
+--
 -- Name: translation_workspace_submissions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3572,6 +3610,13 @@ ALTER TABLE ONLY public.translation_segment_runs ALTER COLUMN id SET DEFAULT nex
 
 
 --
+-- Name: translation_workspace_drafts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts ALTER COLUMN id SET DEFAULT nextval('public.translation_workspace_drafts_id_seq'::regclass);
+
+
+--
 -- Name: translation_workspace_submissions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3916,6 +3961,14 @@ ALTER TABLE ONLY public.translation_runs
 
 ALTER TABLE ONLY public.translation_segment_runs
     ADD CONSTRAINT translation_segment_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_workspace_drafts translation_workspace_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts
+    ADD CONSTRAINT translation_workspace_drafts_pkey PRIMARY KEY (id);
 
 
 --
@@ -4876,6 +4929,34 @@ CREATE INDEX index_translation_segment_runs_on_running_last_claimed_at ON public
 
 
 --
+-- Name: index_translation_workspace_drafts_on_expires_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_drafts_on_expires_at_and_id ON public.translation_workspace_drafts USING btree (expires_at, id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_public_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_workspace_drafts_on_public_id ON public.translation_workspace_drafts USING btree (public_id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_drafts_on_user_id ON public.translation_workspace_drafts USING btree (user_id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_user_id_and_context_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_workspace_drafts_on_user_id_and_context_key ON public.translation_workspace_drafts USING btree (user_id, context_key);
+
+
+--
 -- Name: index_translation_workspace_submissions_on_experiment_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5802,6 +5883,14 @@ ALTER TABLE ONLY public.judge_evaluations
 
 
 --
+-- Name: translation_workspace_drafts fk_rails_72cbb19784; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts
+    ADD CONSTRAINT fk_rails_72cbb19784 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: experiments fk_rails_78c1da6c54; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6080,6 +6169,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260924090000'),
 ('20260920090100'),
 ('20260920090000'),
 ('20260914090300'),

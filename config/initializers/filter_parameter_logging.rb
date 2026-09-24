@@ -9,5 +9,5 @@ Rails.application.config.filter_parameters += [
   :translated_text, :translation_text, :suggested_translation, :proposed_translation,
   :approved_translation, :approved_translation_file, :reference_source_text,
   "methodology_profile.guidance", :source_term, :preferred_target_term, "glossary.entries.note",
-  "final_translation.content", "final_translation.change_note"
+  "final_translation.content", "final_translation.change_note", :workspace_payload, :workspace
 ]
