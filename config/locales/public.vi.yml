@@ -20,6 +20,9 @@ vi:
     title: Three Heavens · So sánh bản dịch
     navigation: Điều hướng trang giới thiệu
     headline: So sánh bản dịch AI. Bạn quyết định bản cuối cùng.
+    headline_first: So sánh bản dịch AI.
+    headline_second_prefix: "Bạn quyết định "
+    headline_second_emphasis: bản cuối cùng.
     introduction: Chuẩn bị văn bản nguồn, áp dụng thuật ngữ và tài liệu tham khảo, so sánh các bản dịch độc lập rồi tự hoàn thiện bản dịch cuối.
     how_it_works: Cách sử dụng
     open_workspace: Mở không gian làm việc

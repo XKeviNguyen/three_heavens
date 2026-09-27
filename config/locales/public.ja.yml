@@ -20,6 +20,9 @@ ja:
     title: Three Heavens · 翻訳を比較
     navigation: 公開ページのナビゲーション
     headline: AI翻訳を比べる。最終判断は、あなたに。
+    headline_first: AI翻訳を比べる。
+    headline_second_prefix: 最終判断は、
+    headline_second_emphasis: あなたに。
     introduction: 原文を準備し、用語集や参考資料を活用。複数の翻訳候補を比較して、最後の訳文は自分で仕上げられます。
     how_it_works: 使い方
     open_workspace: ワークスペースを開く

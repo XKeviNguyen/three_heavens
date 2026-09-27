@@ -2,6 +2,10 @@ vi:
   workspace_ui:
     title: "Bản dịch mới · Three Heavens"
     new_translation: "Bản dịch mới"
+    translation_label: "Bản dịch"
+    terminology_editor: "Trình biên tập thuật ngữ"
+    translation_references: "Tài liệu tham khảo"
+    methodology_profiles: "Phương pháp dịch"
     add_translation: "Thêm bản dịch vào dự án này"
     intro: "Dán hoặc tải tài liệu lên, chọn ngôn ngữ và mô hình AI, rồi xem lại các bản dịch."
     repeat_heading: "Điền sẵn từ bản dịch trước"
@@ -81,6 +85,7 @@ vi:
     mode_help: "Chế độ thủ công tạo các bản dịch độc lập để bạn kiểm soát. Chế độ tự động chạy theo quy trình đã lưu rồi dừng để bạn biên tập."
     ai_models: "Mô hình AI"
     models_hint: "Chọn các mô hình OpenRouter độc lập để tạo bản dịch."
+    models_description: "Chọn 1–%{maximum}. Tìm theo mô hình, nhà cung cấp hoặc mã định danh."
     saved_workflow: "Quy trình đã lưu"
     saved_hint: "Chế độ thủ công cho phép bạn điều khiển từng giai đoạn. Chế độ tự động dùng quy trình đã lưu và luôn dừng để người biên tập quyết định."
     paid_authorization: "Xác nhận sử dụng AI có tính phí"

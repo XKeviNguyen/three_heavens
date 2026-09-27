@@ -63,7 +63,7 @@
             <% end %>
           </nav>
 
-          <div class="border-t border-slate-100 p-3">
+          <div class="min-w-0 overflow-x-clip border-t border-slate-100 p-3">
             <div class="flex items-center gap-2 rounded-lg px-2 py-2">
               <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold uppercase text-slate-700" aria-hidden="true"><%= current_user.email.to_s.first(2) %></span>
               <span class="min-w-0 flex-1 truncate text-xs text-slate-500" title="<%= current_user.email %>"><%= current_user.email %></span>

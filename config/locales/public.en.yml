@@ -20,6 +20,9 @@ en:
     title: Three Heavens · Compare translations
     navigation: Public navigation
     headline: Compare AI translations. Keep the final word.
+    headline_first: Compare AI translations.
+    headline_second_prefix: "Keep the final "
+    headline_second_emphasis: word.
     introduction: Prepare source material, apply your terminology and references, compare independent translation candidates, then make the final translation yourself.
     how_it_works: How it works
     open_workspace: Open workspace

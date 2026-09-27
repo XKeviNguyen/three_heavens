@@ -2,6 +2,10 @@ en:
   workspace_ui:
     title: "New translation · Three Heavens"
     new_translation: "New translation"
+    translation_label: "Translation"
+    terminology_editor: "Terminology editor"
+    translation_references: "Translation references"
+    methodology_profiles: "Methodology profiles"
     add_translation: "Add a translation to this Project"
     intro: "Paste or upload a document, choose your languages and AI models, then review the best translation."
     repeat_heading: "Prefilled from a previous translation"
@@ -81,6 +85,7 @@ en:
     mode_help: "Manual creates independent candidates you control. Automatic advances through a saved workflow and stops for editing."
     ai_models: "AI models"
     models_hint: "Choose independent OpenRouter models to produce translation candidates."
+    models_description: "Choose 1–%{maximum}. Search by model, provider, or identifier."
     saved_workflow: "Saved workflow"
     saved_hint: "Manual lets you control each stage. Automatic advances through a saved workflow and always stops for the human editor."
     paid_authorization: "Paid-work authorization"

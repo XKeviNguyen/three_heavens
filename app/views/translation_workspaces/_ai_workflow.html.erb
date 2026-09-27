@@ -21,7 +21,7 @@
           max: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
           label: t("workflow_ui.ai_models"),
           hint: t("workflow_ui.models_hint"),
-          description: "Choose 1–#{Ai::UsageLimits::MAX_TRANSLATION_MODELS}. Search by model, provider, or identifier.",
+          description: t("workflow_ui.models_description", maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS),
           selected: @translation_workspace.model_identifier_selections %>
   </fieldset>
 
@@ -40,7 +40,7 @@
           </label>
         <% end %>
       </div>
-      <%= render "translation_workspaces/configuration_pagination", pagination: @workflow_profiles_pagination, label: "Workflow profiles", page_param: :workflow_profile_page %>
+      <%= render "translation_workspaces/configuration_pagination", pagination: @workflow_profiles_pagination, label: t("workflows_ui.heading"), page_param: :workflow_profile_page %>
       <% if @translation_workspace.provider_work_plan_preview %>
         <% work_plan = @translation_workspace.provider_work_plan_preview %>
         <section class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">

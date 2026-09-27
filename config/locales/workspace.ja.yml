@@ -2,6 +2,10 @@ ja:
   workspace_ui:
     title: "新しい翻訳 · Three Heavens"
     new_translation: "新しい翻訳"
+    translation_label: "翻訳"
+    terminology_editor: "用語集エディター"
+    translation_references: "参考資料"
+    methodology_profiles: "翻訳方針"
     add_translation: "このプロジェクトに翻訳を追加"
     intro: "文章を貼り付けるかアップロードし、言語とAIモデルを選んで、翻訳候補を確認します。"
     repeat_heading: "以前の翻訳から入力しました"
@@ -81,6 +85,7 @@ ja:
     mode_help: "手動では独立した候補を作り、各段階を自分で進めます。自動では保存済みの手順に従い、編集前に停止します。"
     ai_models: "AIモデル"
     models_hint: "翻訳候補を作るOpenRouterモデルを選びます。"
+    models_description: "1～%{maximum}件を選択。モデル名、プロバイダー名、識別子で検索できます。"
     saved_workflow: "保存済みのワークフロー"
     saved_hint: "手動では各工程を操作できます。自動では保存済みの手順で進み、最後は必ず人の編集を待ちます。"
     paid_authorization: "有料AI処理の承認"
