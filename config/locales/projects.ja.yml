@@ -1,0 +1,47 @@
+ja:
+  projects_ui:
+    title: プロジェクト · Three Heavens
+    workspaces: 翻訳ワークスペース
+    heading: プロジェクト
+    intro: 同じ言語ペアの原文と翻訳作業を、1つのプロジェクトにまとめます。
+    start_new: 新しいプロジェクトで翻訳を始める
+    empty: プロジェクトはまだありません
+    empty_intro: 最初の翻訳を始めると、個人用のプロジェクトと原文が作成されます。
+    start_translation: 翻訳を始める
+    documents: 文書
+    experiments: 翻訳実行
+    newest_activity: 最新の更新
+    open_project: プロジェクトを開く
+    workspace: プロジェクトの作業画面
+    paste_start: 文章を貼り付けて翻訳を始める
+    upload_source: 原文ファイルをアップロード
+    no_documents: 原文はまだありません
+    no_documents_intro: 文章を貼り付けるか原文ファイルをアップロードして、このプロジェクトの最初の翻訳を始めます。
+    paste_source: 原文を貼り付ける
+    project_documents: プロジェクトの文書
+    uploaded_source: アップロードした原文
+    pasted_source: 貼り付けた原文
+    download_original: 元のファイルをダウンロード
+    translation_experiment: 翻訳実行
+    automatic_workflow: 自動ワークフロー
+    manual_workflow: 手動ワークフロー
+    glossary: 用語集
+    methodology: 翻訳方針
+    guidance_preference: 指針の優先順位
+    references: 参考資料
+    blind_review: ブラインド評価
+    judge: 選考
+    final_translation: 最終訳
+    not_started: 未開始
+    not_created: 未作成
+    experiment: 翻訳実行
+    pipeline_progress: ワークフローの進捗
+    judge_results: 選考結果
+    all_projects: ← プロジェクト一覧
+    revision: 第%{version}版
+    document_count:
+      one: '%{count}件の文書'
+      other: '%{count}件の文書'
+    experiment_count:
+      one: '%{count}件の翻訳'
+      other: '%{count}件の翻訳'

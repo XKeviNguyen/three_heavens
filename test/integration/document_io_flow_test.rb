@@ -73,6 +73,42 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{download_original_document_path(document)}']", text: "Download original"
   end
 
+  test "text PDF is privately imported and reviewed before translation" do
+    assert_no_enqueued_jobs only: AI_JOBS do
+      post source_imports_path, params: {
+        source_import: {
+          source_file: uploaded_file(pdf_with_text("Readable PDF source"), filename: "source.pdf", content_type: "application/pdf")
+        }
+      }
+    end
+
+    source_import = SourceImport.order(:id).last
+    assert source_import.ready?
+    assert_equal "pdf", source_import.imported_format
+    assert_equal "Readable PDF source", source_import.extracted_text
+    assert_equal "test", source_import.source_file.blob.service_name
+    assert_equal 0, AiProviderAttempt.count
+
+    follow_redirect!
+    assert_response :success
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "Readable PDF source"
+    assert_select "input[name='translation_workspace[source_import_id]'][value='#{source_import.id}']"
+
+    assert_enqueued_jobs 1, only: TranslationRunJob do
+      post translation_workspace_path, params: {
+        translation_workspace: workspace_attributes.merge(
+          source_import_id: source_import.id,
+          source_import_project_token: source_import_binding(source_import),
+          source_text: "Reviewed PDF source"
+        )
+      }
+    end
+    document = Document.order(:id).last
+    assert_equal "pdf", document.source_format
+    assert_equal "Reviewed PDF source", document.source_text
+    assert_equal source_import.source_file.blob_id, document.source_file.blob_id
+  end
+
   test "pasted workflow remains supported with pasted provenance" do
     assert_enqueued_jobs 1, only: TranslationRunJob do
       post translation_workspace_path, params: {
@@ -88,7 +124,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
   test "unsupported invalid binary and oversized uploads show safe errors and enqueue no AI" do
     uploads = [
-      [ uploaded_file("%PDF", filename: "source.pdf"), /Choose a \.docx/ ],
+      [ uploaded_file("%PDF", filename: "source.pdf"), /type does not match/ ],
       [ uploaded_file("abc\0def", filename: "source.txt", content_type: "text/plain"), /plain text/ ],
       [ uploaded_file("a" * (SourceImports::Limits::MAX_UPLOAD_BYTES + 1), filename: "huge.txt"), /larger than/ ]
     ]
@@ -108,8 +144,9 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       [ uploaded_file("plain", filename: "source.txt", content_type: SourceImports::Detector::DOCX_MIME), /type does not match/ ],
       [ uploaded_file("\xFF".b, filename: "source.txt", content_type: "text/plain"), /valid UTF-8/ ],
       [ uploaded_file(" \n\t", filename: "source.md", content_type: "text/markdown"), /readable text/ ],
-      [ uploaded_file("a" * (SourceImports::Limits::MAX_EXTRACTED_CHARACTERS + 1), filename: "long.txt", content_type: "text/plain"), /limit is/ ],
+      [ uploaded_file("a" * (SourceImports::Limits::MAX_EXTRACTED_CHARACTERS + 1), filename: "long.txt", content_type: "text/plain"), /character limit/ ],
       [ uploaded_file(build_docx(encrypted: true), filename: "encrypted.docx", content_type: SourceImports::Detector::DOCX_MIME), /Encrypted DOCX/ ],
+      [ uploaded_file(Rails.root.join("test/fixtures/files/encrypted_source.pdf").binread, filename: "encrypted.pdf", content_type: "application/pdf"), /Encrypted or password-protected PDF/ ],
       [ uploaded_file(build_docx(entries: { "word/vbaProject.bin" => "macro" }), filename: "macro.docx", content_type: SourceImports::Detector::DOCX_MIME), /Macro-enabled/ ],
       [ uploaded_file(build_docx(entries: { "../outside" => "unsafe" }), filename: "unsafe.docx", content_type: SourceImports::Detector::DOCX_MIME), /cannot be processed safely/ ]
     ]
@@ -418,7 +455,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: [ ActiveStorage::PurgeJob, *AI_JOBS ] do
       delete source_import_path(source_import)
     end
-    assert_redirected_to root_path
+    assert_redirected_to new_translation_workspace_path
     assert_not SourceImport.exists?(source_import.id)
     assert_not ActiveStorage::Attachment.exists?(attachment_id)
     assert_not ActiveStorage::Blob.exists?(blob.id)
@@ -427,7 +464,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     consumed = create_ready_import(user: users(:normal))
     consume_import(consumed)
     delete source_import_path(consumed)
-    assert_redirected_to root_path
+    assert_redirected_to new_translation_workspace_path
     assert SourceImport.exists?(consumed.id)
 
     delete source_import_path(consumed, format: :json)

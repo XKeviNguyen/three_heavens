@@ -28,22 +28,22 @@ class SourceImportsController < ApplicationController
         source_import_id: @source_import.id,
         project_id: @project&.id,
         source_import_project_token: project_binding
-      ), notice: "Source text extracted. Review and edit it before starting translation."
+      ), notice: t("source_imports.imported_notice")
     end
   rescue SourceImports::Error => error
     @source_import = SourceImport.new
     if request.format.json?
-      render json: { error: error.message }, status: :unprocessable_content
+      render json: { error: t("source_imports.errors.#{error.code}", default: error.message) }, status: :unprocessable_content
     else
-      flash.now[:alert] = error.message
+      flash.now[:alert] = t("source_imports.errors.#{error.code}", default: error.message)
       render :new, status: :unprocessable_content
     end
   rescue ActionController::ParameterMissing, ActionController::BadRequest
     @source_import = SourceImport.new
     if request.format.json?
-      render json: { error: "The upload request is invalid. Choose one source file and try again." }, status: :bad_request
+      render json: { error: t("source_imports.invalid_request") }, status: :bad_request
     else
-      flash.now[:alert] = "The upload request is invalid. Choose one source file and try again."
+      flash.now[:alert] = t("source_imports.invalid_request")
       render :new, status: :bad_request
     end
   end
@@ -54,9 +54,9 @@ class SourceImportsController < ApplicationController
       source_import.lock!
       unless source_import.status.in?(%w[pending ready failed])
         if request.format.json?
-          render json: { error: "This source import can no longer be canceled." }, status: :conflict
+          render json: { error: t("source_imports.cancel_unavailable") }, status: :conflict
         else
-          redirect_to root_path, alert: "This source import can no longer be canceled."
+          redirect_to new_translation_workspace_path, alert: t("source_imports.cancel_unavailable")
         end
         return
       end
@@ -65,7 +65,7 @@ class SourceImportsController < ApplicationController
     if request.format.json?
       head :no_content
     else
-      redirect_to root_path, notice: "Source import canceled."
+      redirect_to new_translation_workspace_path, notice: t("source_imports.canceled")
     end
   end
 

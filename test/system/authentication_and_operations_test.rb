@@ -7,7 +7,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
   include FinalTranslationTestHelper
 
   test "unauthenticated visitor is taken to sign in" do
-    visit root_path
+    visit new_translation_workspace_path
 
     assert_text "Sign in"
     assert_text "Please sign in to continue."
@@ -69,8 +69,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
     fill_in "Reviewed source text", with: "Reviewed browser source\n日本語"
     fill_in "Project name", with: "Browser import"
-    fill_in "Source language", with: "Vietnamese"
-    fill_in "Target language", with: "Japanese"
+    choose_known_language "Source language", "Vietnamese"
+    choose_known_language "Target language", "Japanese"
     fill_in "Document title", with: "Browser source"
     fill_in "Translation name", with: "Browser secure import"
     fill_in "Instructions for the translation", with: "Translate faithfully."
@@ -100,7 +100,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     FileUtils.mkdir_p(Rails.root.join("tmp/ux_review"))
 
     page.current_window.resize_to(1440, 1000)
-    visit root_path
+    visit new_translation_workspace_path
     assert_selector "aside#app-sidebar", visible: true
     assert_selector "aside#app-sidebar", text: "Three Heavens"
     assert_no_selector "button[data-action='sidebar#open']", visible: true
@@ -108,13 +108,13 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     desktop_metrics = page.evaluate_script("({ width: window.innerWidth, rootFont: getComputedStyle(document.documentElement).fontSize, media: matchMedia('(min-width: 75rem)').matches, className: document.querySelector('#workspace-layout').className, sheets: Array.from(document.styleSheets).map((sheet) => sheet.href) })")
     assert_operator layout_columns.split.size, :>=, 2, "Expected desktop workspace split, got #{layout_columns.inspect} with #{desktop_metrics.inspect}"
 
-    source_language = find("input[name='translation_workspace[source_language]']")
+    source_language = find_field("Source language")
     source_language.send_keys("viet", :arrow_down, :enter)
     assert_equal "Vietnamese", source_language.value
     source_language.send_keys(:escape)
     assert_no_selector "#translation_workspace_source_language-list", visible: true
 
-    target_language = find("input[name='translation_workspace[target_language]']")
+    target_language = find_field("Target language")
     target_language.send_keys("japan", :arrow_down, :enter)
     assert_equal "Japanese", target_language.value
     target_language.send_keys(:escape)
@@ -142,8 +142,8 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     click_button "Cancel"
 
     fill_in "Project name", with: "Pasted browser project"
-    fill_in "Source language", with: "Vietnamese"
-    fill_in "Target language", with: "Japanese"
+    choose_known_language "Source language", "Vietnamese"
+    choose_known_language "Target language", "Japanese"
     fill_in "Document title", with: "Pasted source"
     fill_in "Source text", with: "Pasted text remains supported"
     fill_in "Translation name", with: "Pasted browser experiment"
@@ -158,7 +158,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert Document.order(:id).last.pasted_text?
     [ [ 320, 844 ], [ 375, 812 ], [ 768, 1024 ], [ 1024, 800 ], [ 1280, 900 ], [ 1440, 1000 ], [ 1920, 1080 ] ].each do |width, height|
       page.current_window.resize_to(width, height)
-      visit root_path
+      visit new_translation_workspace_path
       assert_selector "h1", text: "New translation"
       if width >= 1024
         assert_selector "aside#app-sidebar", visible: true
@@ -174,7 +174,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     end
 
     page.current_window.resize_to(320, 844)
-    visit root_path
+    visit new_translation_workspace_path
     find("button[data-action='sidebar#open']").click
     assert_link "Projects"
     page.driver.browser.action.send_keys(:escape).perform
@@ -182,7 +182,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
 
     page.current_window.resize_to(1440, 1000)
-    visit root_path
+    visit new_translation_workspace_path
     [ [ 1.25, "125" ], [ 1.5, "150" ], [ 2.0, "200" ] ].each do |scale, label|
       page.driver.browser.execute_cdp(
         "Emulation.setDeviceMetricsOverride",

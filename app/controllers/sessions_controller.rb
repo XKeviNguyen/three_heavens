@@ -1,6 +1,6 @@
 class SessionsController < ApplicationController
+  layout "public"
   ALLOWED_SESSION_ATTRIBUTES = %w[email password].freeze
-  INVALID_CREDENTIALS_MESSAGE = "The email or password is incorrect."
   LOGIN_RATE_LIMIT = 10
   LOGIN_RATE_LIMIT_WINDOW = 3.minutes
 
@@ -12,7 +12,7 @@ class SessionsController < ApplicationController
 
   def new
     @email = ""
-    redirect_to root_path if authenticated?
+    redirect_to new_translation_workspace_path if authenticated?
   end
 
   def create
@@ -28,9 +28,14 @@ class SessionsController < ApplicationController
       password: credentials[:password]
     )
 
+    if user && !user.email_verified?
+      flash.now[:alert] = t("authentication.confirm_email")
+      return render :new, status: :unprocessable_content
+    end
+
     if user
       destination = start_authenticated_session!(user)
-      redirect_to destination.presence || root_path, notice: "Signed in successfully."
+      redirect_to destination.presence || new_translation_workspace_path, notice: t("authentication.signed_in")
     else
       render_invalid_credentials
     end
@@ -41,7 +46,7 @@ class SessionsController < ApplicationController
 
   def destroy
     end_authenticated_session!
-    redirect_to login_path, notice: "Signed out successfully."
+    redirect_to login_path, notice: t("authentication.signed_out")
   end
 
   private
@@ -77,14 +82,14 @@ class SessionsController < ApplicationController
   end
 
   def render_invalid_credentials(status: :unprocessable_content)
-    flash.now[:alert] = INVALID_CREDENTIALS_MESSAGE
+    flash.now[:alert] = t("authentication.invalid_credentials")
     render :new, status: status
   end
 
   def render_rate_limited
     response.set_header("Retry-After", LOGIN_RATE_LIMIT_WINDOW.to_i.to_s)
     @email = ""
-    flash.now[:alert] = "Too many sign-in attempts. Wait three minutes, then try again."
+    flash.now[:alert] = t("authentication.rate_limited")
     render :new, status: :too_many_requests
   end
 end

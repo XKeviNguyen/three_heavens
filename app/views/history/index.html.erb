@@ -1,22 +1,22 @@
-<% content_for :title, "Experiment history · Three Heavens" %>
+<% content_for :title, t("history_ui.title") %>
 
 <div class="space-y-8">
   <header>
-    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Analytics</p>
-    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Experiment history</h1>
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("history_ui.analytics") %></p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("history_ui.heading") %></h1>
     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-      Newest first. System cost adds each translation, review, judge, and finalization run once. A partial total is labeled whenever any run lacks cost telemetry.
+      <%= t("history_ui.intro") %>
     </p>
   </header>
 
   <% if @history.entries.empty? %>
     <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">No experiments yet</h2>
-      <p class="mt-2 text-sm text-slate-600">Run a translation experiment to begin building history.</p>
-      <%= link_to "New experiment", new_translation_workspace_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+      <h2 class="text-lg font-semibold text-slate-950"><%= t("history_ui.empty") %></h2>
+      <p class="mt-2 text-sm text-slate-600"><%= t("history_ui.empty_intro") %></p>
+      <%= link_to t("history_ui.new_experiment"), new_translation_workspace_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
     </section>
   <% else %>
-    <section class="space-y-4" aria-label="Experiments">
+    <section class="space-y-4" aria-label="<%= t("projects_ui.experiments") %>">
       <% @history.entries.each do |entry| %>
         <% experiment = entry.experiment %>
         <% project = experiment.document.project %>
@@ -30,50 +30,50 @@
               <h2 class="mt-2 text-xl font-semibold text-slate-950"><%= experiment.name.presence || experiment.document.title %></h2>
               <p class="mt-1 text-sm text-slate-600"><%= link_to project.name, project_path(project), class: "font-semibold text-blue-700 hover:text-blue-900" %> · <%= project.source_language %> → <%= project.target_language %></p>
             </div>
-            <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(experiment.status) %>"><%= experiment.status.humanize %></span>
+            <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(experiment.status) %>"><%= localized_status(experiment.status) %></span>
           </div>
 
           <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
-            <div><dt class="text-slate-500">Translation candidates</dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.translation_candidate_count %></dd></div>
-            <div><dt class="text-slate-500">Execution</dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.execution_segment_count > 1 ? "Segmented (#{entry.execution_segment_count} segments)" : "Single request per run" %></dd></div>
-            <div><dt class="text-slate-500">Blind review</dt><dd class="mt-1 font-semibold text-slate-950"><%= review_round&.status&.humanize || "Not started" %></dd></div>
-            <div><dt class="text-slate-500">Judge round</dt><dd class="mt-1 font-semibold text-slate-950"><%= judge_round&.status&.humanize || "Not started" %></dd></div>
-            <div><dt class="text-slate-500">Official winner</dt><dd class="mt-1 font-semibold text-slate-950"><%= judge_round&.winner_translation_run&.llm_model&.display_name || "N/A" %></dd></div>
+            <div><dt class="text-slate-500"><%= t("history_ui.translation_candidates") %></dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.translation_candidate_count %></dd></div>
+            <div><dt class="text-slate-500"><%= t("history_ui.execution") %></dt><dd class="mt-1 font-semibold text-slate-950"><%= entry.execution_segment_count > 1 ? t("history_ui.segmented", count: entry.execution_segment_count) : t("history_ui.single_request") %></dd></div>
+            <div><dt class="text-slate-500"><%= t("projects_ui.blind_review") %></dt><dd class="mt-1 font-semibold text-slate-950"><%= (localized_status(review_round.status) if review_round) || t("projects_ui.not_started") %></dd></div>
+            <div><dt class="text-slate-500"><%= t("history_ui.judge_round") %></dt><dd class="mt-1 font-semibold text-slate-950"><%= (localized_status(judge_round.status) if judge_round) || t("projects_ui.not_started") %></dd></div>
+            <div><dt class="text-slate-500"><%= t("history_ui.official_winner") %></dt><dd class="mt-1 font-semibold text-slate-950"><%= judge_round&.winner_translation_run&.llm_model&.display_name || t("common.not_available") %></dd></div>
             <div>
-              <dt class="text-slate-500">System cost</dt>
+              <dt class="text-slate-500"><%= t("history_ui.system_cost") %></dt>
               <dd class="mt-1 font-semibold text-slate-950"><%= analytics_money(entry.known_system_cost) %></dd>
               <% if entry.cost_telemetry_incomplete? %>
-                <p class="mt-1 text-xs font-medium text-amber-700">Known total · incomplete cost telemetry (<%= entry.cost_complete_count %>/<%= entry.cost_record_count %> runs complete; <%= entry.cost_sample_count %> with known spend)</p>
+                <p class="mt-1 text-xs font-medium text-amber-700"><%= t("history_ui.partial_cost", complete: entry.cost_complete_count, total: entry.cost_record_count, known: entry.cost_sample_count) %></p>
               <% elsif entry.cost_telemetry_complete? %>
-                <p class="mt-1 text-xs text-slate-500"><%= entry.cost_sample_count %> run(s) reported cost</p>
+                <p class="mt-1 text-xs text-slate-500"><%= t("history_ui.reported_cost", count: entry.cost_sample_count) %></p>
               <% else %>
-                <p class="mt-1 text-xs text-slate-500">No cost telemetry reported</p>
+                <p class="mt-1 text-xs text-slate-500"><%= t("history_ui.no_cost") %></p>
               <% end %>
             </div>
           </dl>
 
           <% if experiment.pipeline_run %>
-            <p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900"><span class="font-semibold">Automatic pipeline</span> · <%= experiment.pipeline_run.workflow_profile_revision.name %> · revision <%= experiment.pipeline_run.workflow_profile_revision.version %> · <%= experiment.pipeline_run.completion_mode.humanize %> · <%= experiment.pipeline_run.status.humanize %></p>
+            <p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900"><span class="font-semibold"><%= t("history_ui.automatic_pipeline") %></span> · <%= experiment.pipeline_run.workflow_profile_revision.name %> · <%= t("projects_ui.revision", version: experiment.pipeline_run.workflow_profile_revision.version) %> · <%= t("workflow_modes.#{experiment.pipeline_run.completion_mode}") %> · <%= localized_status(experiment.pipeline_run.status) %></p>
           <% else %>
-            <p class="mt-4 text-sm text-slate-500"><span class="font-semibold">Manual workflow</span></p>
+            <p class="mt-4 text-sm text-slate-500"><span class="font-semibold"><%= t("projects_ui.manual_workflow") %></span></p>
           <% end %>
-          <% if experiment.methodology_profile_revision %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold">Methodology:</span> <%= experiment.methodology_profile_revision.name %> · revision <%= experiment.methodology_profile_revision.version %></p><% end %>
-          <p class="mt-2 text-sm text-slate-600"><span class="font-semibold">Guidance preference:</span> <%= TranslationGuidance::Policy.label(experiment.guidance_preference) %></p>
-          <% if experiment.experiment_reference_revisions.any? %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold">References:</span> <%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · revision #{snapshot.translation_reference_revision.version}" }.to_sentence %></p><% end %>
+          <% if experiment.methodology_profile_revision %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.methodology") %></span> <%= experiment.methodology_profile_revision.name %> · <%= t("projects_ui.revision", version: experiment.methodology_profile_revision.version) %></p><% end %>
+          <p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.guidance_preference") %></span> <%= localized_guidance_label(experiment.guidance_preference) %></p>
+          <% if experiment.experiment_reference_revisions.any? %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.references") %></span> <%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · #{t("projects_ui.revision", version: snapshot.translation_reference_revision.version)}" }.to_sentence %></p><% end %>
 
           <div class="mt-5 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">
             <%= link_to next_action_label, next_action_path, class: "rounded-lg bg-blue-700 px-3 py-2 text-white hover:bg-blue-800" %>
-            <% unless next_action_path == experiment_path(experiment) %><%= link_to "Experiment", experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <%= link_to "Repeat configuration", repeat_experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
-            <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to "Pipeline progress", pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to "Blind review", review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to "Judge results", judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
-            <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% unless next_action_path == experiment_path(experiment) %><%= link_to t("projects_ui.experiment"), experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <%= link_to t("history_ui.repeat_configuration"), repeat_experiment_path(experiment), class: "text-blue-700 hover:text-blue-900" %>
+            <% if experiment.pipeline_run && next_action_path != pipeline_run_path(experiment.pipeline_run) %><%= link_to t("projects_ui.pipeline_progress"), pipeline_run_path(experiment.pipeline_run), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if review_round && next_action_path != review_round_path(review_round) %><%= link_to t("projects_ui.blind_review"), review_round_path(review_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if judge_round && next_action_path != judge_round_path(judge_round) %><%= link_to t("projects_ui.judge_results"), judge_round_path(judge_round), class: "text-blue-700 hover:text-blue-900" %><% end %>
+            <% if experiment.final_translation && next_action_path != final_translation_path(experiment.final_translation) %><%= link_to t("history_ui.final_translation_status", status: localized_status(experiment.final_translation.status)), final_translation_path(experiment.final_translation), class: "text-blue-700 hover:text-blue-900" %><% end %>
           </div>
         </article>
       <% end %>
     </section>
 
-    <%= render "shared/pagination", pagination: { current_page: @history.current_page, total_pages: @history.total_pages, total_count: @history.total_count }, label: "Experiments" %>
+    <%= render "shared/pagination", pagination: { current_page: @history.current_page, total_pages: @history.total_pages, total_count: @history.total_count }, label: t("projects_ui.experiments") %>
   <% end %>
 </div>

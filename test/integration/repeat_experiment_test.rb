@@ -118,13 +118,13 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
       methodology_profile_page: [ "Methodology profiles", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
       translation_reference_page: [ "Translation references", "translation_workspace[translation_reference_revision_ids][]", selected_reference.current_revision_id ]
     }.each do |page_param, (label, input_name, revision_id)|
-      get root_path(page_param => 2)
+      get new_translation_workspace_path(page_param => 2)
       assert_response :success
       assert_select "nav[aria-label='#{label} pagination']", text: /Page 2 of 2/
       assert_select "input[name='#{input_name}'][value='#{revision_id}']", count: 1
     end
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "button[formaction='#{translation_workspace_options_path}'][formmethod='post'][name='workflow_profile_page'][value='2'][formnovalidate]", count: 1
 
     preserved_token = css_select("input[name='translation_workspace[submission_token]']").first["value"]

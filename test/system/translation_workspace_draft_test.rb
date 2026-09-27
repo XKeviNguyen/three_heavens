@@ -5,6 +5,46 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     sign_in_in_browser
   end
 
+  test "language search requires selection and Escape restores the committed value" do
+    visit new_translation_workspace_path
+    choose_language("Source language", "Vietnamese")
+    source = find_field("Source language")
+    assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
+
+    source.fill_in with: "French"
+    assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
+    source.send_keys(:escape)
+    assert_field "Source language", with: "Vietnamese"
+    assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
+
+    source.fill_in with: "Japanese"
+    source.send_keys(:arrow_down, :enter)
+    assert_equal "Japanese", find("input[name='translation_workspace[source_language]']", visible: :all).value
+  end
+
+  test "switching English to Japanese to Vietnamese preserves the workspace draft" do
+    visit new_translation_workspace_path
+    fill_in "Project name", with: "Locale draft"
+    fill_in "Source text", with: "Private source across locales"
+
+    within "aside#app-sidebar" do
+      select "日本語", from: "Interface language"
+      click_button "Apply"
+    end
+    assert_selector "html[lang='ja']"
+    assert_field "プロジェクト名", with: "Locale draft"
+    assert_equal "Private source across locales", find("textarea[name='translation_workspace[source_text]']", visible: :all).value
+    assert_selector "[data-workspace-guard-target='status']", text: "下書きを復元しました", wait: 10
+
+    within "aside#app-sidebar" do
+      select "Tiếng Việt", from: "表示言語"
+      click_button "適用"
+    end
+    assert_selector "html[lang='vi']"
+    assert_field "Tên dự án", with: "Locale draft"
+    assert_equal "Private source across locales", find("textarea[name='translation_workspace[source_text]']", visible: :all).value
+  end
+
   test "autosaves source and configuration then restores after navigation and refresh" do
     visit new_translation_workspace_path
     fill_in "Project name", with: "Autosaved project"
@@ -125,8 +165,6 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
   end
 
   def choose_language(label, value)
-    field = find_field(label)
-    field.fill_in with: value
-    field.send_keys(:escape)
+    choose_known_language(label, value)
   end
 end

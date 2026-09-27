@@ -14,7 +14,9 @@ module TranslationWorkspaceSubmissions
         email: "workspace-race-#{suffix}@example.test",
         password: "workspace race password",
         role: :user,
-        status: :active
+        status: :active,
+        email_verified_at: Time.current,
+        managed_ai_access: true
       )
       @models = 2.times.map do |index|
         LlmModel.create!(

@@ -1,0 +1,169 @@
+ja:
+  common:
+    cancel: キャンセル
+    not_available: 該当なし
+    skip_to_content: 本文へ移動
+    interface_language: 表示言語
+    apply: 適用
+  authentication:
+    invalid_credentials: メールアドレスまたはパスワードが正しくありません。
+    signed_out: ログアウトしました。
+    rate_limited: ログインの試行回数が多すぎます。3分後にもう一度お試しください。
+    sign_in_benefit: 翻訳作業を続けましょう。
+    no_account: 初めてご利用ですか？
+    sign_in: ログイン
+    sign_in_required: 続行するにはログインしてください。
+    admin_required: 管理画面へのアクセス権がありません。
+    confirm_email: ログイン前にメールアドレスを確認してください。
+    signed_in: ログインしました。
+  landing:
+    title: Three Heavens · 翻訳を比較
+    navigation: 公開ページのナビゲーション
+    headline: AI翻訳を比べる。最終判断は、あなたに。
+    headline_first: AI翻訳を比べる。
+    headline_second_prefix: 最終判断は、
+    headline_second_emphasis: あなたに。
+    introduction: 原文を準備し、用語集や参考資料を活用。複数の翻訳候補を比較して、最後の訳文は自分で仕上げられます。
+    how_it_works: 使い方
+    open_workspace: ワークスペースを開く
+    access_note: AI翻訳の利用は、承認されたアカウントごとに別途有効化されます。アカウント作成だけでは利用できません。
+    your_work: 訳文を決めるのは、あなた
+    trust: プロジェクトごとの指針を再利用できます。作業中の下書きは自動保存され、最終訳文は人が編集します。
+    steps:
+      prepare:
+        title: 準備
+        description: 原文、用語集、参考資料、翻訳方針をまとめます。
+      compare:
+        title: 比較
+        description: 設定したAIモデルで独立した翻訳候補を作ります。
+      review:
+        title: 検討
+        description: 候補の品質と匿名のレビュー結果を確認します。
+      finalize:
+        title: 仕上げ
+        description: 最終訳文を自分で選び、編集します。
+  registration:
+    create_account: アカウントを作成
+    benefit: 別のブラウザーや端末でも作業を続けられます。
+    email: メールアドレス
+    password: パスワード
+    password_hint: 12文字以上。
+    confirm_password: パスワード（確認）
+    fix_errors: 入力内容を確認してください。
+    already_account: アカウントをお持ちですか？
+    check_email: 確認メールをご覧ください。
+    rate_limited: 試行回数が多すぎます。1時間後にお試しください。
+  email_confirmation:
+    title: メールアドレスを確認
+    subject: Three Heavensのメールアドレス確認
+    ready: メールアドレスを確認して、アカウント作成を完了してください。
+    confirm: メールアドレスを確認
+    confirmed: メールアドレスを確認しました。ログインできます。
+    invalid: 確認リンクが無効か、有効期限が切れています。
+    resend: 確認メールを再送
+    resend_sent: 未確認のアカウントがある場合は、新しい確認メールを送信しました。
+    check_inbox: メールを確認
+    pending: メール内のリンクからアカウントを有効化してください。AIの利用には別途承認が必要です。
+    email_intro: Three Heavensのアカウント作成が申請されました。以下のリンクでメールアドレスを確認してください。
+    expires: このリンクの有効期限は24時間です。
+    ignore: お心当たりがなければ、このメールは無視してください。
+  language:
+    source: 原文の言語
+    target: 訳文の言語
+    search_placeholder: 言語を選択・検索
+    suggestions: "%{label}の候補"
+    show_suggestions: "%{label}の候補を表示"
+    use_custom: 「%{value}」をカスタム言語として使用
+    custom_saved: カスタム言語
+    names:
+      english: 英語
+      japanese: 日本語
+      vietnamese: ベトナム語
+  workspace:
+    saving: 保存中…
+    saved: 保存しました
+    save_conflict: 保存できません · 別のタブに新しい下書きがあります
+    save_failed: 保存できません
+    discard_confirm: 保存した下書きを削除して、作業内容を消去しますか？
+    discard_conflict: 削除できません · 別のタブに新しい下書きがあります
+    discard_failed: 削除できません
+    draft_restored: 下書きを復元しました · 保存済み
+    discard_draft: 下書きを破棄
+  upload:
+    choose_file: TXT、Markdown、DOCX、PDFのいずれかを選択してください。
+    extracting: 原文を抽出中…
+    import_failed: ファイルを読み込めませんでした。
+    reviewed_source: 確認済みの原文
+    imported: 原文を抽出しました。編集画面で内容を確認してください。
+    source_text: 原文
+    removed: 読み込みを解除しました。確認済みの文章は編集画面に残ります。
+    remove_failed: 読み込みを解除できませんでした。もう一度お試しください。
+  source_imports:
+    imported_notice: 原文を抽出しました。翻訳を始める前に内容を確認・編集してください。
+    invalid_request: アップロードの内容が正しくありません。原文ファイルを1つ選んで、もう一度お試しください。
+    cancel_unavailable: この原文ファイルの読み込みは取り消せません。
+    canceled: 原文ファイルの読み込みを取り消しました。
+    errors:
+      file_too_large: 原文ファイルが10 MiBの上限を超えています。
+      invalid_utf8: 原文ファイルには有効なUTF-8テキストが必要です。
+      binary_source: 読み取れるテキストが含まれていません。
+      docx_too_many_entries: DOCXファイルの構成要素が多すぎます。
+      docx_uncompressed_too_large: DOCXの展開後のサイズが安全上の上限を超えています。
+      docx_xml_too_large: DOCXの内容が安全上の上限を超えています。
+      empty_source: 読み取れるテキストが含まれていません。
+      encrypted_docx: 暗号化されたDOCXには対応していません。
+      macro_docx: マクロ付きのWord文書には対応していません。
+      malformed_docx: DOCXファイルを安全に読み取れませんでした。
+      malformed_pdf: PDFファイルを安全に読み取れませんでした。
+      mismatched_type: ファイルの種類と拡張子が一致しません。
+      missing_file: アップロードするファイルを選択してください。
+      pdf_encrypted: 暗号化またはパスワード保護されたPDFには対応していません。
+      pdf_no_text: このPDFからテキストを抽出できません。画像だけのPDFにはOCRが必要ですが、現在は対応していません。
+      pdf_timeout: PDFの処理に時間がかかりすぎました。
+      pdf_too_many_pages: PDFのページ数が安全上の上限を超えています。
+      project_binding_invalid: このプロジェクトでは、読み込んだ原文を利用できません。
+      source_too_long: 抽出した原文が文字数の上限を超えています。
+      suspicious_compression: DOCXファイルを安全に処理できません。
+      unsafe_docx: DOCXファイルを安全に処理できません。
+      unsupported_docx_feature: このDOCXには未対応の埋め込みコンテンツがあります。
+      unsupported_format: TXT、Markdown、DOCX、PDFのいずれかを選択してください。
+  navigation:
+    menu: メニュー
+    subtitle: 翻訳ワークスペース
+    primary: メインナビゲーション
+    close: メニューを閉じる
+    log_out: ログアウト
+    sections:
+      work: 作業
+      library: 資料
+      insights: 分析
+      admin: 管理
+    items:
+      new_translation: 新しい翻訳
+      projects: プロジェクト
+      history: 履歴
+      terminology: 用語集
+      references: 参考資料
+      methodology: 翻訳方針
+      workflows: ワークフロー
+      benchmarks: モデル評価
+      users: ユーザー
+      models: モデル
+      operations: 運用
+  managed_ai:
+    unavailable: このアカウントではAI翻訳を利用できません。資料や翻訳方針は準備できます。翻訳を始めるには管理者による許可が必要です。
+  admin_users:
+    title: ユーザー
+    description: サーバー管理のAIを利用できるユーザーを設定します。アカウントとAIの利用権限は別です。
+    status: アカウント状態
+    verification: メール確認
+    managed_ai: AI利用権限
+    action: 操作
+    verified: 確認済み
+    unverified: 未確認
+    enabled: 有効
+    disabled: 無効
+    enable: AI利用を許可
+    disable: AI利用を停止
+    granted: AI利用を許可しました。
+    revoked: AI利用を停止しました。

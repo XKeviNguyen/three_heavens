@@ -1,0 +1,169 @@
+vi:
+  common:
+    cancel: Hủy
+    not_available: Không có
+    skip_to_content: Chuyển đến nội dung chính
+    interface_language: Ngôn ngữ giao diện
+    apply: Áp dụng
+  authentication:
+    invalid_credentials: Email hoặc mật khẩu không đúng.
+    signed_out: Đã đăng xuất.
+    rate_limited: Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi ba phút rồi thử lại.
+    sign_in_benefit: Tiếp tục công việc dịch thuật của bạn.
+    no_account: Bạn chưa có tài khoản?
+    sign_in: Đăng nhập
+    sign_in_required: Vui lòng đăng nhập để tiếp tục.
+    admin_required: Bạn không có quyền truy cập phần quản trị.
+    confirm_email: Hãy xác nhận email trước khi đăng nhập.
+    signed_in: Đăng nhập thành công.
+  landing:
+    title: Three Heavens · So sánh bản dịch
+    navigation: Điều hướng trang giới thiệu
+    headline: So sánh bản dịch AI. Bạn quyết định bản cuối cùng.
+    headline_first: So sánh bản dịch AI.
+    headline_second_prefix: "Bạn quyết định "
+    headline_second_emphasis: bản cuối cùng.
+    introduction: Chuẩn bị văn bản nguồn, áp dụng thuật ngữ và tài liệu tham khảo, so sánh các bản dịch độc lập rồi tự hoàn thiện bản dịch cuối.
+    how_it_works: Cách sử dụng
+    open_workspace: Mở không gian làm việc
+    access_note: Quyền dùng AI để dịch được cấp riêng cho từng tài khoản. Tạo tài khoản không bao gồm quyền sử dụng AI do hệ thống quản lý.
+    your_work: Bản dịch do bạn quyết định
+    trust: Lưu hướng dẫn dùng lại cho từng dự án. Bản nháp được tự động lưu, và người biên tập luôn quyết định bản dịch cuối.
+    steps:
+      prepare:
+        title: Chuẩn bị
+        description: Tập hợp văn bản nguồn, thuật ngữ, tài liệu tham khảo và phương pháp dịch.
+      compare:
+        title: So sánh
+        description: Tạo các bản dịch độc lập bằng những mô hình AI đã cấu hình.
+      review:
+        title: Đánh giá
+        description: Xem chất lượng bản dịch và nhận xét đánh giá ẩn danh.
+      finalize:
+        title: Hoàn thiện
+        description: Tự chọn và biên tập bản dịch cuối cùng.
+  registration:
+    create_account: Tạo tài khoản
+    benefit: Tiếp tục công việc trên nhiều trình duyệt và thiết bị.
+    email: Email
+    password: Mật khẩu
+    password_hint: Ít nhất 12 ký tự.
+    confirm_password: Xác nhận mật khẩu
+    fix_errors: Vui lòng sửa các trường sau.
+    already_account: Đã có tài khoản?
+    check_email: Hãy kiểm tra email để xác nhận tài khoản.
+    rate_limited: Bạn đã thử quá nhiều lần. Vui lòng đợi một giờ.
+  email_confirmation:
+    title: Xác nhận email
+    subject: Xác nhận email cho tài khoản Three Heavens
+    ready: Xác nhận email để hoàn tất việc tạo tài khoản.
+    confirm: Xác nhận email
+    confirmed: Đã xác nhận email. Bạn có thể đăng nhập.
+    invalid: Liên kết xác nhận không hợp lệ hoặc đã hết hạn.
+    resend: Gửi lại email xác nhận
+    resend_sent: Nếu có tài khoản chưa xác nhận với email này, chúng tôi đã gửi email xác nhận mới.
+    check_inbox: Kiểm tra hộp thư
+    pending: Mở liên kết trong email để kích hoạt tài khoản. Quyền sử dụng AI cần được cấp riêng.
+    email_intro: Bạn đã yêu cầu tạo tài khoản Three Heavens. Hãy dùng liên kết dưới đây để xác nhận email.
+    expires: Liên kết này hết hạn sau 24 giờ.
+    ignore: Nếu bạn không tạo tài khoản, hãy bỏ qua email này.
+  language:
+    source: Ngôn ngữ nguồn
+    target: Ngôn ngữ đích
+    search_placeholder: Chọn hoặc tìm ngôn ngữ
+    suggestions: Gợi ý %{label}
+    show_suggestions: Hiển thị gợi ý %{label}
+    use_custom: Dùng “%{value}” làm ngôn ngữ tùy chỉnh
+    custom_saved: Ngôn ngữ tùy chỉnh
+    names:
+      english: Tiếng Anh
+      japanese: Tiếng Nhật
+      vietnamese: Tiếng Việt
+  workspace:
+    saving: Đang lưu…
+    saved: Đã lưu
+    save_conflict: Không thể lưu · có bản nháp mới hơn ở tab khác
+    save_failed: Không thể lưu
+    discard_confirm: Xóa bản nháp đã lưu và đặt lại không gian làm việc?
+    discard_conflict: Không thể xóa · có bản nháp mới hơn ở tab khác
+    discard_failed: Không thể xóa
+    draft_restored: Đã khôi phục bản nháp · Vừa lưu
+    discard_draft: Xóa bản nháp
+  upload:
+    choose_file: Chọn tệp TXT, Markdown, DOCX hoặc PDF.
+    extracting: Đang trích xuất văn bản nguồn…
+    import_failed: Không thể nhập tệp.
+    reviewed_source: Văn bản nguồn đã xem lại
+    imported: Đã trích xuất văn bản. Hãy xem lại trong trình biên tập.
+    source_text: Văn bản nguồn
+    removed: Đã xóa tệp nhập. Văn bản đã xem lại vẫn còn trong trình biên tập.
+    remove_failed: Không thể xóa tệp nhập. Vui lòng thử lại.
+  source_imports:
+    imported_notice: Đã trích xuất văn bản nguồn. Hãy xem lại và chỉnh sửa trước khi bắt đầu dịch.
+    invalid_request: Yêu cầu tải lên không hợp lệ. Hãy chọn một tệp nguồn và thử lại.
+    cancel_unavailable: Không thể hủy tệp nguồn này nữa.
+    canceled: Đã hủy tệp nguồn.
+    errors:
+      file_too_large: Tệp nguồn vượt giới hạn 10 MiB.
+      invalid_utf8: Tệp nguồn phải chứa văn bản UTF-8 hợp lệ.
+      binary_source: Tệp không chứa văn bản thuần có thể đọc được.
+      docx_too_many_entries: Tệp DOCX có quá nhiều thành phần.
+      docx_uncompressed_too_large: Nội dung DOCX sau giải nén vượt giới hạn an toàn.
+      docx_xml_too_large: Nội dung DOCX vượt giới hạn an toàn.
+      empty_source: Tệp không chứa văn bản có thể đọc được.
+      encrypted_docx: Chưa hỗ trợ tệp DOCX được mã hóa.
+      macro_docx: Chưa hỗ trợ tệp Word có macro.
+      malformed_docx: Không thể đọc tệp DOCX một cách an toàn.
+      malformed_pdf: Không thể đọc tệp PDF một cách an toàn.
+      mismatched_type: Loại tệp không khớp với phần mở rộng.
+      missing_file: Hãy chọn tệp để tải lên.
+      pdf_encrypted: Chưa hỗ trợ tệp PDF được mã hóa hoặc bảo vệ bằng mật khẩu.
+      pdf_no_text: Tệp PDF này không có văn bản có thể trích xuất. PDF dạng ảnh cần OCR, hiện chưa được hỗ trợ.
+      pdf_timeout: Quá trình xử lý PDF mất quá nhiều thời gian.
+      pdf_too_many_pages: Tệp PDF có quá nhiều trang để xử lý an toàn.
+      project_binding_invalid: Tệp nguồn đã nhập không còn dùng được cho dự án này.
+      source_too_long: Văn bản trích xuất vượt giới hạn ký tự.
+      suspicious_compression: Không thể xử lý tệp DOCX một cách an toàn.
+      unsafe_docx: Không thể xử lý tệp DOCX một cách an toàn.
+      unsupported_docx_feature: Tệp DOCX chứa nội dung nhúng chưa được hỗ trợ.
+      unsupported_format: Hãy chọn tệp TXT, Markdown, DOCX hoặc PDF.
+  navigation:
+    menu: Trình đơn
+    subtitle: Không gian dịch thuật
+    primary: Điều hướng chính
+    close: Đóng trình đơn
+    log_out: Đăng xuất
+    sections:
+      work: Công việc
+      library: Thư viện
+      insights: Thống kê
+      admin: Quản trị
+    items:
+      new_translation: Bản dịch mới
+      projects: Dự án
+      history: Lịch sử
+      terminology: Thuật ngữ
+      references: Tài liệu tham khảo
+      methodology: Phương pháp
+      workflows: Quy trình
+      benchmarks: Đánh giá mô hình
+      users: Người dùng
+      models: Mô hình
+      operations: Vận hành
+  managed_ai:
+    unavailable: Tài khoản này chưa được cấp quyền dùng AI để dịch. Bạn vẫn có thể chuẩn bị tài liệu và hướng dẫn; quản trị viên cần bật quyền dùng AI trước khi bắt đầu dịch.
+  admin_users:
+    title: Người dùng
+    description: Quyết định ai được dùng AI do hệ thống quản lý. Quyền truy cập tài khoản và quyền dùng AI là hai quyền riêng.
+    status: Trạng thái tài khoản
+    verification: Xác nhận email
+    managed_ai: Quyền dùng AI
+    action: Thao tác
+    verified: Đã xác nhận
+    unverified: Chưa xác nhận
+    enabled: Đã bật
+    disabled: Đã tắt
+    enable: Bật quyền dùng AI
+    disable: Tắt quyền dùng AI
+    granted: Đã bật quyền dùng AI.
+    revoked: Đã tắt quyền dùng AI.

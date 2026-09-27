@@ -18,6 +18,29 @@ module DocumentIoTestHelper
     </Relationships>
   XML
 
+  def pdf_with_text(text)
+    stream = "BT /F1 12 Tf 72 720 Td (#{text}) Tj ET"
+    objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      "<< /Length #{stream.bytesize} >>\nstream\n#{stream}\nendstream"
+    ]
+    pdf = +"%PDF-1.4\n"
+    offsets = [ 0 ]
+    objects.each_with_index do |object, index|
+      offsets << pdf.bytesize
+      pdf << "#{index + 1} 0 obj\n#{object}\nendobj\n"
+    end
+    startxref = pdf.bytesize
+    pdf << "xref\n0 #{offsets.size}\n0000000000 65535 f \n"
+    offsets.drop(1).each { |offset| pdf << format("%010d 00000 n \n", offset) }
+    pdf << "trailer\n<< /Size #{offsets.size} /Root 1 0 R >>\nstartxref\n#{startxref}\n%%EOF\n"
+    pdf.b
+  end
+
+
   def uploaded_file(bytes, filename:, content_type: "application/octet-stream")
     Rack::Test::UploadedFile.new(
       StringIO.new(bytes),

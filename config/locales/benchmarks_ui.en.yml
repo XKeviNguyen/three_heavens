@@ -1,0 +1,67 @@
+en:
+  benchmarks_ui:
+    title: Model benchmarks · Three Heavens
+    show_title: '%{name} benchmark · Three Heavens'
+    heading: Model benchmark leaderboard
+    intro: Grouped by the requested catalog model, including inactive models with translation history. Every average and rate includes its sample count; missing telemetry remains N/A.
+    sort_by: Sort by
+    sort_button: Sort
+    sort:
+      judge_samples: Judge score samples (high to low)
+      wins: Official wins (high to low)
+      win_rate: Official win rate (high to low)
+      review_score: Blind-review score (high to low)
+      judge_score: Judge score (high to low)
+      translation_cost: Average translation cost (low to high)
+      latency: Average latency (low to high)
+    empty: No benchmark history yet
+    empty_intro: Models appear after they have participated in a translation experiment.
+    diagnostics: Reviewer and judge diagnostics
+    diagnostics_intro: Self-score difference is the reviewer’s average score for candidates requested from the same catalog model minus its average for other requested models. It is a diagnostic, not proof of causation. Judge agreement measures agreement with the completed round’s aggregate winner, not objective correctness.
+    model_role: Model role
+    self_scores: Self scores
+    other_scores: Other scores
+    self_difference: Self-score difference
+    agreement: Aggregate agreement
+    metric_notes: Metric notes
+    metric_notes_intro: Official win rate = completed judge rounds won ÷ completed judge rounds where the model had an evaluated candidate. Failed and incomplete rounds are excluded. Translation participation and failure rate count logical translation runs, never physical segment calls. Quality averages use non-null scores from completed reviewer or judge runs. Cost, tokens, and latency use completed translation runs only; latency requires both timestamps and a nonnegative duration.
+    cost_note: Cost per judge-score point is calculated per completed positive-cost translation run as cost ÷ that run’s mean completed judge score, then averaged across eligible runs. Zero-cost and unjudged runs are excluded.
+    all: ← All benchmarks
+    summary: Summary
+    role_diagnostics: Role diagnostics
+    role_intro: Reviewer identity comparisons use the requested catalog model, not the provider-resolved identifier. Differences are descriptive and do not establish causation. Judge agreement is agreement with the aggregate outcome, not objective correctness.
+    self_difference_heading: Potential self-review scoring difference
+    self: Self
+    other: Other
+    difference: Difference
+    no_review_scores: N/A · no completed review-run scores.
+    agreement_heading: Agreement with aggregate winner
+    agreement_detail: '%{agreements} agreements across %{total} eligible completed judge run(s)'
+    no_judge_runs: N/A · no eligible completed judge runs.
+    resolved_history: Resolved-model history
+    resolved_intro: OpenRouter may serve a different resolved identifier than the requested catalog model. Unknown/unreported values are kept explicit. Cost totals below include completed translations with reported cost.
+    resolved_identifier: Resolved identifier
+    runs: Runs
+    wins: Wins
+    judge_score: Judge score
+    known_cost: Known cost
+    unknown: Unknown/unreported
+    recent_history: Recent translation history
+    recent_intro: The 25 most recent requested runs for this model.
+    sample: Translation benchmark sample
+    official_winner: Official winner
+    latency: Latency
+    review_score: Blind-review score
+    completed_translations: Completed translations
+    participation: '%{count} logical participation(s) · %{failed} failed · %{rate} failure rate'
+    official_wins: Official wins
+    win_rate_detail: '%{rate} across %{count} eligible completed round(s)'
+    score_samples: '%{count} score sample(s) · %{candidates} candidate(s)'
+    known_translation_cost: Known translation cost
+    total: '%{value} total'
+    average_samples: '%{value} average · %{count} completed run sample(s)'
+    average_latency: Average latency
+    completed_samples: '%{count} completed run sample(s)'
+    average_total_tokens: Average total tokens
+    cost_per_point: Avg cost per judge-score point
+    cost_quality_samples: '%{count} positive-cost judged run sample(s) · lower is better'

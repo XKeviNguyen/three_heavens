@@ -1,4 +1,4 @@
-<% content_for :title, "Judge selection · Three Heavens" %>
+<% content_for :title, t("results_ui.judge.title") %>
 <% unless @judge_round.terminal? %>
   <% content_for :head do %>
     <meta http-equiv="refresh" content="5">
@@ -9,43 +9,43 @@
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Judge selection</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("results_ui.judge.heading") %></p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= experiment.name.presence || experiment.document.title %></h1>
       <p class="mt-2 text-sm text-slate-600"><%= experiment.document.project.name %> · <%= experiment.document.project.source_language %> → <%= experiment.document.project.target_language %></p>
     </div>
-    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@judge_round.status) %>"><%= @judge_round.status.humanize %></span>
+    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@judge_round.status) %>"><%= localized_status(@judge_round.status) %></span>
   </header>
 
   <%= render "shared/workflow_progress", experiment: experiment %>
 
   <% unless @judge_round.terminal? %>
     <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
-      Judges are evaluating the translations. This page refreshes automatically every 5 seconds.
+      <%= t("results_ui.judge.running") %>
     </div>
   <% end %>
 
   <% failed_runs = @judge_round.judge_runs.select(&:failed?) %>
   <% if failed_runs.any? %>
     <section class="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-950">Recover failed judges</h2>
-      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed judge") %> can be retried in this round. Completed judgments and anonymous mappings stay unchanged. No official winner exists until every judge completes and aggregation succeeds. Each failed physical work item selected by this action authorizes up to <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> new provider attempts and may incur additional cost.</p>
+      <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.judge.recover") %></h2>
+      <p class="mt-2 text-sm text-slate-700"><%= t("results_ui.judge.retry_intro", count: failed_runs.size, attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION) %></p>
       <% if failed_runs.all? { |run| run.judge_llm_model.active? && run.judge_llm_model.gateway == "openrouter" } %>
-        <%= button_to "Retry failed judges", retry_failed_judge_round_path(@judge_round), method: :post, data: { turbo_confirm: "Retry only the failed judge work? Each failed physical item may make up to #{Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} new provider attempts and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+        <%= button_to t("results_ui.judge.retry"), retry_failed_judge_round_path(@judge_round), method: :post, data: { turbo_confirm: t("results_ui.judge.retry_confirm", attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION), turbo_submits_with: t("results_ui.queueing_retries") }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
       <% else %>
-        <p class="mt-3 text-sm font-semibold text-amber-900">Retry is unavailable because a historical judge model is inactive or unsupported.</p>
+        <p class="mt-3 text-sm font-semibold text-amber-900"><%= t("results_ui.judge.retry_unavailable") %></p>
       <% end %>
     </section>
   <% end %>
 
   <div class="flex">
-    <%= link_to "Back to Project", project_path(experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
-    <%= link_to "Back to blind review", @judge_round.review_round, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to t("results_ui.back_project"), project_path(experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to t("results_ui.back_review"), @judge_round.review_round, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
   </div>
 
   <% if @judge_round.completed? %>
     <% winner = @judge_round.winner_translation_run %>
     <section class="rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-      <p class="text-sm font-semibold uppercase tracking-wide text-emerald-800">Official aggregate winner</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-emerald-800"><%= t("results_ui.judge.winner") %></p>
       <h2 class="mt-2 text-2xl font-bold text-slate-950"><%= winner.llm_model.display_name %></h2>
       <p class="mt-1 break-all font-mono text-xs text-slate-600"><%= winner.llm_model.model_identifier %></p>
       <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-white/70 p-4 text-sm leading-6 text-slate-900"><%= winner.translated_text %></div>
@@ -53,9 +53,9 @@
 
       <div class="mt-5">
         <% if @judge_round.final_translation %>
-          <%= link_to "Open final translation workspace", @judge_round.final_translation, class: "inline-flex rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800" %>
+          <%= link_to t("results_ui.judge.open_editor"), @judge_round.final_translation, class: "inline-flex rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800" %>
         <% else %>
-          <%= button_to "Create final translation workspace", judge_round_final_translation_path(@judge_round), method: :post, class: "rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800", data: { turbo_submits_with: "Opening editor…" } %>
+          <%= button_to t("results_ui.judge.create_editor"), judge_round_final_translation_path(@judge_round), method: :post, class: "rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800", data: { turbo_submits_with: t("results_ui.judge.opening_editor") } %>
         <% end %>
       </div>
 
@@ -64,39 +64,39 @@
           <% translation = experiment.translation_runs.find { |run| run.id == ranking.fetch("translation_run_id") } %>
           <li class="rounded-lg border border-emerald-100 bg-white p-4 text-sm">
             <span class="font-semibold text-slate-950">#<%= ranking.fetch("aggregate_rank") %> · <%= translation.llm_model.display_name %></span>
-            <span class="mt-1 block text-slate-600"><%= ranking.fetch("borda_points") %> Borda points · <%= ranking.fetch("mean_overall_score") %>/100 mean score · <%= ranking.fetch("judge_count") %> judge(s)</span>
+            <span class="mt-1 block text-slate-600"><%= t("results_ui.judge.ranking", points: ranking.fetch("borda_points"), score: ranking.fetch("mean_overall_score"), count: ranking.fetch("judge_count")) %></span>
           </li>
         <% end %>
       </ol>
     </section>
   <% elsif @judge_round.failed? %>
     <section class="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
-      <h2 class="font-semibold">No official aggregate winner</h2>
-      <p class="mt-2">At least one judge failed. Successful sibling judgments are preserved below, but the round does not declare an official winner.</p>
+      <h2 class="font-semibold"><%= t("results_ui.judge.no_winner") %></h2>
+      <p class="mt-2"><%= t("results_ui.judge.no_winner_intro") %></p>
     </section>
   <% end %>
 
   <section class="space-y-6">
-    <h2 class="text-xl font-semibold text-slate-950">Judge runs</h2>
+    <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.judge.runs") %></h2>
 
     <% @judge_round.judge_runs.sort_by { |run| [run.judge_llm_model.display_name, run.id] }.each do |judge_run| %>
       <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Judge</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= t("results_ui.judge.judge") %></p>
             <h3 class="mt-1 text-lg font-semibold text-slate-950"><%= judge_run.judge_llm_model.display_name %></h3>
             <p class="mt-1 break-all font-mono text-xs text-slate-600"><%= judge_run.judge_llm_model.model_identifier %></p>
           </div>
-          <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(judge_run.status) %>"><%= judge_run.status.humanize %></span>
+          <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(judge_run.status) %>"><%= localized_status(judge_run.status) %></span>
         </div>
 
-        <% if judge_run.judge_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">Segmented execution: <strong><%= judge_run.judge_segment_runs.count(&:completed?) %> / <%= judge_run.judge_segment_runs.size %></strong> provider requests complete.</p><% end %>
+        <% if judge_run.judge_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900"><%= t("results_ui.segmented") %>: <strong><%= judge_run.judge_segment_runs.count(&:completed?) %> / <%= judge_run.judge_segment_runs.size %></strong> <%= t("results_ui.provider_requests_complete") %></p><% end %>
 
         <% if judge_run.failed? %>
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p class="font-semibold">Judge failed</p>
+            <p class="font-semibold"><%= t("results_ui.judge.failed") %></p>
             <% if judge_run.error_code.present? %>
-              <p class="mt-1">Error code: <span class="font-mono"><%= safe_provider_error_code(judge_run.error_code) %></span></p>
+              <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= safe_provider_error_code(judge_run.error_code) %></span></p>
             <% end %>
             <% if judge_run.error_message.present? %>
               <p class="mt-1 break-words"><%= safe_provider_error(judge_run.error_message) %></p>
@@ -104,15 +104,15 @@
           </div>
         <% elsif !judge_run.completed? %>
           <p class="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-            <%= judge_run.running? ? "This judge is ranking the anonymous candidates now." : "This judgment is queued and waiting to start." %>
+            <%= judge_run.running? ? t("results_ui.judge.run_running") : t("results_ui.judge.run_pending") %>
           </p>
         <% end %>
 
         <% if judge_run.completed? %>
           <div class="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-slate-800">
-            <p><span class="font-semibold">Judge winner:</span> <%= judge_run.winner_translation_run.llm_model.display_name %></p>
+            <p><span class="font-semibold"><%= t("results_ui.judge.judge_winner") %>:</span> <%= judge_run.winner_translation_run.llm_model.display_name %></p>
             <p class="mt-2 whitespace-pre-wrap break-words"><%= judge_run.winner_rationale %></p>
-            <p class="mt-2 text-slate-600">Confidence: <%= judge_run.confidence_score %>/100</p>
+            <p class="mt-2 text-slate-600"><%= t("results_ui.judge.confidence") %>: <%= judge_run.confidence_score %>/100</p>
           </div>
 
           <div class="mt-5 space-y-4">
@@ -121,17 +121,17 @@
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h4 class="font-semibold text-slate-950">#<%= evaluation.rank %> · <%= evaluation.anonymous_label %></h4>
-                    <p class="mt-1 text-sm text-slate-600">Human-only mapping: <span class="font-semibold text-slate-800"><%= evaluation.translation_run.llm_model.display_name %></span> · <span class="font-mono text-xs"><%= evaluation.translation_run.llm_model.model_identifier %></span></p>
+                    <p class="mt-1 text-sm text-slate-600"><%= t("results_ui.human_mapping") %>: <span class="font-semibold text-slate-800"><%= evaluation.translation_run.llm_model.display_name %></span> · <span class="font-mono text-xs"><%= evaluation.translation_run.llm_model.model_identifier %></span></p>
                   </div>
                   <span class="text-lg font-bold text-blue-800"><%= evaluation.overall_score %>/100</span>
                 </div>
                 <div class="mt-4 grid gap-4 lg:grid-cols-3">
-                  <div><h5 class="text-sm font-semibold text-slate-800">Rationale</h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.rationale %></p></div>
-                  <div><h5 class="text-sm font-semibold text-emerald-800">Strengths</h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.strengths %></p></div>
-                  <div><h5 class="text-sm font-semibold text-red-800">Risks</h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.risks %></p></div>
+                  <div><h5 class="text-sm font-semibold text-slate-800"><%= t("results_ui.rationale") %></h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.rationale %></p></div>
+                  <div><h5 class="text-sm font-semibold text-emerald-800"><%= t("results_ui.strengths") %></h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.strengths %></p></div>
+                  <div><h5 class="text-sm font-semibold text-red-800"><%= t("results_ui.risks") %></h5><p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><%= evaluation.risks %></p></div>
                 </div>
                 <details class="mt-4 rounded-lg bg-slate-50 p-4">
-                  <summary class="cursor-pointer text-sm font-semibold text-slate-800">Candidate translation</summary>
+                  <summary class="cursor-pointer text-sm font-semibold text-slate-800"><%= t("results_ui.candidate_translation") %></summary>
                   <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= evaluation.translation_run.translated_text %></div>
                 </details>
               </section>
@@ -140,10 +140,10 @@
         <% end %>
 
         <% telemetry = {
-             "Prompt tokens" => judge_run.prompt_tokens,
-             "Completion tokens" => judge_run.completion_tokens,
-             "Total tokens" => judge_run.total_tokens,
-             "Cost" => (number_to_currency(judge_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless judge_run.cost.nil?)
+             t("results_ui.telemetry.prompt_tokens") => judge_run.prompt_tokens,
+             t("results_ui.telemetry.completion_tokens") => judge_run.completion_tokens,
+             t("results_ui.telemetry.total_tokens") => judge_run.total_tokens,
+             t("results_ui.telemetry.cost") => (number_to_currency(judge_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless judge_run.cost.nil?)
            }.compact %>
         <% if telemetry.any? %>
           <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">

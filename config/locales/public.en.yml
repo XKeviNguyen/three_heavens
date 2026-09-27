@@ -1,0 +1,169 @@
+en:
+  common:
+    cancel: Cancel
+    not_available: N/A
+    skip_to_content: Skip to main content
+    interface_language: Interface language
+    apply: Apply
+  authentication:
+    invalid_credentials: The email or password is incorrect.
+    signed_out: Signed out successfully.
+    rate_limited: Too many sign-in attempts. Wait three minutes, then try again.
+    sign_in_benefit: Continue your translation work.
+    no_account: New to Three Heavens?
+    sign_in: Sign in
+    sign_in_required: Please sign in to continue.
+    admin_required: You are not authorized to access administration settings.
+    confirm_email: Confirm your email before signing in.
+    signed_in: Signed in successfully.
+  landing:
+    title: Three Heavens · Compare translations
+    navigation: Public navigation
+    headline: Compare AI translations. Keep the final word.
+    headline_first: Compare AI translations.
+    headline_second_prefix: "Keep the final "
+    headline_second_emphasis: word.
+    introduction: Prepare source material, apply your terminology and references, compare independent translation candidates, then make the final translation yourself.
+    how_it_works: How it works
+    open_workspace: Open workspace
+    access_note: AI translation access is enabled separately for approved accounts. Creating an account does not include managed AI usage.
+    your_work: Your work, your judgment
+    trust: Keep reusable guidance close to each project. Workspace drafts are saved automatically, and a human editor remains in control of the final translation.
+    steps:
+      prepare:
+        title: Prepare
+        description: Bring together your source, terminology, references, and methodology.
+      compare:
+        title: Compare
+        description: Generate independent candidates with configured AI models.
+      review:
+        title: Review
+        description: Examine candidate quality and blind review feedback.
+      finalize:
+        title: Finalize
+        description: Choose and edit the final translation yourself.
+  registration:
+    create_account: Create account
+    benefit: Save your work across browsers and devices.
+    email: Email
+    password: Password
+    password_hint: At least 12 characters.
+    confirm_password: Confirm password
+    fix_errors: Please fix these fields.
+    already_account: Already have an account?
+    check_email: Check your email to confirm your account.
+    rate_limited: Too many attempts. Please wait an hour.
+  email_confirmation:
+    title: Confirm your email
+    subject: Confirm your Three Heavens email
+    ready: Confirm your email to finish creating your account.
+    confirm: Confirm email
+    confirmed: Email confirmed. You can now sign in.
+    invalid: This confirmation link is invalid or has expired.
+    resend: Resend confirmation email
+    resend_sent: If an unverified account exists for that email, a new confirmation email has been sent.
+    check_inbox: Check your inbox
+    pending: Use the confirmation link in your email to activate your account. AI access requires separate approval.
+    email_intro: You requested a Three Heavens account. Confirm your email using the link below.
+    expires: This link expires after 24 hours.
+    ignore: If you did not create an account, you can ignore this message.
+  language:
+    source: Source language
+    target: Target language
+    search_placeholder: Choose or search languages
+    suggestions: "%{label} suggestions"
+    show_suggestions: Show %{label} suggestions
+    use_custom: Use “%{value}” as a custom language
+    custom_saved: Custom language
+    names:
+      english: English
+      japanese: Japanese
+      vietnamese: Vietnamese
+  workspace:
+    saving: Saving…
+    saved: Saved
+    save_conflict: Could not save · newer draft in another tab
+    save_failed: Could not save
+    discard_confirm: Discard this saved draft and clear the workspace?
+    discard_conflict: Could not discard · newer draft in another tab
+    discard_failed: Could not discard
+    draft_restored: Draft restored · Saved moments ago
+    discard_draft: Discard draft
+  upload:
+    choose_file: Choose a TXT, Markdown, DOCX, or PDF file.
+    extracting: Extracting source text…
+    import_failed: The file could not be imported.
+    reviewed_source: Reviewed source text
+    imported: Source text extracted. Review it in the editor.
+    source_text: Source text
+    removed: Import removed. The reviewed text remains in the editor.
+    remove_failed: The import could not be removed. Try again.
+  source_imports:
+    imported_notice: Source text extracted. Review and edit it before starting translation.
+    invalid_request: The upload request is invalid. Choose one source file and try again.
+    cancel_unavailable: This source import can no longer be canceled.
+    canceled: Source import canceled.
+    errors:
+      file_too_large: The source file is larger than the 10 MiB limit.
+      invalid_utf8: The source file must contain valid UTF-8 text.
+      binary_source: The file does not contain readable plain text.
+      docx_too_many_entries: The DOCX contains too many parts.
+      docx_uncompressed_too_large: The DOCX expands beyond safe limits.
+      docx_xml_too_large: The DOCX content exceeds safe limits.
+      empty_source: The file does not contain readable text.
+      encrypted_docx: Encrypted DOCX files are not supported.
+      macro_docx: Macro-enabled Word documents are not supported.
+      malformed_docx: The DOCX could not be read safely.
+      malformed_pdf: The PDF could not be read safely.
+      mismatched_type: The file type does not match its extension.
+      missing_file: Choose a file to upload.
+      pdf_encrypted: Encrypted or password-protected PDFs are not supported.
+      pdf_no_text: This PDF does not contain extractable text. Scanned PDFs need OCR, which is not supported yet.
+      pdf_timeout: This PDF took too long to process.
+      pdf_too_many_pages: This PDF has too many pages to process safely.
+      project_binding_invalid: The source import is no longer available for this project.
+      source_too_long: The extracted source exceeds the character limit.
+      suspicious_compression: The DOCX cannot be processed safely.
+      unsafe_docx: The DOCX cannot be processed safely.
+      unsupported_docx_feature: This DOCX contains unsupported embedded content.
+      unsupported_format: Choose a TXT, Markdown, DOCX, or PDF file.
+  navigation:
+    menu: Menu
+    subtitle: Translation workspace
+    primary: Primary navigation
+    close: Close navigation
+    log_out: Log out
+    sections:
+      work: Work
+      library: Library
+      insights: Insights
+      admin: Admin
+    items:
+      new_translation: New translation
+      projects: Projects
+      history: History
+      terminology: Terminology
+      references: References
+      methodology: Methodology
+      workflows: Workflows
+      benchmarks: Benchmarks
+      users: Users
+      models: Models
+      operations: Operations
+  managed_ai:
+    unavailable: AI translation access isn't enabled for this account. You can prepare documents and guidance; an administrator must enable managed AI access before translation requests can run.
+  admin_users:
+    title: Users
+    description: Control who can use server-managed AI. Account access and AI access are separate.
+    status: Account status
+    verification: Email verification
+    managed_ai: Managed AI access
+    action: Action
+    verified: Verified
+    unverified: Unverified
+    enabled: Enabled
+    disabled: Disabled
+    enable: Enable managed AI access
+    disable: Disable managed AI access
+    granted: Managed AI access enabled.
+    revoked: Managed AI access disabled.

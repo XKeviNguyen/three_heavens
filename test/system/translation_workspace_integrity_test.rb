@@ -26,7 +26,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "primary fields and auxiliary editor have separate real DOM form owners" do
-    visit root_path
+    visit new_translation_workspace_path
     choose_language("Source language", "Vietnamese")
     choose_language("Target language", "Japanese")
     find("#workspace-glossary summary", text: "Choose saved glossary").click
@@ -65,7 +65,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "saved navigation restores a populated workspace" do
-    visit root_path
+    visit new_translation_workspace_path
     fill_in "Project name", with: "Protected project"
     choose_language("Source language", "Vietnamese")
     choose_language("Target language", "Japanese")
@@ -130,14 +130,14 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "pristine workspace navigates without a warning" do
-    visit root_path
+    visit new_translation_workspace_path
     click_link "Projects"
     assert_current_path projects_path
     assert_no_selector "dialog[open]", text: "Leave this translation?"
   end
 
   test "workspace controls preserve the populated source and configuration" do
-    visit root_path
+    visit new_translation_workspace_path
     page.execute_script("window.__workspaceErrors = []; window.addEventListener('error', event => window.__workspaceErrors.push(event.message)); window.addEventListener('unhandledrejection', event => window.__workspaceErrors.push(String(event.reason)))")
     fill_in "Project name", with: "Control project"
     choose_language("Source language", "Vietnamese")
@@ -168,9 +168,9 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     target.send_keys(:arrow_down, :enter)
     assert_core_state
 
-    click_button "Swap languages"
+    find("button[data-action='language-swap#swap']").click
     assert_core_state(source_language: "Japanese", target_language: "Vietnamese")
-    click_button "Swap languages"
+    find("button[data-action='language-swap#swap']").click
     assert_core_state
 
     click_button "Upload file"
@@ -225,8 +225,8 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
     within "dialog[open]" do
       fill_in "Glossary name", with: "New workspace terms"
-      fill_in "Source language", with: "Vietnamese"
-      fill_in "Target language", with: "Japanese"
+      choose_known_language "Source language", "Vietnamese"
+      choose_known_language "Target language", "Japanese"
       first("input[name='glossary[entries][][source_term]']").fill_in with: "Mercy"
       first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈しみ"
       click_button "Create & select"
@@ -237,7 +237,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "success failure and removal of an import preserve unrelated workspace fields" do
-    visit root_path
+    visit new_translation_workspace_path
     fill_in "Project name", with: "Import project"
     choose_language("Source language", "Vietnamese")
     choose_language("Target language", "Japanese")
@@ -285,7 +285,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "server validation keeps workspace selections and source text" do
-    visit root_path
+    visit new_translation_workspace_path
     fill_in "Project name", with: "Validation project"
     choose_language("Source language", "Vietnamese")
     choose_language("Target language", "Vietnamese")
@@ -316,7 +316,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "contextual help supports hover keyboard touch escape and outside dismissal" do
-    visit root_path
+    visit new_translation_workspace_path
     hint = find("[aria-label='More information about Source language']")
     tooltip = find("##{hint[:'aria-describedby']}", visible: :all)
     hint.hover
@@ -339,7 +339,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   test "catalog response after an outside click does not reopen model results" do
-    visit root_path
+    visit new_translation_workspace_path
     browser = find("#workspace-manual-models")
     assert_selector "#workspace-manual-models [role='option']", minimum: 1
     page.execute_script(<<~JS)
@@ -390,8 +390,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   def choose_language(label, value)
-    field = find_field(label)
-    field.fill_in with: value
-    field.send_keys(:escape)
+    choose_known_language(label, value)
   end
 end

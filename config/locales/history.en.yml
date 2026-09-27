@@ -1,0 +1,24 @@
+en:
+  history_ui:
+    title: Experiment history · Three Heavens
+    analytics: Analytics
+    heading: Experiment history
+    intro: Newest first. System cost adds each translation, review, judge, and finalization
+      run once. A partial total is labeled whenever any run lacks cost telemetry.
+    empty: No experiments yet
+    empty_intro: Run a translation experiment to begin building history.
+    new_experiment: New experiment
+    translation_candidates: Translation candidates
+    execution: Execution
+    segmented: Segmented (%{count} segments)
+    single_request: Single request per run
+    judge_round: Judge round
+    official_winner: Official winner
+    system_cost: System cost
+    partial_cost: Known total · incomplete cost telemetry (%{complete}/%{total} runs
+      complete; %{known} with known spend)
+    reported_cost: '%{count} run(s) reported cost'
+    no_cost: No cost telemetry reported
+    automatic_pipeline: Automatic pipeline
+    repeat_configuration: Repeat configuration
+    final_translation_status: Final translation (%{status})

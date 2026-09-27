@@ -1,0 +1,18 @@
+en:
+  workspace_ui:
+    adding_to: Adding to
+    file_limits: TXT, Markdown, DOCX, or PDF · maximum %{maximum} MiB
+    references_selected: '%{count} of 5 references selected'
+    references_empty_suffix: to add approved examples.
+    models: 'Models:'
+    profile_summary: '%{mode} · %{translators} translators · %{reviewers} reviewers · %{judges} judges · %{finalizers} finalizers'
+    paid_plan: '%{segments} source segment(s) require %{slots} initial request slots and authorize at most %{maximum} requests
+      including built-in retries.'
+    paid_plan_role: '%{role}: %{runs} runs × %{segments} segments = %{requests} requests'
+    draft_import_detached: The original upload is no longer attached. Your reviewed source text remains.
+    draft_configuration_changed: Some saved configuration is no longer available. Review the remaining selections.
+    repeat_profile_unavailable: The historical automatic profile no longer has the model capability data required for this
+      source. A manual launch has been prefilled with its currently active translation models; review or replace them before
+      authorizing work.
+    profile_unavailable: is not available
+    repeat_of: Repeat of %{name}

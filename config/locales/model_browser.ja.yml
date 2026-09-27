@@ -1,0 +1,37 @@
+ja:
+  model_browser:
+    selected: 選択数
+    selected_models: 選択したモデル
+    selected_one: モデルを1件選択
+    selected_many: "モデルを%{count}件選択"
+    empty_selected: モデルが選択されていません。下の一覧から追加してください。
+    search_placeholder: OpenRouterのモデルを検索…
+    provider: プロバイダー
+    all_providers: すべてのプロバイダー
+    free_only: 無料のみ
+    sort: 並び替え
+    name: 名前
+    price: 料金
+    context: コンテキスト
+    results: OpenRouterモデルの検索結果
+    loading: OpenRouterのモデルを読み込み中…
+    searching: OpenRouterのモデルを検索中…
+    saved_prefix: "保存済みモデル · "
+    compatible_count: "利用可能なモデル %{count}件"
+    no_results: 条件に合うモデルがありません。
+    unavailable: OpenRouterのモデル一覧を取得できません。しばらくしてからお試しください。
+    live_unavailable: OpenRouterの最新モデル一覧を取得できません。選択済みの保存されたモデルは上に表示されています。
+    free: 無料
+    translator: 翻訳
+    structured: 構造化出力
+    price_in: 入力
+    price_out: 出力
+    added: 追加済み
+    add: 追加
+    add_model: "%{name}を追加"
+    is_selected: "%{name}を選択済み"
+    remove: 削除
+    remove_model: "%{name}を削除"
+    max_models: "選択できるモデルは%{count}件までです。"
+    model_added: "%{name}を追加しました。"
+    model_removed: モデルを削除しました。

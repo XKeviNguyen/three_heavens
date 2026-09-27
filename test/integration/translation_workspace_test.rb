@@ -53,7 +53,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
       active: true
     )
 
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
     assert_select "h1", "New translation"

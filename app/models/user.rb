@@ -3,6 +3,11 @@ class User < ApplicationRecord
   MAXIMUM_EMAIL_LENGTH = 254
   MINIMUM_PASSWORD_LENGTH = 12
   MAXIMUM_PASSWORD_LENGTH = 128
+  SUPPORTED_LOCALES = %w[en vi ja].freeze
+
+  generates_token_for :email_confirmation, expires_in: 24.hours do
+    [ email, email_verified_at, confirmation_sent_at ].join(":")
+  end
 
   has_secure_password
 
@@ -34,6 +39,11 @@ class User < ApplicationRecord
   validates :password,
             length: { minimum: MINIMUM_PASSWORD_LENGTH, maximum: MAXIMUM_PASSWORD_LENGTH },
             allow_nil: true
+  validates :locale, inclusion: { in: SUPPORTED_LOCALES }
+
+  def email_verified?
+    email_verified_at.present?
+  end
 
   def self.authenticate_by_email(email:, password:)
     account = authenticate_by(

@@ -8,8 +8,12 @@ export default class extends Controller {
     const previous = source.value
     source.value = target.value
     target.value = previous
-    source.dispatchEvent(new Event("input", { bubbles: true }))
-    target.dispatchEvent(new Event("input", { bubbles: true }))
-    source.focus()
+    for (const field of [source, target]) {
+      const visible = field.closest("[data-controller='combobox']")?.querySelector("[data-combobox-target='input']")
+      if (visible) visible.value = field.value
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      field.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+    source.closest("[data-controller='combobox']")?.querySelector("[data-combobox-target='input']")?.focus()
   }
 }

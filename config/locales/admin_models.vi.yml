@@ -1,0 +1,46 @@
+vi:
+  admin_models:
+    title: Danh mục mô hình · Three Heavens
+    edit_title: Chỉnh sửa %{name} · Three Heavens
+    new_title: Thêm mô hình · Three Heavens
+    provider_help: Chỉ nhập thông tin danh mục; không nhập khóa API hay thông tin đăng nhập.
+    identifier_locked: Mã này đã được dùng trong các lần dịch, nhận xét hoặc chấm điểm trước đây nên không thể sửa.
+    identifier_help: Dùng mã trong danh mục OpenRouter. Mã không thể đổi sau lần sử dụng đầu tiên.
+    context_help: Cần cho việc xử lý tài liệu dài. Chỉ để trống nếu chấp nhận giới hạn an toàn cho tài liệu ngắn.
+    output_help: Giới hạn này phải đáp ứng phần dự phòng đầu ra của từng giai đoạn; nếu không, công việc AI sẽ bị chặn trước khi xếp lịch.
+    context_window: Cửa sổ ngữ cảnh (token)
+    maximum_output: Đầu ra tối đa (token)
+    add_active: Thêm mô hình đang hoạt động
+    save_metadata: Lưu thông tin
+    saving: Đang lưu mô hình…
+    breadcrumb: Cài đặt / Mô hình
+    edit_heading: Chỉnh sửa thông tin mô hình
+    gateway: 'Cổng:'
+    edit_intro: Đổi trạng thái hoạt động bằng nút riêng trong danh sách.
+    settings: Cài đặt
+    heading: Danh mục mô hình OpenRouter
+    intro: Quản lý mô hình dùng cho dịch, nhận xét, chấm điểm và hoàn thiện. Khóa API chỉ nằm trong môi trường máy chủ, không được quản lý tại đây.
+    add: Thêm mô hình
+    deactivation_help: Không thể xóa mô hình ở đây. Tắt mô hình sẽ ẩn khỏi các lựa chọn mới nhưng vẫn giữ toàn bộ lịch sử.
+    search: Tìm trên OpenRouter
+    search_intro: Tìm mô hình văn bản tương thích và thêm thông tin đáng tin cậy từ danh mục. Việc tra cứu chỉ đọc và không phát sinh yêu cầu AI tính phí.
+    browse: Duyệt OpenRouter
+    browse_help: Tìm trong danh mục OpenRouter và thêm mô hình với thông tin chuẩn.
+    add_and_activate: Thêm và kích hoạt mô hình
+    empty: Chưa có mô hình OpenRouter
+    empty_intro: Thêm mô hình đầu tiên để dùng trong các quy trình mới.
+    model: Mô hình
+    provider_gateway: Nhà cung cấp / cổng
+    usage: Lượt sử dụng
+    actions: Thao tác
+    capability: 'Ngữ cảnh %{context} · đầu ra tối đa %{output} token'
+    capability_missing: Chưa thiết lập giới hạn ngữ cảnh
+    translations: 'Lượt dịch:'
+    reviews: 'Lượt nhận xét:'
+    judgments: 'Lượt chấm điểm:'
+    finalizations: 'Lượt hoàn thiện:'
+    wins: 'Lượt thắng chính thức:'
+    benchmark: Thống kê
+    deactivate_confirm: Tắt %{name}? Lịch sử hiện có vẫn được giữ nguyên.
+    new_heading: Thêm mô hình OpenRouter
+    new_intro: Mô hình mới được kích hoạt ngay. Máy chủ kiểm soát cổng và trạng thái hoạt động; khóa API chỉ nằm trong môi trường.

@@ -1,4 +1,5 @@
 class TranslationWorkspacesController < ApplicationController
+  before_action :require_managed_ai_access, only: :create
   CONFIGURATION_OPTION_LIMIT = 100
   SCALAR_ATTRIBUTES = %w[
     project_id
@@ -113,11 +114,11 @@ class TranslationWorkspacesController < ApplicationController
         outcome: @translation_workspace.replayed? ? "replayed" : "success"
       )
       notice = if @translation_workspace.replayed?
-        "This translation launch was already completed; showing its existing result."
+        t("flash_ui.workspace.replayed")
       elsif @translation_workspace.pipeline_run
-        "Automatic translation pipeline started."
+        t("flash_ui.workspace.automatic_started")
       else
-        "Translation experiment started."
+        t("flash_ui.workspace.experiment_started")
       end
       redirect_to destination, notice: notice
     else
@@ -159,9 +160,7 @@ class TranslationWorkspacesController < ApplicationController
   def prepare_repeat_preview(revision, historical)
     @translation_workspace.prepare_provider_work_plan_preview(revision: revision)
   rescue Ai::ContextBudget::Error
-    @repeat_configuration_notice =
-      "The historical automatic profile no longer has the model capability data required for this source. " \
-      "A manual launch has been prefilled with its currently active translation models; review or replace them before authorizing work."
+    @repeat_configuration_notice = t("workspace_ui.repeat_profile_unavailable")
     @translation_workspace.workflow_mode = "manual"
     @translation_workspace.workflow_profile_revision_id = nil
     @translation_workspace.automatic_plan_digest = nil
@@ -176,7 +175,7 @@ class TranslationWorkspacesController < ApplicationController
     end
     unless profile
       reset_paged_provider_authorization
-      @translation_workspace.errors.add(:workflow_profile_revision_id, "is not available")
+      @translation_workspace.errors.add(:workflow_profile_revision_id, t("workspace_ui.profile_unavailable"))
       return
     end
 
@@ -202,7 +201,7 @@ class TranslationWorkspacesController < ApplicationController
     {
       document_title: historical.document.title,
       source_text: historical.document.source_text,
-      experiment_name: "Repeat of #{historical.name.presence || historical.document.title}".first(150),
+      experiment_name: t("workspace_ui.repeat_of", name: historical.name.presence || historical.document.title).first(150),
       instruction_prompt: historical.instruction_prompt,
       glossary_revision_id: repeatable_glossary_revision_id(historical),
       methodology_profile_revision_id: repeatable_methodology_revision_id(historical),

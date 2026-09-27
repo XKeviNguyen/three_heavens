@@ -128,8 +128,8 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
 
   def fill_workspace
     fill_in "Project name", with: "Automatic system project"
-    fill_in "Source language", with: "Vietnamese"
-    fill_in "Target language", with: "Japanese"
+    choose_known_language "Source language", "Vietnamese"
+    choose_known_language "Target language", "Japanese"
     fill_in "Document title", with: "Automatic system source"
     fill_in "Source text", with: "Source for deterministic browser test"
     fill_in "Translation name", with: "Automatic system experiment"

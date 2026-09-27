@@ -7,7 +7,7 @@ const SEARCH_DEBOUNCE_MS = 220
 // trusted server-side resolution; existing saved selections retain their IDs.
 export default class extends Controller {
   static targets = ["search", "list", "selected", "count", "status", "provider", "free", "sort", "meta", "empty"]
-  static values = { role: String, name: String, max: Number, endpoint: String }
+  static values = { role: String, name: String, max: Number, endpoint: String, messages: Object }
 
   connect() {
     this.onDocumentPointerDown = this.onDocumentPointerDown.bind(this)
@@ -56,7 +56,7 @@ export default class extends Controller {
 
   async fetchResults() {
     const requestSequence = ++this.requestSequence
-    this.setStatus("Searching OpenRouter…")
+    this.setStatus(this.copy("searching"))
     const url = new URL(this.endpointValue, window.location.origin)
     url.searchParams.set("role", this.roleValue)
     const query = this.searchTarget.value.trim()
@@ -74,14 +74,14 @@ export default class extends Controller {
       this.total = payload.total
       this.loadProviders(payload.providers || [], payload.source)
       this.renderResults(payload)
-      const sourceLabel = payload.source === "fallback" ? "Saved models · " : ""
+      const sourceLabel = payload.source === "fallback" ? this.copy("saved_prefix") : ""
       const totalLabel = typeof this.total === "number" ? this.total : this.results.length
-      this.setStatus(this.results.length === 0 ? "No compatible models match these filters." : `${sourceLabel}${totalLabel} compatible model(s)`)
+      this.setStatus(this.results.length === 0 ? this.copy("no_results") : `${sourceLabel}${this.copy("compatible_count", { count: totalLabel })}`)
     } catch {
       if (requestSequence !== this.requestSequence) return
       this.results = []
       this.renderResults({ source: "error" })
-      this.setStatus("OpenRouter catalog is unavailable. Try again shortly.")
+      this.setStatus(this.copy("unavailable"))
     }
   }
 
@@ -90,7 +90,7 @@ export default class extends Controller {
     if (this.providersLoaded && source === "fallback") return
 
     const current = this.providerTarget.value
-    const options = ['<option value="">All providers</option>'].concat(
+    const options = [`<option value="">${this.escape(this.copy("all_providers"))}</option>`].concat(
       providers.map((provider) => `<option value="${this.escape(provider)}">${this.escape(provider)}</option>`)
     )
     this.providerTarget.innerHTML = options.join("")
@@ -103,12 +103,12 @@ export default class extends Controller {
     this.options = []
 
     if (payload.source === "error") {
-      this.listTarget.appendChild(this.message("The live OpenRouter catalog is unavailable. Previously selected saved models remain available above."))
+      this.listTarget.appendChild(this.message(this.copy("live_unavailable")))
       this.closeList()
       return
     }
     if (this.results.length === 0) {
-      this.listTarget.appendChild(this.message("No compatible models match these filters."))
+      this.listTarget.appendChild(this.message(this.copy("no_results")))
       this.closeList()
       return
     }
@@ -143,7 +143,7 @@ export default class extends Controller {
     const title = document.createElement("p")
     title.className = "flex items-center gap-2 text-sm font-semibold text-slate-900"
     title.appendChild(document.createTextNode(model.name))
-    if (model.free) title.appendChild(this.badge("Free", "bg-emerald-100 text-emerald-800"))
+    if (model.free) title.appendChild(this.badge(this.copy("free"), "bg-emerald-100 text-emerald-800"))
     details.appendChild(title)
 
     const identifier = document.createElement("p")
@@ -153,11 +153,11 @@ export default class extends Controller {
 
     const meta = document.createElement("div")
     meta.className = "mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500"
-    meta.appendChild(this.metaItem(`Context ${this.compactNumber(model.context_length)}`))
-    meta.appendChild(this.compatItem("Translator", model.translator))
-    meta.appendChild(this.compatItem("Structured", model.structured))
-    meta.appendChild(this.metaItem(`${this.pricePerMillion(model.prompt_price)} in`))
-    meta.appendChild(this.metaItem(`${this.pricePerMillion(model.completion_price)} out`))
+    meta.appendChild(this.metaItem(`${this.copy("context")} ${this.compactNumber(model.context_length)}`))
+    meta.appendChild(this.compatItem(this.copy("translator"), model.translator))
+    meta.appendChild(this.compatItem(this.copy("structured"), model.structured))
+    meta.appendChild(this.metaItem(`${this.pricePerMillion(model.prompt_price)} ${this.copy("price_in")}`))
+    meta.appendChild(this.metaItem(`${this.pricePerMillion(model.completion_price)} ${this.copy("price_out")}`))
     details.appendChild(meta)
 
     const action = document.createElement("button")
@@ -168,9 +168,9 @@ export default class extends Controller {
         : atMax
           ? "bg-slate-100 text-slate-400"
           : "bg-blue-700 text-white hover:bg-blue-800")
-    action.textContent = selected ? "Added" : "Add"
+    action.textContent = selected ? this.copy("added") : this.copy("add")
     action.disabled = selected || atMax
-    action.setAttribute("aria-label", selected ? `${model.name} is selected` : `Add ${model.name}`)
+    action.setAttribute("aria-label", selected ? this.copy("is_selected", { name: model.name }) : this.copy("add_model", { name: model.name }))
     action.addEventListener("click", (event) => {
       event.stopPropagation()
       if (!selected) this.add(model)
@@ -190,7 +190,7 @@ export default class extends Controller {
   add(model) {
     if (this.selectedIdentifiers().includes(model.identifier)) return
     if (this.selectedIdentifiers().length >= this.maxValue) {
-      this.setStatus(`You can select up to ${this.maxValue} models.`)
+      this.setStatus(this.copy("max_models", { count: this.maxValue }))
       return
     }
 
@@ -221,15 +221,15 @@ export default class extends Controller {
     remove.type = "button"
     remove.dataset.action = "model-browser#remove"
     remove.className = "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-    remove.textContent = "Remove"
-    remove.setAttribute("aria-label", `Remove ${model.name}`)
+    remove.textContent = this.copy("remove")
+    remove.setAttribute("aria-label", this.copy("remove_model", { name: model.name }))
     card.appendChild(remove)
 
     this.selectedTarget.appendChild(card)
     this.updateCount()
     this.dispatchSelectionChange()
     this.renderResults({ source: "live" })
-    this.setStatus(`${model.name} added.`)
+    this.setStatus(this.copy("model_added", { name: model.name }))
   }
 
   remove(event) {
@@ -238,7 +238,7 @@ export default class extends Controller {
     this.updateCount()
     this.dispatchSelectionChange()
     this.renderResults({ source: "live" })
-    this.setStatus("Model removed.")
+    this.setStatus(this.copy("model_removed"))
   }
 
   keydown(event) {
@@ -287,8 +287,15 @@ export default class extends Controller {
   updateCount() {
     const count = this.selectedIdentifiers().length
     if (this.hasCountTarget) this.countTarget.textContent = `${count}/${this.maxValue}`
-    if (this.hasMetaTarget) this.metaTarget.textContent = count === 1 ? "1 model selected" : `${count} models selected`
+    if (this.hasMetaTarget) this.metaTarget.textContent = count === 1 ? this.copy("selected_one") : this.copy("selected_many", { count })
     if (this.hasEmptyTarget) this.emptyTarget.hidden = count > 0
+  }
+
+  copy(key, replacements = {}) {
+    return Object.entries(replacements).reduce(
+      (text, [name, value]) => text.replaceAll(`%{${name}}`, String(value)),
+      this.messagesValue[key]
+    )
   }
 
   setStatus(message) {

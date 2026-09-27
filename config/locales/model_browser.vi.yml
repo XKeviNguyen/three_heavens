@@ -1,0 +1,37 @@
+vi:
+  model_browser:
+    selected: Đã chọn
+    selected_models: Mô hình đã chọn
+    selected_one: Đã chọn 1 mô hình
+    selected_many: "Đã chọn %{count} mô hình"
+    empty_selected: Chưa chọn mô hình. Hãy thêm từ danh mục bên dưới.
+    search_placeholder: Tìm mô hình OpenRouter…
+    provider: Nhà cung cấp
+    all_providers: Tất cả nhà cung cấp
+    free_only: Chỉ mô hình miễn phí
+    sort: Sắp xếp
+    name: Tên
+    price: Giá
+    context: Ngữ cảnh
+    results: Kết quả tìm mô hình OpenRouter
+    loading: Đang tải mô hình OpenRouter…
+    searching: Đang tìm mô hình OpenRouter…
+    saved_prefix: "Mô hình đã lưu · "
+    compatible_count: "%{count} mô hình phù hợp"
+    no_results: Không có mô hình phù hợp với bộ lọc này.
+    unavailable: Không thể tải danh mục OpenRouter. Vui lòng thử lại sau.
+    live_unavailable: Không thể tải danh mục OpenRouter trực tiếp. Các mô hình đã lưu và được chọn vẫn hiển thị phía trên.
+    free: Miễn phí
+    translator: Dịch
+    structured: Đầu ra có cấu trúc
+    price_in: đầu vào
+    price_out: đầu ra
+    added: Đã thêm
+    add: Thêm
+    add_model: "Thêm %{name}"
+    is_selected: "Đã chọn %{name}"
+    remove: Xóa
+    remove_model: "Xóa %{name}"
+    max_models: "Bạn có thể chọn tối đa %{count} mô hình."
+    model_added: "Đã thêm %{name}."
+    model_removed: Đã xóa mô hình.

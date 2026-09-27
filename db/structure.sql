@@ -1566,7 +1566,7 @@ CREATE TABLE public.documents (
     source_sha256 character varying,
     extraction_version character varying,
     CONSTRAINT documents_original_byte_size_check CHECK (((original_byte_size IS NULL) OR ((original_byte_size >= 0) AND (original_byte_size <= 10485760)))),
-    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
+    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying, 'pdf'::character varying])::text[])))),
     CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY ((ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying])::text[]))),
     CONSTRAINT documents_source_sha256_check CHECK (((source_sha256 IS NULL) OR (char_length((source_sha256)::text) = 64)))
 );
@@ -2874,7 +2874,7 @@ CREATE TABLE public.source_imports (
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
-    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
+    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying, 'pdf'::character varying])::text[])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
     CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying])::text[])))
@@ -3207,6 +3207,11 @@ CREATE TABLE public.users (
     role character varying DEFAULT 'user'::character varying NOT NULL,
     status character varying DEFAULT 'active'::character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    email_verified_at timestamp(6) without time zone,
+    confirmation_sent_at timestamp(6) without time zone,
+    locale character varying DEFAULT 'en'::character varying NOT NULL,
+    managed_ai_access boolean DEFAULT false NOT NULL,
+    CONSTRAINT users_locale_check CHECK (((locale)::text = ANY ((ARRAY['en'::character varying, 'vi'::character varying, 'ja'::character varying])::text[]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
     CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
@@ -6169,6 +6174,8 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260924090200'),
+('20260924090100'),
 ('20260924090000'),
 ('20260920090100'),
 ('20260920090000'),

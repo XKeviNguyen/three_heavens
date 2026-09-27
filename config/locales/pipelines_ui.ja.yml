@@ -1,0 +1,72 @@
+ja:
+  pipelines_ui:
+    title: 自動ワークフロー · Three Heavens
+    methodology_snapshot: 保存された翻訳方針
+    started: '%{revision} · %{mode} · 開始 %{at}'
+    blocked_at: '%{stage}の段階で処理が停止しました'
+    blocked_generic: この段階で処理が停止しました。続行する前に該当ページを確認してください。
+    blocked_help: 該当する段階のページから再試行するか、手動で続行してください。
+    ready_editor: 編集者に引き継げます
+    ready_help: 自動処理は終了しました。提案は適用されず、下書きも自動変更・確定されていません。
+    stopped: 以降の自動処理を停止しました
+    stopped_help: 完了済みの履歴は残ります。待機中または実行中のAI処理は取り消されません。手動で続行できます。
+    progress: 進行状況
+    current_stage: 現在の段階：
+    plan: 承認したAI処理計画
+    plan_intro: 原文%{segments}セグメント · 初回リクエスト枠%{slots}件 · 組み込みの最大%{attempts}回の試行を含め、AIリクエストは最大%{maximum}件です。後から手動再試行する場合は別途操作が必要です。
+    plan_role: 論理処理%{logical}件 × セグメント%{segments}件 = 初回リクエスト%{requests}件
+    execution_status: 実行状況
+    logical_runs: 論理処理
+    physical_slots: 実処理枠
+    attempts_started: 開始したAI試行
+    pending_running_failed: 待機 · 実行中 · 失敗
+    known_tokens: 判明しているトークン数
+    known_attempt_cost: 判明している試行費用
+    average_latency: 完了した試行の平均所要時間
+    logical_progress: 完了%{completed}件 / 全%{total}件
+    physical_progress: 完了%{completed}件 / 作成%{total}件
+    token_coverage: 既知分の小計です。%{known}/%{total}件の試行でトークン数が報告されました。
+    cost_coverage: 既知分の小計です。不明な費用を0とはみなしません。
+    recent_failures: 最近失敗したAI試行
+    failure_intro: 安全なエラーコードと変更できないリクエスト履歴のみを表示します。提供元の応答、プロンプト、原文、生のエラーは表示しません。
+    attempt_number: 試行%{number}
+    snapshots: 承認済みモデルの記録
+    logical_coverage: 論理処理の費用範囲
+    known_logical_total: 判明している合計費用
+    logical_records: 論理処理の件数
+    with_known_cost: 費用が判明した件数
+    coverage_help: 試行ごとの履歴は実処理%{tracked}/%{total}件をカバーします。別掲の論理処理合計は以前の費用を残すためのもので、重複する可能性があるため小計には加算しません。不明な費用を0とはみなしません。
+    links: ワークフローへのリンク
+    final_translation: 最終訳
+    stop_heading: 以降の自動処理を停止
+    stop_help: 以降の自動段階を止めます。待機中・実行中のAI処理は取り消せず、履歴は削除されません。手動で続行できます。
+    stop: 自動処理を停止
+    stop_confirm: 以降の自動段階をすべて停止しますか？待機中・実行中のAI処理は取り消せません。
+    blocked_reasons:
+      managed_ai_access_revoked: このアカウントではサーバー管理のAIを利用できません。
+      stage_failed: 1件以上の処理に失敗しました。該当段階のページから明示的に再試行してください。
+      configuration_unavailable: 次の段階で承認されたモデル設定が利用できません。自動処理を止めて手動で続行するか、元の設定を復元してください。
+      stage_conflict: 現在の状態がこの自動段階と競合しています。自動処理を止め、該当ページから続行してください。
+      reference_context_budget: 選択した参考訳がモデルのコンテキスト上限を超えています。
+    events:
+      pipeline_started: ワークフローを開始
+      translation_started: 翻訳を開始
+      translation_completed: 翻訳が完了
+      review_started: レビューを開始
+      review_completed: レビューが完了
+      judge_started: 判定を開始
+      judge_completed: 判定が完了
+      final_workspace_created: 最終訳の編集画面を作成
+      refinement_started: 修正案の作成を開始
+      refinement_completed: 修正案の作成が完了
+      ready_for_editor: 編集者に引き継ぎ可能
+      automation_stopped: 自動処理を停止
+      configuration_blocked: 設定により停止
+      translation_blocked: 翻訳を停止
+      translation_retry_resumed: 翻訳を再試行を再開
+      review_blocked: レビューを停止
+      review_retry_resumed: レビューを再試行を再開
+      judge_blocked: 判定を停止
+      judge_retry_resumed: 判定を再試行を再開
+      finalization_blocked: 最終調整を停止
+      finalization_retry_resumed: 最終調整を再試行を再開

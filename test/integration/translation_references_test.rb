@@ -69,6 +69,24 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_equal "DOCX approved", revisions[2].approved_translation
   end
 
+  test "text PDF uploads extract both reference sides without provider work" do
+    assert_no_difference "AiProviderAttempt.count" do
+      post translation_references_path, params: {
+        translation_reference: {
+          title: "PDF reference",
+          source_language: "Vietnamese",
+          target_language: "Japanese",
+          source_file: uploaded_file(pdf_with_text("PDF source example"), filename: "source.pdf", content_type: "application/pdf"),
+          approved_translation_file: uploaded_file(pdf_with_text("PDF approved example"), filename: "approved.pdf", content_type: "application/pdf")
+        }
+      }
+    end
+    assert_response :redirect
+    revision = TranslationReference.order(:id).last.current_revision
+    assert_equal "PDF source example", revision.source_text
+    assert_equal "PDF approved example", revision.approved_translation
+  end
+
   test "an individually oversized file is rejected below the global two-file request ceiling" do
     oversized = "a" * (SourceImports::Limits::MAX_UPLOAD_BYTES + 1)
 

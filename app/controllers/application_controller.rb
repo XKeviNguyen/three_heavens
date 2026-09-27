@@ -4,6 +4,7 @@ class ApplicationController < ActionController::Base
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
   before_action :require_authentication
+  around_action :with_locale
 
   helper_method :current_user, :authenticated?
 
@@ -14,6 +15,21 @@ class ApplicationController < ActionController::Base
   stale_when_importmap_changes
 
   private
+
+  def with_locale(&action)
+    I18n.with_locale(current_user&.locale || preferred_public_locale, &action)
+  end
+
+  def preferred_public_locale
+    cookie_locale = cookies[:ui_locale]
+    return cookie_locale if User::SUPPORTED_LOCALES.include?(cookie_locale)
+
+    request.headers["Accept-Language"].to_s.split(",").each do |part|
+      language = part.split(";", 2).first.to_s.strip.downcase.split("-", 2).first
+      return language if User::SUPPORTED_LOCALES.include?(language)
+    end
+    "en"
+  end
 
   def paginate(scope, per_page: DEFAULT_PAGE_SIZE)
     total_count = scope.count
@@ -35,16 +51,18 @@ class ApplicationController < ActionController::Base
   end
 
   def render_not_found
-    respond_to do |format|
-      format.html { render "errors/not_found", status: :not_found }
-      format.any { head :not_found }
+    I18n.with_locale(current_user&.locale || preferred_public_locale) do
+      respond_to do |format|
+        format.html { render "errors/not_found", status: :not_found }
+        format.any { head :not_found }
+      end
     end
   end
 
   def current_user
     return @current_user if defined?(@current_user)
 
-    @current_user = User.active.find_by(id: session[:user_id])
+    @current_user = User.active.where.not(email_verified_at: nil).find_by(id: session[:user_id])
   end
 
   def authenticated?
@@ -56,13 +74,32 @@ class ApplicationController < ActionController::Base
 
     reset_session if session[:user_id].present?
     session[:return_to_after_authenticating] = request.fullpath if request.get? && request.format.html?
-    redirect_to login_path, alert: "Please sign in to continue."
+    redirect_to login_path, alert: I18n.t("authentication.sign_in_required")
+  end
+
+  def require_managed_ai_access
+    return if Ai::ManagedAccess.allowed?(current_user)
+
+    redirect_to new_translation_workspace_path, alert: I18n.t("managed_ai.unavailable")
   end
 
   def require_admin
     return if current_user&.admin?
 
-    redirect_to root_path, alert: "You are not authorized to access administration settings."
+    redirect_to root_path, alert: I18n.t("authentication.admin_required")
+  end
+
+  def localized_retry_notice(result, kind:)
+    base = "retry_feedback.#{kind}"
+    return I18n.t("#{base}.none") if result.retried_count.zero?
+
+    failed_count = result.retried_count - result.enqueued_count
+    return I18n.t("#{base}.queue_failed") if result.enqueued_count.zero?
+    if failed_count.positive?
+      return I18n.t("#{base}.partial", queued: result.enqueued_count, failed: failed_count)
+    end
+
+    I18n.t("#{base}.queued", count: result.retried_count)
   end
 
   def find_owned_project(id)

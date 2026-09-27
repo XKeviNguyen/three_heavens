@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @layer base {
+  html[lang="ja"] body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", "Noto Sans JP", "Segoe UI", sans-serif;
+    writing-mode: horizontal-tb;
+  }
+
   :where(a, button, input, select, textarea, summary):focus-visible {
     outline: 2px solid var(--color-blue-600);
     outline-offset: 2px;
@@ -65,6 +70,17 @@ body:has(#workspace-form) #app-sidebar {
   background: var(--workspace-sidebar);
   border-color: var(--workspace-border);
   backdrop-filter: none;
+}
+
+body:has(#workspace-form) #app-sidebar > *,
+body:has(#workspace-form) #app-sidebar form {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .public-locale-selector { width: max-content; }
+  .public-locale-selector select { width: 8rem; }
 }
 
 body:has(#workspace-form) #app-sidebar a[aria-current="page"] {

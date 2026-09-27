@@ -1,5 +1,18 @@
 Rails.application.routes.draw do
-  root "translation_workspaces#new"
+  root "landing#show"
+
+  resource :registration, only: %i[new create]
+  resource :email_confirmation, only: %i[show create]
+  resource :confirmation_resend, only: %i[new create]
+  resource :locale, only: :update
+  namespace :settings do
+    resources :users, only: :index do
+      member do
+        patch :grant_managed_ai_access
+        patch :revoke_managed_ai_access
+      end
+    end
+  end
 
   resource :session, only: %i[new create destroy]
   get "login", to: "sessions#new", as: :login

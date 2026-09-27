@@ -4,7 +4,7 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
   test "authenticated shell renders grouped sidebar navigation with brand and language picker" do
     sign_in_as users(:normal)
 
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
     assert_select "aside[aria-label='Primary navigation']" do
@@ -25,7 +25,7 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
 
     assert_select "li[role='option'][data-value='Vietnamese']"
     assert_select "li[role='option'][data-value='Japanese']"
-    assert_select "input[type='text'][role='combobox'][name='translation_workspace[source_language]']"
+    assert_select "input[type='text'][role='combobox'][id='translation_workspace_source_language']"
 
     assert_select "span[role='tooltip']", minimum: 1
     assert_select "button[aria-describedby][aria-label^='More information about']", minimum: 1
@@ -34,7 +34,7 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
   test "admin shell exposes Models and Operations only to admins" do
     sign_in_as users(:admin)
 
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
     assert_select "aside[aria-label='Primary navigation']" do
@@ -48,7 +48,7 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
     get login_path
 
     assert_response :success
-    assert_select "span", text: "Three Heavens"
+    assert_select "a", text: "Three Heavens"
     assert_select "a", text: "New translation", count: 0
   end
 

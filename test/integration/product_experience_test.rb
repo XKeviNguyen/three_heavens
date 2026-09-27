@@ -11,7 +11,7 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
   end
 
   test "authenticated shell exposes accessible responsive navigation and current page" do
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
     assert_select "a[href='#main-content']", "Skip to main content"
@@ -27,7 +27,7 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
   test "workspace presents mutually exclusive workflow controls and retry-safe submit state" do
     create_workflow_profile
 
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
     assert_select "form[data-controller~='workflow-mode'][data-controller~='workspace-summary']"

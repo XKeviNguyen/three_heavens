@@ -1,0 +1,60 @@
+vi:
+  operations_ui:
+    title: Vận hành · Three Heavens
+    admin_settings: Cài đặt quản trị
+    heading: Vận hành quy trình AI
+    intro: Chỉ hiển thị tình trạng tổng hợp. Trang này không tiết lộ văn bản nguồn, bản dịch, lời nhắc, đề xuất hay nội dung phản hồi từ nhà cung cấp.
+    diagnostics: Chẩn đoán hệ thống
+    diagnostics_intro: Chỉ hiển thị trạng thái phụ thuộc và số liệu hàng đợi có giới hạn. Không hiển thị kết nối, đường dẫn lưu trữ, đối số công việc hay dữ liệu người dùng.
+    release: 'Bản phát hành:'
+    checks:
+      primary_database: Cơ sở dữ liệu chính
+      schema_migrations: Di trú lược đồ
+      cache_database: Cơ sở dữ liệu bộ nhớ đệm
+      queue_database: Cơ sở dữ liệu hàng đợi
+      cable_database: Cơ sở dữ liệu kết nối
+      active_storage: Lưu trữ tệp
+    health:
+      healthy: Bình thường
+      degraded: Suy giảm
+      unavailable: Không khả dụng
+    metrics:
+      pending_count: Đang chờ
+      failed_count: Thất bại
+      writable: Có thể ghi
+      configured: Đã cấu hình
+    current_work: Công việc hiện tại
+    stale_help: Công việc chờ quá lâu chưa bắt đầu, hoặc công việc đang chạy không có lượt nhận xử lý mới, được xem là quá hạn sau %{minutes} phút.
+    workflow: Quy trình
+    stale_pending: Chờ quá hạn
+    stale_running: Chạy quá hạn
+    oldest_active: Cũ nhất đang hoạt động
+    ago: '%{duration} trước'
+    pipeline_health: Tình trạng quy trình tự động
+    pipeline_intro: Chỉ hiển thị số liệu tổng hợp, không tiết lộ chủ sở hữu, cấu hình, tệp, văn bản nguồn hay bản dịch.
+    configuration_blocked: Bị chặn do cấu hình
+    oldest_running: Đang chạy lâu nhất
+    active_by_stage: 'Đang hoạt động theo giai đoạn:'
+    stages:
+      translation: Dịch
+      review: Nhận xét
+      judge: Chấm điểm
+      finalization: Hoàn thiện
+      editor: Biên tập
+    reconciliation: Xử lý công việc quá hạn
+    reconciliation_intro: Đánh dấu các mục chờ hoặc đang chạy quá hạn là thất bại và cập nhật quy trình liên quan. Thao tác có thể lặp lại và không khởi chạy AI; chủ sở hữu quyết định có thử lại hay không.
+    reconcile: Xử lý công việc quá hạn
+    reconcile_confirm: Đánh dấu mọi công việc AI quá hạn hiện tại là thất bại và cập nhật quy trình liên quan? Không khởi chạy AI.
+    reconciling: Đang xử lý…
+    failure_codes: Mã lỗi gần đây
+    failure_intro: Số liệu tổng hợp từ mã lỗi đã lọc trong bảy ngày qua.
+    no_failures: Không có lỗi được ghi mã trong khoảng này.
+    run_types:
+      translations: Dịch
+      reviews: Nhận xét
+      judgments: Chấm điểm
+      finalizations: Hoàn thiện
+      translation_segments: Đoạn dịch
+      review_segments: Đoạn nhận xét
+      judge_segments: Đoạn chấm điểm
+      finalization_segments: Đoạn hoàn thiện

@@ -1,0 +1,18 @@
+ja:
+  activerecord:
+    attributes:
+      user:
+        email: メールアドレス
+        password: パスワード
+        password_confirmation: パスワード（確認）
+        locale: 表示言語
+  errors:
+    format: "%{attribute}%{message}"
+    messages:
+      blank: を入力してください
+      too_short: "は短すぎます（%{count}文字以上）"
+      too_long: "は長すぎます（%{count}文字以内）"
+      confirmation: が%{attribute}と一致しません
+      taken: はすでに使用されています
+      invalid: が正しくありません
+      inclusion: は選択できません

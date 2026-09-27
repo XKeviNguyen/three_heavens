@@ -29,5 +29,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     OpenRouter::Catalog.transport = @original_catalog_transport
   end
 
+  def choose_known_language(label, value)
+    field = find_field(label)
+    field.fill_in with: value
+    field.send_keys(:arrow_down, :enter)
+  end
+
   Selenium::WebDriver.logger.level = :warn
 end

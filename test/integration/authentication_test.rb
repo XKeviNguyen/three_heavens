@@ -29,7 +29,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       css_select("[role='alert']").first.text.strip
     end
 
-    assert_equal [ SessionsController::INVALID_CREDENTIALS_MESSAGE ] * 2, alerts
+    assert_equal [ I18n.t("authentication.invalid_credentials") ] * 2, alerts
   end
 
   test "login attempts are rate limited by remote IP" do
@@ -162,7 +162,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   end
 
   test "protected pages require authentication" do
-    get root_path
+    get new_translation_workspace_path
 
     assert_redirected_to login_path
     follow_redirect!
@@ -210,7 +210,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   end
 
   def assert_not_authenticated
-    get root_path
+    get new_translation_workspace_path
     assert_redirected_to login_path
   end
 

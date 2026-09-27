@@ -1,4 +1,5 @@
 class ExperimentsController < ApplicationController
+  before_action :require_managed_ai_access, only: :retry_failed
   def show
     @experiment = current_user.experiments.includes(
       methodology_profile_revision: :methodology_profile,
@@ -14,23 +15,8 @@ class ExperimentsController < ApplicationController
   def retry_failed
     experiment = current_user.experiments.find(params[:id])
     result = TranslationExperiments::RetryFailed.call(experiment)
-    redirect_to experiment, notice: retry_notice(result, "translation")
+    redirect_to experiment, notice: localized_retry_notice(result, kind: :translation)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to experiment, alert: error.message
-  end
-
-  private
-
-  def retry_notice(result, noun)
-    return "No failed #{noun} runs need retrying." if result.retried_count.zero?
-    failed_count = result.retried_count - result.enqueued_count
-    if result.enqueued_count.zero?
-      return "Retry could not be queued. The failed #{noun} runs remain available for another explicit retry."
-    end
-    if failed_count.positive?
-      return "Queued #{result.enqueued_count} failed #{noun} run(s); #{failed_count} could not be queued and remain available for retry."
-    end
-
-    "Queued #{result.retried_count} failed #{noun} run(s) for retry."
   end
 end

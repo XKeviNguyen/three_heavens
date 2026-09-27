@@ -1,0 +1,11 @@
+<% content_for :title, t("email_confirmation.resend") %>
+<section class="mx-auto max-w-md">
+  <h1 class="text-3xl font-semibold"><%= t("email_confirmation.check_inbox") %></h1>
+  <p class="mt-4 leading-7 text-slate-600"><%= t("email_confirmation.pending") %></p>
+  <%= form_with url: confirmation_resend_path, class: "mt-8 space-y-4" do |form| %>
+    <%= form.label :email, t("registration.email"), class: "block text-sm font-medium" %>
+    <%= form.email_field :email, required: true, autocomplete: "email", class: "block w-full rounded-lg border border-slate-300 px-3 py-3" %>
+    <%= form.submit t("email_confirmation.resend"), class: "w-full rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white" %>
+  <% end %>
+  <p class="mt-5 text-sm"><%= link_to t("authentication.sign_in"), login_path, class: "font-semibold text-blue-700" %></p>
+</section>

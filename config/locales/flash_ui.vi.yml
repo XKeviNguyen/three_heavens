@@ -1,0 +1,54 @@
+vi:
+  flash_ui:
+    glossary:
+      created: Đã tạo bảng thuật ngữ.
+      revision: Đã tạo phiên bản %{version} của bảng thuật ngữ.
+      activated: Đã kích hoạt bảng thuật ngữ.
+      archived: Đã lưu trữ bảng thuật ngữ. Các phiên bản cũ vẫn xem được.
+    methodology:
+      created: Đã tạo phương pháp dịch.
+      revision: Đã tạo phiên bản %{version} của phương pháp dịch.
+      activated: Đã kích hoạt phương pháp dịch.
+      archived: Đã lưu trữ phương pháp dịch. Các phiên bản cũ vẫn xem được.
+    workflow:
+      created: Đã tạo cấu hình quy trình.
+      revision: Đã tạo phiên bản %{version} của cấu hình quy trình.
+      duplicated: Đã nhân bản cấu hình quy trình.
+      activated: Đã kích hoạt cấu hình quy trình.
+      deactivated: Đã tắt cấu hình quy trình.
+    reference:
+      created: Đã tạo bản dịch tham chiếu.
+      revision: Đã tạo phiên bản %{version} của bản tham chiếu.
+      activated: Đã kích hoạt bản tham chiếu.
+      archived: Đã lưu trữ bản tham chiếu. Các bản đã dùng trước đây vẫn xem được.
+    final:
+      workspace_ready: Không gian biên tập bản dịch cuối đã sẵn sàng.
+      revision_saved: Đã lưu phiên bản.
+      revision_restored: Đã khôi phục thành phiên bản mới.
+      refinement_started: AI đã bắt đầu tạo đề xuất chỉnh sửa.
+      proposal_applied: Đã áp dụng đề xuất AI thành phiên bản mới.
+      finalized: Đã hoàn tất bản dịch cuối.
+      reopened: Đã mở lại bản dịch để sửa.
+    review:
+      started: Đã bắt đầu nhận xét ẩn danh.
+    judge:
+      started: Đã bắt đầu chấm điểm.
+    pipeline:
+      stopped: Đã dừng các bước tự động tiếp theo. Yêu cầu AI đang chờ hoặc chạy không bị hủy.
+    operations:
+      reconciled: Đã xử lý %{count} lượt AI quá hạn. Không khởi chạy AI.
+    model:
+      added: Đã thêm và kích hoạt mô hình.
+      catalog_action: '%{name} đã %{action}.'
+      actions:
+        activated: được kích hoạt
+        added_and_activated: được thêm và kích hoạt
+        already_active: hoạt động từ trước
+      catalog_failed: Không thể thêm mô hình đã chọn từ danh mục OpenRouter.
+      updated: Đã cập nhật thông tin mô hình.
+      activated: Đã kích hoạt %{name}.
+      deactivated: Đã tắt %{name}. Lịch sử vẫn được giữ.
+    workspace:
+      replayed: Lượt dịch này đã hoàn tất; đang hiển thị kết quả hiện có.
+      automatic_started: Quy trình dịch tự động đã bắt đầu.
+      experiment_started: Thử nghiệm dịch đã bắt đầu.

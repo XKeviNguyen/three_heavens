@@ -1,25 +1,25 @@
 <%= form_with url: form_url, method: form_method, scope: :methodology_profile, class: "space-y-7" do |form| %>
   <% if @form_errors.present? %>
     <section class="rounded-xl border border-red-200 bg-red-50 p-5" role="alert">
-      <h2 class="font-semibold text-red-900">Please correct the following:</h2>
+      <h2 class="font-semibold text-red-900"><%= t("glossaries_ui.correct_errors") %></h2>
       <ul class="mt-2 list-disc pl-5 text-sm text-red-800"><% @form_errors.each do |message| %><li><%= message %></li><% end %></ul>
     </section>
   <% end %>
   <% if @form_values["expected_version"].present? %><%= form.hidden_field :expected_version, value: @form_values["expected_version"] %><% end %>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 class="text-lg font-semibold">Methodology configuration</h2>
+    <h2 class="text-lg font-semibold"><%= t("methodology_ui.configuration") %></h2>
     <div class="mt-5 grid gap-5 md:grid-cols-2">
-      <div class="md:col-span-2"><%= form.label :name, "Name", class: "block text-sm font-medium" %><%= form.text_field :name, value: @form_values["name"], required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
-      <div><%= form.label :source_language, "Source language", class: "block text-sm font-medium" %><%= form.text_field :source_language, value: @form_values["source_language"], required: true, maxlength: 100, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
-      <div><%= form.label :target_language, "Target language", class: "block text-sm font-medium" %><%= form.text_field :target_language, value: @form_values["target_language"], required: true, maxlength: 100, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
-      <div class="md:col-span-2"><%= form.label :description, "Description (optional)", class: "block text-sm font-medium" %><%= form.text_area :description, value: @form_values["description"], maxlength: 500, rows: 3, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
+      <div class="md:col-span-2"><%= form.label :name, t("glossaries_ui.name"), class: "block text-sm font-medium" %><%= form.text_field :name, value: @form_values["name"], required: true, maxlength: 150, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
+      <div><%= render "shared/language_combobox", form: form, method: :source_language, label: t("language.source"), value: @form_values["source_language"] %></div>
+      <div><%= render "shared/language_combobox", form: form, method: :target_language, label: t("language.target"), value: @form_values["target_language"] %></div>
+      <div class="md:col-span-2"><%= form.label :description, t("glossaries_ui.description_optional"), class: "block text-sm font-medium" %><%= form.text_area :description, value: @form_values["description"], maxlength: 500, rows: 3, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2" %></div>
       <div class="md:col-span-2">
-        <%= form.label :guidance, "Methodology guidance", class: "block text-sm font-medium" %>
-        <p class="mt-1 text-sm text-slate-600">Describe philosophy, literalness, tone, theological handling, citation, writing, and formatting conventions. Internal line breaks and spacing are preserved.</p>
+        <%= form.label :guidance, t("methodology_ui.guidance"), class: "block text-sm font-medium" %>
+        <p class="mt-1 text-sm text-slate-600"><%= t("methodology_ui.guidance_help") %></p>
         <%= form.text_area :guidance, value: @form_values["guidance"], required: true, maxlength: MethodologyProfileRevision::MAXIMUM_GUIDANCE_CHARACTERS, rows: 18, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" %>
       </div>
     </div>
   </section>
-  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to "Cancel", @methodology_profile&.persisted? ? methodology_profile_path(@methodology_profile) : methodology_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white", data: { turbo_submits_with: "Saving revision…" } %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @methodology_profile&.persisted? ? methodology_profile_path(@methodology_profile) : methodology_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white", data: { turbo_submits_with: t("glossaries_ui.saving") } %></div>
 <% end %>

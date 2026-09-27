@@ -1,0 +1,55 @@
+ja:
+  workflows_ui:
+    title: ワークフロー設定 · Three Heavens
+    edit_title: ワークフロー設定の編集 · Three Heavens
+    new_title: 新しいワークフロー設定 · Three Heavens
+    show_title: '%{name} · ワークフロー設定 · Three Heavens'
+    configuration: 設定内容
+    completion_mode: 完了方法
+    winner_help: 採用候補の下書きを作成し、編集者に引き継ぎます。
+    refinement_help: AIの修正案も作成しますが、自動で適用や確定はしません。
+    select_range: '%{minimum}～%{maximum}件を選択'
+    finalizer_range: 採用候補の下書きでは選択なし、修正案では1～%{maximum}件を選択
+    role_order: '%{selection}。順序は固定されます。'
+    role_models: '%{role}モデル'
+    role_hints:
+      translator: 独立した翻訳候補を作るモデルです。
+      reviewer: 候補を項目別に評価するモデルです。
+      judge: 評価済みの候補を独立して採点・順位付けするモデルです。
+      finalizer: 修正案を提案します。自動適用はしません。
+    roles:
+      translator: 翻訳
+      reviewer: レビュー
+      judge: 判定
+      finalizer: 最終調整
+    saving: 設定を保存中…
+    automation: 自動化
+    create_revision: 第%{version}版を作成
+    edit_intro: 第%{version}版は監査と過去の処理記録のため変更されません。
+    heading: ワークフロー設定
+    singular: ワークフロー設定
+    index_intro: 自分だけの再利用可能な設定です。編集ごとに変更できない新しい版が作られます。
+    new: 新しいワークフロー設定
+    empty: ワークフロー設定はまだありません
+    empty_intro: 実験開始時に一連の自動処理を選べるよう、設定を作成します。
+    updated: 更新 %{at}
+    revision: 版
+    mode: モード
+    view: 表示
+    edit: 編集
+    duplicate: 複製
+    deactivate: 無効にする
+    deactivate_confirm: この設定を無効にしますか？過去の処理は変更されません。
+    new_intro: 設定を保存してもAI処理は始まりません。実行時には毎回、別途確認が必要です。
+    create: ワークフロー設定を作成
+    active_new: 有効 · 新しい処理で利用可能
+    inactive_history: 無効 · 履歴のみ
+    all: 設定一覧
+    using: '設定の使い方：'
+    using_intro: この設定は
+    using_confirmation: 実行時には毎回、AI処理を明示的に確認する必要があります。
+    eligible: 現在利用可能
+    ineligible: 現在利用不可
+    launched:
+      one: この版から過去の処理が1件実行されました。
+      other: この版から過去の処理が%{count}件実行されました。

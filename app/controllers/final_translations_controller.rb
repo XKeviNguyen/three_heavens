@@ -1,11 +1,12 @@
 class FinalTranslationsController < ApplicationController
+  before_action :require_managed_ai_access, only: :refine
   HISTORY_PAGE_SIZE = 25
   before_action :set_final_translation, except: :create
 
   def create
     judge_round = current_user.judge_rounds.find(params[:judge_round_id])
     final_translation = FinalTranslations::Create.call(judge_round: judge_round)
-    redirect_to final_translation, notice: "Final translation workspace is ready."
+    redirect_to final_translation, notice: t("flash_ui.final.workspace_ready")
   rescue FinalTranslations::EligibilityError => error
     redirect_to judge_round, alert: error.message
   end
@@ -22,7 +23,7 @@ class FinalTranslationsController < ApplicationController
       expected_version_number: attributes["expected_version_number"],
       change_note: attributes["change_note"]
     )
-    redirect_to @final_translation, notice: "Revision saved."
+    redirect_to @final_translation, notice: t("flash_ui.final.revision_saved")
   rescue FinalTranslations::StaleVersionError => error
     @submitted_content = attributes&.fetch("content", "")
     @submitted_change_note = attributes&.fetch("change_note", nil)
@@ -41,7 +42,7 @@ class FinalTranslationsController < ApplicationController
       version_id: attributes["version_id"],
       expected_version_number: attributes["expected_version_number"]
     )
-    redirect_to @final_translation, notice: "Revision restored as a new version."
+    redirect_to @final_translation, notice: t("flash_ui.final.revision_restored")
   rescue FinalTranslations::StaleVersionError => error
     render_workspace_error(error, :conflict)
   rescue FinalTranslations::InvalidStateError, ActiveRecord::RecordNotFound,
@@ -55,7 +56,7 @@ class FinalTranslationsController < ApplicationController
       final_translation: @final_translation,
       finalizer_ids: attributes["finalizer_ids"]
     )
-    redirect_to @final_translation, notice: "AI refinement started."
+    redirect_to @final_translation, notice: t("flash_ui.final.refinement_started")
   rescue FinalTranslations::Error, ActionController::ParameterMissing => error
     render_workspace_error(error, :unprocessable_content)
   end
@@ -66,7 +67,7 @@ class FinalTranslationsController < ApplicationController
       final_translation: @final_translation,
       finalization_run_id: attributes["finalization_run_id"]
     )
-    redirect_to @final_translation, notice: "AI proposal applied as a new revision."
+    redirect_to @final_translation, notice: t("flash_ui.final.proposal_applied")
   rescue FinalTranslations::StaleVersionError => error
     render_workspace_error(error, :conflict)
   rescue FinalTranslations::Error, ActiveRecord::RecordNotFound,
@@ -77,7 +78,7 @@ class FinalTranslationsController < ApplicationController
   def finalize
     reject_unexpected_optional_parameters!(:final_translation)
     FinalTranslations::ChangeStatus.finalize(final_translation: @final_translation)
-    redirect_to @final_translation, notice: "Final translation finalized."
+    redirect_to @final_translation, notice: t("flash_ui.final.finalized")
   rescue FinalTranslations::Error, ActionController::ParameterMissing => error
     render_workspace_error(error, :unprocessable_content)
   end
@@ -85,7 +86,7 @@ class FinalTranslationsController < ApplicationController
   def reopen
     reject_unexpected_optional_parameters!(:final_translation)
     FinalTranslations::ChangeStatus.reopen(final_translation: @final_translation)
-    redirect_to @final_translation, notice: "Final translation reopened for editing."
+    redirect_to @final_translation, notice: t("flash_ui.final.reopened")
   rescue FinalTranslations::Error, ActionController::ParameterMissing => error
     render_workspace_error(error, :unprocessable_content)
   end

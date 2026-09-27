@@ -1,48 +1,43 @@
-<%# locals: form:, method:, label:, value:, hint:, required: true %>
+<%# locals: form:, method:, label:, value:, hint: nil, required: true %>
 <% required = local_assigns.fetch(:required, true) %>
 <% field_id = "#{form.object_name}_#{method}" %>
+<% known = TranslationLanguage::COMMON.any? { |language| language[:name] == value } %>
 <div>
-  <div class="flex items-center gap-1.5">
-    <%= form.label method, label, class: "block text-sm font-medium text-slate-700" %>
-    <%= render "shared/hint", text: hint, label: label %>
-  </div>
-  <div class="relative mt-1.5 min-w-0" data-controller="combobox">
-    <%= form.text_field method,
-          value: value,
-          required: required,
-          maxlength: 100,
-          placeholder: "Choose or search languages",
-          autocomplete: "off",
-          role: "combobox",
-          aria: { expanded: "false", autocomplete: "list", controls: "#{field_id}-list", haspopup: "listbox" },
-          data: {
-            combobox_target: "input",
-            action: "input->combobox#filter focus->combobox#filter keydown->combobox#keydown"
-          },
-          class: "block w-full min-w-0 rounded-xl border border-slate-300 bg-white py-2.5 pl-3 pr-10 text-sm text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" %>
-    <button type="button"
-            data-action="click->combobox#toggle"
-            aria-label="Show <%= label %> suggestions"
-            class="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-xl text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
-      <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 8 4 4 4-4"/></svg>
-    </button>
-    <ul id="<%= field_id %>-list"
-        data-combobox-target="list"
-        role="listbox"
-        aria-label="<%= label %> suggestions"
-        class="absolute z-30 mt-1 hidden max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+  <%= form.label method, label, class: "block text-sm font-medium text-slate-700" %>
+  <% if local_assigns[:hint].present? %><%= render "shared/hint", text: local_assigns[:hint], label: label %><% end %>
+  <div class="relative mt-1.5 min-w-0" data-controller="combobox"
+       data-action="focusout->combobox#focusOut"
+       data-combobox-custom-label-value="<%= t("language.use_custom") %>"
+       data-combobox-custom-status-value="<%= t("language.custom_saved") %>">
+    <%= form.hidden_field method, value: value, id: "#{field_id}-value", data: { combobox_target: "value", action: "change->combobox#rememberValue" } %>
+    <input id="<%= field_id %>" type="text" value="<%= value %>" required="<%= required %>" maxlength="100"
+           autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
+           aria-controls="<%= field_id %>-list" aria-haspopup="listbox"
+           data-combobox-target="input"
+           data-action="input->combobox#filter focus->combobox#filter keydown->combobox#keydown"
+           placeholder="<%= t("language.search_placeholder") %>"
+           class="block w-full min-w-0 rounded-xl border border-slate-300 bg-white py-2.5 pl-3 pr-10 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+    <button type="button" data-action="click->combobox#toggle"
+            aria-label="<%= t("language.show_suggestions", label: label) %>"
+            class="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-xl text-slate-500">▾</button>
+    <ul id="<%= field_id %>-list" data-combobox-target="list" role="listbox"
+        aria-label="<%= t("language.suggestions", label: label) %>"
+        class="absolute z-50 mt-1 hidden max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
       <% TranslationLanguage::COMMON.each_with_index do |language, index| %>
-        <li id="<%= field_id %>-option-<%= index %>"
-            role="option"
-            data-combobox-target="option"
+        <% localized = t("language.names.#{language[:name].parameterize(separator: "_")}", default: language[:name]) %>
+        <li id="<%= field_id %>-option-<%= index %>" role="option" data-combobox-target="option"
             data-value="<%= language[:name] %>"
-            data-search="<%= language[:name] %> <%= language[:native] %>"
-            data-action="mousedown->combobox#choose"
-            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50">
-          <span><%= language[:name] %></span>
-          <span class="text-xs text-slate-400"><%= language[:native] %></span>
+            data-search="<%= [language[:name], localized, language[:native]].join(" ") %>"
+            data-search-values="<%= [language[:name], localized, language[:native]].to_json %>"
+            data-action="pointerdown->combobox#choose"
+            class="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-blue-50">
+          <span class="font-medium"><%= localized %></span>
+          <span class="ml-2 text-xs text-slate-500"><%= language[:native] %></span>
         </li>
       <% end %>
+      <li id="<%= field_id %>-custom" data-combobox-target="custom" role="option" data-action="pointerdown->combobox#chooseCustom"
+          class="hidden cursor-pointer border-t border-slate-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"></li>
     </ul>
+    <p data-combobox-target="status" role="status" aria-live="polite" class="mt-1 text-xs text-slate-500"><%= t("language.custom_saved") if value.present? && !known %></p>
   </div>
 </div>

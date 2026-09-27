@@ -1,0 +1,72 @@
+vi:
+  pipelines_ui:
+    title: Quy trình tự động · Three Heavens
+    methodology_snapshot: Bản phương pháp được lưu
+    started: '%{revision} · %{mode} · bắt đầu %{at}'
+    blocked_at: Quy trình bị chặn ở bước %{stage}
+    blocked_generic: Giai đoạn này đã bị chặn. Xem trang liên quan trước khi tiếp tục.
+    blocked_help: Dùng trang giai đoạn liên quan để thử lại hoặc tiếp tục thủ công.
+    ready_editor: Sẵn sàng để biên tập
+    ready_help: Tự động hóa đã dừng. Không đề xuất nào được áp dụng, bản nháp không bị tự sửa và bản dịch chưa được hoàn tất.
+    stopped: Đã dừng các bước tự động tiếp theo
+    stopped_help: Lịch sử đã hoàn tất được giữ nguyên. Các yêu cầu AI đang chờ hoặc đang chạy không bị hủy; bạn có thể tiếp tục thủ công.
+    progress: Tiến độ
+    current_stage: 'Giai đoạn hiện tại:'
+    plan: Kế hoạch yêu cầu AI đã cho phép
+    plan_intro: '%{segments} đoạn nguồn · %{slots} yêu cầu AI ban đầu · tối đa %{maximum} yêu cầu gồm cả giới hạn thử lại %{attempts} lần. Mỗi lần thử lại thủ công về sau cần thao tác xác nhận riêng.'
+    plan_role: '%{logical} lượt × %{segments} đoạn = %{requests} yêu cầu ban đầu'
+    execution_status: Trạng thái thực hiện
+    logical_runs: Lượt xử lý
+    physical_slots: Mục xử lý thực tế
+    attempts_started: Lượt yêu cầu AI đã bắt đầu
+    pending_running_failed: Đang chờ · đang chạy · thất bại
+    known_tokens: Số token đã biết
+    known_attempt_cost: Chi phí yêu cầu đã biết
+    average_latency: Độ trễ trung bình của yêu cầu đã hoàn tất
+    logical_progress: '%{completed} hoàn tất / %{total} tổng cộng'
+    physical_progress: '%{completed} hoàn tất / %{total} đã tạo'
+    token_coverage: Tổng phụ đã biết; %{known}/%{total} lượt có số token.
+    cost_coverage: Tổng phụ đã biết; chi phí chưa rõ không được tính là 0.
+    recent_failures: Yêu cầu AI thất bại gần đây
+    failure_intro: Chỉ hiển thị mã lỗi đã lọc và nguồn gốc yêu cầu không thể sửa. Không hiển thị phản hồi AI, lời nhắc, nguồn hay lỗi thô.
+    attempt_number: lượt %{number}
+    snapshots: Bản chụp mô hình đã cho phép
+    logical_coverage: Phạm vi chi phí của lượt xử lý
+    known_logical_total: Tổng chi phí đã biết
+    logical_records: Số lượt xử lý
+    with_known_cost: Có chi phí đã biết
+    coverage_help: Lịch sử từng yêu cầu bao gồm %{tracked}/%{total} mục xử lý. Tổng riêng của lượt xử lý giữ lại chi phí cũ đã biết; không cộng vào tổng phụ vì có thể trùng phạm vi. Chi phí chưa rõ không tính là 0.
+    links: Liên kết quy trình
+    final_translation: Bản dịch cuối
+    stop_heading: Dừng tự động hóa tiếp theo
+    stop_help: Thao tác này chặn các giai đoạn tự động tiếp theo. Không thể hủy yêu cầu AI đang chờ hoặc chạy, không xóa lịch sử và vẫn có thể tiếp tục thủ công.
+    stop: Dừng tự động hóa
+    stop_confirm: Dừng mọi giai đoạn tự động tiếp theo? Không thể hủy yêu cầu AI đã xếp lịch hoặc đang chạy.
+    blocked_reasons:
+      managed_ai_access_revoked: Tài khoản này chưa được bật quyền dùng AI của máy chủ.
+      stage_failed: Một hoặc nhiều lượt xử lý thất bại. Dùng nút thử lại trên trang giai đoạn liên quan.
+      configuration_unavailable: Cấu hình mô hình của giai đoạn tiếp theo không còn khả dụng. Dừng tự động hóa và tiếp tục thủ công, hoặc khôi phục cấu hình ban đầu.
+      stage_conflict: Trạng thái quy trình hiện tại xung đột với giai đoạn tự động này. Dừng tự động hóa và tiếp tục từ trang giai đoạn liên quan.
+      reference_context_budget: Các bản tham chiếu đã chọn vượt giới hạn ngữ cảnh của mô hình.
+    events:
+      pipeline_started: Đã bắt đầu quy trình
+      translation_started: Đã bắt đầu dịch
+      translation_completed: Đã dịch xong
+      review_started: Đã bắt đầu nhận xét
+      review_completed: Đã nhận xét xong
+      judge_started: Đã bắt đầu chấm điểm
+      judge_completed: Đã chấm điểm xong
+      final_workspace_created: Đã tạo không gian biên tập
+      refinement_started: Đã bắt đầu đề xuất chỉnh sửa
+      refinement_completed: Đã hoàn tất đề xuất chỉnh sửa
+      ready_for_editor: Sẵn sàng biên tập
+      automation_stopped: Đã dừng tự động hóa
+      configuration_blocked: Bị chặn do cấu hình
+      translation_blocked: Dịch bị chặn
+      translation_retry_resumed: Dịch đã thử lại
+      review_blocked: Nhận xét bị chặn
+      review_retry_resumed: Nhận xét đã thử lại
+      judge_blocked: Chấm điểm bị chặn
+      judge_retry_resumed: Chấm điểm đã thử lại
+      finalization_blocked: Hoàn thiện bị chặn
+      finalization_retry_resumed: Hoàn thiện đã thử lại
