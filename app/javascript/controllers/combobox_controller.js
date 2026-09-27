@@ -4,7 +4,7 @@ import { Controller } from "@hotwired/stimulus"
 // explicit choice, so a typo cannot silently become a language.
 export default class extends Controller {
   static targets = ["input", "value", "list", "option", "custom", "status"]
-  static values = { customLabel: String }
+  static values = { customLabel: String, customStatus: String }
 
   connect() {
     this.activeIndex = -1
@@ -17,27 +17,31 @@ export default class extends Controller {
 
   disconnect() {
     document.removeEventListener("pointerdown", this.boundCloseIfOutside)
+    window.clearTimeout(this.focusOutTimer)
   }
 
   closeIfOutside(event) {
-    if (!this.element.contains(event.target)) this.close()
+    if (!this.element.contains(event.target)) this.restoreAndClose()
   }
 
   rememberValue() {
     this.committedValue = this.valueTarget.value
+    this.inputTarget.value = this.committedValue
+    this.updateStatus()
   }
 
   filter() {
-    const query = this.inputTarget.value.trim().toLocaleLowerCase()
-    if (this.inputTarget.value !== this.valueTarget.value) this.valueTarget.value = ""
+    const query = this.normalizeSearch(this.inputTarget.value.trim())
     this.visibleOptions = this.optionTargets.filter((option) => {
-      const match = !query || (option.dataset.search || "").toLocaleLowerCase().includes(query)
+      const match = !query || this.normalizeSearch(option.dataset.search || "").includes(query)
       option.hidden = !match
-      option.setAttribute("aria-selected", option.dataset.value === this.valueTarget.value ? "true" : "false")
+      option.setAttribute("aria-selected", option.dataset.value === this.committedValue ? "true" : "false")
       return match
     })
-    const exact = this.optionTargets.some((option) => option.dataset.value.toLocaleLowerCase() === query)
-    this.customTarget.hidden = !query || exact || query.length > 100
+    const exact = this.optionTargets.some((option) => this.searchValues(option).some((value) => this.normalizeSearch(value) === query))
+    const customHidden = !query || exact || query.length > 100
+    this.customTarget.hidden = customHidden
+    this.customTarget.classList.toggle("hidden", customHidden)
     this.customTarget.textContent = this.customLabelValue.replace("%{value}", this.inputTarget.value.trim())
     if (!this.customTarget.hidden) this.visibleOptions.push(this.customTarget)
     this.activeIndex = -1
@@ -75,12 +79,10 @@ export default class extends Controller {
         }
         break
       case "Escape":
-        this.valueTarget.value = this.committedValue
-        this.inputTarget.value = this.committedValue
-        this.close()
+        this.restoreAndClose()
         break
       case "Tab":
-        this.close()
+        this.restoreAndClose()
         break
     }
   }
@@ -101,8 +103,15 @@ export default class extends Controller {
       this.filter()
       this.inputTarget.focus()
     } else {
-      this.close()
+      this.restoreAndClose()
     }
+  }
+
+  focusOut() {
+    window.clearTimeout(this.focusOutTimer)
+    this.focusOutTimer = window.setTimeout(() => {
+      if (!this.element.contains(document.activeElement)) this.restoreAndClose()
+    }, 0)
   }
 
   move(delta) {
@@ -125,7 +134,7 @@ export default class extends Controller {
     this.inputTarget.value = value
     this.valueTarget.dispatchEvent(new Event("input", { bubbles: true }))
     this.valueTarget.dispatchEvent(new Event("change", { bubbles: true }))
-    this.statusTarget.textContent = option === this.customTarget ? value : ""
+    this.updateStatus(option === this.customTarget)
     this.dispatch("change")
     this.close()
     this.inputTarget.focus()
@@ -142,5 +151,28 @@ export default class extends Controller {
     this.inputTarget.removeAttribute("aria-activedescendant")
     this.visibleOptions.forEach((option) => option.setAttribute("aria-selected", "false"))
     this.activeIndex = -1
+  }
+
+  restoreAndClose() {
+    this.valueTarget.value = this.committedValue
+    this.inputTarget.value = this.committedValue
+    this.updateStatus()
+    this.close()
+  }
+
+  updateStatus(custom = !this.optionTargets.some((option) => option.dataset.value === this.committedValue)) {
+    this.statusTarget.textContent = this.committedValue && custom ? this.customStatusValue : ""
+  }
+
+  searchValues(option) {
+    try {
+      return JSON.parse(option.dataset.searchValues || "[]")
+    } catch {
+      return [option.dataset.value]
+    }
+  }
+
+  normalizeSearch(value) {
+    return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase()
   }
 }

@@ -5,7 +5,10 @@
 <div>
   <%= form.label method, label, class: "block text-sm font-medium text-slate-700" %>
   <% if local_assigns[:hint].present? %><%= render "shared/hint", text: local_assigns[:hint], label: label %><% end %>
-  <div class="relative mt-1.5 min-w-0" data-controller="combobox" data-combobox-custom-label-value="<%= t("language.use_custom") %>">
+  <div class="relative mt-1.5 min-w-0" data-controller="combobox"
+       data-action="focusout->combobox#focusOut"
+       data-combobox-custom-label-value="<%= t("language.use_custom") %>"
+       data-combobox-custom-status-value="<%= t("language.custom_saved") %>">
     <%= form.hidden_field method, value: value, id: "#{field_id}-value", data: { combobox_target: "value", action: "change->combobox#rememberValue" } %>
     <input id="<%= field_id %>" type="text" value="<%= value %>" required="<%= required %>" maxlength="100"
            autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list"
@@ -25,6 +28,7 @@
         <li id="<%= field_id %>-option-<%= index %>" role="option" data-combobox-target="option"
             data-value="<%= language[:name] %>"
             data-search="<%= [language[:name], localized, language[:native]].join(" ") %>"
+            data-search-values="<%= [language[:name], localized, language[:native]].to_json %>"
             data-action="pointerdown->combobox#choose"
             class="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-blue-50">
           <span class="font-medium"><%= localized %></span>

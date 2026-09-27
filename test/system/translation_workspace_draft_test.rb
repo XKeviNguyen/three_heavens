@@ -12,7 +12,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
 
     source.fill_in with: "French"
-    assert_equal "", find("input[name='translation_workspace[source_language]']", visible: :all).value
+    assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
     source.send_keys(:escape)
     assert_field "Source language", with: "Vietnamese"
     assert_equal "Vietnamese", find("input[name='translation_workspace[source_language]']", visible: :all).value
