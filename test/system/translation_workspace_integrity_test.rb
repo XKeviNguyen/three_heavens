@@ -272,6 +272,37 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_equal [ 1, 1 ], page.evaluate_script("[document.querySelectorAll('dialog[data-controller=\"terminology-sheet\"]').length, document.querySelectorAll('#workspace-terminology-editor form').length]")
   end
 
+  test "a newer model search aborts an older slow one and is never overwritten by it" do
+    visit new_translation_workspace_path
+    page.execute_script(<<~JS)
+      window.__catalogRequests = []
+      const deliver = window.fetch.bind(window)
+      window.fetch = (url, options = {}) => {
+        const target = new URL(url, location.origin)
+        if (target.pathname !== "/open_router_catalog") return deliver(url, options)
+        const record = { q: target.searchParams.get("q"), aborted: false }
+        window.__catalogRequests.push(record)
+        options.signal?.addEventListener("abort", () => { record.aborted = true })
+        if (record.q !== "gemini") return deliver(url, options)
+        return new Promise((resolve, reject) => {
+          setTimeout(() => deliver(url, options).then(resolve, reject), 1500)
+          options.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))
+        })
+      }
+    JS
+    within "#workspace-manual-models" do
+      search = find("input[placeholder='Search OpenRouter models…']")
+      search.fill_in with: "gemini"
+      assert_until { page.evaluate_script("window.__catalogRequests.some(r => r.q === 'gemini')") }
+      search.fill_in with: "claude"
+      assert_selector "[role='option']", text: "Claude", minimum: 1
+      sleep 2
+      assert_selector "[role='option']", text: "Claude", minimum: 1
+      assert_no_selector "[role='option']", text: "Gemini"
+    end
+    assert page.evaluate_script("window.__catalogRequests.find(r => r.q === 'gemini').aborted"), "the superseded request must be aborted"
+  end
+
   test "success failure and removal of an import preserve unrelated workspace fields" do
     visit new_translation_workspace_path
     fill_in "Project name", with: "Import project"
@@ -402,6 +433,14 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   end
 
   private
+
+  def assert_until(timeout: 10)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    until yield
+      flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.05
+    end
+  end
 
   def sign_in_in_browser
     visit login_path

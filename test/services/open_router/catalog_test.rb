@@ -192,6 +192,69 @@ module OpenRouter
       assert_equal 1, cached.models.size
     end
 
+    test "a failed fetch is not retried upstream until the bounded backoff passes, then recovers" do
+      calls = 0
+      failing = true
+      transport = lambda do
+        calls += 1
+        raise Net::OpenTimeout, "upstream down" if failing
+
+        JSON.generate("data" => [ model_entry ])
+      end
+      catalog = OpenRouter::Catalog.new(transport: transport, cache: memory_cache, clock: -> { Time.current })
+
+      5.times { assert_raises(OpenRouter::Catalog::Error) { catalog.call } }
+      assert_equal 1, calls, "repeated opens during an outage must not reach upstream again"
+
+      failing = false
+      travel OpenRouter::Catalog::FAILURE_BACKOFF + 1.second do
+        assert_equal 1, catalog.call.models.size
+        assert_equal 2, calls
+        catalog.call
+        assert_equal 2, calls, "a successful fetch replaces the failure state and is cached"
+      end
+    end
+
+    test "a later failure after the cache expires starts a new bounded backoff" do
+      calls = 0
+      failing = false
+      transport = lambda do
+        calls += 1
+        raise Net::ReadTimeout, "upstream down" if failing
+
+        JSON.generate("data" => [ model_entry ])
+      end
+      catalog = OpenRouter::Catalog.new(transport: transport, cache: memory_cache, clock: -> { Time.current })
+      catalog.call
+
+      failing = true
+      travel OpenRouter::Catalog::CACHE_TTL + 1.second do
+        3.times { assert_raises(OpenRouter::Catalog::Error) { catalog.call } }
+        assert_equal 2, calls
+      end
+    end
+
+    test "concurrent cold requests in one process share a single upstream fetch" do
+      calls = 0
+      gate = Queue.new
+      transport = lambda do
+        calls += 1
+        gate.pop
+        JSON.generate("data" => [ model_entry ])
+      end
+      cache = memory_cache
+      threads = 4.times.map do
+        Thread.new { OpenRouter::Catalog.new(transport: transport, cache: cache, clock: -> { Time.current }).call }
+      end
+      sleep 0.05 until calls.positive?
+      sleep 0.1
+      4.times { gate << true }
+      results = threads.map(&:value)
+
+      assert_equal 1, calls
+      assert_equal [ 1 ], results.map { it.models.size }.uniq
+    end
+
     private
 
     def with_http_class(fake)

@@ -26,6 +26,7 @@ export default class extends Controller {
     window.clearTimeout(this.debounceTimer)
     window.clearTimeout(this.outsideTimer)
     this.requestSequence += 1
+    this.pendingRequest?.abort()
   }
 
   onDocumentPointerDown(event) {
@@ -54,8 +55,13 @@ export default class extends Controller {
     this.fetchResults()
   }
 
+  // Only the newest request matters: starting one aborts the previous one, and
+  // a response is applied only if it is still the newest.
   async fetchResults() {
     const requestSequence = ++this.requestSequence
+    this.pendingRequest?.abort()
+    const request = new AbortController()
+    this.pendingRequest = request
     this.setStatus(this.copy("searching"))
     const url = new URL(this.endpointValue, window.location.origin)
     url.searchParams.set("role", this.roleValue)
@@ -66,7 +72,7 @@ export default class extends Controller {
     if (this.hasSortTarget) url.searchParams.set("sort", this.sortTarget.value)
 
     try {
-      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } })
+      const response = await fetch(url.toString(), { headers: { Accept: "application/json" }, signal: request.signal })
       if (!response.ok) throw new Error("catalog request failed")
       const payload = await response.json()
       if (requestSequence !== this.requestSequence) return
@@ -82,6 +88,8 @@ export default class extends Controller {
       this.results = []
       this.renderResults({ source: "error" })
       this.setStatus(this.copy("unavailable"))
+    } finally {
+      if (this.pendingRequest === request) this.pendingRequest = null
     }
   }
 

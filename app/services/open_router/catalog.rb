@@ -13,6 +13,11 @@ module OpenRouter
     ENDPOINT = URI("https://openrouter.ai/api/v1/models").freeze
     CACHE_KEY = "openrouter/model-catalog/v1"
     CACHE_TTL = 20.minutes
+    # After a failed fetch, requests report the catalog as unavailable without
+    # contacting OpenRouter until this passes, so an outage cannot turn every
+    # search, filter, or page load into another slow upstream request.
+    FAILURE_CACHE_KEY = "openrouter/model-catalog/v1/unavailable"
+    FAILURE_BACKOFF = 30.seconds
     MAX_RESPONSE_BYTES = 2 * 1024 * 1024
     OPEN_TIMEOUT = 3
     READ_TIMEOUT = 5
@@ -84,6 +89,9 @@ module OpenRouter
       attr_accessor :transport
     end
 
+    # Concurrent cold requests in one process wait for a single fetch.
+    FETCH_LOCK = Mutex.new
+
     def self.call(**options)
       new(**options).call
     end
@@ -95,20 +103,29 @@ module OpenRouter
     end
 
     def call
-      cached = @cache.read(CACHE_KEY)
-      return cached if cached.is_a?(Result)
-
-      body = @transport.call
-      result = Result.new(models: normalize(body), fetched_at: @clock.call)
-      @cache.write(CACHE_KEY, result, expires_in: CACHE_TTL)
-      result
-    rescue Error
-      raise
-    rescue StandardError
-      raise Error
+      cached_result || FETCH_LOCK.synchronize { cached_result || fetch }
     end
 
     private
+
+    def cached_result
+      cached = @cache.read(CACHE_KEY)
+      return cached if cached.is_a?(Result)
+      raise Error if @cache.read(FAILURE_CACHE_KEY)
+
+      nil
+    end
+
+    def fetch
+      body = @transport.call
+      result = Result.new(models: normalize(body), fetched_at: @clock.call)
+      @cache.write(CACHE_KEY, result, expires_in: CACHE_TTL)
+      @cache.delete(FAILURE_CACHE_KEY)
+      result
+    rescue StandardError
+      @cache.write(FAILURE_CACHE_KEY, true, expires_in: FAILURE_BACKOFF)
+      raise Error
+    end
 
     def http_get
       http = Net::HTTP.new(ENDPOINT.host, ENDPOINT.port)
