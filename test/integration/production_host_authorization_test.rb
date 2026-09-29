@@ -28,10 +28,17 @@ class ProductionHostAuthorizationTest < ActiveSupport::TestCase
         malicious_readiness: [ "http://evil.example/ready", "evil.example" ],
         malicious_normal: [ "http://evil.example/robots.txt", "evil.example" ],
         malicious_liveness: [ "http://evil.example/up", "evil.example" ],
-        empty_host_readiness: [ "http://10.0.0.42/ready", "" ]
+        empty_host_readiness: [ "http://10.0.0.42/ready", "" ],
+        loopback_range_readiness: [ "http://127.0.0.2/ready", "127.0.0.2" ],
+        loopback_suffix_readiness: [ "http://evil.localhost/ready", "evil.localhost" ],
+        forwarded_loopback_readiness: [ "http://evil.example/ready", "evil.example", { "HTTP_X_FORWARDED_HOST" => "localhost" } ],
+        forwarded_loopback_from_ip_readiness: [ "http://10.0.0.42/ready", "10.0.0.42", { "HTTP_X_FORWARDED_HOST" => "127.0.0.1" } ],
+        forwarded_loopback_normal: [ "http://evil.example/robots.txt", "evil.example", { "HTTP_X_FORWARDED_HOST" => "localhost" } ],
+        missing_host_readiness: [ "http://localhost/ready", nil ]
       }
-      statuses = requests.transform_values do |url, host|
-        env = Rack::MockRequest.env_for(url, "HTTP_HOST" => host)
+      statuses = requests.transform_values do |url, host, headers = {}|
+        env = Rack::MockRequest.env_for(url, "HTTP_HOST" => host).merge(headers)
+        env.delete("HTTP_HOST") if host.nil?
         status, = Rails.application.call(env)
         status
       end
@@ -70,7 +77,9 @@ class ProductionHostAuthorizationTest < ActiveSupport::TestCase
       "loopback_uppercase_readiness" => 200, "loopback_trailing_dot_readiness" => 403,
       "loopback_readiness_format" => 403, "loopback_normal" => 403,
       "malicious_readiness" => 403, "malicious_normal" => 403, "malicious_liveness" => 200,
-      "empty_host_readiness" => 403
+      "empty_host_readiness" => 403, "loopback_range_readiness" => 403, "loopback_suffix_readiness" => 403,
+      "forwarded_loopback_readiness" => 403, "forwarded_loopback_from_ip_readiness" => 403,
+      "forwarded_loopback_normal" => 403, "missing_host_readiness" => 403
     }
     assert_equal expected, results
   end

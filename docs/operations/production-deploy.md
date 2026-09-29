@@ -40,7 +40,7 @@ Health probes and Host authorization:
 
 - **Kamal Proxy liveness:** `/up` is exempt from Host authorization, because Kamal Proxy reaches the container by address.
 - **Public readiness:** probe with Host `APP_HOST`, for example `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER`.
-- **Internal readiness:** probe from inside the container over loopback, for example `docker exec CONTAINER_PLACEHOLDER curl -fsS http://127.0.0.1:3000/ready`. Only `localhost`, `127.0.0.1`, and `[::1]` are accepted as Host for this.
+- **Internal readiness:** probe from inside the container over loopback, for example `docker exec CONTAINER_PLACEHOLDER curl -fsS http://127.0.0.1:3000/ready`. Only a raw `Host` header of `localhost`, `127.0.0.1`, or `[::1]` (optionally with a port) qualifies, and never on a request that carries `X-Forwarded-Host`.
 - **Refused hosts:** any other Host, such as a container IP or an unknown name, receives `403` on `/ready` and on every application path. Probing `/ready` through a container IP therefore reports `403` by design.
 - **Pre-promotion checks:** a quiescent or pre-promotion environment must be checked with the loopback probe, or with an explicit `Host: APP_HOST` header.
 
