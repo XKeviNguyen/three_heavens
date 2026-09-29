@@ -10,8 +10,8 @@
       </p>
     </div>
 
-    <%= form_with url: benchmarks_path, method: :get, class: "flex items-end gap-3" do |form| %>
-      <div>
+    <%= form_with url: benchmarks_path, method: :get, class: "flex flex-wrap items-end gap-3" do |form| %>
+      <div class="min-w-0 max-w-full">
         <%= form.label :sort, t("benchmarks_ui.sort_by"), class: "block text-xs font-semibold uppercase tracking-wide text-slate-500" %>
         <%= form.select :sort,
                         options_for_select([
@@ -24,7 +24,7 @@
                           [ t("benchmarks_ui.sort.latency"), "latency" ]
                         ], @sort),
                         {},
-                        class: "mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" %>
+                        class: "mt-1 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" %>
       </div>
       <%= form.submit t("benchmarks_ui.sort_button"), class: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" %>
     <% end %>

@@ -63,6 +63,30 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
     clear_browser_viewport
   end
 
+  # 320 CSS px is the reflow width (1280 px at 400% zoom). The Benchmarks sort
+  # form used to push a whole-page scroll there, worst in Vietnamese/Japanese;
+  # the admin users table must keep its own contained scroll.
+  test "benchmarks and admin tables reflow at narrow widths in every locale" do
+    user = users(:admin)
+    sign_in_in_browser(user, "admin secure password value")
+    %w[en vi ja].each do |locale|
+      user.update!(locale:)
+      [ 320, 360 ].each do |width|
+        with_browser_viewport(width, 900, mobile: true) do
+          visit benchmarks_path
+          assert_selector "select#sort"
+          assert_no_horizontal_overflow("benchmarks #{locale} #{width}px")
+          visit settings_users_path
+          assert_no_horizontal_overflow("admin users #{locale} #{width}px")
+          table_region = find("table").ancestor("div.overflow-x-auto")
+          assert_operator page.evaluate_script("arguments[0].clientWidth", table_region), :<=, width
+        end
+      end
+    end
+  ensure
+    clear_browser_viewport
+  end
+
   test "landing redesign stays composed across viewports locales and zoom" do
     review_dir = Rails.root.join("tmp/landing_review")
     FileUtils.mkdir_p(review_dir) if ENV["LANDING_REVIEW"] == "1"
