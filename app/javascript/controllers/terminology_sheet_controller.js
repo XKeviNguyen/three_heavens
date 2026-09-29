@@ -24,6 +24,9 @@ export default class extends Controller {
     if (!frame?.children.length && this.element.open) {
       this.element.close()
       this.restoreFocus()
+      // A save or create selects a new revision in the replaced panel without
+      // any input event, so announce it for autosave.
+      this.dispatch("changed")
     }
   }
 

@@ -69,9 +69,7 @@ export default class extends Controller {
   // save runs, never per keystroke, so a large source stays responsive.
   changed(event) {
     if (this.launching || this.discarding) return
-    // Only draft fields matter: typing in the model search or the terminology
-    // sheet bubbles here too but changes nothing that is saved.
-    if ((event?.type === "input" || event?.type === "change") && !event.target?.name?.startsWith("translation_workspace[")) return
+    if (!this.draftChange(event)) return
     this.retryCount = 0
     window.clearTimeout(this.saveTimer)
     if (!this.editPending) {
@@ -79,6 +77,17 @@ export default class extends Controller {
       this.setStatus(this.messagesValue.saving)
     }
     this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
+  }
+
+  // Typing in the model search and filters (unnamed controls) or in the
+  // terminology sheet bubbles here but changes nothing that is saved. Events
+  // dispatched on containers, such as an import or its removal, do count.
+  draftChange(event) {
+    const target = event?.target
+    if (!target || (event.type !== "input" && event.type !== "change")) return true
+    if (target.closest("dialog")) return false
+    if (target.matches("input, select, textarea")) return target.name?.startsWith("translation_workspace[") === true
+    return true
   }
 
   scheduleSave() {

@@ -1,4 +1,5 @@
 require "application_system_test_case"
+require "tempfile"
 
 class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
   setup do
@@ -207,6 +208,26 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 20
     assert_equal [ 1, 1 ], page.evaluate_script("[window.__serializations, window.__draftSaves]")
     assert users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text").end_with?("typed" * 4)
+  end
+
+  test "importing a source file and removing the import are autosaved" do
+    visit new_translation_workspace_path
+    click_button "Upload file"
+    source = Tempfile.new([ "autosaved-import", ".txt" ])
+    source.write("Imported and autosaved")
+    source.flush
+    attach_file "Source file", source.path
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "Imported and autosaved"
+    source_import = users(:normal).source_imports.sole
+    draft_value = -> { users(:normal).translation_workspace_drafts.first&.payload&.fetch("source_import_id", nil) }
+    assert_until { draft_value.call == source_import.id.to_s }
+
+    click_button "Remove import"
+    assert_no_selector "#workspace-source-import", visible: true
+    assert_until { draft_value.call == "" }
+  ensure
+    source&.close!
   end
 
   test "reverting to acknowledged text after a lost response saves the reverted text" do

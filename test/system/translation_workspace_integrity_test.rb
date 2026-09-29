@@ -266,6 +266,8 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     end
     assert_no_selector "dialog[open]"
     assert page.evaluate_script("!!document.activeElement.closest('#workspace-terminology')"), "focus must return to the terminology panel"
+    created = users(:normal).glossaries.joins(:current_revision).find_by!(glossary_revisions: { name: "Second workspace terms" })
+    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("glossary_revision_id", nil) == created.current_revision_id.to_s }
 
     # Each reopen replaces the editor; no Stimulus binding may keep an old
     # editor's elements alive (they used to accumulate for the whole session).
