@@ -1,4 +1,6 @@
 module ApplicationHelper
+  INTERFACE_LOCALE_NAMES = { "en" => "English", "vi" => "Tiếng Việt", "ja" => "日本語" }.freeze
+
   SIDEBAR_SECTIONS = [
     {
       label: "Work",
@@ -33,6 +35,10 @@ module ApplicationHelper
       ]
     }
   ].freeze
+
+  def interface_locale_names
+    INTERFACE_LOCALE_NAMES
+  end
 
   def sidebar_sections
     SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }.map do |section|

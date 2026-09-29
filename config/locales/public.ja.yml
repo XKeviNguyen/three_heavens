@@ -17,31 +17,113 @@ ja:
     confirm_email: ログイン前にメールアドレスを確認してください。
     signed_in: ログインしました。
   landing:
-    title: Three Heavens · 翻訳を比較
+    title: Three Heavens · AI翻訳を比較
+    meta_description: 複数のAIによる独立した翻訳を比較し、品質評価を確認しながら、人の判断で最終訳を仕上げます。
     navigation: 公開ページのナビゲーション
-    headline: AI翻訳を比べる。最終判断は、あなたに。
+    footer_navigation: フッターのナビゲーション
+    eyebrow: 人が導くAI翻訳
     headline_first: AI翻訳を比べる。
-    headline_second_prefix: 最終判断は、
+    headline_second_lead: 最終判断は、
     headline_second_emphasis: あなたに。
-    introduction: 原文を準備し、用語集や参考資料を活用。複数の翻訳候補を比較して、最後の訳文は自分で仕上げられます。
-    how_it_works: 使い方
+    introduction: 原文、用語集、参考資料を準備。複数のAIモデルがそれぞれ翻訳し、結果を比較できます。最終訳を決めるのは、あなたです。
+    start_translation: 翻訳を始める
+    see_how_it_works: 仕組みを見る
     open_workspace: ワークスペースを開く
     access_note: AI翻訳の利用は、承認されたアカウントごとに別途有効化されます。アカウント作成だけでは利用できません。
-    your_work: 訳文を決めるのは、あなた
-    trust: プロジェクトごとの指針を再利用できます。作業中の下書きは自動保存され、最終訳文は人が編集します。
-    steps:
-      prepare:
-        title: 準備
-        description: 原文、用語集、参考資料、翻訳方針をまとめます。
+    nav:
+      product: プロダクト
+      how_it_works: 仕組み
+      benchmarks: 評価データ
+      menu: ナビゲーションを開く
+    principles:
+      label: プロダクトの原則
+      models: 複数のAIモデル
+      transparent: 透明なプロセス
+      approval: 最終訳は人が承認
+    flow:
+      target_locale: en
+      accessible_description: 一つの原文から三つのAIモデルが独立した翻訳候補を作成します。品質評価で有力な候補を見極め、最後は人が編集して承認します。
+      source:
+        title: 原文
+        preview: 四半期の業績は、力強い成長を示しました…
+        language: JA → EN
+      models:
+        a:
+          title: モデルA
+          preview: "Quarterly financial results show strong growth…"
+        b:
+          title: モデルB
+          preview: "The quarter's results reflect solid growth…"
+        c:
+          title: モデルC
+          preview: "Quarterly earnings point to robust growth…"
+      metrics:
+        quality: 品質
+        accuracy: 正確さ
+        style: 文体
+      winner:
+        title: 最有力の候補
+        description: 品質、正確さ、文体のバランスに優れた候補です。
+      approval:
+        title: あなたが編集・承認
+        description: 内容を確認し、自分の言葉に仕上げます。
+      final:
+        title: 最終訳
+        description: あなたが承認した、高品質な翻訳です。
+    values:
+      heading: "答えは、一つではない。\nだから、判断の質が上がる。"
+      introduction: "複数の視点と、あなたの専門性。\nその両方で、より良い訳文へ。"
       compare:
-        title: 比較
-        description: 設定したAIモデルで独立した翻訳候補を作ります。
+        title: 比較する
+        description: 複数のAIモデルから、独立した翻訳候補を得られます。
+      guide:
+        title: 導く
+        description: 用語、文体、翻訳方針、参考資料で方向性を示せます。
       review:
-        title: 検討
-        description: 候補の品質と匿名のレビュー結果を確認します。
+        title: 検討する
+        description: 明確な品質フィードバックをもとに候補を比較できます。
       finalize:
-        title: 仕上げ
-        description: 最終訳文を自分で選び、編集します。
+        title: 仕上げる
+        description: 最終訳を編集し、整えて、承認します。主導権は常にあなたにあります。
+    decision:
+      heading: "あなたの知見。\n複数の視点。\nより良い翻訳へ。"
+      introduction: あなたの知識と、独立したAIモデルそれぞれの強みを組み合わせます。
+      accessible_description: 原文、用語集、信頼できる参考訳を翻訳方針と複数のAIモデルに反映し、人が主導するより良い翻訳判断につなげます。
+      source:
+        title: 原文
+        description: 翻訳する文書やコンテンツ。
+      terminology:
+        title: 用語集
+        description: 表記を統一したい言葉。
+      references:
+        title: 参考資料
+        description: 信頼できる既存の翻訳。
+      methodology:
+        title: 翻訳方針
+        description: どのように訳すかを定めます。
+      models:
+        title: AIモデル
+        description: 独立した翻訳候補を作ります。
+      outcome:
+        title: より良い翻訳判断
+        description: 高い品質。一貫した表現。最後はあなたが決めます。
+    trust:
+      heading: 人を中心に据えた原則
+      explicit:
+        title: ブラックボックスにしない
+        description: AIの作業は明示され、何が起きたかを確認できます。
+      inspect:
+        title: 勝者を押しつけない
+        description: すべての候補とフィードバックを自分で検討できます。
+      human:
+        title: 自動で確定しない
+        description: AIは提案まで。承認するのは人です。
+    final_cta:
+      eyebrow: 翻訳を始めませんか？
+      heading: "原文を用意したら、\nモデル同士に競わせよう。"
+      description: 候補を比べ、最後はあなた自身で決められます。
+    footer:
+      copyright: "© %{year} Three Heavens. All rights reserved."
   registration:
     create_account: アカウントを作成
     benefit: 別のブラウザーや端末でも作業を続けられます。

@@ -186,4 +186,32 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     patch revoke_managed_ai_access_settings_user_path(target)
     assert_not target.reload.managed_ai_access?
   end
+
+  test "landing explains the human-guided comparison flow and account-aware action" do
+    get root_path, headers: { "Accept-Language" => "en" }
+    assert_response :success
+    assert_select "meta[name='description']"
+    assert_select "h1", text: /Compare AI translations.*Keep the final word/m
+    assert_select ".flow-model", count: 3
+    assert_select ".flow-winner", text: /Strongest candidate/
+    assert_select ".flow-human", text: /You edit and approve/
+    assert_select ".flow-final", text: /Final translation/
+    assert_select "a[href='#{new_registration_path}']", text: /Start a translation/
+    assert_select "a[href='#{benchmarks_path}']", minimum: 1
+    assert_select "a[href='#how-it-works']", minimum: 1
+    assert_select "#how-it-works", 1
+    # CSP style-src 'self' drops inline style attributes, so the page must not rely on them.
+    assert_select ".landing-page [style]", count: 0
+    assert_select ".landing-locale form[action='#{locale_path}'] button[lang='ja']", text: "日本語"
+
+    patch locale_path, params: { locale_code: "ja" }
+    follow_redirect!
+    assert_select "h1", text: /AI翻訳を比べる。.*最終判断は、あなたに。/m
+
+    sign_in_as users(:normal)
+    get root_path
+    assert_response :success
+    assert_select "a[href='#{new_translation_workspace_path}']", text: /Open workspace/
+    assert_select "a[href='#{new_registration_path}']", count: 0
+  end
 end

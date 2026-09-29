@@ -1,0 +1,21 @@
+<section class="landing-section landing-trust" aria-labelledby="trust-heading">
+  <div class="landing-shell">
+    <h2 id="trust-heading" class="sr-only"><%= t("landing.trust.heading") %></h2>
+    <div class="landing-trust-grid">
+      <% %w[explicit inspect human].each do |principle| %>
+        <article>
+          <span class="landing-trust-icon" aria-hidden="true">
+            <% if principle == "explicit" %>
+              <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.4 8 7 10 4.6-2 7-5.2 7-10V6l-7-3Zm-3 9 2 2 4-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+            <% elsif principle == "inspect" %>
+              <svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Zm9 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7"/></svg>
+            <% else %>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 20c.6-4.5 3-7 7-7s6.4 2.5 7 7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg>
+            <% end %>
+          </span>
+          <div><h3><%= t("landing.trust.#{principle}.title") %></h3><p><%= t("landing.trust.#{principle}.description") %></p></div>
+        </article>
+      <% end %>
+    </div>
+  </div>
+</section>

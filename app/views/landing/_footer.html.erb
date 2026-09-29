@@ -1,0 +1,11 @@
+<footer class="landing-footer">
+  <div class="landing-shell landing-footer-inner">
+    <%= link_to root_path, class: "landing-brand landing-footer-brand", aria: { label: "Three Heavens" } do %><%= render "landing/brand" %><% end %>
+    <nav aria-label="<%= t("landing.footer_navigation") %>">
+      <a href="#product"><%= t("landing.nav.product") %></a>
+      <a href="#how-it-works"><%= t("landing.nav.how_it_works") %></a>
+      <%= link_to t("landing.nav.benchmarks"), benchmarks_path %>
+    </nav>
+    <p><%= t("landing.footer.copyright", year: Time.current.year) %></p>
+  </div>
+</footer>
