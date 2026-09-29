@@ -267,6 +267,16 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
     assert page.evaluate_script("!!document.activeElement.closest('#workspace-terminology')"), "focus must return to the terminology panel"
 
+    # Each reopen replaces the editor; no Stimulus binding may keep an old
+    # editor's elements alive (they used to accumulate for the whole session).
+    3.times do
+      click_link "Edit terminology"
+      assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
+      click_button "Cancel"
+      assert_no_selector "dialog[open]"
+    end
+    assert_equal 0, page.evaluate_script("Array.from(window.Stimulus.dispatcher.eventListenerMaps.keys()).filter(target => !target.isConnected).length")
+
     click_link "Edit terminology"
     assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
     assert_equal [ 1, 1 ], page.evaluate_script("[document.querySelectorAll('dialog[data-controller=\"terminology-sheet\"]').length, document.querySelectorAll('#workspace-terminology-editor form').length]")
@@ -295,6 +305,8 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
       search.fill_in with: "gemini"
       assert_until { page.evaluate_script("window.__catalogRequests.some(r => r.q === 'gemini')") }
       search.fill_in with: "claude"
+      # The search box is not a draft field, so typing in it must not claim a save.
+      assert_not_includes page.evaluate_script("document.querySelector(\"[data-workspace-guard-target='status']\").textContent"), "Saving"
       assert_selector "[role='option']", text: "Claude", minimum: 1
       sleep 2
       assert_selector "[role='option']", text: "Claude", minimum: 1

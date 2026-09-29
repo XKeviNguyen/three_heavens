@@ -67,8 +67,11 @@ export default class extends Controller {
 
   // Typing only restarts the debounce. The form is serialized once, when the
   // save runs, never per keystroke, so a large source stays responsive.
-  changed() {
+  changed(event) {
     if (this.launching || this.discarding) return
+    // Only draft fields matter: typing in the model search or the terminology
+    // sheet bubbles here too but changes nothing that is saved.
+    if ((event?.type === "input" || event?.type === "change") && !event.target?.name?.startsWith("translation_workspace[")) return
     this.retryCount = 0
     window.clearTimeout(this.saveTimer)
     if (!this.editPending) {
