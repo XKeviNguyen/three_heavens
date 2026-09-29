@@ -12,9 +12,12 @@ module GoogleIdentity
     PURPOSE = :google_identity_ceremony
     MAXIMUM_RETURN_PATH_LENGTH = 200
 
-    attr_reader :id, :intent, :user_id, :locale, :appearance, :return_path
+    attr_reader :id, :intent, :user_id, :locale, :appearance, :preference_overrides, :return_path
 
-    def self.issue(intent:, locale:, appearance:, user: nil, return_path: nil)
+    # locale/appearance are the page's effective values (initial preferences
+    # for a new account); preference_overrides are only the values the visitor
+    # explicitly chose while signed out, which an existing account adopts.
+    def self.issue(intent:, locale:, appearance:, user: nil, preference_overrides: nil, return_path: nil)
       raise ArgumentError, "unknown intent" unless INTENTS.include?(intent)
       raise ArgumentError, "linking requires a user" if intent == "link" && user.nil?
 
@@ -24,6 +27,7 @@ module GoogleIdentity
         "u" => user&.id,
         "l" => locale.to_s,
         "a" => appearance.to_s,
+        "o" => UiPreferences.sanitize(preference_overrides).presence,
         "r" => safe_return_path(return_path)
       }.compact
       verifier.generate(payload, expires_in: TTL, purpose: PURPOSE)
@@ -55,6 +59,7 @@ module GoogleIdentity
       @user_id = payload["u"]
       @locale = payload["l"].presence_in(User::SUPPORTED_LOCALES)
       @appearance = payload["a"].presence_in(User::APPEARANCES)
+      @preference_overrides = UiPreferences.sanitize(payload["o"])
       @return_path = self.class.safe_return_path(payload["r"])
     end
 

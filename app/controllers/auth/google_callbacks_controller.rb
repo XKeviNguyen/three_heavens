@@ -49,7 +49,9 @@ module Auth
       return reject(result.status) unless result.signed_in?
 
       request.session_options[:skip] = false
-      start_authenticated_session!(result.user)
+      # The callback cannot read preference cookies (cross-site); the ceremony
+      # carries the explicit signed-out choices captured when it was minted.
+      start_authenticated_session!(result.user, preference_overrides: ceremony.preference_overrides)
       I18n.with_locale(result.user.locale) do
         redirect_to ceremony.return_path || new_translation_workspace_path,
                     notice: t("authentication.signed_in"), status: :see_other

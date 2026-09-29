@@ -42,7 +42,8 @@ class SessionsController < ApplicationController
 
     if user
       destination = start_authenticated_session!(user)
-      redirect_to destination.presence || new_translation_workspace_path, notice: t("authentication.signed_in")
+      redirect_to destination.presence || new_translation_workspace_path,
+                  notice: I18n.with_locale(user.locale) { t("authentication.signed_in") }
     else
       render_invalid_credentials
     end

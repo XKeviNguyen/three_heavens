@@ -39,6 +39,7 @@ export default class extends Controller {
         savedAppearance = appearance
         // Cached page snapshots still carry the previous preference.
         window.Turbo?.cache?.clear()
+        document.dispatchEvent(new CustomEvent("appearance:saved", { detail: { appearance } }))
       } catch {
         // Only the most recent choice decides what is shown after a failure.
         if (pendingAppearance === appearance) this.apply(savedAppearance)

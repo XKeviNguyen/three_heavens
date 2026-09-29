@@ -20,9 +20,12 @@ class ApplicationController < ActionController::Base
     I18n.with_locale(current_user&.locale || preferred_public_locale, &action)
   end
 
+  def ui_preferences
+    @ui_preferences ||= UiPreferences.new(cookies)
+  end
+
   def preferred_public_locale
-    cookie_locale = cookies[:ui_locale]
-    return cookie_locale if User::SUPPORTED_LOCALES.include?(cookie_locale)
+    return ui_preferences.locale if ui_preferences.locale
 
     request.headers["Accept-Language"].to_s.split(",").each do |part|
       language = part.split(";", 2).first.to_s.strip.downcase.split("-", 2).first
@@ -62,7 +65,7 @@ class ApplicationController < ActionController::Base
   def current_appearance
     return current_user.appearance if current_user
 
-    cookies[:ui_appearance].presence_in(User::APPEARANCES) || "system"
+    ui_preferences.appearance || "system"
   end
 
   def google_identity_ceremony(intent)
@@ -71,6 +74,7 @@ class ApplicationController < ActionController::Base
       user: (current_user if intent == "link"),
       locale: I18n.locale,
       appearance: current_appearance,
+      preference_overrides: (ui_preferences.pending_overrides if intent == "sign_in"),
       return_path: session[:return_to_after_authenticating]
     )
   end
@@ -141,7 +145,10 @@ class ApplicationController < ActionController::Base
     current_user.projects.find(id)
   end
 
-  def start_authenticated_session!(user)
+  # Every sign-in (password or Google) reconciles interface preferences here,
+  # before the first signed-in page renders.
+  def start_authenticated_session!(user, preference_overrides: ui_preferences.pending_overrides)
+    ui_preferences.apply_at_sign_in(user, preference_overrides)
     destination = session.delete(:return_to_after_authenticating)
     reset_session
     session[:user_id] = user.id
@@ -149,6 +156,7 @@ class ApplicationController < ActionController::Base
   end
 
   def end_authenticated_session!
+    ui_preferences.mirror(current_user) if current_user
     reset_session
     GoogleIdentity::PendingLink.clear(cookies)
   end

@@ -67,6 +67,13 @@ the sign-in page.
   by another account is refused without revealing that account. Signing out
   discards a pending link.
 - **Disconnect:** refused when Google is the account's only sign-in method.
+- **Interface language and appearance** follow one policy for password and
+  Google sign-in (`UiPreferences`): a choice made while signed out is shown at
+  once and becomes the account's preference at the next sign-in; without one,
+  the account's stored preference wins (browser defaults never overwrite it).
+  The account's values are mirrored to the visitor cookies at sign-in, on every
+  signed-in change and at sign-out. Google's callback cannot read those cookies,
+  so the ceremony carries the signed-out choices. Linking never changes them.
 - Paid AI access is unaffected by how a person signs in.
 - Password sign-in to an account without a password still performs a bcrypt
   comparison, so response timing does not reveal Google-only accounts.

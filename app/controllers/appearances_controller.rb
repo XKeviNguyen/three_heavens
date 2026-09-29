@@ -9,11 +9,9 @@ class AppearancesController < ApplicationController
     raise ActionController::BadRequest unless User::APPEARANCES.include?(appearance)
 
     if current_user
-      current_user.update!(appearance: appearance)
+      ui_preferences.choose_as_user(current_user, appearance: appearance)
     else
-      cookies[:ui_appearance] = {
-        value: appearance, expires: 1.year.from_now, same_site: :lax, httponly: true, secure: Rails.env.production?
-      }
+      ui_preferences.choose_as_guest(appearance: appearance)
     end
 
     respond_to do |format|

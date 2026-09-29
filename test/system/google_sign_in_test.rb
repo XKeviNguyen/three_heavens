@@ -105,7 +105,7 @@ class GoogleSignInSystemTest < ApplicationSystemTestCase
     assert_equal "sign_in", GoogleIdentity::Ceremony.resolve(restored).intent
   end
 
-  test "switching theme re-renders with the same valid ceremony and switching language mints one for it" do
+  test "a saved signed-out theme choice re-mints a ceremony carrying it, and a language switch mints one too" do
     install_google_identity_stand_in
     visit login_path
     assert_selector "button[data-theme='outline']"
@@ -114,8 +114,10 @@ class GoogleSignInSystemTest < ApplicationSystemTestCase
     find(".appearance-menu summary").click
     click_button "Dark"
     assert_selector "button[data-theme='filled_black']"
-    assert_equal [ ceremony ], gis_nonces.uniq, "a theme change does not mint a ceremony"
-    assert GoogleIdentity::Ceremony.resolve(ceremony)
+    assert_until { gis_nonces.size == 2 }
+    renewed = GoogleIdentity::Ceremony.resolve(gis_nonces.last)
+    assert_equal({ "appearance" => "dark" }, renewed.preference_overrides, "the explicit choice travels with Google sign-in")
+    assert_empty GoogleIdentity::Ceremony.resolve(ceremony).preference_overrides
 
     within("header") { select "日本語", from: "Interface language" }
     assert_selector "html[lang='ja']"

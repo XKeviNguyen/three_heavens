@@ -56,10 +56,13 @@ export default class extends Controller {
 
   connect() {
     this.rerender = this.rerender.bind(this)
+    this.renew = this.renew.bind(this)
     this.onVisibilityChange = this.onVisibilityChange.bind(this)
     this.colorScheme = window.matchMedia("(prefers-color-scheme: dark)")
     this.colorScheme.addEventListener("change", this.rerender)
     document.addEventListener("appearance:change", this.rerender)
+    // A saved signed-out choice must travel with the next sign-in, so re-mint.
+    document.addEventListener("appearance:saved", this.renew)
     document.addEventListener("visibilitychange", this.onVisibilityChange)
     this.ceremonies = 0
     this.generation = 0
@@ -69,6 +72,7 @@ export default class extends Controller {
   disconnect() {
     this.colorScheme.removeEventListener("change", this.rerender)
     document.removeEventListener("appearance:change", this.rerender)
+    document.removeEventListener("appearance:saved", this.renew)
     document.removeEventListener("visibilitychange", this.onVisibilityChange)
     this.generation++
     this.clear()
@@ -144,7 +148,7 @@ export default class extends Controller {
     })
   }
 
-  // Theme changes re-render with the same, still valid ceremony.
+  // Theme changes re-render at once; the saved choice then re-mints (above).
   rerender() {
     if (this.nonce) this.render()
   }

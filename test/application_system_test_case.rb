@@ -19,6 +19,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   setup do
+    # Start from a clean browser: a late response from the previous example can
+    # land after Capybara's reset and restore its session cookie.
+    page.driver.browser.execute_cdp("Network.clearBrowserCookies")
     # Browser tests never load Google Identity Services; tests that exercise the
     # button install a local stand-in (see GoogleIdentitySystemHelper).
     page.driver.browser.execute_cdp("Network.enable")

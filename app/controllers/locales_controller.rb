@@ -6,9 +6,9 @@ class LocalesController < ApplicationController
     raise ActionController::BadRequest unless User::SUPPORTED_LOCALES.include?(locale)
 
     if current_user
-      current_user.update!(locale: locale)
+      ui_preferences.choose_as_user(current_user, locale: locale)
     else
-      cookies[:ui_locale] = { value: locale, expires: 1.year.from_now, same_site: :lax, httponly: true }
+      ui_preferences.choose_as_guest(locale: locale)
     end
     redirect_back_to_same_origin
   end
