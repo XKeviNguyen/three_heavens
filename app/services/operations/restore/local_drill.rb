@@ -125,7 +125,8 @@ module Operations
       # payload digest CHECK constraints) plus identity, preferences, staged
       # imports, and the encrypted workspace draft. No provider is involved.
       def create_representative_data!
-        bytes = "synthetic restore drill source bytes\n".b
+        # Real uploads (PDF, DOCX, UTF-8 text) are arbitrary bytes.
+        bytes = "synthetic restore drill source · 承認 · 🙏🏽\n".b + (0..255).map(&:chr).join.b
         user = User.create!(
           email: "restore-drill-#{SecureRandom.hex(6)}@example.test",
           password: "synthetic restore drill password",

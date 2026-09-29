@@ -8,8 +8,8 @@ module Operations
     # call them and such a bundle cannot be restored. Verification restores the
     # schema section first and then installs that migration's corrected
     # definitions, which produce identical digests, before loading data. Only
-    # the exact legacy bodies are replaced; any other definition is left as
-    # restored.
+    # bodies that still call the unqualified digest() are replaced; any other
+    # definition is left as restored.
     class LegacyDigestFunctions
       LEGACY_BODY_MARKER = "encode(digest("
       LEGACY_FUNCTION_SQL = <<~SQL.squish.freeze
