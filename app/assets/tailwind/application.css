@@ -238,6 +238,31 @@ body:has(#workspace-form) {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* User-supplied names (titles, file names, glossary names) may be long
+   unbroken strings; let them wrap instead of widening the whole page. */
+#main-content {
+  overflow-wrap: anywhere;
+}
+
+/* Keep keyboard focus clear of the sticky mobile header and, on the
+   workspace, the fixed launch bar (WCAG 2.4.11). */
+@media (width < 64rem) {
+  html { scroll-padding-top: 4.75rem; }
+}
+
+html:has(#workspace-form) {
+  scroll-padding-bottom: 7rem;
+}
+
+/* On short viewports (about 200% zoom and beyond) the two bars would cover
+   most of the page, so both return to the normal flow. */
+@media (max-height: 34rem) {
+  html, html:has(#workspace-form) { scroll-padding: 0; }
+  #app-header { position: static; }
+  body:has(#workspace-form) #workspace-launch { position: static; margin-top: 16px; }
+  body:has(#workspace-form) #main-content { padding-bottom: 24px; }
+}
+
 body:has(#workspace-form) #app-sidebar {
   width: 248px;
   background: var(--workspace-sidebar);
@@ -251,7 +276,7 @@ body:has(#workspace-form) #app-sidebar form {
   max-width: 100%;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 64rem) {
   .public-locale-selector { width: max-content; }
   .public-locale-selector select { width: 8rem; }
 }
@@ -430,7 +455,7 @@ body:has(#workspace-form) #workspace-form > #workspace-layout {
   background: var(--th-accent-fill-hover);
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 64rem) {
   #workspace-launch { left: 248px; }
 }
 
@@ -452,7 +477,7 @@ body:has(#workspace-form) #workspace-form > #workspace-layout {
   }
 }
 
-@media (max-width: 1023px) {
+@media (width < 64rem) {
   body:has(#workspace-form) .lg\:pl-64 { padding-left: 0; }
   body:has(#workspace-form) #main-content { padding: 20px 16px 110px; }
   body:has(#workspace-form) #app-sidebar { width: min(20rem, 85vw); }

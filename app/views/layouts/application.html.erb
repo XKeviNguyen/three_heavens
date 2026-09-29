@@ -25,7 +25,7 @@
 
     <% if authenticated? %>
       <div data-controller="sidebar" class="min-h-screen">
-        <header class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+        <header id="app-header" class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
           <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
             <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>
             <%= t("navigation.menu") %>
