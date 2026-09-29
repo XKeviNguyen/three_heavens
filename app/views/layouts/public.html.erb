@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="<%= I18n.locale %>">
+<html lang="<%= I18n.locale %>" data-appearance="<%= current_appearance %>">
   <head>
     <title><%= content_for(:title) || "Three Heavens" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="<%= color_scheme_for(current_appearance) %>">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
@@ -17,7 +18,10 @@
     <% else %>
       <header class="mx-auto flex w-full min-w-0 max-w-6xl flex-col items-stretch gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
         <%= link_to "Three Heavens", root_path, class: "min-w-0 text-lg font-semibold tracking-tight" %>
-        <%= render "shared/locale_selector", context: :public %>
+        <div class="flex min-w-0 items-end gap-2">
+          <div class="min-w-0 flex-1"><%= render "shared/locale_selector", context: :public %></div>
+          <%= render "shared/appearance_menu" %>
+        </div>
       </header>
       <main id="main-content" tabindex="-1" class="mx-auto w-full min-w-0 max-w-lg px-5 pb-20 pt-10 outline-none sm:px-8 sm:pt-12">
         <% if notice.present? %><div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" role="status"><%= notice %></div><% end %>

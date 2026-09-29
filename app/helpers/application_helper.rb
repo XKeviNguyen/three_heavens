@@ -1,4 +1,10 @@
 module ApplicationHelper
+  # The UA paints its default canvas and form controls in this scheme before
+  # the stylesheet loads, so a saved Dark preference never flashes light.
+  def color_scheme_for(appearance)
+    appearance.in?(%w[light dark]) ? appearance : "light dark"
+  end
+
   SIDEBAR_SECTIONS = [
     {
       label: "Work",

@@ -1,0 +1,39 @@
+ja:
+  google_identity:
+    or: または
+    button_unavailable: 現在、Googleでのログインを利用できません。メールアドレスとパスワードでログインできます。
+    messages:
+      failed: Googleでのログインを完了できませんでした。もう一度お試しください。
+      unavailable: Googleでのログインは一時的に利用できません。時間をおいて再度お試しいただくか、メールアドレスとパスワードをご利用ください。
+      rate_limited: ログインの試行回数が多すぎます。3分後にもう一度お試しください。
+      email_taken: このメールアドレスのアカウントはすでに存在します。先にログインしてから、Googleを連携してください。
+      confirmation_required: ログインする前に、メールアドレスを確認してください。
+      email_not_authoritative: このメールアドレスは、Googleでは新しいアカウント用に確認できません。メールアドレスとパスワードでアカウントを作成してから、「アカウント」でGoogleを連携してください。
+  appearance:
+    label: 外観
+    options:
+      system: システム設定
+      light: ライト
+      dark: ダーク
+  account:
+    title: アカウント
+    description: Three Heavensへのログイン方法です。
+    password:
+      set: 設定済み
+      not_set: 未設定。このアカウントはGoogleでログインします。
+    google:
+      status_connected: 連携済みです。Googleでログインできます。
+      status_not_connected: 未連携です。
+      connect_hint: 連携したいGoogleアカウントで続行してください。
+      confirm_prompt: Googleアカウント %{email} を、このThree Heavensアカウントに連携しますか？
+      confirm: Googleを連携
+      cancel: キャンセル
+      disconnect: 連携を解除
+      connected: Googleを連携しました。
+      disconnected: Googleの連携を解除しました。
+      not_configured: このサーバーでは、Googleでのログインを利用できません。
+      errors:
+        expired: Googleの確認の有効期限が切れました。もう一度連携してください。
+        taken: このGoogleアカウントは、すでに別のアカウントに連携されています。
+        other_connected: 別のGoogleアカウントがすでに連携されています。先に連携を解除してください。
+        only_sign_in_method: このアカウントのログイン方法はGoogleだけのため、連携を解除できません。

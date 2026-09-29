@@ -6,7 +6,7 @@ class ApplicationController < ActionController::Base
   before_action :require_authentication
   around_action :with_locale
 
-  helper_method :current_user, :authenticated?
+  helper_method :current_user, :authenticated?, :current_appearance, :google_identity_ceremony
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
@@ -57,6 +57,32 @@ class ApplicationController < ActionController::Base
         format.any { head :not_found }
       end
     end
+  end
+
+  def current_appearance
+    return current_user.appearance if current_user
+
+    cookies[:ui_appearance].presence_in(User::APPEARANCES) || "system"
+  end
+
+  def google_identity_ceremony(intent)
+    GoogleIdentity::Ceremony.issue(
+      intent: intent,
+      user: (current_user if intent == "link"),
+      locale: I18n.locale,
+      appearance: current_appearance,
+      return_path: session[:return_to_after_authenticating]
+    )
+  end
+
+  # Returns to the referring page only when it is on this host; otherwise home.
+  def redirect_back_to_same_origin
+    uri = URI.parse(request.referer.to_s)
+    path = uri.host == request.host && uri.port == request.port ? uri.request_uri : root_path
+    path = root_path if path.start_with?("//", "/\\")
+    redirect_to path, allow_other_host: false, status: :see_other
+  rescue URI::InvalidURIError
+    redirect_to root_path, status: :see_other
   end
 
   def current_user
@@ -119,5 +145,6 @@ class ApplicationController < ActionController::Base
 
   def end_authenticated_session!
     reset_session
+    GoogleIdentity::PendingLink.clear(cookies)
   end
 end

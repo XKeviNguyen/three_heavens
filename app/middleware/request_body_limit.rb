@@ -4,7 +4,7 @@ class RequestBodyLimit
   MULTIPART_OVERHEAD_BYTES = 1 * 1024 * 1024
   MAX_BYTES = (MAX_FILES_PER_REQUEST * MAX_FILE_UPLOAD_BYTES) + MULTIPART_OVERHEAD_BYTES
   PUBLIC_FORM_MAX_BYTES = 8 * 1024
-  PUBLIC_FORM_PATHS = %w[/registration /confirmation_resend /email_confirmation /locale].freeze
+  PUBLIC_FORM_PATHS = %w[/registration /confirmation_resend /email_confirmation /locale /appearance /auth/google/callback].freeze
 
   class ExceededError < StandardError; end
 

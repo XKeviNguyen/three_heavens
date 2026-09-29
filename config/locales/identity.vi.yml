@@ -1,0 +1,39 @@
+vi:
+  google_identity:
+    or: hoặc
+    button_unavailable: Hiện chưa thể đăng nhập bằng Google. Bạn vẫn có thể dùng email và mật khẩu.
+    messages:
+      failed: Không thể hoàn tất đăng nhập bằng Google. Vui lòng thử lại.
+      unavailable: Đăng nhập bằng Google tạm thời không khả dụng. Hãy thử lại sau hoặc dùng email và mật khẩu.
+      rate_limited: Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi ba phút rồi thử lại.
+      email_taken: Email này đã có tài khoản. Hãy đăng nhập trước, sau đó kết nối Google.
+      confirmation_required: Vui lòng xác nhận email trước khi đăng nhập.
+      email_not_authoritative: Google không thể xác nhận địa chỉ email này cho tài khoản mới. Hãy tạo tài khoản bằng email và mật khẩu, sau đó kết nối Google trong mục Tài khoản.
+  appearance:
+    label: Giao diện
+    options:
+      system: Theo hệ thống
+      light: Sáng
+      dark: Tối
+  account:
+    title: Tài khoản
+    description: Các cách bạn đăng nhập vào Three Heavens.
+    password:
+      set: Đã đặt
+      not_set: Chưa đặt. Tài khoản này đăng nhập bằng Google.
+    google:
+      status_connected: Đã kết nối. Bạn có thể đăng nhập bằng Google.
+      status_not_connected: Chưa kết nối.
+      connect_hint: Tiếp tục với tài khoản Google bạn muốn kết nối.
+      confirm_prompt: Kết nối tài khoản Google %{email} với tài khoản Three Heavens này?
+      confirm: Kết nối Google
+      cancel: Hủy
+      disconnect: Ngắt kết nối
+      connected: Đã kết nối Google.
+      disconnected: Đã ngắt kết nối Google.
+      not_configured: Máy chủ này chưa bật đăng nhập bằng Google.
+      errors:
+        expired: Phiên xác nhận Google đã hết hạn. Hãy kết nối Google lại.
+        taken: Tài khoản Google này đã được kết nối với một tài khoản khác.
+        other_connected: Tài khoản của bạn đang kết nối với một tài khoản Google khác. Hãy ngắt kết nối trước.
+        only_sign_in_method: Google là cách đăng nhập duy nhất của tài khoản này nên không thể ngắt kết nối.

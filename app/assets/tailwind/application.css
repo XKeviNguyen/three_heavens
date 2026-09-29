@@ -37,26 +37,199 @@
   }
 }
 
-/* Focus Workspace V2: semantic light workspace palette and layout. */
+/* Appearance: System / Light / Dark.
+   The server renders <html data-appearance="system|light|dark"> with a matching
+   color-scheme meta, so the first paint is already in the chosen scheme.
+   Light is the authored design and is unchanged. Dark redefines the semantic
+   tokens and remaps the palette roles the views use (neutral surfaces and text,
+   accent, status), so existing utilities adapt without per-view dark: classes.
+   Shades used both as text and as solid fills get explicit fill rules below.
+   System follows prefers-color-scheme, including live OS changes. */
+@custom-variant dark {
+  &:where([data-appearance="dark"], [data-appearance="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-appearance="system"], [data-appearance="system"] *) {
+      @slot;
+    }
+  }
+}
+
 :root {
-  --workspace-canvas: #f5f5f7;
-  --workspace-sidebar: #f2f2f7;
-  --workspace-surface: #fff;
-  --workspace-surface-subtle: #fafafa;
-  --workspace-text: #1d1d1f;
-  --workspace-secondary: #6e6e73;
-  --workspace-tertiary: #76767b;
-  --workspace-border: #e5e5ea;
-  --workspace-border-strong: #d1d1d6;
-  --workspace-accent: #0071e3;
-  --workspace-accent-hover: #006bd6;
-  --workspace-accent-soft: #eaf3ff;
-  --workspace-success: #1e7a34;
-  --workspace-success-soft: #eaf8ee;
-  --workspace-warning: #9a5700;
-  --workspace-warning-soft: #fff5e5;
-  --workspace-danger: #c9342f;
-  --workspace-danger-soft: #fff0f0;
+  color-scheme: light;
+  --th-canvas: #f5f5f7;
+  --th-sidebar: #f2f2f7;
+  --th-surface: #fff;
+  --th-surface-subtle: #fafafa;
+  --th-text: #1d1d1f;
+  --th-text-secondary: #6e6e73;
+  --th-text-tertiary: #76767b;
+  --th-border: #e5e5ea;
+  --th-border-strong: #d1d1d6;
+  --th-accent: #0071e3;
+  --th-accent-hover: #006bd6;
+  --th-accent-soft: #eaf3ff;
+  --th-accent-fill: #0071e3;
+  --th-accent-fill-hover: #006bd6;
+  --th-success: #1e7a34;
+  --th-success-soft: #eaf8ee;
+  --th-warning: #9a5700;
+  --th-warning-soft: #fff5e5;
+  --th-danger: #c9342f;
+  --th-danger-soft: #fff0f0;
+
+  @variant dark {
+    color-scheme: dark;
+    --th-canvas: #0d0d0f;
+    --th-sidebar: #141416;
+    --th-surface: #1c1c1e;
+    --th-surface-subtle: #242426;
+    --th-text: #f5f5f7;
+    --th-text-secondary: #aeaeb2;
+    --th-text-tertiary: #8e8e93;
+    --th-border: #2c2c2e;
+    --th-border-strong: #3a3a3c;
+    --th-accent: #0a84ff;
+    --th-accent-hover: #409cff;
+    --th-accent-soft: rgb(10 132 255 / .16);
+    /* #0a84ff under white text is 3.6:1; solid fills use a deeper blue (4.8:1). */
+    --th-accent-fill: #0a6fe0;
+    --th-accent-fill-hover: #0a62c7;
+    --th-success: #30d158;
+    --th-success-soft: rgb(48 209 88 / .14);
+    --th-warning: #ff9f0a;
+    --th-warning-soft: rgb(255 159 10 / .14);
+    --th-danger: #ff453a;
+    --th-danger-soft: rgb(255 69 58 / .14);
+
+    /* Surfaces: white cards on the canvas become raised dark surfaces. */
+    --color-white: var(--th-surface);
+    /* Neutral roles: 50–300 are surfaces and borders, 400–950 are text. */
+    --color-slate-50: var(--th-surface-subtle);
+    --color-slate-100: #29292b;
+    --color-slate-200: var(--th-border);
+    --color-slate-300: var(--th-border-strong);
+    --color-slate-400: var(--th-text-tertiary);
+    --color-slate-500: #98989d;
+    --color-slate-600: var(--th-text-secondary);
+    --color-slate-700: #c7c7cc;
+    --color-slate-800: #e5e5ea;
+    --color-slate-900: var(--th-text);
+    --color-slate-950: var(--th-text);
+    /* Accent: tints and borders stay subtle; 600+ are link and label text. */
+    --color-blue-50: #13253a;
+    --color-blue-100: #172d47;
+    --color-blue-200: #1f3d61;
+    --color-blue-300: #2d5a8f;
+    --color-blue-400: #3f7fcf;
+    --color-blue-500: var(--th-accent);
+    --color-blue-600: #3b9bff;
+    --color-blue-700: #4da3ff;
+    --color-blue-800: #6db3ff;
+    --color-blue-900: #8fc5ff;
+    --color-blue-950: #b5d8ff;
+    /* Status colours: dark tints with light, readable text. */
+    --color-emerald-50: #10261a;
+    --color-emerald-100: #143020;
+    --color-emerald-200: #1d4a2f;
+    --color-emerald-300: #28653f;
+    --color-emerald-700: var(--th-success);
+    --color-emerald-800: #5cdb7b;
+    --color-emerald-900: #8be6a0;
+    --color-emerald-950: #b6f0c4;
+    --color-amber-50: #2a1f0c;
+    --color-amber-100: #35270f;
+    --color-amber-200: #553d15;
+    --color-amber-300: #75561e;
+    --color-amber-700: #ffa938;
+    --color-amber-800: #ffb84d;
+    --color-amber-900: #ffcb80;
+    --color-amber-950: #ffddb0;
+    --color-red-50: #2c1413;
+    --color-red-100: #381917;
+    --color-red-200: #582421;
+    --color-red-300: #7a302c;
+    --color-red-500: var(--th-danger);
+    --color-red-700: #ff6b63;
+    --color-red-800: #ff8b85;
+    --color-red-900: #ffaca7;
+    --color-red-950: #ffcdca;
+  }
+}
+
+/* Dark fills keep white text readable where the same shade is also a text role. */
+html {
+  @variant dark {
+    .text-white { color: #fff; }
+    body.bg-slate-50,
+    body.bg-white { background-color: var(--th-canvas); }
+    #app-sidebar { background-color: var(--th-sidebar); }
+    .bg-blue-600,
+    .bg-blue-700 { background-color: var(--th-accent-fill); }
+    .hover\:bg-blue-700:hover,
+    .hover\:bg-blue-800:hover { background-color: var(--th-accent-fill-hover); }
+    .disabled\:bg-blue-400:disabled { background-color: #24476f; }
+    .bg-emerald-700 { background-color: #1e7a34; }
+    .hover\:bg-emerald-800:hover { background-color: #186a2c; }
+    .bg-amber-700 { background-color: #9a5700; }
+    .hover\:bg-amber-800:hover { background-color: #844a00; }
+    .bg-red-700 { background-color: #c9342f; }
+    .hover\:bg-red-800:hover { background-color: #ad2c28; }
+    .bg-slate-900,
+    .bg-slate-950 { background-color: var(--th-border-strong); }
+    .hover\:bg-slate-700:hover { background-color: #48484a; }
+    .bg-slate-900\/40 { background-color: rgb(0 0 0 / .55); }
+    .backdrop\:bg-slate-950\/35::backdrop { background-color: rgb(0 0 0 / .6); }
+    ::selection { background: #1f4a7a; }
+  }
+}
+
+/* Appearance menu: a compact icon button with System / Light / Dark choices. */
+.appearance-menu { position: relative; flex: none; }
+.appearance-menu > summary { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--color-slate-300); border-radius: 10px; color: var(--color-slate-700); list-style: none; }
+.appearance-menu > summary::-webkit-details-marker { display: none; }
+.appearance-menu > summary:hover,
+.appearance-menu[open] > summary { background: var(--color-slate-100); color: var(--color-slate-950); }
+.appearance-menu > summary svg { width: 18px; height: 18px; }
+@media (pointer: coarse) { .appearance-menu > summary { width: 44px; height: 44px; } }
+.appearance-menu-panel { position: absolute; z-index: 40; right: 0; bottom: calc(100% + 6px); display: grid; min-width: 11rem; padding: 6px; border: 1px solid var(--color-slate-200); border-radius: 12px; background: var(--color-white); box-shadow: 0 14px 36px rgb(0 0 0 / .16); }
+/* Opens upward from the sidebar footer, downward from page headers. */
+header .appearance-menu-panel { top: calc(100% + 6px); bottom: auto; }
+.appearance-menu-heading { margin: 2px 8px 4px; color: var(--color-slate-500); font-size: 12px; font-weight: 600; }
+.appearance-menu-panel form { margin: 0; }
+.appearance-option { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 10px; border-radius: 8px; color: var(--color-slate-800); font-size: 14px; text-align: left; }
+.appearance-option:hover { background: var(--color-slate-100); }
+.appearance-option svg { width: 16px; height: 16px; flex: none; color: var(--th-accent); visibility: hidden; }
+.appearance-option[aria-pressed="true"] { color: var(--color-slate-950); font-weight: 600; }
+.appearance-option[aria-pressed="true"] svg { visibility: visible; }
+
+/* Sign in with Google: Google renders its own button inside this container. */
+.google-sign-in-button { display: flex; justify-content: center; min-height: 44px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: var(--color-slate-500); font-size: 13px; }
+.auth-divider::before,
+.auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--color-slate-200); }
+
+/* Focus Workspace V2: workspace names for the shared semantic tokens. */
+:root {
+  --workspace-canvas: var(--th-canvas);
+  --workspace-sidebar: var(--th-sidebar);
+  --workspace-surface: var(--th-surface);
+  --workspace-surface-subtle: var(--th-surface-subtle);
+  --workspace-text: var(--th-text);
+  --workspace-secondary: var(--th-text-secondary);
+  --workspace-tertiary: var(--th-text-tertiary);
+  --workspace-border: var(--th-border);
+  --workspace-border-strong: var(--th-border-strong);
+  --workspace-accent: var(--th-accent);
+  --workspace-accent-hover: var(--th-accent-hover);
+  --workspace-accent-soft: var(--th-accent-soft);
+  --workspace-success: var(--th-success);
+  --workspace-success-soft: var(--th-success-soft);
+  --workspace-warning: var(--th-warning);
+  --workspace-warning-soft: var(--th-warning-soft);
+  --workspace-danger: var(--th-danger);
+  --workspace-danger-soft: var(--th-danger-soft);
 }
 
 body:has(#workspace-form) {
@@ -245,16 +418,16 @@ body:has(#workspace-form) #workspace-form > #workspace-layout {
   min-height: 76px;
   padding: 12px 20px;
   border-top: 1px solid var(--workspace-border);
-  background: #fff;
+  background: var(--workspace-surface);
   box-shadow: 0 -1px 6px rgb(0 0 0 / .04);
 }
 
 #workspace-launch input[type="submit"] {
-  background: var(--workspace-accent);
+  background: var(--th-accent-fill);
 }
 
 #workspace-launch input[type="submit"]:hover {
-  background: var(--workspace-accent-hover);
+  background: var(--th-accent-fill-hover);
 }
 
 @media (min-width: 1024px) {

@@ -8,7 +8,7 @@
       <%= link_to t("registration.create_account"), new_registration_path, class: "rounded-lg bg-blue-700 px-4 py-2.5 text-white hover:bg-blue-800" unless authenticated? %>
       <%= link_to t("landing.open_workspace"), new_translation_workspace_path, class: "rounded-lg bg-blue-700 px-4 py-2.5 text-white hover:bg-blue-800" if authenticated? %>
     </nav>
-    <%= render "shared/locale_selector", context: :public %>
+    <div class="flex min-w-0 items-end gap-2"><div class="min-w-0 flex-1"><%= render "shared/locale_selector", context: :public %></div><%= render "shared/appearance_menu" %></div>
   </header>
   <main id="main-content">
     <section class="mx-auto w-full min-w-0 max-w-6xl px-5 pb-20 pt-12 sm:px-8 sm:pt-24">

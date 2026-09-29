@@ -10,9 +10,14 @@ class SessionsController < ApplicationController
              with: :render_rate_limited,
              only: :create
 
+  GOOGLE_IDENTITY_MESSAGES = %w[failed unavailable rate_limited email_taken email_not_authoritative confirmation_required].freeze
+
   def new
     @email = ""
-    redirect_to new_translation_workspace_path if authenticated?
+    google_message = google_identity_message
+    return redirect_to new_translation_workspace_path, alert: google_message if authenticated?
+
+    flash.now[:alert] = google_message if google_message
   end
 
   def create
@@ -50,6 +55,13 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # Google's callback reports outcomes as allowlisted codes so the message is
+  # rendered here, in the visitor's locale (the cross-site callback cannot see it).
+  def google_identity_message
+    code = flash[:google_identity].to_s.presence_in(GOOGLE_IDENTITY_MESSAGES)
+    t("google_identity.messages.#{code}") if code
+  end
 
   def session_params
     submitted = params.require(:session)

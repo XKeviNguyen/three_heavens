@@ -66,6 +66,7 @@ Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. 
 - `POSTGRES_PORT`
 - optional `DB_HOST`
 - `OPENROUTER_API_KEY` only when a person explicitly starts real AI work
+- optional `GOOGLE_CLIENT_ID` to enable Sign in with Google (a public OAuth client ID; no client secret). See [docs/identity/google-sign-in.md](docs/identity/google-sign-in.md).
 
 Create and migrate the databases with:
 
@@ -175,6 +176,7 @@ Required non-secret runtime variable names are:
 - optional `RAILS_MAX_THREADS`
 - optional `JOB_CONCURRENCY`
 - optional `AI_STALE_EXECUTION_THRESHOLD_MINUTES`
+- optional `GOOGLE_CLIENT_ID` for Sign in with Google (production uses its own OAuth client; see [docs/identity/google-sign-in.md](docs/identity/google-sign-in.md))
 
 The four database URLs must point to distinct PostgreSQL databases or otherwise deliberately isolated databases for these roles:
 

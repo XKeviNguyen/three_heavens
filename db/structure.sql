@@ -1702,6 +1702,41 @@ ALTER SEQUENCE public.experiments_id_seq OWNED BY public.experiments.id;
 
 
 --
+-- Name: federated_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.federated_identities (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    provider character varying NOT NULL,
+    provider_uid character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT federated_identities_provider_check CHECK (((provider)::text = 'google'::text)),
+    CONSTRAINT federated_identities_provider_uid_length_check CHECK (((char_length((provider_uid)::text) >= 1) AND (char_length((provider_uid)::text) <= 255)))
+);
+
+
+--
+-- Name: federated_identities_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.federated_identities_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: federated_identities_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.federated_identities_id_seq OWNED BY public.federated_identities.id;
+
+
+--
 -- Name: final_translation_version_segments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3203,7 +3238,7 @@ CREATE TABLE public.users (
     id bigint NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     email character varying NOT NULL,
-    password_digest character varying NOT NULL,
+    password_digest character varying,
     role character varying DEFAULT 'user'::character varying NOT NULL,
     status character varying DEFAULT 'active'::character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
@@ -3211,6 +3246,8 @@ CREATE TABLE public.users (
     confirmation_sent_at timestamp(6) without time zone,
     locale character varying DEFAULT 'en'::character varying NOT NULL,
     managed_ai_access boolean DEFAULT false NOT NULL,
+    appearance character varying DEFAULT 'system'::character varying NOT NULL,
+    CONSTRAINT users_appearance_check CHECK (((appearance)::text = ANY ((ARRAY['system'::character varying, 'light'::character varying, 'dark'::character varying])::text[]))),
     CONSTRAINT users_locale_check CHECK (((locale)::text = ANY ((ARRAY['en'::character varying, 'vi'::character varying, 'ja'::character varying])::text[]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
@@ -3416,6 +3453,13 @@ ALTER TABLE ONLY public.experiment_segments ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.experiments ALTER COLUMN id SET DEFAULT nextval('public.experiments_id_seq'::regclass);
+
+
+--
+-- Name: federated_identities id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities ALTER COLUMN id SET DEFAULT nextval('public.federated_identities_id_seq'::regclass);
 
 
 --
@@ -3734,6 +3778,14 @@ ALTER TABLE ONLY public.experiment_segments
 
 ALTER TABLE ONLY public.experiments
     ADD CONSTRAINT experiments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: federated_identities federated_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities
+    ADD CONSTRAINT federated_identities_pkey PRIMARY KEY (id);
 
 
 --
@@ -4175,6 +4227,20 @@ CREATE INDEX index_experiments_on_glossary_revision_id ON public.experiments USI
 --
 
 CREATE INDEX index_experiments_on_methodology_profile_revision_id ON public.experiments USING btree (methodology_profile_revision_id);
+
+
+--
+-- Name: index_federated_identities_on_provider_and_provider_uid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_federated_identities_on_provider_and_provider_uid ON public.federated_identities USING btree (provider, provider_uid);
+
+
+--
+-- Name: index_federated_identities_on_user_id_and_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_federated_identities_on_user_id_and_provider ON public.federated_identities USING btree (user_id, provider);
 
 
 --
@@ -6064,6 +6130,14 @@ ALTER TABLE ONLY public.projects
 
 
 --
+-- Name: federated_identities fk_rails_ba05d5a23b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities
+    ADD CONSTRAINT fk_rails_ba05d5a23b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: finalization_segment_runs fk_rails_c171c093d3; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6174,6 +6248,9 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260929090200'),
+('20260929090100'),
+('20260929090000'),
 ('20260924090200'),
 ('20260924090100'),
 ('20260924090000'),

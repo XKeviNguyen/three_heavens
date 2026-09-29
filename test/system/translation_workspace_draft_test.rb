@@ -29,7 +29,6 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
 
     within "aside#app-sidebar" do
       select "日本語", from: "Interface language"
-      click_button "Apply"
     end
     assert_selector "html[lang='ja']"
     assert_field "プロジェクト名", with: "Locale draft"
@@ -38,7 +37,6 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
 
     within "aside#app-sidebar" do
       select "Tiếng Việt", from: "表示言語"
-      click_button "適用"
     end
     assert_selector "html[lang='vi']"
     assert_field "Tên dự án", with: "Locale draft"

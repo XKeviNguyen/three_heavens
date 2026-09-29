@@ -52,7 +52,7 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
                       page.evaluate_script("arguments[0].clientWidth", sidebar)
       within "aside#app-sidebar" do
         assert_field "表示言語"
-        assert_button "適用"
+        assert_no_button "適用"
       end
       assert_text "1～6件を選択。モデル名、プロバイダー名、識別子で検索できます。"
       assert_no_text "Choose 1–6. Search by model, provider, or identifier."
@@ -67,8 +67,8 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
     visit root_path
     within "header" do
       select({ "en" => "English", "vi" => "Tiếng Việt", "ja" => "日本語" }.fetch(locale), from: "locale_code")
-      find("form input[type=submit]").click
     end
+    assert_selector "html[lang='#{locale}']"
   end
 
   def sign_in_in_browser(user, password)

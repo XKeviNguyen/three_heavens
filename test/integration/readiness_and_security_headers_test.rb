@@ -48,7 +48,12 @@ class ReadinessAndSecurityHeadersTest < ActionDispatch::IntegrationTest
     assert_includes csp, "object-src 'none'"
     assert_includes csp, "frame-ancestors 'none'"
     assert_includes csp, "form-action 'self'"
-    assert_match(/script-src 'self' 'nonce-[^']+'/i, csp)
+    assert_match(/script-src 'self' https:\/\/accounts\.google\.com\/gsi\/client 'nonce-[^']+';/i, csp)
+    # Sign in with Google adds only path-scoped GIS sources, never wildcards.
+    assert_match(/style-src 'self' https:\/\/accounts\.google\.com\/gsi\/style 'nonce-[^']+';/, csp)
+    assert_includes csp, "connect-src 'self' https://accounts.google.com/gsi/;"
+    assert_includes csp, "frame-src 'self' https://accounts.google.com/gsi/;"
+    assert_not_includes csp, "*"
     assert_not_includes csp, "unsafe-eval"
     assert_not_includes csp, "unsafe-inline"
     assert_equal "DENY", response.headers["X-Frame-Options"]

@@ -1,0 +1,49 @@
+<% content_for :title, t("account.title") %>
+<section class="max-w-2xl space-y-6">
+  <header>
+    <h1 class="text-3xl font-semibold"><%= t("account.title") %></h1>
+    <p class="mt-2 text-slate-600"><%= t("account.description") %></p>
+  </header>
+
+  <div class="rounded-xl border border-slate-200 bg-white">
+    <dl class="divide-y divide-slate-100 text-sm">
+      <div class="grid gap-1 p-5 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <dt class="font-medium text-slate-600"><%= t("registration.email") %></dt>
+        <dd class="min-w-0 break-words text-slate-950"><%= current_user.email %></dd>
+      </div>
+      <div class="grid gap-1 p-5 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <dt class="font-medium text-slate-600"><%= t("registration.password") %></dt>
+        <dd class="text-slate-950"><%= current_user.password_sign_in? ? t("account.password.set") : t("account.password.not_set") %></dd>
+      </div>
+    </dl>
+  </div>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="account-google-heading">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 id="account-google-heading" class="text-lg font-semibold text-slate-950">Google</h2>
+        <p class="mt-1 text-sm text-slate-600"><%= @google_identity ? t("account.google.status_connected") : t("account.google.status_not_connected") %></p>
+      </div>
+      <% if @google_identity %>
+        <%= button_to t("account.google.disconnect"), settings_account_google_identity_path, method: :delete, class: "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50" %>
+      <% end %>
+    </div>
+
+    <% if @pending_link %>
+      <div class="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4" role="status">
+        <p class="text-sm text-blue-950"><%= t("account.google.confirm_prompt", email: @pending_link.email) %></p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <%= button_to t("account.google.confirm"), settings_account_google_identity_path, method: :post, class: "rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800" %>
+          <%= button_to t("account.google.cancel"), pending_settings_account_google_identity_path, method: :delete, class: "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50" %>
+        </div>
+      </div>
+    <% elsif @google_identity.nil? && GoogleIdentity.enabled? %>
+      <div class="mt-5 max-w-sm">
+        <p class="mb-3 text-sm text-slate-600"><%= t("account.google.connect_hint") %></p>
+        <%= render "shared/google_sign_in", intent: "link", text: "continue_with" %>
+      </div>
+    <% elsif @google_identity.nil? %>
+      <p class="mt-4 text-sm text-slate-500"><%= t("account.google.not_configured") %></p>
+    <% end %>
+  </section>
+</section>

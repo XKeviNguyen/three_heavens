@@ -1,0 +1,79 @@
+module GoogleIdentity
+  # Server-signed context for one Sign in with Google attempt, sent to Google as
+  # the ID-token nonce and returned inside the Google-signed credential.
+  #
+  # Google posts the credential cross-site, so the SameSite=Lax session cookie is
+  # not available in the callback. The ceremony carries what the callback needs
+  # (intent, the linking user, interface preferences, a safe return path) and
+  # binds the credential to a sign-in page this server rendered. It is single-use.
+  class Ceremony
+    INTENTS = %w[sign_in link].freeze
+    TTL = 10.minutes
+    PURPOSE = :google_identity_ceremony
+    MAXIMUM_RETURN_PATH_LENGTH = 200
+
+    attr_reader :id, :intent, :user_id, :locale, :appearance, :return_path
+
+    def self.issue(intent:, locale:, appearance:, user: nil, return_path: nil)
+      raise ArgumentError, "unknown intent" unless INTENTS.include?(intent)
+      raise ArgumentError, "linking requires a user" if intent == "link" && user.nil?
+
+      payload = {
+        "n" => SecureRandom.urlsafe_base64(16),
+        "i" => intent,
+        "u" => user&.id,
+        "l" => locale.to_s,
+        "a" => appearance.to_s,
+        "r" => safe_return_path(return_path)
+      }.compact
+      verifier.generate(payload, expires_in: TTL, purpose: PURPOSE)
+    end
+
+    def self.resolve(token)
+      payload = verifier.verified(token.to_s, purpose: PURPOSE)
+      new(payload) if payload.is_a?(Hash) && valid_payload?(payload)
+    end
+
+    # Accepts only same-origin absolute paths; rejects scheme-relative,
+    # backslash, and control-character tricks that browsers may treat as hosts.
+    def self.safe_return_path(path)
+      path = path.to_s
+      return if path.empty? || path.length > MAXIMUM_RETURN_PATH_LENGTH
+      return unless path.start_with?("/") && !path.start_with?("//") && path.match?(/\A[\x21-\x7e]+\z/)
+      return if path.include?("\\")
+
+      uri = URI.parse(path)
+      path if uri.scheme.nil? && uri.host.nil?
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    def self.valid_payload?(payload)
+      payload["n"].is_a?(String) && INTENTS.include?(payload["i"]) &&
+        (payload["i"] != "link" || payload["u"].is_a?(Integer))
+    end
+
+    def self.verifier
+      Rails.application.message_verifier(PURPOSE)
+    end
+    private_class_method :verifier, :valid_payload?
+
+    def initialize(payload)
+      @id = payload["n"]
+      @intent = payload["i"]
+      @user_id = payload["u"]
+      @locale = payload["l"].presence_in(User::SUPPORTED_LOCALES)
+      @appearance = payload["a"].presence_in(User::APPEARANCES)
+      @return_path = self.class.safe_return_path(payload["r"])
+    end
+
+    def link?
+      intent == "link"
+    end
+
+    # True only for the first caller; a replayed credential carries a used nonce.
+    def consume!
+      Rails.cache.write("google_identity/ceremony/#{id}", true, unless_exist: true, expires_in: TTL + 1.minute)
+    end
+  end
+end
