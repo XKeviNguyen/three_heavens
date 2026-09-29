@@ -152,6 +152,86 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal 0, AiProviderAttempt.count
   end
 
+  # Commit success + response unknown to the client: the wrapped fetch lets
+  # the real request reach the server and waits for its complete response,
+  # so the draft transaction has committed, then discards it and rejects
+  # exactly like a connection dropped after the server finished.
+  test "an autosave committed without a delivered response never loses the next edit" do
+    visit new_translation_workspace_path
+    drop_next_draft_save_responses(1)
+    fill_in "Project name", with: "Ambiguous project"
+    fill_in "Source text", with: "Edit A committed without a response"
+    assert_selector "[data-workspace-guard-target='status']", text: "Could not save", wait: 10
+    assert_equal "Edit A committed without a response", users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text")
+
+    fill_in "Source text", with: "Edit B written after the lost response"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal 0, page.evaluate_script("window.__pendingDraftDrops")
+
+    refresh
+    assert_field "Source text", with: "Edit B written after the lost response"
+    assert_equal 1, users(:normal).translation_workspace_drafts.count
+  end
+
+  test "a retry after a lost response resolves the save without another edit" do
+    visit new_translation_workspace_path
+    drop_next_draft_save_responses(1)
+    fill_in "Project name", with: "Retried project"
+    assert_selector "[data-workspace-guard-target='status']", text: "Could not save", wait: 10
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    draft = users(:normal).translation_workspace_drafts.sole
+    assert_equal draft.public_id, find("#translation_workspace_draft_id", visible: :all).value
+    assert_equal draft.lock_version.to_s, find("#translation_workspace_draft_version", visible: :all).value
+    assert_equal 0, draft.lock_version
+
+    accept_confirm { click_button "Discard draft" }
+    assert_current_path new_translation_workspace_path
+    assert_equal 0, users(:normal).translation_workspace_drafts.count
+  end
+
+  test "a second tab reports a conflict instead of overwriting the newer draft" do
+    visit new_translation_workspace_path
+    second_tab = open_new_window
+    within_window(second_tab) { visit new_translation_workspace_path }
+
+    fill_in "Project name", with: "First tab project"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    within_window(second_tab) do
+      fill_in "Project name", with: "Stale second tab"
+      assert_selector "[data-workspace-guard-target='status']", text: "newer draft in another tab", wait: 10
+    end
+
+    fill_in "Project name", with: "First tab keeps saving"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "First tab keeps saving", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    second_tab.close
+
+    reopened_tab = open_new_window
+    within_window(reopened_tab) do
+      visit new_translation_workspace_path
+      assert_field "Project name", with: "First tab keeps saving"
+    end
+    reopened_tab.close
+  end
+
+  test "edits made while offline are saved after reconnecting" do
+    visit new_translation_workspace_path
+    fill_in "Project name", with: "Online project"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+
+    set_browser_offline(true)
+    fill_in "Project name", with: "Edited while offline"
+    assert_selector "[data-workspace-guard-target='status']", text: "Could not save", wait: 10
+    set_browser_offline(false)
+
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 20
+    assert_equal "Edited while offline", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    refresh
+    assert_field "Project name", with: "Edited while offline"
+  ensure
+    set_browser_offline(false)
+  end
+
   private
 
   def sign_in_in_browser
@@ -164,5 +244,32 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
 
   def choose_language(label, value)
     choose_known_language(label, value)
+  end
+
+  def drop_next_draft_save_responses(count)
+    page.execute_script(<<~JS, count)
+      window.__pendingDraftDrops = arguments[0]
+      if (!window.__draftFetchWrapped) {
+        const deliver = window.fetch.bind(window)
+        window.__draftFetchWrapped = true
+        window.fetch = async (url, options = {}) => {
+          const response = await deliver(url, options)
+          const draftSave = new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST"
+          if (draftSave && window.__pendingDraftDrops > 0) {
+            window.__pendingDraftDrops -= 1
+            await response.arrayBuffer()
+            throw new TypeError("Failed to fetch")
+          }
+          return response
+        }
+      }
+    JS
+  end
+
+  def set_browser_offline(offline)
+    page.driver.browser.execute_cdp(
+      "Network.emulateNetworkConditions",
+      offline: offline, latency: 0, downloadThroughput: -1, uploadThroughput: -1
+    )
   end
 end

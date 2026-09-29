@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 const SAVE_DELAY_MS = 1000
+const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
 const SCALARS = [
   "project_name", "source_language", "target_language", "document_title",
   "source_text", "source_import_id", "experiment_name", "instruction_prompt",
@@ -14,15 +15,23 @@ export default class extends Controller {
   static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object }
 
   connect() {
+    // One editor per page load. Only this random identifier and save counter
+    // live in memory; the draft itself is stored encrypted on the server.
+    this.editorId = randomHex(16)
+    this.sequence = 0
+    this.unacknowledged = null
+    this.retryCount = 0
     this.lastSavedState = this.needsSaveValue ? null : this.state()
     this.currentUrl = window.location.href
     this.currentHistoryState = window.history.state
     this.onBeforeRender = this.onBeforeRender.bind(this)
     this.onBeforeVisit = this.onBeforeVisit.bind(this)
     this.onBeforeUnload = this.onBeforeUnload.bind(this)
+    this.onOnline = this.onOnline.bind(this)
     document.addEventListener("turbo:before-render", this.onBeforeRender)
     document.addEventListener("turbo:before-visit", this.onBeforeVisit)
     window.addEventListener("beforeunload", this.onBeforeUnload)
+    window.addEventListener("online", this.onOnline)
     if (this.needsSaveValue) this.scheduleSave()
   }
 
@@ -31,6 +40,7 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-render", this.onBeforeRender)
     document.removeEventListener("turbo:before-visit", this.onBeforeVisit)
     window.removeEventListener("beforeunload", this.onBeforeUnload)
+    window.removeEventListener("online", this.onOnline)
     if (this.hasDialogTarget) this.dialogTarget.close?.()
   }
 
@@ -52,6 +62,7 @@ export default class extends Controller {
 
   changed() {
     if (this.launching) return
+    this.retryCount = 0
     this.scheduleSave()
   }
 
@@ -72,10 +83,18 @@ export default class extends Controller {
 
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
+    // Resending unchanged content whose outcome is unknown is a replay of the
+    // same save; any other content is a newer save.
+    const sequence = this.unacknowledged?.snapshot === snapshot ? this.unacknowledged.sequence : ++this.sequence
+    this.unacknowledged = { sequence, snapshot }
     this.setStatus(this.messagesValue.saving)
-    this.saving = this.persist(workspace)
+    this.saving = this.persist(workspace, sequence)
     try {
       const result = await this.saving
+      if (result.sequence !== sequence) throw new Error("draft save was not acknowledged")
+
+      this.unacknowledged = null
+      this.retryCount = 0
       this.draftIdValue = result.id
       this.versionValue = result.version
       this.formTarget.elements.translation_workspace_draft_id.value = result.id
@@ -86,13 +105,32 @@ export default class extends Controller {
       return true
     } catch (error) {
       this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)
+      if (!error.final) this.scheduleRetry()
       return false
     } finally {
       this.saving = null
     }
   }
 
-  async persist(workspace) {
+  // A failed request may still have been saved; retrying resolves that with
+  // the same editor identity instead of guessing. Retries are bounded; going
+  // back online or editing again starts a new round. Conflicts and rejected
+  // content are final.
+  scheduleRetry() {
+    if (this.retryCount >= RETRY_DELAYS_MS.length) return
+    const delay = RETRY_DELAYS_MS[this.retryCount]
+    this.retryCount += 1
+    window.clearTimeout(this.saveTimer)
+    this.saveTimer = window.setTimeout(() => this.save(), delay)
+  }
+
+  onOnline() {
+    if (this.launching || !this.dirty()) return
+    this.retryCount = 0
+    this.scheduleSave()
+  }
+
+  async persist(workspace, sequence) {
     const response = await fetch(this.saveUrlValue, {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": this.csrfToken() },
@@ -100,12 +138,15 @@ export default class extends Controller {
         project_id: this.formTarget.elements["translation_workspace[project_id]"]?.value || "",
         draft_id: this.draftIdValue || "",
         version: this.draftIdValue ? this.versionValue : "",
+        editor_id: this.editorId,
+        sequence,
         workspace
       })
     })
     if (!response.ok) {
       const error = new Error("draft save failed")
-      error.conflict = response.status === 409
+      error.conflict = response.status === 409 || response.status === 404
+      error.final = response.status < 500
       throw error
     }
     return response.json()
@@ -202,17 +243,24 @@ export default class extends Controller {
 
   async discard() {
     if (!window.confirm(this.messagesValue.discardConfirm)) return
-    if (this.draftIdValue) {
+    window.clearTimeout(this.saveTimer)
+    if (this.saving) {
+      try { await this.saving } catch {}
+    }
+    // A save whose response was lost may have created the draft, so this
+    // editor asks the server to discard even without a known draft identity.
+    if (this.draftIdValue || this.sequence > 0) {
       const response = await fetch(this.saveUrlValue, {
         method: "DELETE", credentials: "same-origin",
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() },
         body: new URLSearchParams({
           project_id: this.formTarget.elements["translation_workspace[project_id]"]?.value || "",
-          draft_id: this.draftIdValue,
-          version: this.versionValue
+          draft_id: this.draftIdValue || "",
+          version: this.draftIdValue ? this.versionValue : "",
+          editor_id: this.editorId
         })
       })
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         this.setStatus(response.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
         return
       }
@@ -228,4 +276,8 @@ export default class extends Controller {
   csrfToken() {
     return document.querySelector("meta[name='csrf-token']")?.content || ""
   }
+}
+
+function randomHex(bytes) {
+  return Array.from(window.crypto.getRandomValues(new Uint8Array(bytes)), byte => byte.toString(16).padStart(2, "0")).join("")
 }

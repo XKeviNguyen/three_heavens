@@ -2,6 +2,8 @@ class TranslationWorkspaceDraft < ApplicationRecord
   # Rolling seven-day expiry; the hourly production job deletes expired rows.
   RETENTION = 7.days
   MAX_PAYLOAD_BYTES = 500_000
+  EDITOR_ID_FORMAT = /\A[0-9a-f]{32}\z/
+  MAX_EDITOR_SEQUENCE = 2**53 - 1
   SCALAR_FIELDS = %w[
     project_name source_language target_language document_title source_text
     source_import_id experiment_name instruction_prompt workflow_mode
@@ -27,6 +29,8 @@ class TranslationWorkspaceDraft < ApplicationRecord
   validates :context_key, presence: true, uniqueness: { scope: :user_id }, length: { maximum: 80 }
   validates :workspace_payload, presence: true
   validates :expires_at, presence: true
+  validates :editor_id, format: { with: EDITOR_ID_FORMAT }, allow_nil: true
+  validates :editor_sequence, presence: true, numericality: { only_integer: true, greater_than: 0 }, if: :editor_id
 
   before_validation :assign_public_id, on: :create
 
@@ -84,6 +88,15 @@ class TranslationWorkspaceDraft < ApplicationRecord
 
   def payload
     JSON.parse(workspace_payload)
+  end
+
+  # An editor is one browser page load. The editor that wrote the draft last
+  # may keep writing even if it never received the latest version, because
+  # every change since its own acknowledged version is its own. Anyone else
+  # must name the current identity and version (optimistic concurrency).
+  def writable_by?(editor_id:, public_id:, version:)
+    (editor_id.present? && self.editor_id == editor_id) ||
+      (self.public_id == public_id && lock_version == version)
   end
 
   private

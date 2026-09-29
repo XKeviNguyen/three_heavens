@@ -297,6 +297,137 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     assert_not TranslationWorkspaceDraft.exists?(draft.id)
   end
 
+  # The dangerous sequence: save A commits but its response never reaches the
+  # browser, so the browser still believes no draft (or an older version)
+  # exists. Discarding A's response here is exactly the browser's knowledge
+  # after a dropped connection; the server-side commit is real.
+  test "a committed save whose response was lost never refuses or regresses the next edit" do
+    editor = new_editor_id
+    post translation_workspace_draft_path, params: {
+      editor_id: editor, sequence: 1, draft_id: "", version: "", workspace: payload("source_text" => "Edit A")
+    }, as: :json
+    assert_response :success
+
+    post translation_workspace_draft_path, params: {
+      editor_id: editor, sequence: 2, draft_id: "", version: "", workspace: payload("source_text" => "Edit B")
+    }, as: :json
+    assert_response :success
+    identity = JSON.parse(response.body)
+    draft = users(:normal).translation_workspace_drafts.sole
+    assert_equal [ draft.public_id, draft.lock_version, 2 ], identity.values_at("id", "version", "sequence")
+
+    get new_translation_workspace_path
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "Edit B"
+    assert_select "input[name='translation_workspace_draft_version'][value='#{draft.lock_version}']"
+  end
+
+  test "an update whose response was lost lets the same page keep saving from its stale version" do
+    editor = new_editor_id
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 1, workspace: payload }, as: :json
+    acknowledged = JSON.parse(response.body)
+
+    post translation_workspace_draft_path, params: {
+      editor_id: editor, sequence: 2, draft_id: acknowledged["id"], version: acknowledged["version"],
+      workspace: payload("source_text" => "Committed but unacknowledged")
+    }, as: :json
+    assert_response :success
+    post translation_workspace_draft_path, params: {
+      editor_id: editor, sequence: 3, draft_id: acknowledged["id"], version: acknowledged["version"],
+      workspace: payload("source_text" => "Latest edit")
+    }, as: :json
+
+    assert_response :success
+    assert_equal "Latest edit", users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text")
+  end
+
+  test "a replayed or late duplicate save is acknowledged without writing or regressing" do
+    editor = new_editor_id
+    first = { editor_id: editor, sequence: 1, workspace: payload("source_text" => "Edit A") }
+    post translation_workspace_draft_path, params: first, as: :json
+    draft = users(:normal).translation_workspace_drafts.sole
+    written_at = draft.updated_at
+
+    post translation_workspace_draft_path, params: first, as: :json
+    assert_response :success
+    assert_equal [ draft.public_id, draft.lock_version, 1 ], JSON.parse(response.body).values_at("id", "version", "sequence")
+    assert_equal [ draft.lock_version, written_at ], draft.reload.then { [ it.lock_version, it.updated_at ] }
+
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 3, workspace: payload("source_text" => "Edit C") }, as: :json
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 2, workspace: payload("source_text" => "Late B") }, as: :json
+    assert_response :success
+    assert_equal 3, JSON.parse(response.body).fetch("sequence")
+    assert_equal "Edit C", draft.reload.payload.fetch("source_text")
+    assert_equal 1, users(:normal).translation_workspace_drafts.count
+  end
+
+  test "another tab cannot overwrite the newer draft until it reloads the current version" do
+    tab_one = new_editor_id
+    tab_two = new_editor_id
+    post translation_workspace_draft_path, params: { editor_id: tab_one, sequence: 1, workspace: payload("source_text" => "Tab one") }, as: :json
+    draft = users(:normal).translation_workspace_drafts.sole
+
+    post translation_workspace_draft_path, params: { editor_id: tab_two, sequence: 1, workspace: payload("source_text" => "Stale tab two") }, as: :json
+    assert_response :conflict
+    post translation_workspace_draft_path, params: {
+      editor_id: tab_two, sequence: 2, draft_id: draft.public_id, version: draft.lock_version + 1,
+      workspace: payload("source_text" => "Guessing tab two")
+    }, as: :json
+    assert_response :conflict
+    assert_equal "Tab one", draft.reload.payload.fetch("source_text")
+
+    post translation_workspace_draft_path, params: {
+      editor_id: tab_two, sequence: 3, draft_id: draft.public_id, version: draft.lock_version,
+      workspace: payload("source_text" => "Reloaded tab two")
+    }, as: :json
+    assert_response :success
+    post translation_workspace_draft_path, params: {
+      editor_id: tab_one, sequence: 2, draft_id: draft.public_id, version: draft.lock_version,
+      workspace: payload("source_text" => "Tab one again")
+    }, as: :json
+    assert_response :conflict
+    assert_equal "Reloaded tab two", draft.reload.payload.fetch("source_text")
+  end
+
+  test "the page that saved last can discard or launch its draft without having seen the latest identity" do
+    editor = new_editor_id
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 1, workspace: payload }, as: :json
+    delete translation_workspace_draft_path, params: { editor_id: new_editor_id, draft_id: "", version: "" }
+    assert_response :conflict
+    delete translation_workspace_draft_path, params: { editor_id: editor, draft_id: "", version: "" }
+    assert_response :no_content
+    assert_equal 0, users(:normal).translation_workspace_drafts.count
+    delete translation_workspace_draft_path, params: { editor_id: editor, draft_id: "", version: "" }
+    assert_response :no_content
+
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 2, workspace: payload("project_name" => "Lost response") }, as: :json
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 2, workspace: payload("project_name" => "Lost response") }, as: :json
+    identity = JSON.parse(response.body)
+    assert_enqueued_jobs 1, only: TranslationRunJob do
+      post translation_workspace_path, params: {
+        translation_workspace: {
+          project_name: "Lost response", source_language: "Vietnamese", target_language: "Japanese",
+          document_title: "Draft document", source_text: "Private source", instruction_prompt: "Translate faithfully",
+          model_ids: [ llm_models(:openrouter_claude).id ], submission_token: issue_translation_workspace_token
+        },
+        translation_workspace_draft_id: identity["id"], translation_workspace_draft_version: identity["version"]
+      }
+    end
+    assert_response :redirect
+    assert_equal 0, users(:normal).translation_workspace_drafts.count
+  end
+
+  test "rejects malformed editor identities without writing" do
+    [
+      { editor_id: "not-hex", sequence: 1 }, { editor_id: "A" * 32, sequence: 1 }, { editor_id: new_editor_id, sequence: 0 },
+      { editor_id: new_editor_id }, { sequence: 1 }, { editor_id: new_editor_id, sequence: 2**60 },
+      { editor_id: [ new_editor_id ], sequence: 1 }, { editor_id: new_editor_id, sequence: [ 1 ] }
+    ].each do |identity|
+      post translation_workspace_draft_path, params: identity.merge(workspace: payload), as: :json
+      assert_response :bad_request, identity.inspect
+    end
+    assert_equal 0, users(:normal).translation_workspace_drafts.count
+  end
+
   private
 
   def payload(overrides = {})
@@ -307,5 +438,9 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
       "workflow_mode" => "manual", "model_ids" => [], "model_identifiers" => [],
       "translation_reference_revision_ids" => []
     }.merge(overrides)
+  end
+
+  def new_editor_id
+    SecureRandom.hex(16)
   end
 end

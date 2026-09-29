@@ -3166,7 +3166,12 @@ CREATE TABLE public.translation_workspace_drafts (
     expires_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    editor_id character varying,
+    editor_sequence bigint,
     CONSTRAINT workspace_drafts_context_key_check CHECK ((char_length((context_key)::text) <= 80)),
+    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$'::text))),
+    CONSTRAINT workspace_drafts_editor_pair_check CHECK (((editor_id IS NULL) = (editor_sequence IS NULL))),
+    CONSTRAINT workspace_drafts_editor_sequence_check CHECK (((editor_sequence IS NULL) OR (editor_sequence > 0))),
     CONSTRAINT workspace_drafts_lock_version_check CHECK ((lock_version >= 0))
 );
 
@@ -6248,6 +6253,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260929120100'),
 ('20260929120000'),
 ('20260929090200'),
 ('20260929090100'),
