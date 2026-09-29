@@ -236,6 +236,42 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_empty page.evaluate_script("window.__workspaceErrors")
   end
 
+  # Saving replaces the panel that opened the sheet, so focus used to fall to
+  # the page body; it must return to the equivalent control in the new panel.
+  test "terminology sheet returns focus to the panel after saving and reopens cleanly" do
+    visit new_translation_workspace_path
+    find("#workspace-glossary summary", text: "Choose saved glossary").click
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
+    assert_selector "#workspace-glossary", text: "Workspace terms"
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_no_selector "dialog[open]"
+    assert_equal [ "A", "Edit terminology" ], page.evaluate_script("[document.activeElement.tagName, document.activeElement.textContent.trim()]")
+
+    click_link "Edit terminology"
+    assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
+    click_button "Cancel"
+    click_link "+ Add terminology"
+    within "dialog[open]" do
+      fill_in "Glossary name", with: "Second workspace terms"
+      choose_known_language "Source language", "Vietnamese"
+      choose_known_language "Target language", "Japanese"
+      first("input[name='glossary[entries][][source_term]']").fill_in with: "Mercy"
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈しみ"
+      click_button "Create & select"
+    end
+    assert_no_selector "dialog[open]"
+    assert page.evaluate_script("!!document.activeElement.closest('#workspace-terminology')"), "focus must return to the terminology panel"
+
+    click_link "Edit terminology"
+    assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
+    assert_equal [ 1, 1 ], page.evaluate_script("[document.querySelectorAll('dialog[data-controller=\"terminology-sheet\"]').length, document.querySelectorAll('#workspace-terminology-editor form').length]")
+  end
+
   test "success failure and removal of an import preserve unrelated workspace fields" do
     visit new_translation_workspace_path
     fill_in "Project name", with: "Import project"
