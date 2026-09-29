@@ -2906,11 +2906,13 @@ CREATE TABLE public.source_imports (
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    request_key character varying,
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
     CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying, 'pdf'::character varying])::text[])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
+    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$'::text))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
     CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying])::text[])))
 );
@@ -4872,6 +4874,13 @@ CREATE UNIQUE INDEX index_source_imports_on_resulting_document_id ON public.sour
 
 
 --
+-- Name: index_source_imports_on_user_and_request_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_source_imports_on_user_and_request_key ON public.source_imports USING btree (user_id, request_key) WHERE (request_key IS NOT NULL);
+
+
+--
 -- Name: index_source_imports_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6253,6 +6262,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260929120200'),
 ('20260929120100'),
 ('20260929120000'),
 ('20260929090200'),

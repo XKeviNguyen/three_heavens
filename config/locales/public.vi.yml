@@ -194,6 +194,7 @@ vi:
       docx_xml_too_large: Nội dung DOCX vượt giới hạn an toàn.
       empty_source: Tệp không chứa văn bản có thể đọc được.
       encrypted_docx: Chưa hỗ trợ tệp DOCX được mã hóa.
+      import_unavailable: Tệp tải lên này không còn khả dụng. Hãy tải tệp lên lại.
       macro_docx: Chưa hỗ trợ tệp Word có macro.
       malformed_docx: Không thể đọc tệp DOCX một cách an toàn.
       malformed_pdf: Không thể đọc tệp PDF một cách an toàn.
@@ -204,6 +205,7 @@ vi:
       pdf_timeout: Quá trình xử lý PDF mất quá nhiều thời gian.
       pdf_too_many_pages: Tệp PDF có quá nhiều trang để xử lý an toàn.
       project_binding_invalid: Tệp nguồn đã nhập không còn dùng được cho dự án này.
+      request_key_reused: Lượt tải lên này đã được gửi với một tệp khác. Hãy chọn lại tệp.
       source_too_long: Văn bản trích xuất vượt giới hạn ký tự.
       suspicious_compression: Không thể xử lý tệp DOCX một cách an toàn.
       unsafe_docx: Không thể xử lý tệp DOCX một cách an toàn.

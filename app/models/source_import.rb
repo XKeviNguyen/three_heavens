@@ -39,6 +39,7 @@ class SourceImport < ApplicationRecord
   validates :failure_code, :extraction_version, length: { maximum: 100 }, allow_nil: true
   validates :failure_message, length: { maximum: 500 }, allow_nil: true
   validates :expires_at, presence: true
+  validates :request_key, format: { with: SourceImports::Limits::REQUEST_KEY_FORMAT }, allow_nil: true
 
   scope :expired_abandoned, lambda { |cutoff = Time.current|
     where(status: %w[pending ready failed]).where(expires_at: ..cutoff)

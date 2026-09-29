@@ -20,5 +20,6 @@ module SourceImports
     IMPORT_EXPIRATION = 24.hours
     CLEANUP_BATCH_SIZE = 100
     EXTRACTION_VERSION = "document-io-v3"
+    REQUEST_KEY_FORMAT = /\A[0-9a-f]{32}\z/
   end
 end

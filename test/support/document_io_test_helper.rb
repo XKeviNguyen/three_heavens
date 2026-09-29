@@ -83,7 +83,8 @@ module DocumentIoTestHelper
   def create_ready_import(user:, text: "Imported source", filename: "source.txt")
     SourceImports::Create.call(
       user:,
-      upload: uploaded_file(text, filename:, content_type: "text/plain")
+      upload: uploaded_file(text, filename:, content_type: "text/plain"),
+      request_key: SecureRandom.hex(16)
     )
   end
 

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { randomHex } from "controllers/random_identifier"
 
 const SAVE_DELAY_MS = 1000
 const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
@@ -276,8 +277,4 @@ export default class extends Controller {
   csrfToken() {
     return document.querySelector("meta[name='csrf-token']")?.content || ""
   }
-}
-
-function randomHex(bytes) {
-  return Array.from(window.crypto.getRandomValues(new Uint8Array(bytes)), byte => byte.toString(16).padStart(2, "0")).join("")
 }

@@ -194,6 +194,7 @@ en:
       docx_xml_too_large: The DOCX content exceeds safe limits.
       empty_source: The file does not contain readable text.
       encrypted_docx: Encrypted DOCX files are not supported.
+      import_unavailable: This upload is no longer available. Upload the file again.
       macro_docx: Macro-enabled Word documents are not supported.
       malformed_docx: The DOCX could not be read safely.
       malformed_pdf: The PDF could not be read safely.
@@ -204,6 +205,7 @@ en:
       pdf_timeout: This PDF took too long to process.
       pdf_too_many_pages: This PDF has too many pages to process safely.
       project_binding_invalid: The source import is no longer available for this project.
+      request_key_reused: This upload was already submitted with a different file. Choose the file again.
       source_too_long: The extracted source exceeds the character limit.
       suspicious_compression: The DOCX cannot be processed safely.
       unsafe_docx: The DOCX cannot be processed safely.

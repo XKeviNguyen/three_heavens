@@ -16,6 +16,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: TranslationRunJob do
       post source_imports_path, params: {
         source_import: {
+          request_key: SecureRandom.hex(16),
           source_file: uploaded_file("\xEF\xBB\xBFOriginal\r\ntext".b, filename: "sermon.txt", content_type: "text/plain")
         }
       }
@@ -77,6 +78,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: AI_JOBS do
       post source_imports_path, params: {
         source_import: {
+          request_key: SecureRandom.hex(16),
           source_file: uploaded_file(pdf_with_text("Readable PDF source"), filename: "source.pdf", content_type: "application/pdf")
         }
       }
@@ -131,7 +133,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
     uploads.each do |upload, message|
       assert_no_enqueued_jobs only: TranslationRunJob do
-        post source_imports_path, params: { source_import: { source_file: upload } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: SecureRandom.hex(16) } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -153,7 +155,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
     cases.each do |upload, message|
       assert_no_enqueued_jobs only: AI_JOBS do
-        post source_imports_path, params: { source_import: { source_file: upload } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: SecureRandom.hex(16) } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -168,8 +170,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       {},
       { source_import: "malformed" },
       { source_import: [ "malformed" ] },
-      { source_import: { source_file: { nested: "malformed" } } },
-      { source_import: { source_file: [ "malformed" ] } }
+      { source_import: { source_file: { nested: "malformed" }, request_key: SecureRandom.hex(16) } },
+      { source_import: { source_file: [ "malformed" ], request_key: SecureRandom.hex(16) } }
     ]
 
     payloads.each do |payload|
@@ -192,6 +194,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
+            request_key: SecureRandom.hex(16),
             source_file: uploaded_file(
               malformed_docx,
               filename: "broken.docx",
@@ -213,6 +216,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
+            request_key: SecureRandom.hex(16),
             source_file: uploaded_file("Retry source", filename: "retry.txt", content_type: "text/plain")
           }
         }
@@ -232,6 +236,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     source = "# Heading\n<script>alert('source only')</script>"
     post source_imports_path, params: {
       source_import: {
+        request_key: SecureRandom.hex(16),
         source_file: uploaded_file(source, filename: "source.md", content_type: "text/markdown")
       }
     }
@@ -471,6 +476,66 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_response :conflict
     assert_equal "This source import can no longer be canceled.", response.parsed_body["error"]
     assert SourceImport.exists?(consumed.id)
+  end
+
+  test "every upload must carry one well-formed request key" do
+    [ nil, "", "short", "A" * 32, [ SecureRandom.hex(16) ], { nested: SecureRandom.hex(16) } ].each do |key|
+      assert_no_difference -> { SourceImport.count } do
+        post source_imports_path(format: :json), params: {
+          source_import: { source_file: uploaded_file("Keyed", filename: "keyed.txt", content_type: "text/plain"), request_key: key }
+        }
+      end
+      assert_response :bad_request, key.inspect
+    end
+  end
+
+  test "a replayed upload returns the original import and a reused key with another file is refused" do
+    key = SecureRandom.hex(16)
+    deliver = lambda do |content, filename: "replay.txt"|
+      post source_imports_path(format: :json), params: {
+        source_import: { source_file: uploaded_file(content, filename:, content_type: "text/plain"), request_key: key }
+      }
+      JSON.parse(response.body)
+    end
+
+    first = nil
+    assert_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ], 1 do
+      first = deliver.call("Delivered once")
+      assert_response :created
+      replay = deliver.call("Delivered once")
+      assert_response :created
+      assert_equal first.except("project_binding"), replay.except("project_binding")
+    end
+
+    assert_no_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ] do
+      refused = deliver.call("A different file")
+      assert_response :unprocessable_content
+      assert_equal I18n.t("source_imports.errors.request_key_reused"), refused.fetch("error")
+    end
+    assert_equal "Delivered once", SourceImport.find(first.fetch("id")).extracted_text
+  end
+
+  test "the upload form issues a fresh key per render and a double submit resolves to one import" do
+    keys = 2.times.map do
+      get new_source_import_path
+      assert_response :success
+      css_select("input[type='hidden'][name='source_import[request_key]']").sole["value"]
+    end
+    assert keys.all? { it.match?(SourceImports::Limits::REQUEST_KEY_FORMAT) }
+    assert_not_equal keys.first, keys.second
+    assert_equal 0, SourceImport.count
+
+    locations = []
+    assert_difference -> { SourceImport.count }, 1 do
+      2.times do
+        post source_imports_path, params: {
+          source_import: { source_file: uploaded_file("Double submit", filename: "double.txt", content_type: "text/plain"), request_key: keys.first }
+        }
+        assert_response :redirect
+        locations << response.location
+      end
+    end
+    assert_equal 1, locations.uniq.size
   end
 
   private

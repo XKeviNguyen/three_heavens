@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { randomHex } from "controllers/random_identifier"
 
 export default class extends Controller {
   static targets = ["file", "button", "message", "import", "filename", "metadata"]
@@ -11,10 +12,17 @@ export default class extends Controller {
       return
     }
 
+    // Uploading the same chosen file again (a retry or double click) is the
+    // same action, so the server returns its import instead of a second copy.
+    if (this.uploadedFile !== file) {
+      this.uploadedFile = file
+      this.requestKey = randomHex(16)
+    }
     this.buttonTarget.disabled = true
     this.messageTarget.textContent = this.messagesValue.extracting
     const body = new FormData()
     body.append("source_import[source_file]", file)
+    body.append("source_import[request_key]", this.requestKey)
     if (this.projectIdValue) body.append("source_import[project_id]", this.projectIdValue)
 
     try {
