@@ -3,6 +3,8 @@ module Settings
     before_action { response.headers["Cache-Control"] = "no-store" }
 
     def show
+      notice = GoogleIdentity::Notice.take(cookies)
+      flash.now[:alert] = t("google_identity.messages.#{notice}") if notice
       @google_identity = current_user.federated_identities.find_by(provider: GoogleIdentity::PROVIDER)
       @pending_link = GoogleIdentity::PendingLink.fetch(cookies)
       unless @pending_link&.for?(current_user)

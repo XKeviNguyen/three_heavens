@@ -2,7 +2,9 @@ vi:
   google_identity:
     or: hoặc
     button_unavailable: Hiện chưa thể đăng nhập bằng Google. Bạn vẫn có thể dùng email và mật khẩu.
+    button_expired: Trang này đã mở quá lâu. Hãy tải lại trang để tiếp tục với Google.
     messages:
+      link_failed: Không thể kết nối Google. Vui lòng thử lại.
       failed: Không thể hoàn tất đăng nhập bằng Google. Vui lòng thử lại.
       unavailable: Đăng nhập bằng Google tạm thời không khả dụng. Hãy thử lại sau hoặc dùng email và mật khẩu.
       rate_limited: Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi ba phút rồi thử lại.

@@ -7,6 +7,12 @@ module ApplicationHelper
     appearance.in?(%w[light dark]) ? appearance : "light dark"
   end
 
+  # Where preference forms return after an HTML submission; only GET pages can
+  # be revisited (a re-rendered POST response has no URL to go back to).
+  def preference_return_path
+    request.fullpath if request.get? || request.head?
+  end
+
   def appearance_labels
     { heading: t("appearance.label") }.merge(User::APPEARANCES.to_h { |appearance| [ appearance, t("appearance.options.#{appearance}") ] })
   end

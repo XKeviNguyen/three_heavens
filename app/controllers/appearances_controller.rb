@@ -1,5 +1,8 @@
 class AppearancesController < ApplicationController
   skip_before_action :require_authentication
+  # The preference lives on the user or in its own cookie. Saves often finish
+  # in the background, so a session written here could overwrite a newer one.
+  before_action { request.session_options[:skip] = true }
 
   def update
     appearance = params[:appearance].to_s

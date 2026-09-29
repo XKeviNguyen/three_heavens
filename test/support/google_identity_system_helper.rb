@@ -52,9 +52,34 @@ module GoogleIdentitySystemHelper
     end
   end
 
-  # CDP keeps injected scripts for the whole browser session, so remove it.
+  # Lets a test fire the ceremony-expiry timer instead of waiting minutes.
+  LONG_TIMER_CAPTURE = <<~JS.freeze
+    window.__longTimers = [];
+    const realSetTimeout = window.setTimeout;
+    window.setTimeout = function (callback, delay, ...rest) {
+      if (delay >= 60000) { window.__longTimers.push({ callback, delay }); return -1; }
+      return realSetTimeout(callback, delay, ...rest);
+    };
+  JS
+
+  # CDP keeps injected scripts for the whole browser session, so remove them.
   def self.included(base)
-    base.teardown { remove_google_identity_stand_in }
+    base.teardown do
+      remove_google_identity_stand_in
+      @injected_scripts&.each { |identifier| page.driver.browser.execute_cdp("Page.removeScriptToEvaluateOnNewDocument", identifier: identifier) }
+    end
+  end
+
+  def install_long_timer_capture
+    (@injected_scripts ||= []) << page.driver.browser.execute_cdp("Page.addScriptToEvaluateOnNewDocument", source: LONG_TIMER_CAPTURE).fetch("identifier")
+  end
+
+  def fire_long_timers
+    page.execute_script("window.__longTimers.splice(0).forEach((timer) => timer.callback())")
+  end
+
+  def gis_nonces
+    page.evaluate_script("window.__gis.initialized.map((config) => config.nonce)")
   end
 
   def install_google_identity_stand_in

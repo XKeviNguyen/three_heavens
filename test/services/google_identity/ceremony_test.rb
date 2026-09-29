@@ -32,7 +32,8 @@ class GoogleIdentity::CeremonyTest < ActiveSupport::TestCase
     ].each { |path| assert_nil GoogleIdentity::Ceremony.safe_return_path(path), path }
     assert_nil GoogleIdentity::Ceremony.safe_return_path("/path with space")
     assert_nil GoogleIdentity::Ceremony.safe_return_path("/#{"a" * 250}")
-    assert_equal "/%2F%2Fevil.example", GoogleIdentity::Ceremony.safe_return_path("/%2F%2Fevil.example")
+    assert_nil GoogleIdentity::Ceremony.safe_return_path("/%2F%2Fevil.example")
+    assert_nil GoogleIdentity::Ceremony.safe_return_path("/no-such-page")
     assert_equal "/projects/1?tab=history", GoogleIdentity::Ceremony.safe_return_path("/projects/1?tab=history")
   end
 

@@ -1,7 +1,7 @@
 <div class="<%= class_name %>" role="group" aria-label="<%= t("appearance.label") %>">
   <p class="appearance-menu-heading" aria-hidden="true"><%= t("appearance.label") %></p>
   <% User::APPEARANCES.each do |appearance| %>
-    <%= button_to appearance_path, method: :patch, params: { appearance: appearance }, form: { data: { action: "submit->appearance#choose" } }, class: "appearance-option", aria: { pressed: (appearance == current_appearance).to_s }, data: { appearance: appearance } do %>
+    <%= button_to appearance_path, method: :patch, params: { appearance: appearance, return_to: preference_return_path }.compact, form: { data: { action: "submit->appearance#choose" } }, class: "appearance-option", aria: { pressed: (appearance == current_appearance).to_s }, data: { appearance: appearance } do %>
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>
       <span><%= appearance_labels.fetch(appearance) %></span>
     <% end %>

@@ -2,7 +2,9 @@ ja:
   google_identity:
     or: または
     button_unavailable: 現在、Googleでのログインを利用できません。メールアドレスとパスワードでログインできます。
+    button_expired: このページは長時間開かれています。Googleで続行するには、ページを再読み込みしてください。
     messages:
+      link_failed: Googleを連携できませんでした。もう一度お試しください。
       failed: Googleでのログインを完了できませんでした。もう一度お試しください。
       unavailable: Googleでのログインは一時的に利用できません。時間をおいて再度お試しいただくか、メールアドレスとパスワードをご利用ください。
       rate_limited: ログインの試行回数が多すぎます。3分後にもう一度お試しください。

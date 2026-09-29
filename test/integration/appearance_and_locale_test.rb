@@ -48,6 +48,64 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     assert_select "html[data-appearance='system']"
   end
 
+  test "HTML appearance changes return to the exact page even without a Referer" do
+    user = users(:normal)
+    user.update_columns(email_verified_at: nil, confirmation_sent_at: Time.current)
+    token = user.generate_token_for(:email_confirmation)
+    confirmation = "/email_confirmation?token=#{token}"
+
+    get confirmation
+    assert_equal "no-referrer", response.headers["Referrer-Policy"]
+    assert_select "form[action='#{appearance_path}'] input[name='return_to'][value=?]", confirmation, count: 3
+
+    [ "/", "/login", "/registration/new", confirmation ].each do |page|
+      patch appearance_path, params: { appearance: "dark", return_to: page }
+      assert_redirected_to page
+    end
+    follow_redirect!
+    assert_select "form[action='#{email_confirmation_path}'] input[name='token'][value=?]", token
+    assert_equal "no-referrer", response.headers["Referrer-Policy"]
+
+    sign_in_as users(:other)
+    [ "/settings/account", "/projects", "/translation_workspace/new" ].each do |page|
+      patch appearance_path, params: { appearance: "light", return_to: page }
+      assert_redirected_to page
+    end
+  end
+
+  test "return destinations that could leave the site fall back safely" do
+    [ "https://evil.example/", "//evil.example/x", "///evil.example", "/\\evil.example", "javascript:alert(1)",
+      "/%2F%2Fevil.example", "/%5C%5Cevil.example", "http:/evil.example", " /login", "/login\n", "/" + "a" * 600,
+      "/no-such-page" ].each do |attack|
+      patch appearance_path, params: { appearance: "dark", return_to: attack }
+      assert_redirected_to root_path, attack.inspect
+    end
+
+    patch appearance_path, params: { appearance: "dark", return_to: "//evil.example" }, headers: { "Referer" => "http://www.example.com/login" }
+    assert_redirected_to "/login", "a hostile return_to falls back to a same-host Referer"
+    patch locale_path, params: { locale_code: "ja", return_to: "https://evil.example" }
+    assert_redirected_to root_path
+  end
+
+  test "return paths and confirmation tokens stay out of logs" do
+    user = users(:normal)
+    user.update_columns(email_verified_at: nil, confirmation_sent_at: Time.current)
+    token = user.generate_token_for(:email_confirmation)
+    log = StringIO.new
+    original_logger = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+    ActionController::Base.logger = Rails.logger
+
+    patch appearance_path, params: { appearance: "dark", return_to: "/email_confirmation?token=#{token}" }
+    assert_redirected_to "/email_confirmation?token=#{token}"
+    assert_match %r{Redirected to http://www\.example\.com/email_confirmation\?token=\[FILTERED\]}, log.string
+    assert_match(/"return_to" => "\[FILTERED\]"/, log.string)
+    assert_not_includes log.string, token
+  ensure
+    Rails.logger = original_logger
+    ActionController::Base.logger = original_logger
+  end
+
   test "signed-in users keep their appearance on their account" do
     user = users(:normal)
     sign_in_as user

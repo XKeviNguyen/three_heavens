@@ -34,18 +34,9 @@ module GoogleIdentity
       new(payload) if payload.is_a?(Hash) && valid_payload?(payload)
     end
 
-    # Accepts only same-origin absolute paths; rejects scheme-relative,
-    # backslash, and control-character tricks that browsers may treat as hosts.
+    # The shared validation, with a tighter length so the nonce stays small.
     def self.safe_return_path(path)
-      path = path.to_s
-      return if path.empty? || path.length > MAXIMUM_RETURN_PATH_LENGTH
-      return unless path.start_with?("/") && !path.start_with?("//") && path.match?(/\A[\x21-\x7e]+\z/)
-      return if path.include?("\\")
-
-      uri = URI.parse(path)
-      path if uri.scheme.nil? && uri.host.nil?
-    rescue URI::InvalidURIError
-      nil
+      SafeReturnPath.call(path) if path.to_s.length <= MAXIMUM_RETURN_PATH_LENGTH
     end
 
     def self.valid_payload?(payload)

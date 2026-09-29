@@ -233,7 +233,8 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
 
   test "sign-in pages offer Google only when configured and keep email sign-in" do
     get login_path
-    assert_select "[data-controller='google-sign-in'][data-google-sign-in-text-value='continue_with'][data-google-sign-in-nonce-value]"
+    assert_select "[data-controller='google-sign-in'][data-google-sign-in-text-value='continue_with'][data-google-sign-in-ceremony-url-value='#{google_identity_ceremony_path}'][data-google-sign-in-intent-value='sign_in']"
+    assert_select "[data-google-sign-in-nonce-value]", { count: 0 }, "no ceremony is baked into the page"
     assert_select "form[action='#{session_path}'] input[type='password']"
     get new_registration_path
     assert_select "[data-google-sign-in-text-value='signup_with']"

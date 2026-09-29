@@ -54,10 +54,13 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     (async () => {
       for (let cycle = 0; cycle < cycles; cycle++) {
         for (const locale of ["ja", "vi", "en"]) {
+          // Each switch is a Turbo visit; wait for it to finish rendering before the next.
+          const loaded = new Promise((resolve) => document.addEventListener("turbo:load", resolve, { once: true }));
           const select = document.querySelector("#app-sidebar select[name='locale_code']");
           select.value = locale;
           select.dispatchEvent(new Event("change", { bubbles: true }));
-          while (document.documentElement.lang !== locale || !document.querySelector("#app-sidebar select[name='locale_code']")) await wait(10);
+          await loaded;
+          if (document.documentElement.lang !== locale) return done(`expected ${locale}, got ${document.documentElement.lang}`);
           await wait(20);
         }
       }
@@ -98,6 +101,20 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "rapid appearance choices persist in order and survive an immediate navigation" do
+    user = users(:normal)
+    sign_in_in_browser(user, "correct horse battery staple")
+    visit projects_path
+    page.execute_script(%w[dark system dark light].map { |choice| "document.querySelector(`.appearance-option[data-appearance='#{choice}']`).form.requestSubmit();" }.join)
+    within("aside#app-sidebar") { click_link "History" }
+
+    assert_current_path history_path
+    assert_selector "html[data-appearance='light']"
+    Timeout.timeout(5) { sleep 0.05 until user.reload.appearance == "light" }
+    refresh
+    assert_selector "html[data-appearance='light']"
+  end
+
   test "System follows the operating system live and explicit choices override it" do
     visit login_path
     emulate_color_scheme("dark")
@@ -121,6 +138,28 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     visit new_registration_path
     assert_equal CANVAS_DARK, body_background
     assert_equal "dark", page.evaluate_script("getComputedStyle(document.documentElement).colorScheme")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.setScriptExecutionDisabled", value: false)
+  end
+
+  test "without JavaScript, changing appearance keeps the confirmation page and its token" do
+    user = users(:normal)
+    user.update_columns(email_verified_at: nil, confirmation_sent_at: Time.current)
+    token = user.generate_token_for(:email_confirmation)
+    page.driver.browser.execute_cdp("Emulation.setScriptExecutionDisabled", value: true)
+
+    visit "/email_confirmation?token=#{token}"
+    find(".appearance-menu summary").click
+    click_button "Dark"
+    assert_current_path "/email_confirmation?token=#{token}"
+    assert_selector "html[data-appearance='dark']"
+    assert_button "Confirm email"
+
+    visit login_path
+    find(".appearance-menu summary").click
+    click_button "Light"
+    assert_current_path login_path
+    assert_selector "html[data-appearance='light']"
   ensure
     page.driver.browser.execute_cdp("Emulation.setScriptExecutionDisabled", value: false)
   end
@@ -243,9 +282,9 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     # few KB of history bookkeeping per visit, so the bound there only catches
     # document-sized retention.
     { "appearance" => [ APPEARANCE_CYCLES, 64.kilobytes ], "locale" => [ LOCALE_CYCLES, 1.megabyte ] }.each do |name, (cycles, heap_bound)|
-      browser.execute_async_script(cycles, 30)
+      assert_nil browser.execute_async_script(cycles, 30), "#{name} warm-up cycles"
       warmed = client_footprint(browser)
-      browser.execute_async_script(cycles, 30)
+      assert_nil browser.execute_async_script(cycles, 30), "#{name} measured cycles"
       settled = client_footprint(browser)
 
       %i[nodes stylesheets listeners menus].each do |metric|

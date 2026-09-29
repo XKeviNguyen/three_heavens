@@ -6,7 +6,7 @@ class ApplicationController < ActionController::Base
   before_action :require_authentication
   around_action :with_locale
 
-  helper_method :current_user, :authenticated?, :current_appearance, :google_identity_ceremony
+  helper_method :current_user, :authenticated?, :current_appearance
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
@@ -75,14 +75,19 @@ class ApplicationController < ActionController::Base
     )
   end
 
-  # Returns to the referring page only when it is on this host; otherwise home.
+  # Returns to the page the form was on: its explicit return_to (needed on
+  # no-referrer pages such as email confirmation), else a same-host Referer,
+  # else home. Both candidates go through SafeReturnPath.
   def redirect_back_to_same_origin
-    uri = URI.parse(request.referer.to_s)
-    path = uri.host == request.host && uri.port == request.port ? uri.request_uri : root_path
-    path = root_path if path.start_with?("//", "/\\")
+    path = SafeReturnPath.call(params[:return_to]) || same_origin_referer_path || root_path
     redirect_to path, allow_other_host: false, status: :see_other
+  end
+
+  def same_origin_referer_path
+    uri = URI.parse(request.referer.to_s)
+    SafeReturnPath.call(uri.request_uri) if uri.host == request.host && uri.port == request.port
   rescue URI::InvalidURIError
-    redirect_to root_path, status: :see_other
+    nil
   end
 
   def current_user

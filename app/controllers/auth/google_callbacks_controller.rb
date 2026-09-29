@@ -4,6 +4,9 @@ module Auth
   # SameSite=Lax session cookie arrives here; Google's g_csrf_token
   # double-submit check replaces the authenticity token for this action only,
   # and the signed ceremony in the ID-token nonce replaces session context.
+  # For the same reason this action never writes a session cookie unless it
+  # completes a sign-in: a new cookie would replace, and so sign out, the
+  # browser's existing session (e.g. a signed-in user linking Google).
   class GoogleCallbacksController < ApplicationController
     CSRF_TOKEN_NAME = "g_csrf_token".freeze
     MAXIMUM_CSRF_TOKEN_LENGTH = 256
@@ -20,6 +23,7 @@ module Auth
       keys_unavailable: "unavailable"
     }.freeze
 
+    prepend_before_action { request.session_options[:skip] = true }
     skip_before_action :require_authentication
     skip_forgery_protection only: :create
     rate_limit to: RATE_LIMIT, within: RATE_LIMIT_WINDOW, only: :create, with: -> { reject(:rate_limited) }
@@ -29,7 +33,7 @@ module Auth
       claims = GoogleIdentity.verifier.verify(params[:credential])
       ceremony = GoogleIdentity::Ceremony.resolve(claims.nonce)
       return reject(:ceremony) unless ceremony
-      return reject(:replayed) unless ceremony.consume!
+      return reject(:replayed, link: ceremony.link?) unless ceremony.consume!
 
       I18n.with_locale(ceremony.locale || I18n.locale) do
         ceremony.link? ? stage_link(claims, ceremony) : sign_in(claims, ceremony)
@@ -44,6 +48,7 @@ module Auth
       result = GoogleIdentity::SignIn.call(claims: claims, ceremony: ceremony)
       return reject(result.status) unless result.signed_in?
 
+      request.session_options[:skip] = false
       start_authenticated_session!(result.user)
       I18n.with_locale(result.user.locale) do
         redirect_to ceremony.return_path || new_translation_workspace_path,
@@ -73,9 +78,12 @@ module Auth
       reject(:csrf) unless valid
     end
 
-    def reject(category)
-      Rails.logger.warn("[google_identity] sign-in rejected category=#{category}")
-      redirect_to login_path, flash: { google_identity: USER_MESSAGES.fetch(category, "failed") }, status: :see_other
+    # Before the credential is verified the intent is unknown, so failures go
+    # to the login page, which forwards a signed-in visitor to Account.
+    def reject(category, link: false)
+      Rails.logger.warn("[google_identity] #{link ? "link" : "sign-in"} rejected category=#{category}")
+      GoogleIdentity::Notice.store(cookies, link ? "link_failed" : USER_MESSAGES.fetch(category, "failed"))
+      redirect_to link ? settings_account_path : login_path, status: :see_other
     end
   end
 end

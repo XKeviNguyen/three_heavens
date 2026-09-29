@@ -2,7 +2,9 @@ en:
   google_identity:
     or: or
     button_unavailable: Google sign-in is unavailable right now. You can still use your email and password.
+    button_expired: This page has been open for a long time. Reload it to continue with Google.
     messages:
+      link_failed: Google could not be connected. Please try again.
       failed: Google sign-in could not be completed. Please try again.
       unavailable: Google sign-in is temporarily unavailable. Try again later or use your email and password.
       rate_limited: Too many sign-in attempts. Wait three minutes, then try again.

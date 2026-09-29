@@ -1,5 +1,6 @@
 <%# Google's official button (GIS redirect mode); Google posts the credential to the callback. %>
-<div class="google-sign-in" data-controller="google-sign-in" data-google-sign-in-client-id-value="<%= GoogleIdentity.client_id %>" data-google-sign-in-login-uri-value="<%= google_identity_callback_url %>" data-google-sign-in-nonce-value="<%= google_identity_ceremony(intent) %>" data-google-sign-in-text-value="<%= text %>" data-google-sign-in-locale-value="<%= I18n.locale %>">
+<div class="google-sign-in" data-controller="google-sign-in" data-action="turbo:before-cache@document->google-sign-in#clear" data-google-sign-in-client-id-value="<%= GoogleIdentity.client_id %>" data-google-sign-in-login-uri-value="<%= google_identity_callback_url %>" data-google-sign-in-ceremony-url-value="<%= google_identity_ceremony_path %>" data-google-sign-in-intent-value="<%= intent %>" data-google-sign-in-text-value="<%= text %>" data-google-sign-in-locale-value="<%= I18n.locale %>">
   <div class="google-sign-in-button" data-google-sign-in-target="button"></div>
   <p class="google-sign-in-fallback text-sm text-slate-500" data-google-sign-in-target="fallback" hidden><%= t("google_identity.button_unavailable") %></p>
+  <p class="google-sign-in-fallback text-sm text-slate-500" data-google-sign-in-target="expired" hidden><%= t("google_identity.button_expired") %></p>
 </div>

@@ -11,9 +11,14 @@ confirmation are unchanged.
 1. `/login`, `/registration/new`, and the account page render Google's official
    button through the GIS JavaScript API in **redirect mode**. One Tap and
    automatic sign-in are never enabled.
-2. The page gives GIS a server-signed, 10-minute, single-use *ceremony* as the
-   ID-token `nonce`. It records the intent (sign in or link), the linking user,
-   interface language and appearance, and a same-origin return path.
+2. Just before showing the button, the page fetches a server-signed, 10-minute,
+   single-use *ceremony* (`POST /auth/google/ceremony`: CSRF-protected, rate
+   limited, `no-store`) and gives it to GIS as the ID-token `nonce`. It records
+   the intent (sign in or link), the linking user, interface language and
+   appearance, and a same-origin return path, all taken from the server. No
+   ceremony is embedded in the page. The button is withdrawn a minute before
+   its ceremony expires and renewed while the page is visible (at most 12 times
+   per page view); Turbo snapshots never keep a live button.
 3. Google posts the credential to `POST /auth/google/callback`
    (`application/x-www-form-urlencoded`; bodies over 8 KB are refused before
    Rails parses them; rate limited to 10 per 3 minutes per client address).
@@ -28,7 +33,12 @@ confirmation are unchanged.
    an unexpired ceremony issued by this server and not used before.
 
 Google's cross-site POST does not carry the SameSite=Lax session cookie; that
-is why the ceremony, not the session, carries the sign-in context.
+is why the ceremony, not the session, carries the sign-in context. For the same
+reason the callback never writes a session cookie unless it completes a sign-in
+(a new cookie would replace, and so sign out, the browser's real session).
+Outcomes travel in a one-minute signed cookie holding an allowlisted code: a
+failed link returns the signed-in user to **Account**; other failures show on
+the sign-in page.
 
 ## Account rules
 
