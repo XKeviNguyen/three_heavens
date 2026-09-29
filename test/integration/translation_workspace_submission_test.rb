@@ -71,7 +71,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
         3.times { post translation_workspace_path, params: { translation_workspace: attributes } }
       end
     end
-    submission = TranslationWorkspaceSubmission.find_owned_by_token!(user: users(:normal), token: token)
+    submission = translation_workspace_submission_for(token)
     assert submission.consumed?
     assert_redirected_to experiment_path(submission.experiment)
   end
@@ -117,7 +117,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     assert_redirected_to experiment_path(experiment)
     assert_equal counts, workspace_counts
     assert_equal "Manual idempotency", experiment.document.project.name
-    assert TranslationWorkspaceSubmission.find_owned_by_token!(user: users(:normal), token: token).consumed?
+    assert translation_workspace_submission_for(token).consumed?
   end
 
   test "automatic duplicate post replays exactly one pipeline and one authorized translation batch" do
@@ -186,7 +186,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     end
     assert_response :unprocessable_content
     assert_select "input[name='translation_workspace[submission_token]'][value='#{token}']"
-    submission = TranslationWorkspaceSubmission.find_owned_by_token!(user: users(:normal), token: token)
+    submission = translation_workspace_submission_for(token)
     assert submission.available?
 
     assert_enqueued_jobs 1, only: TranslationRunJob do

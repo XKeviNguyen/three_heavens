@@ -173,6 +173,66 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal 1, users(:normal).translation_workspace_drafts.count
   end
 
+  test "reverting to acknowledged text after a lost response saves the reverted text" do
+    visit new_translation_workspace_path
+    fill_in "Project name", with: "Acknowledged A"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+
+    drop_next_draft_save_responses(1)
+    fill_in "Project name", with: "Committed B"
+    assert_selector "[data-workspace-guard-target='status']", text: "Could not save", wait: 10
+    assert_equal "Committed B", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+
+    fill_in "Project name", with: "Acknowledged A"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "Acknowledged A", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    refresh
+    assert_field "Project name", with: "Acknowledged A"
+  end
+
+  test "discarding while a save is unresolved never recreates the draft" do
+    visit new_translation_workspace_path
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+      window.fetch = async (url, options = {}) => {
+        const draft = new URL(url, location.origin).pathname === "/translation_workspace_draft"
+        if (draft && options.method === "POST" && !window.__firstSaveSent) {
+          window.__firstSaveSent = true
+          const response = await deliver(url, options)
+          await pause(1500)
+          await response.arrayBuffer()
+          throw new TypeError("Failed to fetch")
+        }
+        const response = await deliver(url, options)
+        if (draft && options.method === "DELETE") await pause(3000)
+        return response
+      }
+    JS
+    fill_in "Project name", with: "Discard while unresolved"
+    assert_until { page.evaluate_script("window.__firstSaveSent === true") }
+    accept_confirm { click_button "Discard draft" }
+
+    # The reset page is the same URL; wait until the old page has been replaced.
+    assert_until(timeout: 15) { page.evaluate_script("window.__firstSaveSent !== true") }
+    assert_field "Project name", with: ""
+    assert_equal 0, users(:normal).translation_workspace_drafts.count
+  end
+
+  test "Back then Forward renders the current draft instead of a stale snapshot" do
+    visit projects_path
+    click_link "New translation"
+    fill_in "Project name", with: "Typed then Back"
+    page.go_back
+    assert_current_path projects_path
+    page.go_forward
+    assert_field "Project name", with: "Typed then Back"
+
+    fill_in "Project name", with: "Edited after Forward"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "Edited after Forward", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
   test "a retry after a lost response resolves the save without another edit" do
     visit new_translation_workspace_path
     drop_next_draft_save_responses(1)
@@ -284,6 +344,14 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
 
   def choose_language(label, value)
     choose_known_language(label, value)
+  end
+
+  def assert_until(timeout: 10)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    until yield
+      flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.05
+    end
   end
 
   def drop_next_draft_save_responses(count)

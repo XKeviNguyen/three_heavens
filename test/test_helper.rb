@@ -39,6 +39,11 @@ module AuthenticationTestHelper
     TranslationWorkspaceSubmission.issue_token(user: user, at: at)
   end
 
+  # Looks up the launch row without creating it (claim! would create it).
+  def translation_workspace_submission_for(token, user: users(:normal))
+    user.translation_workspace_submissions.find_by!(token_digest: Digest::SHA256.hexdigest(token))
+  end
+
   private
 
   def login_rate_limit_headers

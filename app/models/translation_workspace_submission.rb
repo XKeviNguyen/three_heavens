@@ -59,12 +59,6 @@ class TranslationWorkspaceSubmission < ApplicationRecord
     user.translation_workspace_submissions.find_by!(token_digest: digest(token))
   end
 
-  def self.find_owned_by_token!(user:, token:)
-    raise ActiveRecord::RecordNotFound, "Translation workspace submission not found" unless valid_public_token?(token)
-
-    user.translation_workspace_submissions.find_by!(token_digest: digest(token))
-  end
-
   def self.valid_public_token?(token)
     token.is_a?(String) && (token.match?(SIGNED_TOKEN_FORMAT) || token.match?(LEGACY_TOKEN_FORMAT))
   end

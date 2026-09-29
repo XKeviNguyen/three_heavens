@@ -57,30 +57,34 @@ export default class extends Controller {
     return JSON.stringify(this.payload())
   }
 
+  // Content stays unsaved until the server acknowledges it. A save whose
+  // outcome is unknown may have stored older or newer content than the page
+  // shows, so it keeps the page dirty even if the fields are reverted.
   dirty() {
-    return this.state() !== this.lastSavedState
+    return this.unacknowledged !== null || this.state() !== this.lastSavedState
   }
 
   changed() {
-    if (this.launching) return
+    if (this.launching || this.discarding) return
     this.retryCount = 0
     this.scheduleSave()
   }
 
   scheduleSave() {
     window.clearTimeout(this.saveTimer)
-    if (!this.dirty()) return
+    if (this.discarding || !this.dirty()) return
     this.setStatus(this.messagesValue.saving)
     this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
   }
 
   async save() {
+    if (this.discarding) return false
     window.clearTimeout(this.saveTimer)
-    if (!this.dirty()) return true
-    if (this.saving) {
+    // One save at a time, so sequence numbers reach the server in order.
+    while (this.saving) {
       try { await this.saving } catch { return false }
-      if (!this.dirty()) return true
     }
+    if (!this.dirty()) return true
 
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
@@ -89,9 +93,10 @@ export default class extends Controller {
     const sequence = this.unacknowledged?.snapshot === snapshot ? this.unacknowledged.sequence : ++this.sequence
     this.unacknowledged = { sequence, snapshot }
     this.setStatus(this.messagesValue.saving)
-    this.saving = this.persist(workspace, sequence)
+    const saving = this.persist(workspace, sequence)
+    this.saving = saving
     try {
-      const result = await this.saving
+      const result = await saving
       if (result.sequence !== sequence) throw new Error("draft save was not acknowledged")
 
       this.unacknowledged = null
@@ -109,7 +114,7 @@ export default class extends Controller {
       if (!error.final) this.scheduleRetry()
       return false
     } finally {
-      this.saving = null
+      if (this.saving === saving) this.saving = null
     }
   }
 
@@ -118,7 +123,7 @@ export default class extends Controller {
   // back online or editing again starts a new round. Conflicts and rejected
   // content are final.
   scheduleRetry() {
-    if (this.retryCount >= RETRY_DELAYS_MS.length) return
+    if (this.discarding || this.retryCount >= RETRY_DELAYS_MS.length) return
     const delay = RETRY_DELAYS_MS[this.retryCount]
     this.retryCount += 1
     window.clearTimeout(this.saveTimer)
@@ -126,7 +131,7 @@ export default class extends Controller {
   }
 
   onOnline() {
-    if (this.launching || !this.dirty()) return
+    if (this.launching || this.discarding || !this.dirty()) return
     this.retryCount = 0
     this.scheduleSave()
   }
@@ -244,10 +249,14 @@ export default class extends Controller {
 
   async discard() {
     if (!window.confirm(this.messagesValue.discardConfirm)) return
+    // Discarding is terminal for this page: no timer, retry, or reconnect may
+    // save again, or a late save could recreate the discarded draft.
+    this.discarding = true
     window.clearTimeout(this.saveTimer)
-    if (this.saving) {
+    while (this.saving) {
       try { await this.saving } catch {}
     }
+    window.clearTimeout(this.saveTimer)
     // A save whose response was lost may have created the draft, so this
     // editor asks the server to discard even without a known draft identity.
     if (this.draftIdValue || this.sequence > 0) {
@@ -260,9 +269,10 @@ export default class extends Controller {
           version: this.draftIdValue ? this.versionValue : "",
           editor_id: this.editorId
         })
-      })
-      if (!response.ok && response.status !== 404) {
-        this.setStatus(response.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
+      }).catch(() => null)
+      if (!response || (!response.ok && response.status !== 404)) {
+        this.discarding = false
+        this.setStatus(response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
         return
       }
     }
