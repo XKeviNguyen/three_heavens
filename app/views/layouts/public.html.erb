@@ -4,6 +4,7 @@
     <title><%= content_for(:title) || "Three Heavens" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="<%= color_scheme_for(current_appearance) %>">
+    <% if content_for?(:meta_description) %><meta name="description" content="<%= content_for(:meta_description) %>"><% end %>
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>

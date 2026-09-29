@@ -243,6 +243,11 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     get login_path
     assert_select "[data-controller='google-sign-in']", count: 0
     assert_select "form[action='#{session_path}'] input[type='password']"
+    get new_registration_path
+    assert_select "[data-controller='google-sign-in']", count: 0
+    assert_select "form[action='#{registration_path}'] input[type='password']", 2
+    sign_in_as users(:normal)
+    assert_equal users(:normal).id, session[:user_id]
   ensure
     Rails.configuration.x.google_identity.client_id = original
   end

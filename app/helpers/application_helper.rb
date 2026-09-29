@@ -1,8 +1,14 @@
 module ApplicationHelper
+  INTERFACE_LOCALE_NAMES = { "en" => "English", "vi" => "Tiếng Việt", "ja" => "日本語" }.freeze
+
   # The UA paints its default canvas and form controls in this scheme before
   # the stylesheet loads, so a saved Dark preference never flashes light.
   def color_scheme_for(appearance)
     appearance.in?(%w[light dark]) ? appearance : "light dark"
+  end
+
+  def appearance_labels
+    { heading: t("appearance.label") }.merge(User::APPEARANCES.to_h { |appearance| [ appearance, t("appearance.options.#{appearance}") ] })
   end
 
   SIDEBAR_SECTIONS = [
@@ -39,6 +45,10 @@ module ApplicationHelper
       ]
     }
   ].freeze
+
+  def interface_locale_names
+    INTERFACE_LOCALE_NAMES
+  end
 
   def sidebar_sections
     SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }.map do |section|

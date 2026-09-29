@@ -164,9 +164,14 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
 
   test "choosing a language switches the landing and signup pages immediately" do
     visit root_path
-    within("header") { select "日本語", from: "Interface language" }
+    within(".landing-header .landing-locale") do
+      find("summary").click
+      assert_no_button "Apply"
+      click_button "日本語"
+    end
     assert_selector "html[lang='ja']"
     assert_current_path root_path
+    assert_selector ".translation-flow", text: "モデルA"
 
     visit new_registration_path
     within("header") { select "Tiếng Việt", from: "表示言語" }
@@ -250,6 +255,26 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
       assert_operator settled[:heap] - warmed[:heap], :<, heap_bound, "#{name} cycles grew the heap: #{warmed} -> #{settled}"
     end
     assert_selector "html[lang='en'][data-appearance='system']"
+  end
+
+  test "thirty appearance cycles on the landing stay bounded" do
+    visit root_path
+    browser = page.driver.browser
+    browser.manage.timeouts.script = 180
+    browser.execute_cdp("Performance.enable")
+    browser.execute_cdp("Network.disable")
+
+    browser.execute_async_script(APPEARANCE_CYCLES, 30)
+    warmed = client_footprint(browser)
+    browser.execute_async_script(APPEARANCE_CYCLES, 30)
+    settled = client_footprint(browser)
+
+    %i[nodes stylesheets listeners].each do |metric|
+      assert_equal warmed[metric], settled[metric], "landing cycles changed #{metric}: #{warmed} -> #{settled}"
+    end
+    assert_operator settled[:heap] - warmed[:heap], :<, 64.kilobytes, "landing cycles grew the heap: #{warmed} -> #{settled}"
+    assert_equal 6, page.evaluate_script("document.querySelectorAll('.appearance-option').length")
+    assert_equal [ "true" ], page.evaluate_script("[...document.querySelectorAll('.appearance-option[data-appearance=system]')].map((option) => option.getAttribute('aria-pressed'))").uniq
   end
 
   private

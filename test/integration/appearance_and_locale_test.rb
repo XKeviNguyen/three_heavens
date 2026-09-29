@@ -11,6 +11,27 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     assert_equal "system", User.new.appearance
   end
 
+  test "the redesigned landing renders in dark with appearance and one-step language controls" do
+    cookies[:ui_appearance] = "dark"
+    get root_path
+
+    assert_select "html[data-appearance='dark']"
+    assert_select "meta[name='color-scheme'][content='dark']"
+    assert_select ".landing-hero h1", text: /Compare AI translations/
+    assert_select ".translation-flow .flow-model", 3
+    assert_select ".translation-flow .flow-winner"
+    assert_select ".landing-value-card", 4
+    assert_select ".decision-diagram"
+    assert_select ".landing-trust-grid article", 3
+    assert_select ".landing-final-cta"
+    assert_select ".landing-header .appearance-menu summary[aria-label='Appearance: Dark']"
+    assert_select ".landing-mobile-panel .landing-appearance-options .appearance-option", 3
+    assert_select ".landing-locale form[action='#{locale_path}'] button[lang='ja']", text: "日本語"
+    assert_select ".landing-page input[type='submit']", count: 0
+    assert_no_match(/>(Apply|適用|Áp dụng)</, response.body)
+    assert_select ".landing-page [style]", count: 0
+  end
+
   test "visitors keep their appearance in a cookie and invalid values are refused" do
     patch appearance_path, params: { appearance: "dark" }, headers: { "Referer" => "http://www.example.com/login" }
     assert_redirected_to "/login"

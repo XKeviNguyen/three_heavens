@@ -1,0 +1,54 @@
+<% arrow = capture do %>
+  <div class="decision-arrow" aria-hidden="true"><svg viewBox="0 0 48 14"><path d="M1 7h44M39 1.5 45 7l-6 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg></div>
+<% end %>
+
+<section class="landing-section landing-decisions" aria-labelledby="decision-heading">
+  <div class="landing-shell">
+    <div class="landing-section-heading">
+      <h2 id="decision-heading"><%= t("landing.decision.heading") %></h2>
+      <p><%= t("landing.decision.introduction") %></p>
+    </div>
+
+    <p class="sr-only"><%= t("landing.decision.accessible_description") %></p>
+    <div class="decision-diagram">
+      <div class="decision-inputs">
+        <% %w[source terminology references].each do |input| %>
+          <div class="decision-input">
+            <span class="landing-line-icon" aria-hidden="true">
+              <% case input when "source" %>
+                <svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20H7zM14 3.5V8h4M10 12h5M10 15h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"/></svg>
+              <% when "terminology" %>
+                <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="6.5" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 6.5v11c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5v-11M5.5 12c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <% else %>
+                <svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7.5 4.5 4 4.5v13c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2v-13c-3.5 0-6 .5-8 2Zm0 0v13" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"/></svg>
+              <% end %>
+            </span>
+            <h3><%= t("landing.decision.#{input}.title") %></h3>
+            <p><%= t("landing.decision.#{input}.description") %></p>
+          </div>
+        <% end %>
+      </div>
+
+      <%= arrow %>
+
+      <div class="decision-process">
+        <div class="decision-method">
+          <span class="landing-line-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h9M18 7h1M5 17h1M10 17h9M5 12h4M13 12h6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.6"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="11" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>
+          <div><h3><%= t("landing.decision.methodology.title") %></h3><p><%= t("landing.decision.methodology.description") %></p></div>
+        </div>
+        <div class="decision-method">
+          <span class="decision-model-chips" aria-hidden="true"><b>A</b><b>B</b><b>C</b></span>
+          <div><h3><%= t("landing.decision.models.title") %></h3><p><%= t("landing.decision.models.description") %></p></div>
+        </div>
+      </div>
+
+      <%= arrow %>
+
+      <div class="decision-outcome">
+        <span class="landing-line-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19V13M10 19V8M15 19v-4M20 19V5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"/></svg></span>
+        <h3><%= t("landing.decision.outcome.title") %></h3>
+        <p><%= t("landing.decision.outcome.description") %></p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,15 +1,6 @@
-<% labels = { heading: t("appearance.label") }.merge(User::APPEARANCES.to_h { |appearance| [ appearance, t("appearance.options.#{appearance}") ] }) %>
-<details class="appearance-menu" data-controller="appearance disclosure" data-appearance-current-value="<%= current_appearance %>" data-appearance-labels-value="<%= labels.to_json %>" data-action="click@document->disclosure#closeOutside keydown.esc@document->disclosure#closeOnEscape">
-  <summary data-appearance-target="summary" title="<%= t("appearance.label") %>" aria-label="<%= t("appearance.label") %>: <%= labels.fetch(current_appearance) %>">
+<details class="appearance-menu" data-controller="appearance disclosure" data-appearance-current-value="<%= current_appearance %>" data-appearance-labels-value="<%= appearance_labels.to_json %>" data-action="click@document->disclosure#closeOutside keydown.esc@document->disclosure#closeOnEscape">
+  <summary data-appearance-target="summary" title="<%= t("appearance.label") %>" aria-label="<%= t("appearance.label") %>: <%= appearance_labels.fetch(current_appearance) %>">
     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3a7 7 0 0 1 0 14Z" fill="currentColor"/></svg>
   </summary>
-  <div class="appearance-menu-panel" role="group" aria-label="<%= t("appearance.label") %>">
-    <p class="appearance-menu-heading" aria-hidden="true"><%= t("appearance.label") %></p>
-    <% User::APPEARANCES.each do |appearance| %>
-      <%= button_to appearance_path, method: :patch, params: { appearance: appearance }, form: { data: { action: "submit->appearance#choose" } }, class: "appearance-option", aria: { pressed: (appearance == current_appearance).to_s }, data: { appearance_target: "option", appearance: appearance } do %>
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>
-        <span><%= labels.fetch(appearance) %></span>
-      <% end %>
-    <% end %>
-  </div>
+  <%= render "shared/appearance_options", class_name: "appearance-menu-panel" %>
 </details>
