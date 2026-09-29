@@ -36,6 +36,14 @@ Then verify `/up`, `/ready`, the admin-only aggregate Operations diagnostics, So
 
 `/up` means process boot only. `/ready` means primary database web readiness only. Cache, cable, queue, and storage state belong to preflight, smoke, admin diagnostics, and logs so an auxiliary outage does not silently change load-balancer semantics.
 
+Health probes and Host authorization:
+
+- **Kamal Proxy liveness:** `/up` is exempt from Host authorization, because Kamal Proxy reaches the container by address.
+- **Public readiness:** probe with Host `APP_HOST`, for example `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER`.
+- **Internal readiness:** probe from inside the container over loopback, for example `docker exec CONTAINER_PLACEHOLDER curl -fsS http://127.0.0.1:3000/ready`. Only `localhost`, `127.0.0.1`, and `[::1]` are accepted as Host for this.
+- **Refused hosts:** any other Host, such as a container IP or an unknown name, receives `403` on `/ready` and on every application path. Probing `/ready` through a container IP therefore reports `403` by design.
+- **Pre-promotion checks:** a quiescent or pre-promotion environment must be checked with the loopback probe, or with an explicit `Host: APP_HOST` header.
+
 ## Rollback
 
 A code rollback and a database rollback are different operations.

@@ -97,8 +97,16 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
+  # Kamal Proxy's liveness check reaches /up by container address, so /up is
+  # exempt. Readiness is probed publicly with Host APP_HOST or from inside the
+  # container over loopback (docs/operations/production-deploy.md); every
+  # other Host is still refused, for /ready and for all application traffic.
+  readiness_probe_hosts = %w[localhost 127.0.0.1 [::1]].freeze
   config.hosts = [ production_host ]
   config.host_authorization = {
-    exclude: ->(request) { request.path == "/up" }
+    exclude: lambda do |request|
+      request.path == "/up" ||
+        (request.path == "/ready" && readiness_probe_hosts.include?(request.host.downcase))
+    end
   }
 end
