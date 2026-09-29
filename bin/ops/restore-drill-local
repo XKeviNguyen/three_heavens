@@ -11,6 +11,7 @@ begin
   puts "Document sources: #{result.document_count}"
   puts "Critical problems: #{result.critical_count}"
   puts "Warnings: #{result.warning_count}"
+  puts "Tables compared with source: #{result.compared_table_count}"
   exit 0
 rescue StandardError
   warn "Disposable restore drill failed safely."

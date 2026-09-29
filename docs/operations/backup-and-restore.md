@@ -65,9 +65,11 @@ The command performs these phases in order:
 2. verifies fixed artifact names, sizes, SHA-256 checksums, and `pg_restore --list`;
 3. refuses a missing, non-empty, or detectably live database target;
 4. refuses a missing, non-empty, live, relative, or unsafe storage target;
-5. restores the primary dump with `pg_restore --exit-on-error` and no ownership/ACL replay;
+5. restores the primary dump with `pg_restore --exit-on-error` and no ownership/ACL replay, one section at a time (schema, data, then indexes/constraints/triggers);
 6. extracts only regular files/directories, rejecting absolute paths, traversal, duplicates, links, special entries, and symlink parents;
 7. audits the restored schema, blobs, attachments, durable Document sources, temporary SourceImports, missing objects, and unreferenced objects in bounded batches.
+
+`pg_restore` loads data with an empty `search_path`, and loading a row evaluates that table's CHECK constraints. Since migration `20260929120000` every database function those constraints call references only schema-qualified objects, so the restore never depends on ambient session state or on where the `pgcrypto` extension is installed. Bundles created before that migration (including every V1.0 bundle) define the payload digest functions with an unqualified `digest()` call that cannot resolve during the data load. After restoring the schema section, the command replaces exactly those legacy function bodies with the corrected, output-identical definitions that migration installs, then loads the data. No manual `search_path` change is needed or supported.
 
 Success requires the restored schema version to equal the backed-up version and zero critical integrity problems. Normal output is aggregate-only. No migrations, provider calls, promotion, DNS change, deployment, or replacement of `/rails/storage` occurs.
 
@@ -79,4 +81,4 @@ Developers and CI operators can exercise the complete path against two uniquely 
 ALLOW_DISPOSABLE_RESTORE_DRILL=1 RAILS_ENV=test bin/ops/restore-drill-local
 ```
 
-The guard refuses production and requires the exact confirmation variable. It creates representative synthetic data with a Document attachment, builds a real `pg_dump` bundle, restores through real `pg_restore`, verifies record and byte survival plus the integrity audit, and removes only databases bearing its random `three_heavens_restore_drill_...` prefix. It never targets the normal test, development, or production database and never calls a provider.
+The guard refuses production and requires the exact confirmation variable. It creates representative synthetic data (a user with interface preferences and a federated identity, a Document attachment, a staged SourceImport, an encrypted workspace draft, and methodology, reference, and glossary revisions whose digest constraints are evaluated during restore), builds a real `pg_dump` bundle, restores through real `pg_restore`, verifies record and byte survival plus the integrity audit, compares every public table row-for-row with the source, reads the restored records back through the application (including draft decryption), and removes only databases bearing its random `three_heavens_restore_drill_...` prefix. It never targets the normal test, development, or production database and never calls a provider.

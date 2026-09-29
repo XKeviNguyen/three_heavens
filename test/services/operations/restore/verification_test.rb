@@ -39,6 +39,7 @@ class Operations::Restore::VerificationTest < ActiveSupport::TestCase
           command_runner: runner,
           database_target_factory: ->(**) { target },
           integrity_auditor: integrity,
+          legacy_schema_upgrader: ->(database_url) { calls << [ :legacy_schema_upgraded, database_url ]; 0 },
           live_database_url: "postgresql://live_user:live_password@localhost/live"
         )
 
@@ -55,6 +56,16 @@ class Operations::Restore::VerificationTest < ActiveSupport::TestCase
         assert_equal "isolated_restore", command_calls.second[:environment]["PGDATABASE"]
         assert_equal "restore_user", command_calls.second[:environment]["PGUSER"]
         assert_equal "restore_password", command_calls.second[:environment]["PGPASSWORD"]
+        restore_steps = calls.filter_map do |call|
+          if call.is_a?(Hash) && !call[:arguments].include?("--list")
+            call[:arguments].grep(/\A--section=/).sole
+          elsif call.is_a?(Array) && call.first == :legacy_schema_upgraded
+            :legacy_schema_upgraded
+          end
+        end
+        assert_equal [ "--section=pre-data", :legacy_schema_upgraded, "--section=data", "--section=post-data" ], restore_steps
+        assert_equal "postgresql://restore_user:restore_password@localhost/isolated_restore",
+                     calls.find { |call| call.is_a?(Array) && call.first == :legacy_schema_upgraded }.second
       end
     end
   end

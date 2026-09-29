@@ -877,24 +877,24 @@ $$;
 CREATE FUNCTION public.glossary_revision_configuration_digest(revision_id bigint) RETURNS text
     LANGUAGE sql STABLE
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
-    ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(glossary_revisions.source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(glossary_revisions.target_language)::text ||
     ',"entries":[' || COALESCE((
-      SELECT string_agg(
-        '{"position":' || position ||
-        ',"source_term":' || to_json(source_term)::text ||
-        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-        ',' ORDER BY position
+      SELECT pg_catalog.string_agg(
+        '{"position":' || glossary_entries.position ||
+        ',"source_term":' || pg_catalog.to_json(glossary_entries.source_term)::text ||
+        ',"preferred_target_term":' || pg_catalog.to_json(glossary_entries.preferred_target_term)::text ||
+        ',"note":' || COALESCE(pg_catalog.to_json(glossary_entries.note)::text, 'null') || '}',
+        ',' ORDER BY glossary_entries.position
       )
-      FROM glossary_entries
-      WHERE glossary_revision_id = glossary_revisions.id
+      FROM public.glossary_entries
+      WHERE glossary_entries.glossary_revision_id = glossary_revisions.id
     ), '') || ']}',
-    'sha256'
-  ), 'hex')
-  FROM glossary_revisions
-  WHERE id = revision_id;
+    'UTF8'
+  )), 'hex')
+  FROM public.glossary_revisions
+  WHERE glossary_revisions.id = revision_id;
 $$;
 
 
@@ -905,12 +905,12 @@ $$;
 CREATE FUNCTION public.methodology_revision_configuration_digest(source_language text, target_language text, guidance text) RETURNS text
     LANGUAGE sql IMMUTABLE STRICT
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"guidance":' || to_json(guidance)::text || '}',
-    'sha256'
-  ), 'hex');
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(target_language)::text ||
+    ',"guidance":' || pg_catalog.to_json(guidance)::text || '}',
+    'UTF8'
+  )), 'hex');
 $$;
 
 
@@ -1315,13 +1315,13 @@ $$;
 CREATE FUNCTION public.translation_reference_revision_configuration_digest(source_language text, target_language text, source_text text, approved_translation text) RETURNS text
     LANGUAGE sql IMMUTABLE STRICT
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"source_text":' || to_json(source_text)::text ||
-    ',"approved_translation":' || to_json(approved_translation)::text || '}',
-    'sha256'
-  ), 'hex');
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(target_language)::text ||
+    ',"source_text":' || pg_catalog.to_json(source_text)::text ||
+    ',"approved_translation":' || pg_catalog.to_json(approved_translation)::text || '}',
+    'UTF8'
+  )), 'hex');
 $$;
 
 
@@ -6248,6 +6248,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260929120000'),
 ('20260929090200'),
 ('20260929090100'),
 ('20260929090000'),

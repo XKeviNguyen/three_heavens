@@ -93,4 +93,47 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
     drill&.send(:drop_databases!, admin) if admin
     admin&.close
   end
+
+  test "detects any restored row difference and reads representative data through the application" do
+    drill = Operations::Restore::LocalDrill.new(
+      environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" }
+    )
+    original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
+    original_storage_service = ActiveStorage::Blob.service
+    original_storage_services = ActiveStorage::Blob.services
+    admin = PG.connect(drill.send(:pg_options, original_configuration, database: "postgres"))
+    source = drill.send(:create_database!, admin, "source")
+
+    Dir.mktmpdir("three-heavens-drill-compare-") do |storage_root|
+      drill.send(:configure_source!, original_configuration, source, storage_root)
+      expected = drill.send(:create_representative_data!)
+      ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+      copy = "#{Operations::Restore::LocalDrill::DATABASE_PREFIX}copy_#{SecureRandom.hex(8)}"
+      admin.exec("CREATE DATABASE #{PG::Connection.quote_ident(copy)} TEMPLATE #{PG::Connection.quote_ident(source)}")
+      drill.send(:database_names) << copy
+      source_url = drill.send(:connection_string, original_configuration, source)
+      copy_url = drill.send(:connection_string, original_configuration, copy)
+
+      assert_operator drill.send(:compare_durable_data!, source_url, copy_url), :>=, 40
+      drill.send(:verify_application_reads!, original_configuration, copy, expected)
+      ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+
+      copy_connection = PG.connect(copy_url)
+      begin
+        copy_connection.exec("DELETE FROM public.federated_identities")
+      ensure
+        copy_connection.close
+      end
+      error = assert_raises(Operations::Restore::LocalDrill::UnsafeDrill) do
+        drill.send(:compare_durable_data!, source_url, copy_url)
+      end
+      assert_equal "restored rows differ from the source", error.message
+    end
+  ensure
+    ActiveStorage::Blob.service = original_storage_service if original_storage_service
+    ActiveStorage::Blob.services = original_storage_services if original_storage_services
+    drill&.send(:restore_application_connection, original_configuration) if original_configuration
+    drill&.send(:drop_databases!, admin) if admin
+    admin&.close
+  end
 end
