@@ -52,13 +52,12 @@ class TranslationWorkspace
   end
 
   def submit
-    submission = TranslationWorkspaceSubmission.find_owned_by_token!(user: user, token: submission_token)
+    submission = TranslationWorkspaceSubmission.claim!(user: user, token: submission_token)
+    return submission_expired unless submission
+
     submission.with_lock do
       next replay!(submission) if submission.consumed?
-      if submission.expired?
-        errors.add(:submission_token, "has expired. Reload the workspace and try again.")
-        next false
-      end
+      next submission_expired if submission.expired?
       next false unless lock_existing_project
       next false unless valid?
       next false unless lock_methodology_selection
@@ -565,8 +564,14 @@ class TranslationWorkspace
     @clock.call
   end
 
+  # Signed and stateless: rendering or refreshing the workspace writes nothing.
   def issue_submission_token
-    self.submission_token = TranslationWorkspaceSubmission.issue!(user: user).public_token
+    self.submission_token = TranslationWorkspaceSubmission.issue_token(user: user)
+  end
+
+  def submission_expired
+    errors.add(:submission_token, "has expired. Reload the workspace and try again.")
+    false
   end
 
   def replay!(submission)

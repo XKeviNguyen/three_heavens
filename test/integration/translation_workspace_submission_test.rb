@@ -12,8 +12,8 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     @model = llm_models(:openrouter_claude)
   end
 
-  test "new workspace issues an opaque owner-scoped submission identity" do
-    assert_difference -> { users(:normal).translation_workspace_submissions.available.count }, 1 do
+  test "new workspace issues an opaque owner-scoped submission identity without writing" do
+    assert_no_difference -> { TranslationWorkspaceSubmission.count } do
       get new_translation_workspace_path
     end
 
@@ -21,8 +21,79 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
     assert_select "input[type='hidden'][name='translation_workspace[submission_token]']" do |inputs|
       token = inputs.sole["value"]
       assert TranslationWorkspaceSubmission.valid_public_token?(token)
+      assert_match TranslationWorkspaceSubmission::SIGNED_TOKEN_FORMAT, token
+      assert_not_includes token, users(:normal).email
       assert_not TranslationWorkspaceSubmission.column_names.include?("public_token")
+      assert_raises(ActiveRecord::RecordNotFound) do
+        TranslationWorkspaceSubmission.claim!(user: users(:other), token: token)
+      end
     end
+  end
+
+  test "rendering, refreshing, and preference navigation never create submission rows" do
+    source_import = create_ready_import(user: users(:normal))
+    experiment = experiments(:one)
+    assert_no_difference -> { TranslationWorkspaceSubmission.count } do
+      tokens = 20.times.map do
+        get new_translation_workspace_path
+        assert_response :success
+        css_select("input[name='translation_workspace[submission_token]']").sole["value"]
+      end
+      assert_equal 20, tokens.uniq.size
+
+      get new_translation_workspace_path(project_id: projects(:one).id)
+      get new_translation_workspace_path(
+        source_import_id: source_import.id, source_import_project_token: source_import_binding(source_import)
+      )
+      get repeat_experiment_path(experiment)
+      post translation_workspace_options_path, params: {
+        translation_workspace: manual_attributes(submission_token: issue_translation_workspace_token)
+      }
+      %w[vi ja en].each do |locale|
+        patch locale_path, params: { locale_code: locale }, headers: { "Referer" => new_translation_workspace_url }
+        follow_redirect!
+        assert_response :success
+      end
+      %w[dark light system].each do |appearance|
+        patch appearance_path, params: { appearance: appearance }, headers: { "Referer" => new_translation_workspace_url }
+        follow_redirect!
+        assert_response :success
+      end
+    end
+  end
+
+  test "the first launch attempt creates the only submission row and every repeat replays it" do
+    token = issue_translation_workspace_token
+    attributes = manual_attributes(submission_token: token)
+
+    assert_difference -> { TranslationWorkspaceSubmission.count }, 1 do
+      assert_enqueued_jobs 1, only: TranslationRunJob do
+        3.times { post translation_workspace_path, params: { translation_workspace: attributes } }
+      end
+    end
+    submission = TranslationWorkspaceSubmission.find_owned_by_token!(user: users(:normal), token: token)
+    assert submission.consumed?
+    assert_redirected_to experiment_path(submission.experiment)
+  end
+
+  test "a submission row issued on render before V1.1 still launches once and replays" do
+    legacy_token = SecureRandom.urlsafe_base64(32, false)
+    TranslationWorkspaceSubmission.create!(
+      user: users(:normal), token_digest: Digest::SHA256.hexdigest(legacy_token),
+      status: :available, expires_at: 1.hour.from_now
+    )
+    attributes = manual_attributes(submission_token: legacy_token)
+
+    assert_no_difference -> { TranslationWorkspaceSubmission.count } do
+      assert_enqueued_jobs 1, only: TranslationRunJob do
+        2.times { post translation_workspace_path, params: { translation_workspace: attributes } }
+      end
+    end
+    assert_response :redirect
+
+    unknown_legacy = manual_attributes(submission_token: SecureRandom.urlsafe_base64(32, false))
+    assert_no_workspace_or_jobs { post translation_workspace_path, params: { translation_workspace: unknown_legacy } }
+    assert_response :not_found
   end
 
   test "manual duplicate post and successful replay return one experiment and one paid schedule" do

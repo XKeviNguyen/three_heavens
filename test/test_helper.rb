@@ -36,7 +36,7 @@ module AuthenticationTestHelper
   end
 
   def issue_translation_workspace_token(user: users(:normal), at: Time.current)
-    TranslationWorkspaceSubmission.issue!(user: user, at: at).public_token
+    TranslationWorkspaceSubmission.issue_token(user: user, at: at)
   end
 
   private

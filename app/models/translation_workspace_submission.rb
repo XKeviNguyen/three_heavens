@@ -1,14 +1,20 @@
 require "digest"
 require "securerandom"
 
+# One launch identity for a translation workspace, so a duplicated, retried,
+# or replayed launch starts at most one experiment.
+#
+# Rendering the workspace only issues a signed token that binds the owner and
+# an expiry; it writes nothing. The durable row is created by the first launch
+# attempt that presents the token, and every attempt then serializes on that
+# row, so the first launch consumes it and any later one replays its result.
 class TranslationWorkspaceSubmission < ApplicationRecord
-  TOKEN_BYTES = 32
-  TOKEN_LENGTH = 43
-  TOKEN_FORMAT = /\A[A-Za-z0-9_-]{#{TOKEN_LENGTH}}\z/
+  TOKEN_PURPOSE = "translation_workspace_submission/token"
+  SIGNED_TOKEN_FORMAT = /\A[A-Za-z0-9_-]{16,400}--\h{64}\z/
+  # Tokens issued before V1.1 were random and had their row created on render.
+  LEGACY_TOKEN_FORMAT = /\A[A-Za-z0-9_-]{43}\z/
   LIFETIME = 24.hours
   CLEANUP_BATCH_SIZE = 100
-
-  attr_accessor :public_token
 
   belongs_to :user
   belongs_to :experiment, optional: true
@@ -28,14 +34,29 @@ class TranslationWorkspaceSubmission < ApplicationRecord
 
   before_destroy :prevent_consumed_destruction
 
-  def self.issue!(user:, at: Time.current)
-    token = SecureRandom.urlsafe_base64(TOKEN_BYTES, false)
-    create!(
-      user: user,
-      token_digest: digest(token),
-      status: :available,
-      expires_at: at + LIFETIME
-    ).tap { |submission| submission.public_token = token }
+  def self.issue_token(user:, at: Time.current)
+    token_verifier.generate({ "n" => SecureRandom.urlsafe_base64(24), "u" => user.id, "e" => (at + LIFETIME).to_i })
+  end
+
+  # Returns the submission for a presented token, creating it on first use.
+  # Returns nil for a genuine token that expired before it was ever used.
+  # Raises RecordNotFound for a token not issued to this user.
+  def self.claim!(user:, token:, at: Time.current)
+    raise ActiveRecord::RecordNotFound, "Translation workspace submission not found" unless valid_public_token?(token)
+
+    existing = user.translation_workspace_submissions.find_by(token_digest: digest(token))
+    return existing if existing
+
+    expires_at = signed_expiry(user:, token:)
+    raise ActiveRecord::RecordNotFound, "Translation workspace submission not found" unless expires_at
+    return if expires_at <= at
+
+    # Concurrent first attempts race here; exactly one row is inserted.
+    insert(
+      { user_id: user.id, token_digest: digest(token), status: "available", expires_at:, created_at: at, updated_at: at },
+      unique_by: :token_digest
+    )
+    user.translation_workspace_submissions.find_by!(token_digest: digest(token))
   end
 
   def self.find_owned_by_token!(user:, token:)
@@ -45,8 +66,23 @@ class TranslationWorkspaceSubmission < ApplicationRecord
   end
 
   def self.valid_public_token?(token)
-    token.is_a?(String) && token.match?(TOKEN_FORMAT)
+    token.is_a?(String) && (token.match?(SIGNED_TOKEN_FORMAT) || token.match?(LEGACY_TOKEN_FORMAT))
   end
+
+  def self.signed_expiry(user:, token:)
+    payload = token_verifier.verified(token)
+    return unless payload.is_a?(Hash) && payload["n"].is_a?(String) && payload["u"] == user.id && payload["e"].is_a?(Integer)
+
+    Time.zone.at(payload["e"])
+  end
+
+  def self.token_verifier
+    ActiveSupport::MessageVerifier.new(
+      Rails.application.key_generator.generate_key(TOKEN_PURPOSE),
+      digest: "SHA256", serializer: JSON, url_safe: true
+    )
+  end
+  private_class_method :signed_expiry, :token_verifier
 
   def self.digest(token)
     Digest::SHA256.hexdigest(token)
