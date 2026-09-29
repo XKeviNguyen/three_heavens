@@ -23,6 +23,7 @@ export default class extends Controller {
     this.unacknowledged = null
     this.retryCount = 0
     this.lastSavedState = this.needsSaveValue ? null : this.state()
+    this.settledStatus = this.hasStatusTarget ? this.statusTarget.textContent : ""
     this.currentUrl = window.location.href
     this.currentHistoryState = window.history.state
     this.onBeforeRender = this.onBeforeRender.bind(this)
@@ -64,10 +65,17 @@ export default class extends Controller {
     return this.unacknowledged !== null || this.state() !== this.lastSavedState
   }
 
+  // Typing only restarts the debounce. The form is serialized once, when the
+  // save runs, never per keystroke, so a large source stays responsive.
   changed() {
     if (this.launching || this.discarding) return
     this.retryCount = 0
-    this.scheduleSave()
+    window.clearTimeout(this.saveTimer)
+    if (!this.editPending) {
+      this.editPending = true
+      this.setStatus(this.messagesValue.saving)
+    }
+    this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
   }
 
   scheduleSave() {
@@ -84,10 +92,14 @@ export default class extends Controller {
     while (this.saving) {
       try { await this.saving } catch { return false }
     }
-    if (!this.dirty()) return true
 
+    this.editPending = false
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
+    if (this.unacknowledged === null && snapshot === this.lastSavedState) {
+      this.setStatus(this.settledStatus)
+      return true
+    }
     // Resending unchanged content whose outcome is unknown is a replay of the
     // same save; any other content is a newer save.
     const sequence = this.unacknowledged?.snapshot === snapshot ? this.unacknowledged.sequence : ++this.sequence
@@ -106,8 +118,9 @@ export default class extends Controller {
       this.formTarget.elements.translation_workspace_draft_id.value = result.id
       this.formTarget.elements.translation_workspace_draft_version.value = result.version
       this.lastSavedState = snapshot
-      if (this.dirty()) this.scheduleSave()
-      else this.setStatus(this.messagesValue.saved)
+      this.settledStatus = this.messagesValue.saved
+      // Edits made while this save was in flight have their own timer.
+      if (!this.editPending) this.setStatus(this.messagesValue.saved)
       return true
     } catch (error) {
       this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)
