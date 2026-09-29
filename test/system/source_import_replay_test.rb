@@ -45,4 +45,33 @@ class SourceImportReplayTest < ApplicationSystemTestCase
   ensure
     source&.close!
   end
+
+  # A decided failure ends that upload action: choosing Upload again with the
+  # same file is a new action, so a storage outage is not repeated forever.
+  test "uploading the same file again after a storage failure starts a new upload" do
+    failures = 1
+    service = ActiveStorage::Blob.service
+    service.define_singleton_method(:upload) do |*arguments, **options|
+      raise IOError, "synthetic storage outage" if (failures -= 1) >= 0
+
+      super(*arguments, **options)
+    end
+    visit new_translation_workspace_path
+    click_button "Upload file"
+    source = Tempfile.new([ "storage-outage", ".txt" ])
+    source.write("Stored on the second attempt")
+    source.flush
+    attach_file "Source file", source.path
+
+    click_button "Upload and review"
+    assert_text I18n.t("source_imports.errors.storage_unavailable")
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "Stored on the second attempt"
+    assert_equal %w[failed ready], users(:normal).source_imports.order(:id).pluck(:status)
+    assert_equal 2, users(:normal).source_imports.distinct.count(:request_key)
+  ensure
+    singleton = ActiveStorage::Blob.service.singleton_class
+    singleton.remove_method(:upload) if singleton.method_defined?(:upload, false)
+    source&.close!
+  end
 end

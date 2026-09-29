@@ -194,6 +194,7 @@ ja:
       docx_xml_too_large: DOCXの内容が安全上の上限を超えています。
       empty_source: 読み取れるテキストが含まれていません。
       encrypted_docx: 暗号化されたDOCXには対応していません。
+      import_in_progress: このアップロードはまだ処理中です。しばらくしてからもう一度お試しください。
       import_unavailable: このアップロードは利用できなくなりました。ファイルをもう一度アップロードしてください。
       macro_docx: マクロ付きのWord文書には対応していません。
       malformed_docx: DOCXファイルを安全に読み取れませんでした。
@@ -207,6 +208,7 @@ ja:
       project_binding_invalid: このプロジェクトでは、読み込んだ原文を利用できません。
       request_key_reused: このアップロードは別のファイルで送信済みです。ファイルを選び直してください。
       source_too_long: 抽出した原文が文字数の上限を超えています。
+      storage_unavailable: ファイルを保存できませんでした。もう一度ファイルを選んでやり直してください。
       suspicious_compression: DOCXファイルを安全に処理できません。
       unsafe_docx: DOCXファイルを安全に処理できません。
       unsupported_docx_feature: このDOCXには未対応の埋め込みコンテンツがあります。

@@ -538,6 +538,24 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_equal 1, locations.uniq.size
   end
 
+  test "a storage failure is reported and every replay of that upload converges on it" do
+    ActiveStorage::Blob.service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
+    key = SecureRandom.hex(16)
+    2.times do
+      post source_imports_path(format: :json), params: {
+        source_import: { source_file: uploaded_file("Unstored", filename: "unstored.txt", content_type: "text/plain"), request_key: key }
+      }
+      assert_response :unprocessable_content
+      assert_equal I18n.t("source_imports.errors.storage_unavailable"), JSON.parse(response.body).fetch("error")
+    end
+    source_import = users(:normal).source_imports.find_by!(request_key: key)
+    assert source_import.failed?
+    assert_not source_import.source_file.attached?
+  ensure
+    singleton = ActiveStorage::Blob.service.singleton_class
+    singleton.remove_method(:upload) if singleton.method_defined?(:upload, false)
+  end
+
   private
 
   def assert_no_workspace_records_created

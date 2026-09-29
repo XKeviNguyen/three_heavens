@@ -204,21 +204,46 @@ module SourceImports
       restore_storage_uploads
     end
 
-    test "a storage write failure after commit removes the import and its blob" do
+    test "a storage write failure after commit leaves a failed import without a blob that replays converge on" do
       service = ActiveStorage::Blob.service
       service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
       key = SecureRandom.hex(16)
 
-      assert_no_difference stored_counts do
-        assert_raises(IOError) do
-          Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: key)
+      assert_difference [ -> { SourceImport.count } ], 1 do
+        assert_no_difference [ -> { ActiveStorage::Blob.count }, -> { ActiveStorage::Attachment.count } ] do
+          error = assert_raises(Error) do
+            Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: key)
+          end
+          assert_equal "storage_unavailable", error.code
+          assert error.source_import.failed?
+          assert_not error.source_import.source_file.attached?
+          assert_nil error.source_import.extracted_text
         end
       end
       restore_storage_uploads
 
-      retried = Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: key)
+      replay = assert_raises(Error) do
+        Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: key)
+      end
+      assert_equal "storage_unavailable", replay.code
+      retried = Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: SecureRandom.hex(16))
       assert retried.available?
       assert retried.source_file.blob.service.exist?(retried.source_file.blob.key)
+    ensure
+      restore_storage_uploads
+    end
+
+    test "an import becomes ready only after its object is stored" do
+      statuses = []
+      service = ActiveStorage::Blob.service
+      service.define_singleton_method(:upload) do |*arguments, **options|
+        statuses << SourceImport.order(:id).last.status
+        super(*arguments, **options)
+      end
+
+      source_import = Create.call(user: users(:normal), upload: uploaded_file("Stored first", filename: "stored.txt"), request_key: SecureRandom.hex(16))
+      assert_equal [ "pending" ], statuses
+      assert source_import.reload.ready?
     ensure
       restore_storage_uploads
     end

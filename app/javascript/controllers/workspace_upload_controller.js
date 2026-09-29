@@ -30,8 +30,13 @@ export default class extends Controller {
         method: "POST", body, credentials: "same-origin",
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || this.messagesValue.importFailed)
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        // The server decided this action, so uploading again is a new action.
+        // A lost response or a server error keeps the key, so a retry replays.
+        if (response.status < 500) this.uploadedFile = null
+        throw new Error(result.error || this.messagesValue.importFailed)
+      }
 
       this.field("source_import_id").value = result.id
       this.field("source_import_project_token").value = result.project_binding || ""

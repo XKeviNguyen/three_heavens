@@ -21,5 +21,8 @@ module SourceImports
     CLEANUP_BATCH_SIZE = 100
     EXTRACTION_VERSION = "document-io-v3"
     REQUEST_KEY_FORMAT = /\A[0-9a-f]{32}\z/
+    # How long a duplicate delivery waits for the first delivery of the same
+    # upload action to reach its final outcome.
+    REQUEST_LOCK_WAIT_SECONDS = 30
   end
 end
