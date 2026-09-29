@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { randomHex } from "controllers/random_identifier"
 
 export default class extends Controller {
   static targets = ["file", "button", "message", "import", "filename", "metadata"]
@@ -11,10 +12,17 @@ export default class extends Controller {
       return
     }
 
+    // Uploading the same chosen file again (a retry or double click) is the
+    // same action, so the server returns its import instead of a second copy.
+    if (this.uploadedFile !== file) {
+      this.uploadedFile = file
+      this.requestKey = randomHex(16)
+    }
     this.buttonTarget.disabled = true
     this.messageTarget.textContent = this.messagesValue.extracting
     const body = new FormData()
     body.append("source_import[source_file]", file)
+    body.append("source_import[request_key]", this.requestKey)
     if (this.projectIdValue) body.append("source_import[project_id]", this.projectIdValue)
 
     try {
@@ -22,8 +30,13 @@ export default class extends Controller {
         method: "POST", body, credentials: "same-origin",
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || this.messagesValue.importFailed)
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        // The server decided this action, so uploading again is a new action.
+        // A lost response or a server error keeps the key, so a retry replays.
+        if (response.status < 500) this.uploadedFile = null
+        throw new Error(result.error || this.messagesValue.importFailed)
+      }
 
       this.field("source_import_id").value = result.id
       this.field("source_import_project_token").value = result.project_binding || ""

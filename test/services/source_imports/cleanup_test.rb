@@ -64,6 +64,7 @@ module SourceImports
       error = assert_raises(Error) do
         Create.call(
           user: users(:normal),
+          request_key: SecureRandom.hex(16),
           upload: uploaded_file(
             build_docx(document_xml: "not valid XML"),
             filename: "failed.docx",

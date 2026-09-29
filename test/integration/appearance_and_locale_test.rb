@@ -156,4 +156,19 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     end
     assert_equal "vi", user.reload.locale
   end
+
+  # Requests in integration tests run on the test's own thread, so a locale
+  # left on the thread stands in for any ambient state a server thread holds.
+  test "the sign-in redirect is worded in the visitor's language regardless of ambient locale" do
+    I18n.with_locale(:ja) do
+      get new_translation_workspace_path, headers: { "Accept-Language" => "en-US,en;q=0.9" }
+    end
+    assert_redirected_to login_path
+    assert_equal I18n.t("authentication.sign_in_required", locale: :en), flash[:alert]
+
+    cookies[:ui_locale] = "vi"
+    get new_translation_workspace_path
+    assert_redirected_to login_path
+    assert_equal I18n.t("authentication.sign_in_required", locale: :vi), flash[:alert]
+  end
 end

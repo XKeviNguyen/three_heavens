@@ -36,7 +36,12 @@ module AuthenticationTestHelper
   end
 
   def issue_translation_workspace_token(user: users(:normal), at: Time.current)
-    TranslationWorkspaceSubmission.issue!(user: user, at: at).public_token
+    TranslationWorkspaceSubmission.issue_token(user: user, at: at)
+  end
+
+  # Looks up the launch row without creating it (claim! would create it).
+  def translation_workspace_submission_for(token, user: users(:normal))
+    user.translation_workspace_submissions.find_by!(token_digest: Digest::SHA256.hexdigest(token))
   end
 
   private

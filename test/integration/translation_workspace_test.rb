@@ -290,10 +290,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     end
 
     assert_includes workspace.errors[:base].join, "could not be started"
-    submission = TranslationWorkspaceSubmission.find_owned_by_token!(
-      user: users(:normal),
-      token: workspace.submission_token
-    )
+    submission = translation_workspace_submission_for(workspace.submission_token)
     assert submission.available?
 
     retry_workspace = TranslationWorkspace.new(valid_attributes.merge(submission_token: workspace.submission_token))

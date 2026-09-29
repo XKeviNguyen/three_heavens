@@ -3,8 +3,11 @@ class ApplicationController < ActionController::Base
 
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
-  before_action :require_authentication
+  # The locale wraps every other callback, so messages produced before an
+  # action (such as the sign-in redirect) use the visitor's language rather
+  # than whatever locale the serving thread was left with.
   around_action :with_locale
+  before_action :require_authentication
 
   helper_method :current_user, :authenticated?, :current_appearance
 

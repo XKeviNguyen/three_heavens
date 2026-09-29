@@ -11,7 +11,8 @@ class SourceImportsController < ApplicationController
     @project = find_owned_project(submitted[:project_id])
     @source_import = SourceImports::Create.call(
       user: current_user,
-      upload: submitted.fetch(:source_file)
+      upload: submitted.fetch(:source_file),
+      request_key: submitted.fetch(:request_key)
     )
     project_binding = SourceImports::ProjectBinding.issue(source_import: @source_import, project: @project)
     if request.format.json?
@@ -77,8 +78,14 @@ class SourceImportsController < ApplicationController
       raise ActionController::BadRequest, "source_import must be a parameter object"
     end
 
-    unexpected = submitted.keys - %w[source_file project_id]
+    unexpected = submitted.keys - %w[source_file project_id request_key]
     raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
+
+    # One random key per upload action makes replayed deliveries resolvable.
+    request_key = submitted[:request_key]
+    unless request_key.is_a?(String) && request_key.match?(SourceImports::Limits::REQUEST_KEY_FORMAT)
+      raise ActionController::BadRequest, "request_key must identify one upload action"
+    end
 
     upload = submitted.require(:source_file)
     unless upload.is_a?(ActionDispatch::Http::UploadedFile)
@@ -90,7 +97,7 @@ class SourceImportsController < ApplicationController
       raise ActionController::BadRequest, "project_id must be a scalar value"
     end
 
-    { source_file: upload, project_id: project_id.presence }
+    { source_file: upload, project_id: project_id.presence, request_key: }
   end
 
   def project_id_param
