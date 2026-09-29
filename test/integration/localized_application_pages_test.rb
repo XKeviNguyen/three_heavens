@@ -42,6 +42,18 @@ class LocalizedApplicationPagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "public pages render in every supported locale" do
+    %w[en vi ja].each do |locale|
+      patch locale_path, params: { locale_code: locale }
+      [ root_path, new_registration_path, login_path ].each do |path|
+        get path
+        assert_response :success, "#{locale} #{path}"
+        assert_select "html[lang='#{locale}']", 1, "#{locale} #{path}"
+        assert_no_match(/Translation missing|translation missing|%= /, response.body, "#{locale} #{path}")
+      end
+    end
+  end
+
   test "admin and not-found pages render in every supported locale" do
     admin = users(:admin)
     sign_in_as admin

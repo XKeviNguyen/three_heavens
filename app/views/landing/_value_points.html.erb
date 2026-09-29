@@ -1,0 +1,30 @@
+<section id="how-it-works" class="landing-section landing-values" aria-labelledby="value-heading">
+  <div class="landing-shell">
+    <div class="landing-section-heading">
+      <h2 id="value-heading"><%= t("landing.values.heading") %></h2>
+      <p><%= t("landing.values.introduction") %></p>
+    </div>
+
+    <div class="landing-value-grid">
+      <% %w[compare guide review finalize].each do |value| %>
+        <article class="landing-value-card">
+          <span class="landing-value-icon landing-value-icon-<%= value %>" aria-hidden="true">
+            <% if value == "compare" %>
+              <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 9h7M8.5 12h5M8.5 15h6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg>
+            <% elsif value == "guide" %>
+              <svg viewBox="0 0 24 24"><path d="M7 6h10M7 12h10M7 18h10M9 4v4M15 10v4M11 16v4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg>
+            <% elsif value == "review" %>
+              <svg viewBox="0 0 24 24"><path d="M5 5.5h11v13H5zM8 9h5M8 12h5M8 15h3M16 9l3-2v10l-3-2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+            <% else %>
+              <svg viewBox="0 0 24 24"><path d="m6 16 9.5-9.5 2 2L8 18H6v-2ZM13.5 8.5l2 2M5 20h14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+            <% end %>
+          </span>
+          <div>
+            <h3><%= t("landing.values.#{value}.title") %></h3>
+            <p><%= t("landing.values.#{value}.description") %></p>
+          </div>
+        </article>
+      <% end %>
+    </div>
+  </div>
+</section>

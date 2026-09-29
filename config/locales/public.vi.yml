@@ -17,31 +17,113 @@ vi:
     confirm_email: Hãy xác nhận email trước khi đăng nhập.
     signed_in: Đăng nhập thành công.
   landing:
-    title: Three Heavens · So sánh bản dịch
+    title: Three Heavens · So sánh bản dịch AI
+    meta_description: So sánh nhiều bản dịch AI độc lập, xem phản hồi chất lượng và giữ quyền quyết định bản dịch cuối cùng trong tay người biên tập.
     navigation: Điều hướng trang giới thiệu
-    headline: So sánh bản dịch AI. Bạn quyết định bản cuối cùng.
+    footer_navigation: Điều hướng cuối trang
+    eyebrow: Dịch thuật AI do con người định hướng
     headline_first: So sánh bản dịch AI.
-    headline_second_prefix: "Bạn quyết định "
-    headline_second_emphasis: bản cuối cùng.
-    introduction: Chuẩn bị văn bản nguồn, áp dụng thuật ngữ và tài liệu tham khảo, so sánh các bản dịch độc lập rồi tự hoàn thiện bản dịch cuối.
-    how_it_works: Cách sử dụng
+    headline_second_lead: "Quyết định cuối "
+    headline_second_emphasis: là của bạn.
+    introduction: Chuẩn bị văn bản nguồn, thuật ngữ và tài liệu tham khảo. Tạo các bản dịch độc lập bằng nhiều mô hình AI, so sánh kết quả rồi tự quyết định bản dịch cuối cùng.
+    start_translation: Bắt đầu dịch
+    see_how_it_works: Xem cách hoạt động
     open_workspace: Mở không gian làm việc
     access_note: Quyền dùng AI để dịch được cấp riêng cho từng tài khoản. Tạo tài khoản không bao gồm quyền sử dụng AI do hệ thống quản lý.
-    your_work: Bản dịch do bạn quyết định
-    trust: Lưu hướng dẫn dùng lại cho từng dự án. Bản nháp được tự động lưu, và người biên tập luôn quyết định bản dịch cuối.
-    steps:
-      prepare:
-        title: Chuẩn bị
-        description: Tập hợp văn bản nguồn, thuật ngữ, tài liệu tham khảo và phương pháp dịch.
+    nav:
+      product: Sản phẩm
+      how_it_works: Cách hoạt động
+      benchmarks: Đánh giá
+      menu: Mở trình đơn điều hướng
+    principles:
+      label: Nguyên tắc sản phẩm
+      models: Nhiều mô hình AI
+      transparent: Quy trình minh bạch
+      approval: Bạn duyệt kết quả cuối
+    flow:
+      target_locale: en
+      accessible_description: Một văn bản nguồn được dịch độc lập bởi ba mô hình AI. Phản hồi chất lượng giúp xác định ứng viên tốt nhất, sau đó người dùng biên tập và duyệt bản dịch cuối.
+      source:
+        title: Văn bản nguồn
+        preview: Kết quả tài chính quý cho thấy mức tăng trưởng mạnh…
+        language: VI → EN
+      models:
+        a:
+          title: Mô hình A
+          preview: "Quarterly financial results show strong growth…"
+        b:
+          title: Mô hình B
+          preview: "The quarter's results reflect solid growth…"
+        c:
+          title: Mô hình C
+          preview: "Quarterly earnings point to robust growth…"
+      metrics:
+        quality: Chất lượng
+        accuracy: Chính xác
+        style: Văn phong
+      winner:
+        title: Ứng viên tốt nhất
+        description: Cân bằng tốt nhất giữa chất lượng, độ chính xác và văn phong.
+      approval:
+        title: Bạn biên tập và duyệt
+        description: Xem lại, tinh chỉnh và hoàn thiện theo ý bạn.
+      final:
+        title: Bản dịch cuối
+        description: Bản dịch chất lượng cao do chính bạn phê duyệt.
+    values:
+      heading: "Không chỉ một đáp án.\nMà là quyết định tốt hơn."
+      introduction: "Nhiều góc nhìn. Chuyên môn của bạn.\nKết quả chất lượng hơn."
       compare:
         title: So sánh
-        description: Tạo các bản dịch độc lập bằng những mô hình AI đã cấu hình.
+        description: Nhận các bản dịch độc lập từ nhiều mô hình AI hàng đầu.
+      guide:
+        title: Định hướng
+        description: Cung cấp thuật ngữ, văn phong, phương pháp và tài liệu tham khảo.
       review:
         title: Đánh giá
-        description: Xem chất lượng bản dịch và nhận xét đánh giá ẩn danh.
+        description: So sánh các ứng viên bằng phản hồi chất lượng rõ ràng.
       finalize:
         title: Hoàn thiện
-        description: Tự chọn và biên tập bản dịch cuối cùng.
+        description: Biên tập, tinh chỉnh và duyệt bản dịch cuối. Bạn luôn nắm quyền kiểm soát.
+    decision:
+      heading: "Dữ liệu của bạn.\nNhiều góc nhìn.\nBản dịch tốt hơn."
+      introduction: Kết hợp hiểu biết của bạn với thế mạnh của nhiều mô hình AI độc lập.
+      accessible_description: Văn bản nguồn, thuật ngữ và bản dịch tham khảo định hướng phương pháp cùng các mô hình AI độc lập để tạo ra quyết định dịch thuật tốt hơn, luôn do con người kiểm soát.
+      source:
+        title: Văn bản nguồn
+        description: Tài liệu và nội dung của bạn.
+      terminology:
+        title: Thuật ngữ
+        description: Những cách dùng cần nhất quán.
+      references:
+        title: Tài liệu tham khảo
+        description: Các bản dịch bạn đã tin dùng.
+      methodology:
+        title: Phương pháp
+        description: Cách bản dịch cần được thực hiện.
+      models:
+        title: Mô hình AI
+        description: Các ứng viên dịch độc lập.
+      outcome:
+        title: Quyết định dịch thuật tốt hơn
+        description: Chất lượng cao hơn. Nhất quán hơn. Bạn quyết định.
+    trust:
+      heading: Nguyên tắc lấy con người làm trung tâm
+      explicit:
+        title: Không có phép màu ẩn
+        description: Công việc của AI luôn minh bạch. Bạn thấy rõ điều gì đang diễn ra.
+      inspect:
+        title: Không ép chọn ứng viên
+        description: Bạn có thể xem mọi bản dịch và phản hồi đi kèm.
+      human:
+        title: Không tự động hoàn tất
+        description: AI có thể đề xuất. Con người là người phê duyệt.
+    final_cta:
+      eyebrow: Sẵn sàng bắt đầu?
+      heading: "Đưa văn bản vào.\nĐể AI tranh luận."
+      description: So sánh các lựa chọn. Tự mình đưa ra quyết định cuối.
+    footer:
+      copyright: "© %{year} Three Heavens. Bảo lưu mọi quyền."
   registration:
     create_account: Tạo tài khoản
     benefit: Tiếp tục công việc trên nhiều trình duyệt và thiết bị.

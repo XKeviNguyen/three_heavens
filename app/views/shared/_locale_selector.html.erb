@@ -1,6 +1,6 @@
 <% selector_context = local_assigns.fetch(:context, :default) %>
 <%= form_with url: locale_path, method: :patch, class: [ "locale-selector", ("public-locale-selector" if selector_context == :public), "grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-sm", ].compact.join(" ") do |form| %>
   <%= form.label :locale_code, t("common.interface_language"), class: "col-span-2 min-w-0 font-medium leading-5 text-slate-600" %>
-  <%= form.select :locale_code, [["English", "en"], ["Tiếng Việt", "vi"], ["日本語", "ja"]], { selected: I18n.locale.to_s }, class: "min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-800" %>
+  <%= form.select :locale_code, interface_locale_names.invert, { selected: I18n.locale.to_s }, class: "min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-800" %>
   <%= form.submit t("common.apply"), class: "rounded-lg border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" %>
 <% end %>

@@ -1,0 +1,30 @@
+<section id="product" class="landing-hero" aria-labelledby="landing-heading">
+  <div class="landing-shell landing-hero-grid">
+    <div class="landing-hero-copy">
+      <p class="landing-eyebrow"><%= t("landing.eyebrow") %></p>
+      <h1 id="landing-heading">
+        <span><%= t("landing.headline_first") %></span>
+        <span class="landing-heading-emphasis"><%= t("landing.headline_second_lead") %><span class="landing-heading-nowrap"><%= t("landing.headline_second_emphasis") %></span></span>
+      </h1>
+      <p class="landing-hero-introduction"><%= t("landing.introduction") %></p>
+
+      <div class="landing-hero-actions">
+        <%= link_to authenticated? ? new_translation_workspace_path : new_registration_path, class: "landing-button landing-button-primary" do %>
+          <%= t("landing.start_translation") %>
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 5l4 4-4 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+        <% end %>
+        <a href="#how-it-works" class="landing-button landing-button-secondary">
+          <span class="landing-play" aria-hidden="true"><svg viewBox="0 0 10 10"><path d="M3 1.8v6.4L8.2 5 3 1.8Z" fill="currentColor"/></svg></span><%= t("landing.see_how_it_works") %>
+        </a>
+      </div>
+
+      <ul class="landing-hero-principles" aria-label="<%= t("landing.principles.label") %>">
+        <% %w[models transparent approval].each do |principle| %>
+          <li><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="9" fill="currentColor" opacity=".12"/><path d="m5.6 9.2 2.2 2.2 4.4-4.8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg><%= t("landing.principles.#{principle}") %></li>
+        <% end %>
+      </ul>
+    </div>
+
+    <%= render "landing/translation_flow" %>
+  </div>
+</section>
