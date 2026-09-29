@@ -5,7 +5,16 @@ Rails.application.routes.draw do
   resource :email_confirmation, only: %i[show create]
   resource :confirmation_resend, only: %i[new create]
   resource :locale, only: :update
+  resource :appearance, only: :update
+  # Sign in with Google (GIS redirect mode) posts the credential here.
+  post "auth/google/callback", to: "auth/google_callbacks#create", as: :google_identity_callback
+  post "auth/google/ceremony", to: "auth/google_ceremonies#create", as: :google_identity_ceremony
   namespace :settings do
+    resource :account, only: :show do
+      resource :google_identity, only: %i[create destroy] do
+        delete :pending, action: :cancel_pending
+      end
+    end
     resources :users, only: :index do
       member do
         patch :grant_managed_ai_access

@@ -6,7 +6,7 @@ class ApplicationController < ActionController::Base
   before_action :require_authentication
   around_action :with_locale
 
-  helper_method :current_user, :authenticated?
+  helper_method :current_user, :authenticated?, :current_appearance
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
@@ -20,9 +20,12 @@ class ApplicationController < ActionController::Base
     I18n.with_locale(current_user&.locale || preferred_public_locale, &action)
   end
 
+  def ui_preferences
+    @ui_preferences ||= UiPreferences.new(cookies)
+  end
+
   def preferred_public_locale
-    cookie_locale = cookies[:ui_locale]
-    return cookie_locale if User::SUPPORTED_LOCALES.include?(cookie_locale)
+    return ui_preferences.locale if ui_preferences.locale
 
     request.headers["Accept-Language"].to_s.split(",").each do |part|
       language = part.split(";", 2).first.to_s.strip.downcase.split("-", 2).first
@@ -57,6 +60,38 @@ class ApplicationController < ActionController::Base
         format.any { head :not_found }
       end
     end
+  end
+
+  def current_appearance
+    return current_user.appearance if current_user
+
+    ui_preferences.appearance || "system"
+  end
+
+  def google_identity_ceremony(intent)
+    GoogleIdentity::Ceremony.issue(
+      intent: intent,
+      user: (current_user if intent == "link"),
+      locale: I18n.locale,
+      appearance: current_appearance,
+      preference_overrides: (ui_preferences.pending_overrides if intent == "sign_in"),
+      return_path: session[:return_to_after_authenticating]
+    )
+  end
+
+  # Returns to the page the form was on: its explicit return_to (needed on
+  # no-referrer pages such as email confirmation), else a same-host Referer,
+  # else home. Both candidates go through SafeReturnPath.
+  def redirect_back_to_same_origin
+    path = SafeReturnPath.call(params[:return_to]) || same_origin_referer_path || root_path
+    redirect_to path, allow_other_host: false, status: :see_other
+  end
+
+  def same_origin_referer_path
+    uri = URI.parse(request.referer.to_s)
+    SafeReturnPath.call(uri.request_uri) if uri.host == request.host && uri.port == request.port
+  rescue URI::InvalidURIError
+    nil
   end
 
   def current_user
@@ -110,7 +145,10 @@ class ApplicationController < ActionController::Base
     current_user.projects.find(id)
   end
 
-  def start_authenticated_session!(user)
+  # Every sign-in (password or Google) reconciles interface preferences here,
+  # before the first signed-in page renders.
+  def start_authenticated_session!(user, preference_overrides: ui_preferences.pending_overrides)
+    ui_preferences.apply_at_sign_in(user, preference_overrides)
     destination = session.delete(:return_to_after_authenticating)
     reset_session
     session[:user_id] = user.id
@@ -118,6 +156,8 @@ class ApplicationController < ActionController::Base
   end
 
   def end_authenticated_session!
+    ui_preferences.mirror(current_user) if current_user
     reset_session
+    GoogleIdentity::PendingLink.clear(cookies)
   end
 end

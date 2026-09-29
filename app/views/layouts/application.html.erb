@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="<%= I18n.locale %>">
+<html lang="<%= I18n.locale %>" data-appearance="<%= current_appearance %>">
   <head>
     <title><%= content_for(:title) || "Three Heavens" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="<%= color_scheme_for(current_appearance) %>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Three Heavens">
     <meta name="mobile-web-app-capable" content="yes">
@@ -64,11 +65,17 @@
           </nav>
 
           <div class="min-w-0 overflow-x-clip border-t border-slate-100 p-3">
-            <div class="flex items-center gap-2 rounded-lg px-2 py-2">
+            <%= link_to settings_account_path, class: "flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-100", aria: { current: (controller_path == "settings/accounts" ? "page" : nil) } do %>
               <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold uppercase text-slate-700" aria-hidden="true"><%= current_user.email.to_s.first(2) %></span>
-              <span class="min-w-0 flex-1 truncate text-xs text-slate-500" title="<%= current_user.email %>"><%= current_user.email %></span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-xs text-slate-500" title="<%= current_user.email %>"><%= current_user.email %></span>
+                <span class="block text-xs font-medium text-slate-700"><%= t("account.title") %></span>
+              </span>
+            <% end %>
+            <div class="flex min-w-0 items-end gap-2">
+              <div class="min-w-0 flex-1"><%= render "shared/locale_selector" %></div>
+              <%= render "shared/appearance_menu" %>
             </div>
-            <%= render "shared/locale_selector" %>
             <%= button_to t("navigation.log_out"), session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>
           </div>
         </aside>

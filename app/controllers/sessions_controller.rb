@@ -12,7 +12,14 @@ class SessionsController < ApplicationController
 
   def new
     @email = ""
-    redirect_to new_translation_workspace_path if authenticated?
+    google_notice = GoogleIdentity::Notice.take(cookies)
+    if authenticated?
+      # A signed-in visitor only reaches Google by linking; keep them signed in on Account.
+      return redirect_to settings_account_path, alert: t("google_identity.messages.link_failed") if google_notice
+      return redirect_to new_translation_workspace_path
+    end
+
+    flash.now[:alert] = t("google_identity.messages.#{google_notice}") if google_notice
   end
 
   def create
@@ -35,7 +42,8 @@ class SessionsController < ApplicationController
 
     if user
       destination = start_authenticated_session!(user)
-      redirect_to destination.presence || new_translation_workspace_path, notice: t("authentication.signed_in")
+      redirect_to destination.presence || new_translation_workspace_path,
+                  notice: I18n.with_locale(user.locale) { t("authentication.signed_in") }
     else
       render_invalid_credentials
     end

@@ -18,6 +18,7 @@
         </summary>
         <%= render "landing/locale_options" %>
       </details>
+      <%= render "shared/appearance_menu" %>
       <% if authenticated? %>
         <%= link_to t("landing.open_workspace"), new_translation_workspace_path, class: "landing-button landing-button-small landing-button-primary" %>
       <% else %>
@@ -41,6 +42,9 @@
           <% end %>
         </nav>
         <%= render "landing/locale_options" %>
+        <div data-controller="appearance" data-appearance-current-value="<%= current_appearance %>" data-appearance-labels-value="<%= appearance_labels.to_json %>">
+          <%= render "shared/appearance_options", class_name: "landing-appearance-options" %>
+        </div>
       </div>
     </details>
   </div>

@@ -32,6 +32,10 @@ module ThreeHeavens
     # This application does not use direct uploads or signed public blob routes.
     config.active_storage.draw_routes = false
 
+    # Sign in with Google authenticates identity only. The OAuth client ID is a
+    # public identifier; no client secret is used. Absent means Google is disabled.
+    config.x.google_identity.client_id = ENV["GOOGLE_CLIENT_ID"].presence
+
     config.action_dispatch.default_headers.merge!(
       "Referrer-Policy" => "strict-origin-when-cross-origin",
       "X-Content-Type-Options" => "nosniff",

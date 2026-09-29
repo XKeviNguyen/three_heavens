@@ -54,7 +54,7 @@ class LanguageComboboxTest < ApplicationSystemTestCase
     assert_equal "Japanese", committed_value("translation_workspace[source_language]")
     assert_field "Ngôn ngữ nguồn", with: "Japanese"
 
-    switch_locale("日本語", current_label: "Ngôn ngữ giao diện", button: "Áp dụng")
+    switch_locale("日本語", current_label: "Ngôn ngữ giao diện")
     assert_selector "html[lang='ja']"
     assert_equal "Japanese", committed_value("translation_workspace[source_language]")
     assert_field "原文の言語", with: "Japanese"
@@ -87,10 +87,9 @@ class LanguageComboboxTest < ApplicationSystemTestCase
     find("input[name='#{name}']", visible: :all).value
   end
 
-  def switch_locale(option, current_label: "Interface language", button: "Apply")
+  def switch_locale(option, current_label: "Interface language")
     within "aside#app-sidebar" do
       select option, from: current_label
-      click_button button
     end
   end
 end

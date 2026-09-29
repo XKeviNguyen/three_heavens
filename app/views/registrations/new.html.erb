@@ -8,7 +8,13 @@
       <ul class="mt-2 list-disc pl-5"><% @user.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
     </div>
   <% end %>
-  <%= form_with model: @user, url: registration_path, class: "mt-7 space-y-5" do |form| %>
+  <% if GoogleIdentity.enabled? %>
+    <div class="mt-8">
+      <%= render "shared/google_sign_in", intent: "sign_in", text: "signup_with" %>
+      <p class="auth-divider mt-6"><span><%= t("google_identity.or") %></span></p>
+    </div>
+  <% end %>
+  <%= form_with model: @user, url: registration_path, class: "#{GoogleIdentity.enabled? ? "mt-6" : "mt-7"} space-y-5" do |form| %>
     <div><%= form.label :email, t("registration.email"), class: "block text-sm font-medium" %><%= form.email_field :email, required: true, autocomplete: "email", value: @user.email, aria: { invalid: @user.errors[:email].any?, describedby: (@user.errors[:email].any? ? "registration-email-error" : nil) }, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-3" %><% if @user.errors[:email].any? %><p id="registration-email-error" class="mt-1 text-sm text-red-700"><%= @user.errors.full_messages_for(:email).join(". ") %></p><% end %></div>
     <div><%= form.label :password, t("registration.password"), class: "block text-sm font-medium" %><%= form.password_field :password, required: true, autocomplete: "new-password", minlength: User::MINIMUM_PASSWORD_LENGTH, maxlength: User::MAXIMUM_PASSWORD_LENGTH, aria: { invalid: @user.errors[:password].any?, describedby: "registration-password-hint#{" registration-password-error" if @user.errors[:password].any?}" }, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-3" %><p id="registration-password-hint" class="mt-2 text-sm text-slate-500"><%= t("registration.password_hint") %></p><% if @user.errors[:password].any? %><p id="registration-password-error" class="mt-1 text-sm text-red-700"><%= @user.errors.full_messages_for(:password).join(". ") %></p><% end %></div>
     <div><%= form.label :password_confirmation, t("registration.confirm_password"), class: "block text-sm font-medium" %><%= form.password_field :password_confirmation, required: true, autocomplete: "new-password", aria: { invalid: @user.errors[:password_confirmation].any?, describedby: (@user.errors[:password_confirmation].any? ? "registration-confirmation-error" : nil) }, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-3" %><% if @user.errors[:password_confirmation].any? %><p id="registration-confirmation-error" class="mt-1 text-sm text-red-700"><%= @user.errors.full_messages_for(:password_confirmation).join(". ") %></p><% end %></div>

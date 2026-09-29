@@ -111,6 +111,26 @@ export default class extends Controller {
     return response.json()
   }
 
+  // Saves until the persisted draft matches the form; false means edits are not safe.
+  async flush() {
+    let saved = false
+    for (let attempt = 0; attempt < 3; attempt++) {
+      saved = await this.save()
+      if (!saved || !this.dirty()) break
+    }
+    return saved && !this.dirty()
+  }
+
+  // The interface-language switch waits for this before navigating, and is
+  // abandoned (keeping the page and its edits) unless the draft is saved.
+  persistBeforeLocaleSwitch(event) {
+    if (this.launching) {
+      event.preventDefault()
+      return
+    }
+    event.detail.pending.push(this.flush())
+  }
+
   onBeforeVisit(event) {
     if (this.allowVisit || this.launching || !this.dirty()) return
     event.preventDefault()
@@ -128,13 +148,9 @@ export default class extends Controller {
   async navigateAfterSave(destination, action) {
     if (this.navigating) return
     this.navigating = true
-    let saved = false
-    for (let attempt = 0; attempt < 3; attempt++) {
-      saved = await this.save()
-      if (!saved || !this.dirty()) break
-    }
+    const saved = await this.flush()
     this.navigating = false
-    if (saved && !this.dirty()) {
+    if (saved) {
       this.allowVisit = true
       if (action === "render") this.pendingRender()
       else window.Turbo.visit(destination)
@@ -155,12 +171,7 @@ export default class extends Controller {
     if (this.allowSubmit || !this.dirty()) return
     event.preventDefault()
     const submitter = event.submitter
-    let saved = false
-    for (let attempt = 0; attempt < 3; attempt++) {
-      saved = await this.save()
-      if (!saved || !this.dirty()) break
-    }
-    if (saved && !this.dirty()) {
+    if (await this.flush()) {
       this.allowSubmit = true
       this.formTarget.requestSubmit(submitter)
       this.allowSubmit = false

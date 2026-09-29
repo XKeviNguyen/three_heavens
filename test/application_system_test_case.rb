@@ -19,6 +19,13 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   setup do
+    # Start from a clean browser: a late response from the previous example can
+    # land after Capybara's reset and restore its session cookie.
+    page.driver.browser.execute_cdp("Network.clearBrowserCookies")
+    # Browser tests never load Google Identity Services; tests that exercise the
+    # button install a local stand-in (see GoogleIdentitySystemHelper).
+    page.driver.browser.execute_cdp("Network.enable")
+    page.driver.browser.execute_cdp("Network.setBlockedURLs", urls: [ "*accounts.google.com*" ])
     # Each browser example starts with an independent login throttle window.
     ActionController::Base.cache_store.clear
     @original_catalog_transport = OpenRouter::Catalog.transport

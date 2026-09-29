@@ -208,10 +208,12 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_select "h1", text: /AI翻訳を比べる。.*最終判断は、あなたに。/m
 
+    # The language chosen while signed out carries into the account.
     sign_in_as users(:normal)
+    assert_equal "ja", users(:normal).reload.locale
     get root_path
     assert_response :success
-    assert_select "a[href='#{new_translation_workspace_path}']", text: /Open workspace/
+    assert_select "a[href='#{new_translation_workspace_path}']", text: "ワークスペースを開く"
     assert_select "a[href='#{new_registration_path}']", count: 0
   end
 end
