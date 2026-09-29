@@ -22,6 +22,8 @@ module OpenRouter
     OPEN_TIMEOUT = 3
     READ_TIMEOUT = 5
     WRITE_TIMEOUT = 5
+    # READ_TIMEOUT bounds each read; this bounds the whole slowly streamed body.
+    TOTAL_TIMEOUT = 10
     MAX_MODELS = 4_000
     # Ai::ContextBudget reserves 4_096 output tokens for every provider stage.
     STAGE_OUTPUT_RESERVE = 4_096
@@ -89,8 +91,17 @@ module OpenRouter
       attr_accessor :transport
     end
 
-    # Concurrent cold requests in one process wait for a single fetch.
-    FETCH_LOCK = Mutex.new
+    # Concurrent cold requests in one process share a single fetch: the first
+    # leads it and the others wait for its outcome. Waiters must not re-read
+    # the cache, because each request reads through a request-local cache
+    # that still answers with the miss it saw before waiting.
+    Flight = Struct.new(:result, :done)
+    FLIGHT_LOCK = Mutex.new
+    FLIGHT_LANDED = ConditionVariable.new
+    @flight = nil
+    class << self
+      attr_accessor :flight
+    end
 
     def self.call(**options)
       new(**options).call
@@ -103,7 +114,7 @@ module OpenRouter
     end
 
     def call
-      cached_result || FETCH_LOCK.synchronize { cached_result || fetch }
+      cached_result || shared_fetch
     end
 
     private
@@ -114,6 +125,28 @@ module OpenRouter
       raise Error if @cache.read(FAILURE_CACHE_KEY)
 
       nil
+    end
+
+    def shared_fetch
+      flight, leading = FLIGHT_LOCK.synchronize do
+        current = self.class.flight
+        current ? [ current, false ] : [ self.class.flight = Flight.new, true ]
+      end
+      if leading
+        begin
+          flight.result = fetch
+        ensure
+          FLIGHT_LOCK.synchronize do
+            flight.done = true
+            self.class.flight = nil
+            FLIGHT_LANDED.broadcast
+          end
+        end
+      else
+        FLIGHT_LOCK.synchronize { FLIGHT_LANDED.wait(FLIGHT_LOCK) until flight.done }
+        raise Error unless flight.result
+      end
+      flight.result
     end
 
     def fetch
@@ -147,9 +180,11 @@ module OpenRouter
           response.decode_content = true if response.respond_to?(:decode_content=)
 
           body = +""
+          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + TOTAL_TIMEOUT
           response.read_body do |chunk|
             body << chunk
             raise Error if body.bytesize > MAX_RESPONSE_BYTES
+            raise Error if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
           end
         end
         body

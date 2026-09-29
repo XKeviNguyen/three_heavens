@@ -1,4 +1,5 @@
 require "test_helper"
+require "tmpdir"
 
 module OpenRouter
   class CatalogTest < ActiveSupport::TestCase
@@ -234,25 +235,50 @@ module OpenRouter
       end
     end
 
-    test "concurrent cold requests in one process share a single upstream fetch" do
-      calls = 0
-      gate = Queue.new
-      transport = lambda do
-        calls += 1
-        gate.pop
-        JSON.generate("data" => [ model_entry ])
-      end
-      cache = memory_cache
-      threads = 4.times.map do
-        Thread.new { OpenRouter::Catalog.new(transport: transport, cache: cache, clock: -> { Time.current }).call }
-      end
-      sleep 0.05 until calls.positive?
-      sleep 0.1
-      4.times { gate << true }
-      results = threads.map(&:value)
+    # Production requests read through a request-local cache that memoizes a
+    # miss, so waiters must take the leader's outcome rather than re-reading.
+    test "concurrent cold requests inside request-local caches share one upstream fetch" do
+      Dir.mktmpdir("catalog-cache-") do |directory|
+        cache = LocalCachedFileStore.new(directory)
+        [ :success, :failure ].each do |outcome|
+          cache.clear
+          calls = 0
+          gate = Queue.new
+          transport = lambda do
+            calls += 1
+            gate.pop
+            raise Net::ReadTimeout, "upstream down" if outcome == :failure
 
-      assert_equal 1, calls
-      assert_equal [ 1 ], results.map { it.models.size }.uniq
+            JSON.generate("data" => [ model_entry ])
+          end
+          threads = 4.times.map do
+            Thread.new do
+              cache.with_local_cache do
+                OpenRouter::Catalog.new(transport:, cache:, clock: -> { Time.current }).call
+              rescue OpenRouter::Catalog::Error => error
+                error
+              end
+            end
+          end
+          sleep 0.05 until calls.positive?
+          sleep 0.2
+          4.times { gate << true }
+          results = threads.map { it.join(10)&.value }
+
+          assert_equal 1, calls, "#{outcome}: waiters must not fetch again"
+          if outcome == :success
+            assert_equal [ 1 ], results.map { it.models.size }.uniq
+          else
+            assert results.all?(OpenRouter::Catalog::Error), results.inspect
+          end
+        end
+      end
+    end
+
+    # The same composition as SolidCache::Store in production: entries are read
+    # through read_serialized_entry with Strategy::LocalCache prepended.
+    class LocalCachedFileStore < ActiveSupport::Cache::FileStore
+      prepend ActiveSupport::Cache::Strategy::LocalCache
     end
 
     private
