@@ -31,6 +31,14 @@ export default class extends Controller {
     this.element.close()
   }
 
+  // Cancel buttons inside the swapped editor are handled by delegation from
+  // the dialog. A Stimulus action on an element inside the frame content
+  // stays registered with this long-lived controller after the frame is
+  // replaced, which kept every previous editor's DOM alive.
+  closeFromButton(event) {
+    if (event.target.closest("[data-terminology-sheet-close]")) this.close()
+  }
+
   // A save replaces the panel that opened the sheet, so the browser cannot
   // return focus to that link; focus the same control in the new panel.
   restoreFocus() {
