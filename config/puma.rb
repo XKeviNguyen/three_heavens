@@ -34,6 +34,12 @@ port ENV.fetch("PORT", 3000)
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
 
+# Puma reads a chunked request body completely before the application sees
+# it, so stop any body above the largest request the application accepts
+# with 413 here. RequestBodyLimit applies the smaller per-type limits.
+require_relative "../app/middleware/request_body_limit"
+http_content_length_limit RequestBodyLimit::MAX_BYTES
+
 # Run the Solid Queue supervisor inside of Puma for single-server deployments.
 plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"] == "true"
 
