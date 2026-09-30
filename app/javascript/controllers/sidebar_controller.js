@@ -14,10 +14,15 @@ export default class extends Controller {
 
   connect() {
     this.onKeydown = this.onKeydown.bind(this)
+    // Turbo snapshots the page when leaving it; an open drawer would come
+    // back open (without its Escape handler or scroll lock) after Back.
+    this.onBeforeCache = () => this.collapse()
+    document.addEventListener("turbo:before-cache", this.onBeforeCache)
   }
 
   disconnect() {
     document.removeEventListener("keydown", this.onKeydown)
+    document.removeEventListener("turbo:before-cache", this.onBeforeCache)
     document.body.classList.remove("overflow-hidden")
   }
 
@@ -32,7 +37,12 @@ export default class extends Controller {
   }
 
   close() {
-    if (this.panelTarget.classList.contains("hidden")) return
+    if (this.collapse()) this.triggerTarget?.focus()
+  }
+
+  // Returns whether the drawer was open.
+  collapse() {
+    if (this.panelTarget.classList.contains("hidden")) return false
 
     this.panelTarget.classList.add("hidden")
     this.panelTarget.classList.remove("flex")
@@ -40,7 +50,7 @@ export default class extends Controller {
     this.triggerTarget?.setAttribute("aria-expanded", "false")
     document.body.classList.remove("overflow-hidden")
     document.removeEventListener("keydown", this.onKeydown)
-    this.triggerTarget?.focus()
+    return true
   }
 
   onKeydown(event) {

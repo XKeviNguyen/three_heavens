@@ -3,17 +3,11 @@ import { randomHex } from "controllers/random_identifier"
 
 const SAVE_DELAY_MS = 1000
 const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
-const SCALARS = [
-  "project_name", "source_language", "target_language", "document_title",
-  "source_text", "source_import_id", "experiment_name", "instruction_prompt",
-  "workflow_mode", "workflow_profile_revision_id", "glossary_revision_id",
-  "methodology_profile_revision_id", "guidance_preference"
-]
-const ARRAYS = ["model_ids", "model_identifiers", "translation_reference_revision_ids"]
 
 export default class extends Controller {
   static targets = ["form", "dialog", "status"]
-  static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object }
+  // The server's draft field lists, so only fields it stores count as edits.
+  static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object, scalarFields: Array, arrayFields: Array }
 
   connect() {
     // One editor per page load. Only this random identifier and save counter
@@ -23,6 +17,7 @@ export default class extends Controller {
     this.unacknowledged = null
     this.retryCount = 0
     this.lastSavedState = this.needsSaveValue ? null : this.state()
+    this.settledStatus = this.hasStatusTarget ? this.statusTarget.textContent : ""
     this.currentUrl = window.location.href
     this.currentHistoryState = window.history.state
     this.onBeforeRender = this.onBeforeRender.bind(this)
@@ -48,8 +43,8 @@ export default class extends Controller {
   payload() {
     const data = new FormData(this.formTarget)
     const workspace = {}
-    for (const field of SCALARS) workspace[field] = data.get("translation_workspace[" + field + "]") || ""
-    for (const field of ARRAYS) workspace[field] = data.getAll("translation_workspace[" + field + "][]").filter(value => typeof value === "string" && value)
+    for (const field of this.scalarFieldsValue) workspace[field] = data.get("translation_workspace[" + field + "]") || ""
+    for (const field of this.arrayFieldsValue) workspace[field] = data.getAll("translation_workspace[" + field + "][]").filter(value => typeof value === "string" && value)
     return workspace
   }
 
@@ -64,10 +59,38 @@ export default class extends Controller {
     return this.unacknowledged !== null || this.state() !== this.lastSavedState
   }
 
-  changed() {
+  // Typing only restarts the debounce. The form is serialized once, when the
+  // save runs, never per keystroke, so a large source stays responsive.
+  changed(event) {
     if (this.launching || this.discarding) return
+    if (!this.draftChange(event)) return
     this.retryCount = 0
-    this.scheduleSave()
+    window.clearTimeout(this.saveTimer)
+    if (!this.editPending) {
+      this.editPending = true
+      this.setStatus(this.messagesValue.saving)
+    }
+    this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
+  }
+
+  // Only controls in the saved draft count. The model search and filters,
+  // the terminology sheet, and the per-launch automatic confirmation, which
+  // is deliberately never saved, change nothing that autosave stores. Events
+  // dispatched on containers, such as an import or its removal, do count.
+  draftChange(event) {
+    const target = event?.target
+    if (!target || (event.type !== "input" && event.type !== "change")) return true
+    if (target.closest("dialog")) return false
+    if (target.matches("input, select, textarea")) return this.draftFieldNames.has(target.name)
+    return true
+  }
+
+  get draftFieldNames() {
+    this.fieldNames ||= new Set([
+      ...this.scalarFieldsValue.map(field => "translation_workspace[" + field + "]"),
+      ...this.arrayFieldsValue.map(field => "translation_workspace[" + field + "][]")
+    ])
+    return this.fieldNames
   }
 
   scheduleSave() {
@@ -84,10 +107,14 @@ export default class extends Controller {
     while (this.saving) {
       try { await this.saving } catch { return false }
     }
-    if (!this.dirty()) return true
 
+    this.editPending = false
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
+    if (this.unacknowledged === null && snapshot === this.lastSavedState) {
+      this.setStatus(this.settledStatus)
+      return true
+    }
     // Resending unchanged content whose outcome is unknown is a replay of the
     // same save; any other content is a newer save.
     const sequence = this.unacknowledged?.snapshot === snapshot ? this.unacknowledged.sequence : ++this.sequence
@@ -106,8 +133,9 @@ export default class extends Controller {
       this.formTarget.elements.translation_workspace_draft_id.value = result.id
       this.formTarget.elements.translation_workspace_draft_version.value = result.version
       this.lastSavedState = snapshot
-      if (this.dirty()) this.scheduleSave()
-      else this.setStatus(this.messagesValue.saved)
+      this.settledStatus = this.messagesValue.saved
+      // Edits made while this save was in flight have their own timer.
+      if (!this.editPending) this.setStatus(this.messagesValue.saved)
       return true
     } catch (error) {
       this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)

@@ -29,22 +29,30 @@ export default class extends Controller {
     this.update()
   }
 
-  update() {
+  // Runs on every input in the form, so it skips the source text (which the
+  // summary does not show) and writes only values that changed: each write
+  // would otherwise force style and layout work on every keystroke.
+  update(event) {
+    if (event?.target?.name === "translation_workspace[source_text]") return
     const sourceLanguage = this.value("translation_workspace[source_language]")
     const targetLanguage = this.value("translation_workspace[target_language]")
-    this.languageTarget.textContent = sourceLanguage && targetLanguage ? `${sourceLanguage} → ${targetLanguage}` : this.messagesValue.not_set
+    this.write(this.languageTarget, sourceLanguage && targetLanguage ? `${sourceLanguage} → ${targetLanguage}` : this.messagesValue.not_set)
 
     const importedSource = this.element.querySelector("#workspace-source-import [data-workspace-upload-target='filename']")?.textContent.trim()
     const uploadPanel = this.element.querySelector("[data-source-mode-target='upload']")
-    this.sourceTarget.textContent = importedSource || (uploadPanel && !uploadPanel.hidden ? this.messagesValue.uploaded_file : this.messagesValue.pasted_text)
+    this.write(this.sourceTarget, importedSource || (uploadPanel && !uploadPanel.hidden ? this.messagesValue.uploaded_file : this.messagesValue.pasted_text))
 
     const mode = this.checkedValue("translation_workspace[workflow_mode]") || "manual"
-    this.workflowTarget.textContent = mode === "automatic" ? this.messagesValue.automatic : this.messagesValue.manual
+    this.write(this.workflowTarget, mode === "automatic" ? this.messagesValue.automatic : this.messagesValue.manual)
     const count = this.element.querySelectorAll("#workspace-manual-models [data-model-card]").length
-    this.modelsTarget.textContent = mode === "automatic" ? this.messagesValue.saved_workflow : this.messagesValue.selected_count.replace("%{count}", String(count))
+    this.write(this.modelsTarget, mode === "automatic" ? this.messagesValue.saved_workflow : this.messagesValue.selected_count.replace("%{count}", String(count)))
 
     const terminology = this.element.querySelector("input[name='translation_workspace[glossary_revision_id]']:checked")
-    if (terminology) this.terminologyTarget.textContent = terminology.dataset.workspaceSummaryName || this.messagesValue.none
+    if (terminology) this.write(this.terminologyTarget, terminology.dataset.workspaceSummaryName || this.messagesValue.none)
+  }
+
+  write(target, text) {
+    if (target.textContent !== text) target.textContent = text
   }
 
   value(name) {

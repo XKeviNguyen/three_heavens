@@ -1,4 +1,5 @@
 require "application_system_test_case"
+require "tempfile"
 
 class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
   setup do
@@ -171,6 +172,62 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     refresh
     assert_field "Source text", with: "Edit B written after the lost response"
     assert_equal 1, users(:normal).translation_workspace_drafts.count
+  end
+
+  # Serializing the whole form on every keystroke made typing in a near-limit
+  # source lag. Serialization must scale with saves, not with keystrokes.
+  test "typing in a large source serializes the form once per save, not per keystroke" do
+    visit new_translation_workspace_path
+    page.execute_script(<<~JS)
+      const unit = "聖書の翻訳 Kinh Thánh dịch thuật 🙏🏽 mixed script. "
+      let text = ""
+      while (text.length < 90000) text += unit
+      const area = document.querySelector("textarea[name='translation_workspace[source_text]']")
+      area.value = text.slice(0, 90000)
+      area.dispatchEvent(new Event("input", { bubbles: true }))
+    JS
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 20
+    page.execute_script(<<~JS)
+      window.__serializations = 0
+      window.__draftSaves = 0
+      const OriginalFormData = window.FormData
+      window.FormData = function(...args) { window.__serializations += 1; return new OriginalFormData(...args) }
+      window.FormData.prototype = OriginalFormData.prototype
+      const deliver = window.fetch.bind(window)
+      window.fetch = (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST") window.__draftSaves += 1
+        return deliver(url, options)
+      }
+      const area = document.querySelector("textarea[name='translation_workspace[source_text]']")
+      area.focus()
+      area.setSelectionRange(area.value.length, area.value.length)
+    JS
+
+    find("textarea[name='translation_workspace[source_text]']").send_keys("typed" * 4)
+    assert_equal 0, page.evaluate_script("window.__serializations"), "typing must not serialize the form"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 20
+    assert_equal [ 1, 1 ], page.evaluate_script("[window.__serializations, window.__draftSaves]")
+    assert users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text").end_with?("typed" * 4)
+  end
+
+  test "importing a source file and removing the import are autosaved" do
+    visit new_translation_workspace_path
+    click_button "Upload file"
+    source = Tempfile.new([ "autosaved-import", ".txt" ])
+    source.write("Imported and autosaved")
+    source.flush
+    attach_file "Source file", source.path
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "Imported and autosaved"
+    source_import = users(:normal).source_imports.sole
+    draft_value = -> { users(:normal).translation_workspace_drafts.first&.payload&.fetch("source_import_id", nil) }
+    assert_until { draft_value.call == source_import.id.to_s }
+
+    click_button "Remove import"
+    assert_no_selector "#workspace-source-import", visible: true
+    assert_until { draft_value.call == "" }
+  ensure
+    source&.close!
   end
 
   test "reverting to acknowledged text after a lost response saves the reverted text" do

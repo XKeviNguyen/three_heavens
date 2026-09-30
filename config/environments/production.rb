@@ -97,8 +97,20 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
+  # Kamal Proxy's liveness check reaches /up by container address, so /up is
+  # exempt. Readiness is probed publicly with Host APP_HOST or from inside the
+  # container over loopback (docs/operations/production-deploy.md); every
+  # other Host is still refused, for /ready and for all application traffic.
+  # The loopback check reads the raw Host header, not request.host, which
+  # would honour X-Forwarded-Host or fall back to the server name when Host is
+  # missing; a forwarded request never qualifies.
+  readiness_probe_hosts = %w[localhost 127.0.0.1 [::1]].freeze
+  loopback_readiness_probe = lambda do |request|
+    host = request.get_header("HTTP_HOST").to_s[/\A(\[[^\]]*\]|[^:\[\]]+)(?::\d+)?\z/, 1]
+    request.get_header("HTTP_X_FORWARDED_HOST").blank? && readiness_probe_hosts.include?(host&.downcase)
+  end
   config.hosts = [ production_host ]
   config.host_authorization = {
-    exclude: ->(request) { request.path == "/up" }
+    exclude: ->(request) { request.path == "/up" || (request.path == "/ready" && loopback_readiness_probe.call(request)) }
   }
 end

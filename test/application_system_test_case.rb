@@ -1,4 +1,8 @@
 require "test_helper"
+
+# Selenium Manager otherwise reports usage statistics to an external service
+# whenever it resolves the browser and driver.
+ENV["SE_AVOID_STATS"] = "true"
 require_relative "support/open_router_catalog_fixture"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase

@@ -63,6 +63,98 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
     clear_browser_viewport
   end
 
+  # 320 CSS px is the reflow width (1280 px at 400% zoom). The Benchmarks sort
+  # form used to push a whole-page scroll there, worst in Vietnamese/Japanese;
+  # the admin users table must keep its own contained scroll.
+  test "benchmarks and admin tables reflow at narrow widths in every locale" do
+    user = users(:admin)
+    sign_in_in_browser(user, "admin secure password value")
+    %w[en vi ja].each do |locale|
+      user.update!(locale:)
+      [ 320, 360 ].each do |width|
+        with_browser_viewport(width, 900, mobile: true) do
+          visit benchmarks_path
+          assert_selector "select#sort"
+          assert_no_horizontal_overflow("benchmarks #{locale} #{width}px")
+          visit settings_users_path
+          assert_no_horizontal_overflow("admin users #{locale} #{width}px")
+          table_region = find("table").ancestor("div.overflow-x-auto")
+          assert_operator page.evaluate_script("arguments[0].clientWidth", table_region), :<=, width
+        end
+      end
+    end
+  ensure
+    clear_browser_viewport
+  end
+
+  # Document titles are auto-filled from uploaded file names, so long unbroken
+  # names are normal data and must wrap instead of widening the page.
+  test "long unbroken project and document names reflow at phone widths" do
+    user = users(:normal)
+    name = "Kinh_Thanh_ban_dich_2024_final_v3_reviewed"
+    project = user.projects.create!(name: name, source_language: "Vietnamese", target_language: "Japanese")
+    project.documents.create!(title: name, source_text: "Source").experiments.create!(instruction_prompt: "Translate.", name: name)
+    sign_in_in_browser(user, "correct horse battery staple")
+    [ 320, 375, 430 ].each do |width|
+      with_browser_viewport(width, 900, mobile: true) do
+        [ projects_path, project_path(project), history_path ].each do |path|
+          visit path
+          assert_text name.first(12)
+          assert_no_horizontal_overflow("#{path} #{width}px")
+        end
+      end
+    end
+  ensure
+    clear_browser_viewport
+  end
+
+  # WCAG 2.4.11: keyboard focus must not end up entirely under the sticky
+  # header or the workspace launch bar, including at high zoom equivalents.
+  test "tabbing through the workspace never hides focus behind the sticky bars" do
+    sign_in_in_browser(users(:normal), "correct horse battery staple")
+    [ [ 853, 683 ], [ 320, 256 ] ].each do |width, height|
+      with_browser_viewport(width, height, mobile: width < 768) do
+        visit new_translation_workspace_path
+        find_field("Project name").click
+        hidden = 0
+        30.times do
+          page.driver.browser.action.send_keys(:tab).perform
+          hidden += 1 if page.evaluate_script(<<~JS)
+            (() => {
+              const focused = document.activeElement.getBoundingClientRect()
+              if (focused.width === 0 && focused.height === 0) return false
+              const header = document.getElementById("app-header")
+              const launch = document.getElementById("workspace-launch")
+              const top = header && getComputedStyle(header).position === "sticky" && header.offsetParent ? header.getBoundingClientRect().bottom : 0
+              const bottom = getComputedStyle(launch).position === "fixed" ? launch.getBoundingClientRect().top : window.innerHeight
+              return focused.bottom <= top || focused.top >= bottom
+            })()
+          JS
+        end
+        assert_equal 0, hidden, "fully hidden tab stops at #{width}x#{height}"
+      end
+    end
+  ensure
+    clear_browser_viewport
+  end
+
+  test "the mobile navigation drawer is closed after navigating back" do
+    sign_in_in_browser(users(:normal), "correct horse battery staple")
+    with_browser_viewport(375, 812, mobile: true) do
+      visit projects_path
+      find("button[data-action='sidebar#open']").click
+      assert_selector "aside#app-sidebar", visible: true
+      within("aside#app-sidebar") { click_link "History" }
+      assert_current_path history_path
+      page.go_back
+      assert_current_path projects_path
+      assert_selector "aside#app-sidebar", visible: :hidden
+      assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
+    end
+  ensure
+    clear_browser_viewport
+  end
+
   test "landing redesign stays composed across viewports locales and zoom" do
     review_dir = Rails.root.join("tmp/landing_review")
     FileUtils.mkdir_p(review_dir) if ENV["LANDING_REVIEW"] == "1"

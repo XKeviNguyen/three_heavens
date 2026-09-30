@@ -76,7 +76,7 @@
       <button class="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400" data-action="glossary-entries#add" type="button"><%= t("terminology_sheet.add_term") %></button>
 
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" data-action="terminology-sheet#close" class="text-xs font-semibold text-slate-600 hover:text-slate-950"><%= t("terminology_sheet.cancel") %></button>
+        <button type="button" data-terminology-sheet-close class="text-xs font-semibold text-slate-600 hover:text-slate-950"><%= t("terminology_sheet.cancel") %></button>
         <%= form.submit t("terminology_sheet.save"), class: "rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("terminology_sheet.saving") } %>
       </div>
     <% end %>

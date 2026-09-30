@@ -3,6 +3,7 @@ require "digest"
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require_relative "support/network_guard"
 
 module ActiveSupport
   class TestCase
