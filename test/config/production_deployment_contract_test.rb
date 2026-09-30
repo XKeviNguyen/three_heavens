@@ -115,6 +115,12 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
         assert_match(/#{name}/, stderr, "the failure does not name #{name}")
         assert_no_secret_values(stdout + stderr, container)
       end
+
+      %w[abc 0 70000].each do |port|
+        _, stderr, status = boot(root, container.merge("SMTP_PORT" => port), "puts :booted")
+        assert_not status.success?, "production booted with SMTP_PORT=#{port}"
+        assert_match(/SMTP_PORT must be a port number/, stderr)
+      end
     end
   end
 

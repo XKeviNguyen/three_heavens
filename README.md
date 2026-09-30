@@ -176,7 +176,7 @@ Required non-secret runtime variable names are:
 - `APP_HOST`
 - `MAIL_FROM` (the sender address of account emails, for example `Three Heavens <no-reply@APP_HOST_PLACEHOLDER>`)
 - `SMTP_HOST`
-- optional `SMTP_PORT` (default `587`; delivery uses STARTTLS and PLAIN authentication)
+- optional `SMTP_PORT` (default `587`; delivery uses STARTTLS and PLAIN authentication, so implicit-TLS port 465 is not supported)
 - optional `RAILS_LOG_LEVEL`
 - optional `RAILS_MAX_THREADS`
 - optional `JOB_CONCURRENCY`
@@ -209,7 +209,7 @@ Active Storage production files use the local `/rails/storage` path, backed by t
 - secret `KAMAL_REGISTRY_PASSWORD`
 - every runtime secret name listed above, which `config/deploy.yml` passes to the container as secret environment
 
-Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. Each name under `env.secret` in `config/deploy.yml`, including `SMTP_USERNAME` and `SMTP_PASSWORD`, must resolve there, for example `SMTP_PASSWORD=$SMTP_PASSWORD` or a password-manager fetch. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
+Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. Each name under `env.secret` in `config/deploy.yml`, including `SMTP_USERNAME` and `SMTP_PASSWORD`, must resolve there, for example `SMTP_PASSWORD=$SMTP_PASSWORD` or a password-manager fetch. A `$NAME` reference to a variable that is not set in the deploying shell silently becomes an empty value, which production then refuses to boot with, so confirm each one resolves before deploying. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
 
 ## Validation
 
