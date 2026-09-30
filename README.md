@@ -181,7 +181,7 @@ Required non-secret runtime variable names are:
 - optional `RAILS_MAX_THREADS`
 - optional `JOB_CONCURRENCY`
 - optional `AI_STALE_EXECUTION_THRESHOLD_MINUTES`
-- optional `GOOGLE_CLIENT_ID` for Sign in with Google (production uses its own OAuth client; see [docs/identity/google-sign-in.md](docs/identity/google-sign-in.md))
+- `GOOGLE_CLIENT_ID=<production Web OAuth Client ID>` for Sign in with Google, a public identifier (never the localhost development client, and there is no client secret). The application only hides Google sign-in without it, but `bin/ops/preflight` fails its `google_client_id` check, so a V1.1 deployment requires it; see [docs/identity/google-sign-in.md](docs/identity/google-sign-in.md)
 
 The four database URLs must point to distinct PostgreSQL databases or otherwise deliberately isolated databases for these roles:
 
@@ -205,7 +205,7 @@ Active Storage production files use the local `/rails/storage` path, backed by t
 - `KAMAL_IMAGE` (the repository name/path within the registry, without the registry hostname)
 - `KAMAL_REGISTRY_SERVER`
 - `KAMAL_REGISTRY_USERNAME`
-- `MAIL_FROM`, `SMTP_HOST`, and optionally `SMTP_PORT`, which `config/deploy.yml` passes to the container as clear environment
+- `MAIL_FROM`, `SMTP_HOST`, `GOOGLE_CLIENT_ID`, and optionally `SMTP_PORT`, which `config/deploy.yml` passes to the container as clear environment
 - secret `KAMAL_REGISTRY_PASSWORD`
 - every runtime secret name listed above, which `config/deploy.yml` passes to the container as secret environment
 

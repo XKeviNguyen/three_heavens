@@ -20,7 +20,9 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     "KAMAL_REGISTRY_SERVER" => "registry.example.test",
     "KAMAL_REGISTRY_USERNAME" => "contract-registry-user",
     "MAIL_FROM" => "Three Heavens <no-reply@example.test>",
-    "SMTP_HOST" => "smtp.example.test"
+    "SMTP_HOST" => "smtp.example.test",
+    # A dummy in the shape of a Google OAuth Web client ID, never a real one.
+    "GOOGLE_CLIENT_ID" => "123456789012-contractdummy.apps.googleusercontent.com"
   }.freeze
   BOOT_REQUIRED = %w[
     APP_HOST DATABASE_URL CACHE_DATABASE_URL QUEUE_DATABASE_URL CABLE_DATABASE_URL
@@ -85,6 +87,21 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     assert_equal [ "smtp.example.test", "587", "app.example.test" ], rendered.fetch("env").values_at("SMTP_HOST", "SMTP_PORT", "APP_HOST")
   end
 
+  test "the Google OAuth client ID is public configuration from the deploying shell, with no client secret" do
+    rendered = render_deploy_configuration
+
+    assert_equal DEPLOY_ENVIRONMENT.fetch("GOOGLE_CLIENT_ID"), rendered.dig("env", "GOOGLE_CLIENT_ID")
+    assert_not_includes rendered.fetch("secret_names"), "GOOGLE_CLIENT_ID"
+    assert_empty rendered.fetch("env").keys.grep(/GOOGLE.*SECRET/)
+    assert_no_match(/GOOGLE_CLIENT_SECRET/, Rails.root.join("config/deploy.yml").read)
+
+    _, stderr, status = Open3.capture3(toolchain_environment.merge(DEPLOY_ENVIRONMENT.except("GOOGLE_CLIENT_ID")),
+                                       RbConfig.ruby, "-rbundler/setup", "-e", RENDER_SCRIPT,
+                                       chdir: Rails.root.to_s, unsetenv_others: true)
+    assert_not status.success?, "Kamal rendered deploy.yml without GOOGLE_CLIENT_ID"
+    assert_match(/GOOGLE_CLIENT_ID/, stderr)
+  end
+
   test "deploy.yml keeps credential-bearing mail settings out of clear environment" do
     deploy = Rails.root.join("config/deploy.yml").read
 
@@ -115,6 +132,17 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
         assert_match(/#{name}/, stderr, "the failure does not name #{name}")
         assert_no_secret_values(stdout + stderr, container)
       end
+
+      # The application degrades to password sign-in without Google, but the
+      # deployment preflight refuses to pass without the client ID.
+      without_google = container.except("GOOGLE_CLIENT_ID")
+      stdout, stderr, status = boot(root, without_google, "puts \"GOOGLE_ENABLED=\#{GoogleIdentity.enabled?}\"")
+      assert status.success?, "production did not boot without Google: #{stderr.lines.first(2).join}"
+      assert_includes stdout, "GOOGLE_ENABLED=false"
+      assert_includes preflight(root, container), "google_client_id: healthy"
+      output = preflight(root, without_google)
+      assert_includes output, "google_client_id: unavailable"
+      assert_includes output, "Preflight failed"
 
       %w[abc 0 70000].each do |port|
         _, stderr, status = boot(root, container.merge("SMTP_PORT" => port), "puts :booted")
@@ -156,6 +184,15 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
       end
       yield root
     end
+  end
+
+  # The real preflight executable. The dummy databases are unreachable, so
+  # it fails overall either way; only the Google check's line is compared.
+  def preflight(root, environment)
+    environment = toolchain_environment.merge("BUNDLE_GEMFILE" => Rails.root.join("Gemfile").to_s).merge(environment)
+    stdout, stderr, = Open3.capture3(environment, "bin/ops/preflight", chdir: root, unsetenv_others: true)
+    assert_no_secret_values(stdout + stderr, environment)
+    stdout
   end
 
   # BUNDLE_GEMFILE keeps the copy on this checkout's installed bundle.

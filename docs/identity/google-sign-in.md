@@ -130,9 +130,10 @@ Do not perform these steps until the production domain is ready.
    Add `https://www.example.com` and `https://www.example.com/auth/google/callback`
    only if `www` is actually served as its own application origin.
 3. Production must be served over HTTPS (it already forces SSL).
-4. Set `GOOGLE_CLIENT_ID=<production client ID>` in the production environment
-   (for Kamal, add it to the `env` section of `config/deploy.yml`). Do not set
-   a client secret.
+4. Set `GOOGLE_CLIENT_ID=<production Web OAuth Client ID>` in the shell that
+   runs `bin/kamal deploy`; `config/deploy.yml` passes it to the container as
+   clear environment, and `bin/ops/preflight` fails its `google_client_id`
+   check without it. Do not set a client secret.
 5. Keep `APP_HOST` set to the canonical production host so the callback URL
    the page sends to Google matches the configured redirect URI.
 6. Add the production domain to the Google Auth Platform branding / authorized
