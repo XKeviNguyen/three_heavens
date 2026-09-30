@@ -26,7 +26,12 @@ class TranslationWorkspaceDraft < ApplicationRecord
   encrypts :workspace_payload
 
   validates :public_id, presence: true, uniqueness: true
-  validates :context_key, presence: true, uniqueness: { scope: :user_id }, length: { maximum: 80 }
+  # One draft per user and context is enforced only by the unique index on
+  # (user_id, context_key). An application uniqueness check would race with a
+  # concurrent first save that commits between its lookup and its insert and
+  # reject it as invalid; TranslationWorkspaceDrafts::Save instead resolves
+  # the index violation against the draft that won.
+  validates :context_key, presence: true, length: { maximum: 80 }
   validates :workspace_payload, presence: true
   validates :expires_at, presence: true
   validates :editor_id, format: { with: EDITOR_ID_FORMAT }, allow_nil: true

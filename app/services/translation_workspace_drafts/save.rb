@@ -43,7 +43,8 @@ module TranslationWorkspaceDrafts
       begin
         TranslationWorkspaceDraft.transaction(requires_new: true) { save_locked }
       rescue ActiveRecord::RecordNotUnique
-        # A concurrent first save created the draft; resolve against it.
+        # A concurrent first save created the draft (the unique index on
+        # user_id and context_key rejected this insert); resolve against it.
         attempts += 1
         retry if attempts == 1
         raise
