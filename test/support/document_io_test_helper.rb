@@ -1,5 +1,6 @@
 require "stringio"
 require "zip"
+require "zlib"
 
 module DocumentIoTestHelper
   CONTENT_TYPES_XML = <<~XML.freeze
@@ -19,25 +20,67 @@ module DocumentIoTestHelper
   XML
 
   def pdf_with_text(text)
-    stream = "BT /F1 12 Tf 72 720 Td (#{text}) Tj ET"
-    objects = [
-      "<< /Type /Catalog /Pages 2 0 R >>",
-      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-      "<< /Length #{stream.bytesize} >>\nstream\n#{stream}\nendstream"
-    ]
-    pdf = +"%PDF-1.4\n"
+    pdf_with_pages([ text ])
+  end
+
+  # One page per text, each drawn with a standard font.
+  def pdf_with_pages(texts)
+    build_pdf(texts.map { |text| { content: "BT /F1 12 Tf 72 720 Td (#{text}) Tj ET" } })
+  end
+
+  # A page that only paints an image, like a scan without OCR.
+  def image_only_pdf
+    pixels = "\x80".b * (16 * 16 * 3)
+    image = "<< /Type /XObject /Subtype /Image /Width 16 /Height 16 /ColorSpace /DeviceRGB " \
+      "/BitsPerComponent 8 /Length #{pixels.bytesize} >>\nstream\n".b + pixels + "\nendstream".b
+    build_pdf([ { content: "q 200 0 0 200 100 400 cm /Im0 Do Q", xobject: image } ])
+  end
+
+  # A one-page text PDF whose valid Flate content stream is about a thousandth
+  # of the size it inflates to while being parsed. A full flush makes every
+  # mebibyte of filler compress to the same block, so the block is repeated
+  # and the zlib checksum combined instead of compressing gigabytes here.
+  def inflating_pdf(inflated_bytes)
+    prefix = "BT /F1 12 Tf 72 720 Td (Hello) Tj ET\n"
+    filler = " " * 1.megabyte
+    count = inflated_bytes / filler.bytesize
+    deflater = Zlib::Deflate.new(Zlib::BEST_COMPRESSION)
+    compressed = deflater.deflate(prefix, Zlib::FULL_FLUSH)
+    compressed << (deflater.deflate(filler, Zlib::FULL_FLUSH) * count)
+    checksum = Zlib.adler32(prefix)
+    filler_checksum = Zlib.adler32(filler)
+    count.times { checksum = Zlib.adler32_combine(checksum, filler_checksum, filler.bytesize) }
+    compressed << deflater.finish.byteslice(0...-4) << [ checksum ].pack("N")
+    build_pdf([ { content: compressed, filter: "/FlateDecode" } ])
+  end
+
+  def build_pdf(pages)
+    objects = [ "<< /Type /Catalog /Pages 2 0 R >>", nil, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>" ]
+    kids = pages.map do |page|
+      resources = +"<< /Font << /F1 3 0 R >>"
+      if page[:xobject]
+        objects << page[:xobject]
+        resources << " /XObject << /Im0 #{objects.size} 0 R >>"
+      end
+      resources << " >>"
+      content = page.fetch(:content).b
+      filter = page[:filter] ? " /Filter #{page[:filter]}" : ""
+      objects << "<< /Length #{content.bytesize}#{filter} >>\nstream\n".b + content + "\nendstream".b
+      objects << "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources #{resources} /Contents #{objects.size} 0 R >>"
+      "#{objects.size} 0 R"
+    end
+    objects[1] = "<< /Type /Pages /Kids [#{kids.join(' ')}] /Count #{kids.size} >>"
+
+    pdf = +"%PDF-1.4\n".b
     offsets = [ 0 ]
     objects.each_with_index do |object, index|
       offsets << pdf.bytesize
-      pdf << "#{index + 1} 0 obj\n#{object}\nendobj\n"
+      pdf << "#{index + 1} 0 obj\n".b << object.b << "\nendobj\n".b
     end
     startxref = pdf.bytesize
     pdf << "xref\n0 #{offsets.size}\n0000000000 65535 f \n"
     offsets.drop(1).each { |offset| pdf << format("%010d 00000 n \n", offset) }
     pdf << "trailer\n<< /Size #{offsets.size} /Root 1 0 R >>\nstartxref\n#{startxref}\n%%EOF\n"
-    pdf.b
   end
 
 

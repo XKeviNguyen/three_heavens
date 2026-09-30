@@ -4,6 +4,14 @@
   image_name = ENV.fetch("KAMAL_IMAGE")
   registry_server = ENV.fetch("KAMAL_REGISTRY_SERVER")
   registry_username = ENV.fetch("KAMAL_REGISTRY_USERNAME")
+  # Production refuses to boot without mail delivery configuration. The SMTP
+  # username and password are secrets; these are not.
+  mail_from = ENV.fetch("MAIL_FROM")
+  smtp_host = ENV.fetch("SMTP_HOST")
+  smtp_port = ENV.fetch("SMTP_PORT", "587")
+  # The production Google OAuth Web client ID: a public identifier, not a
+  # secret. Sign in with Google uses no client secret.
+  google_client_id = ENV.fetch("GOOGLE_CLIENT_ID")
 %>
 
 service: three_heavens
@@ -35,8 +43,14 @@ env:
     - QUEUE_DATABASE_URL
     - CABLE_DATABASE_URL
     - OPENROUTER_API_KEY
+    - SMTP_USERNAME
+    - SMTP_PASSWORD
   clear:
     APP_HOST: <%= app_host %>
+    MAIL_FROM: <%= mail_from.to_json %>
+    SMTP_HOST: <%= smtp_host.to_json %>
+    SMTP_PORT: <%= smtp_port.to_json %>
+    GOOGLE_CLIENT_ID: <%= google_client_id.to_json %>
     SOLID_QUEUE_IN_PUMA: true
     RAILS_LOG_LEVEL: info
     AI_STALE_EXECUTION_THRESHOLD_MINUTES: 120
