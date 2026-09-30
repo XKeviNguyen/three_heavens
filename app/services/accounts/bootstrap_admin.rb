@@ -20,11 +20,14 @@ module Accounts
       normalized_email = User.normalize_value_for(:email, resolved_email)
       User.transaction do
         account = User.find_or_initialize_by(email: normalized_email)
+        # The operator supplied this address, so it counts as verified; sign-in
+        # requires a verified address. Managed AI access stays an explicit grant.
         account.assign_attributes(
           password: resolved_password,
           password_confirmation: resolved_password,
           role: :admin,
-          status: :active
+          status: :active,
+          email_verified_at: account.email_verified_at || Time.current
         )
         account.save!
         claim_legacy_projects!(account)

@@ -126,6 +126,22 @@ class Accounts::BootstrapAdminTest < ActiveSupport::TestCase
     assert_not admin.authenticate("correct horse battery staple")
   end
 
+  test "a bootstrapped admin can sign in without a confirmation email but gets no automatic managed AI access" do
+    admin = Accounts::BootstrapAdmin.call(email: "fresh-admin@example.test", password: "operator supplied secure password")
+
+    assert admin.email_verified?
+    assert_not admin.managed_ai_access?
+    assert_equal admin, User.authenticate_by_email(email: "fresh-admin@example.test", password: "operator supplied secure password")
+
+    unverified = User.create!(email: "claimed@example.test", password: "someone else's password", confirmation_sent_at: Time.current)
+    promoted = Accounts::BootstrapAdmin.call(email: unverified.email, password: "operator supplied secure password")
+    assert promoted.reload.email_verified?
+    assert_not promoted.authenticate("someone else's password")
+
+    verified_at = users(:normal).email_verified_at
+    assert_equal verified_at, Accounts::BootstrapAdmin.call(email: users(:normal).email, password: "replacement secure password").email_verified_at
+  end
+
   test "never includes the password in validation errors" do
     password = "Zq7!marker"
 

@@ -9,6 +9,14 @@
 # registration always records one), and no federated identity (Google sign-up
 # always creates one). Accounts created later keep the false default, and
 # running this again changes nothing.
+#
+# The signature is exact for a V1.0 database upgraded directly, where both
+# migrations run in one db:prepare before any request. A database that already
+# ran the earlier V1.1 code in between may differ: a V1.0 account that linked
+# Google meanwhile is not restored, and an account created with a verified
+# password outside the sign-up flows (for example in a console) is. A manual
+# rollback and redo also re-grants V1.0 accounts revoked in between. Review
+# such accounts in Settings > Users.
 class PreserveManagedAiAccessForV10Accounts < ActiveRecord::Migration[8.1]
   def up
     restored = update(<<~SQL.squish)
