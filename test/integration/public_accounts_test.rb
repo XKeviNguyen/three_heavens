@@ -187,6 +187,26 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert_not target.reload.managed_ai_access?
   end
 
+  test "an admin's revocation of a V1.0 account still at the upgrade default survives the upgrade migration" do
+    require Rails.root.join("db/migrate/20260930090000_preserve_managed_ai_access_for_v1_0_accounts")
+    upgraded_at = 1.day.ago
+    kept, revoked = %w[kept revoked].map do |name|
+      user = User.create!(email: "v1-#{name}@example.test", password: "v1 account password", role: :user, status: :active,
+                          email_verified_at: upgraded_at)
+      user.update_columns(updated_at: upgraded_at - 1.day)
+      user
+    end
+    sign_in_as users(:admin)
+    patch revoke_managed_ai_access_settings_user_path(revoked)
+
+    migration = PreserveManagedAiAccessForV10Accounts.new
+    migration.define_singleton_method(:connection) { ActiveRecord::Base.connection }
+    migration.suppress_messages { migration.migrate(:up) }
+
+    assert kept.reload.managed_ai_access?
+    assert_not revoked.reload.managed_ai_access?
+  end
+
   test "landing explains the human-guided comparison flow and account-aware action" do
     get root_path, headers: { "Accept-Language" => "en" }
     assert_response :success

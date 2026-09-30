@@ -8,9 +8,9 @@ class PreserveManagedAiAccessForV10AccountsTest < ActiveSupport::TestCase
     User.update_all(managed_ai_access: false)
     upgraded_at = Time.zone.parse("2026-09-24 09:01:00")
     # The state 20260924090100 leaves every V1.0 account in.
-    @v1_account = create_user("v1@example.test", email_verified_at: upgraded_at)
-    @v1_disabled = create_user("v1-disabled@example.test", email_verified_at: upgraded_at, status: :disabled)
-    @v1_admin = create_user("v1-admin@example.test", email_verified_at: upgraded_at, role: :admin)
+    @v1_account = create_v1_account("v1@example.test", upgraded_at)
+    @v1_disabled = create_v1_account("v1-disabled@example.test", upgraded_at, status: :disabled)
+    @v1_admin = create_v1_account("v1-admin@example.test", upgraded_at, role: :admin)
     # V1.1 self-service sign-ups, confirmed and not yet confirmed.
     @registered = create_user("registered@example.test", email_verified_at: Time.current, confirmation_sent_at: 1.hour.ago)
     @unconfirmed = create_user("unconfirmed@example.test", confirmation_sent_at: 1.hour.ago)
@@ -35,6 +35,30 @@ class PreserveManagedAiAccessForV10AccountsTest < ActiveSupport::TestCase
     end
   end
 
+  # Codex review of the first version: an administrator's decision made after
+  # the earlier migration ran must never be overridden.
+  test "an explicit access decision after the upgrade is never overridden" do
+    @v1_admin.update!(managed_ai_access: true)
+    @v1_admin.update!(managed_ai_access: false) # granted, then revoked
+    changed = create_v1_account("v1-changed@example.test", @v1_account.email_verified_at)
+    changed.update!(locale: "ja")
+
+    run_migration
+
+    assert_equal [ false, false ], [ @v1_admin, changed ].map { |user| user.reload.managed_ai_access }
+    assert @v1_account.reload.managed_ai_access, "an untouched V1.0 account is still restored"
+  end
+
+  test "rolling back and migrating again does not re-grant a revocation" do
+    run_migration
+    @v1_account.reload.update!(managed_ai_access: false)
+
+    run_migration(:down)
+    run_migration
+
+    assert_not @v1_account.reload.managed_ai_access
+  end
+
   test "accounts that sign up after the upgrade keep the restricted default" do
     run_migration
     later = create_user("later@example.test", email_verified_at: Time.current, confirmation_sent_at: 1.minute.ago)
@@ -52,6 +76,14 @@ class PreserveManagedAiAccessForV10AccountsTest < ActiveSupport::TestCase
   end
 
   private
+
+  # As 20260924090100 leaves a V1.0 account: verified at the upgrade, last
+  # updated before it.
+  def create_v1_account(email, upgraded_at, **attributes)
+    user = create_user(email, email_verified_at: upgraded_at, **attributes)
+    user.update_columns(created_at: upgraded_at - 30.days, updated_at: upgraded_at - 1.day)
+    user
+  end
 
   def create_user(email, role: :user, status: :active, **attributes)
     User.create!(email:, password: PASSWORD, role:, status:, **attributes)
