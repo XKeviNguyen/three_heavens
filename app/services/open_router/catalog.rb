@@ -244,10 +244,15 @@ module OpenRouter
       end
     end
 
-    # Net::BufferedIO waits only after a non-blocking read reports that no
-    # data is ready, so waiting here first bounds headers, chunk framing, and
-    # body reads, including TLS records delivered a few bytes at a time.
+    # Every read Net::BufferedIO makes goes through read_nonblock, and it
+    # waits only after one reports that no data is ready. Checking and
+    # waiting here bounds headers, chunk framing, trailers, and the body,
+    # whether the peer trickles bytes (TLS records included) or floods them.
+    # Headers and framing are not counted by the body limit, so all bytes
+    # read are capped too.
     module DeadlineReads
+      MAX_BYTES = MAX_RESPONSE_BYTES + 64 * 1024
+
       attr_accessor :deadline
 
       def self.now
@@ -255,8 +260,13 @@ module OpenRouter
       end
 
       def read_nonblock(...)
+        raise Net::ReadTimeout if deadline <= DeadlineReads.now
+
         result = super(...)
-        if result == :wait_readable || result == :wait_writable
+        if result.is_a?(String)
+          @bytes_read = @bytes_read.to_i + result.bytesize
+          raise Error if @bytes_read > MAX_BYTES
+        elsif result == :wait_readable || result == :wait_writable
           remaining = deadline - DeadlineReads.now
           raise Net::ReadTimeout if remaining <= 0
           to_io.public_send(result, [ remaining, READ_TIMEOUT ].min) or raise Net::ReadTimeout

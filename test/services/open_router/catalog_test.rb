@@ -134,6 +134,35 @@ module OpenRouter
       end
     end
 
+    # A peer that never lets the socket go idle never makes a read wait, and
+    # header lines are not counted by the body limit. The flood runs in a
+    # forked process so that it keeps the socket full, as a remote peer can.
+    test "the deadline and read cap stop a peer flooding endless header lines" do
+      server = TCPServer.new("127.0.0.1", 0)
+      flooder = fork do
+        socket = server.accept
+        socket.gets("\r\n\r\n")
+        socket.write("HTTP/1.1 200 OK\r\n")
+        stop = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 8
+        socket.write("X-Flood: b\r\n" * 8192) while Process.clock_gettime(Process::CLOCK_MONOTONIC) < stop
+      rescue SystemCallError, IOError
+        nil
+      ensure
+        exit!(0)
+      end
+      endpoint = URI("http://127.0.0.1:#{server.addr[1]}/api/v1/models")
+      server.close
+      catalog = OpenRouter::Catalog.new(cache: memory_cache, endpoint:, total_timeout: 1)
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      assert_raises(OpenRouter::Catalog::Error) { catalog.call }
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+      assert_operator elapsed, :<, 1.6, "a flood held the request for #{elapsed.round(2)}s"
+    ensure
+      Process.kill(:KILL, flooder) if flooder
+      Process.wait(flooder) if flooder
+    end
+
     # Every chunk arrives well inside READ_TIMEOUT, so only a deadline over
     # the whole read can stop the request thread from waiting for all of them.
     test "the total deadline aborts a body that trickles in under the read timeout" do
