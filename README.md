@@ -150,7 +150,7 @@ The authoritative recovery set is the primary PostgreSQL database plus private A
 
 Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
 
-The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
+The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read; Puma also stops chunked bodies above 21 MiB. JSON bodies have much smaller limits because Rails parses them into parameters before authentication and parsed JSON is over a hundred times larger in memory: 512 KiB for the workspace draft autosave (the largest legitimate JSON request) and 8 KiB for every other path, enforced from `Content-Length` without reading the body or while reading it. JSON within those limits is parsed only if it has at most 1,000 strings, containers, and separators; larger structures are refused with 400 before any object is allocated. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
 
 Detailed executable procedures are in:
 
@@ -160,7 +160,7 @@ Detailed executable procedures are in:
 
 ## Production configuration
 
-Production fails fast when its public host or database URLs are missing. Required runtime secret variable names are:
+Production fails fast, before serving any request, when its public host, database URLs, or mail delivery settings are missing. Account confirmation links always use `https://APP_HOST`, never the request's Host header. Required runtime secret variable names are:
 
 - `RAILS_MASTER_KEY`
 - `DATABASE_URL`
@@ -168,10 +168,15 @@ Production fails fast when its public host or database URLs are missing. Require
 - `QUEUE_DATABASE_URL`
 - `CABLE_DATABASE_URL`
 - `OPENROUTER_API_KEY`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
 
 Required non-secret runtime variable names are:
 
 - `APP_HOST`
+- `MAIL_FROM` (the sender address of account emails, for example `Three Heavens <no-reply@APP_HOST_PLACEHOLDER>`)
+- `SMTP_HOST`
+- optional `SMTP_PORT` (default `587`; delivery uses STARTTLS and PLAIN authentication)
 - optional `RAILS_LOG_LEVEL`
 - optional `RAILS_MAX_THREADS`
 - optional `JOB_CONCURRENCY`
@@ -200,10 +205,11 @@ Active Storage production files use the local `/rails/storage` path, backed by t
 - `KAMAL_IMAGE` (the repository name/path within the registry, without the registry hostname)
 - `KAMAL_REGISTRY_SERVER`
 - `KAMAL_REGISTRY_USERNAME`
+- `MAIL_FROM`, `SMTP_HOST`, and optionally `SMTP_PORT`, which `config/deploy.yml` passes to the container as clear environment
 - secret `KAMAL_REGISTRY_PASSWORD`
-- every runtime secret name listed above
+- every runtime secret name listed above, which `config/deploy.yml` passes to the container as secret environment
 
-Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
+Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. Each name under `env.secret` in `config/deploy.yml`, including `SMTP_USERNAME` and `SMTP_PASSWORD`, must resolve there, for example `SMTP_PASSWORD=$SMTP_PASSWORD` or a password-manager fetch. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
 
 ## Validation
 
