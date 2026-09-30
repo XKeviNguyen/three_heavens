@@ -13,21 +13,25 @@ export default class extends Controller {
     this.observer.disconnect()
     this.element.close?.()
     this.invoker = null
+    this.hadEditor = false
   }
 
   sync() {
-    const frame = this.element.querySelector("#workspace-terminology-editor")
-    if (frame?.children.length && !this.element.open) {
+    const hasEditor = Boolean(this.element.querySelector("#workspace-terminology-editor")?.children.length)
+    if (hasEditor && !this.element.open) {
       this.invoker = document.activeElement
       this.element.showModal()
     }
-    if (!frame?.children.length && this.element.open) {
-      this.element.close()
+    // Only a successful save or create empties the editor frame; cancelling
+    // just closes the sheet. A save selects a new revision in the replaced
+    // panel without any input event, so announce it for autosave, even when
+    // the sheet was closed before the response arrived.
+    if (this.hadEditor && !hasEditor) {
+      if (this.element.open) this.element.close()
       this.restoreFocus()
-      // A save or create selects a new revision in the replaced panel without
-      // any input event, so announce it for autosave.
       this.dispatch("changed")
     }
+    this.hadEditor = hasEditor
   }
 
   close() {

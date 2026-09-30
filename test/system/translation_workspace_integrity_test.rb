@@ -284,6 +284,124 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_equal [ 1, 1 ], page.evaluate_script("[document.querySelectorAll('dialog[data-controller=\"terminology-sheet\"]').length, document.querySelectorAll('#workspace-terminology-editor form').length]")
   end
 
+  # The response to a save can arrive after the user has already closed the
+  # sheet; the selection it makes must still reach the saved draft.
+  test "a terminology save that lands after the sheet was closed early is autosaved" do
+    visit new_translation_workspace_path
+    select_workspace_glossary
+    hold_terminology_submissions
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+    find("dialog[open]").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    revised = @glossary.reload.current_revision
+    assert_equal 2, revised.version
+    assert_equal 0, page.evaluate_script("window.__sheetChanged")
+
+    page.execute_script("window.__releaseTerminology()")
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{revised.id}']:checked", visible: :all
+    assert_until { workspace_draft_glossary == revised.id.to_s }
+    assert_equal 1, page.evaluate_script("window.__sheetChanged")
+    assert_no_selector "dialog[open]"
+
+    refresh
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{revised.id}']:checked", visible: :all
+    assert_equal 1, page.evaluate_script("document.querySelectorAll(\"input[name='translation_workspace[glossary_revision_id]']:checked\").length")
+  end
+
+  test "a failed or refused terminology save after an early close changes nothing" do
+    visit new_translation_workspace_path
+    original = @glossary.current_revision_id
+    select_workspace_glossary
+
+    # A save the server refuses (the glossary changed meanwhile) re-renders
+    # the editor with its error instead of emptying it.
+    hold_terminology_submissions
+    click_link "Edit terminology"
+    assert_selector "dialog[open] input[name='glossary[entries][][preferred_target_term]']"
+    Glossaries::Revise.call(glossary: @glossary, expected_version: 1, attributes: {
+      name: "Workspace terms", source_language: "Vietnamese", target_language: "Japanese",
+      entries: [ { source_term: "Grace", preferred_target_term: "恩寵" } ]
+    })
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 409 }
+    click_button "Cancel"
+    assert_no_selector "dialog[open]"
+    page.execute_script("window.__releaseTerminology()")
+    assert_selector "dialog[open] [role='alert']", text: "This glossary changed while you were editing it"
+    click_button "Cancel"
+    assert_no_selector "dialog[open]"
+
+    # A request that never reaches the server.
+    hold_terminology_submissions(fail: true)
+    click_link "+ Add terminology"
+    within "dialog[open]" do
+      fill_in "Glossary name", with: "Never created terms"
+      choose_known_language "Source language", "Vietnamese"
+      choose_known_language "Target language", "Japanese"
+      first("input[name='glossary[entries][][source_term]']").fill_in with: "Mercy"
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈しみ"
+      click_button "Create & select"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == "network" }
+    find("dialog[open]").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    page.execute_script("window.__releaseTerminology()")
+
+    sleep 1.5 # longer than the autosave debounce, so a false change would have saved
+    assert_equal 0, page.evaluate_script("window.__sheetChanged")
+    assert_equal original.to_s, workspace_draft_glossary
+    assert_not users(:normal).glossaries.joins(:current_revision).exists?(glossary_revisions: { name: "Never created terms" })
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{original}']:checked", visible: :all
+  end
+
+  # The paid-provider confirmation authorizes one launch and is never part of
+  # the saved draft, so ticking it must not trigger or claim a save.
+  test "the automatic launch confirmation is never autosaved or reported as saved" do
+    visit new_translation_workspace_path
+    choose "Automatic"
+    choose "translation_workspace_workflow_profile_revision_id_#{@workflow.current_revision_id}"
+    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("workflow_profile_revision_id", nil) == @workflow.current_revision_id.to_s }
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved"
+    page.execute_script(<<~JS)
+      window.__draftSaves = 0
+      window.__statuses = []
+      const status = document.querySelector("[data-workspace-guard-target='status']")
+      status.textContent = ""
+      new MutationObserver(() => window.__statuses.push(status.textContent)).observe(status, { childList: true, characterData: true, subtree: true })
+      const deliver = window.fetch.bind(window)
+      window.fetch = (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST") window.__draftSaves += 1
+        return deliver(url, options)
+      }
+    JS
+
+    check "translation_workspace[automatic_confirmation]"
+    sleep 1.5 # longer than the autosave debounce
+    assert_equal [ 0, [] ], page.evaluate_script("[window.__draftSaves, window.__statuses]")
+    assert_checked_field "translation_workspace[automatic_confirmation]"
+
+    fill_in "Translation name", with: "Saved normally"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved"
+    assert_equal 1, page.evaluate_script("window.__draftSaves")
+    assert_includes page.evaluate_script("window.__statuses"), "Saving…"
+    payload = users(:normal).translation_workspace_drafts.sole.payload
+    assert_equal "Saved normally", payload.fetch("experiment_name")
+    assert_not payload.key?("automatic_confirmation")
+
+    refresh
+    assert_field "Translation name", with: "Saved normally"
+    assert_no_checked_field "translation_workspace[automatic_confirmation]"
+  end
+
   test "a newer model search aborts an older slow one and is never overwritten by it" do
     visit new_translation_workspace_path
     page.execute_script(<<~JS)
@@ -454,6 +572,51 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
       flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
       sleep 0.05
     end
+  end
+
+  # Restoring a draft keeps a glossary only when its languages match.
+  def select_workspace_glossary
+    choose_language("Source language", "Vietnamese")
+    choose_language("Target language", "Japanese")
+    find("#workspace-glossary summary", text: "Choose saved glossary").click
+    find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
+    assert_selector "#workspace-glossary", text: "Workspace terms"
+    assert_until { workspace_draft_glossary == @glossary.current_revision_id.to_s }
+  end
+
+  def workspace_draft_glossary
+    users(:normal).translation_workspace_drafts.first&.payload&.fetch("glossary_revision_id", nil)
+  end
+
+  # Holds the next terminology submission until window.__releaseTerminology()
+  # runs: its response once the server has answered (window.__terminologyHeld
+  # is the status), or with fail:, a network error without reaching the server.
+  def hold_terminology_submissions(fail: false)
+    page.execute_script(<<~JS, fail)
+      const fail = arguments[0]
+      window.__terminologyHeld = null
+      if (window.__sheetChanged === undefined) {
+        window.__sheetChanged = 0
+        document.addEventListener("terminology-sheet:changed", () => { window.__sheetChanged += 1 })
+      }
+      window.__deliverTerminology ||= window.fetch.bind(window)
+      const deliver = window.__deliverTerminology
+      window.fetch = (url, options = {}) => {
+        const target = new URL(url, location.origin)
+        if (!target.pathname.startsWith("/workspace_terminology") || (options.method || "GET").toUpperCase() === "GET") return deliver(url, options)
+        window.fetch = deliver
+        if (fail) {
+          return new Promise((_resolve, reject) => {
+            window.__releaseTerminology = () => reject(new TypeError("Failed to fetch"))
+            window.__terminologyHeld = "network"
+          })
+        }
+        return deliver(url, options).then(response => new Promise(resolve => {
+          window.__releaseTerminology = () => resolve(response)
+          window.__terminologyHeld = response.status
+        }))
+      }
+    JS
   end
 
   def sign_in_in_browser
