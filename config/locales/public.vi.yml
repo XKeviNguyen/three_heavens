@@ -201,6 +201,7 @@ vi:
       malformed_pdf: Không thể đọc tệp PDF một cách an toàn.
       mismatched_type: Loại tệp không khớp với phần mở rộng.
       missing_file: Hãy chọn tệp để tải lên.
+      pdf_busy: Máy chủ đang bận xử lý các PDF khác. Vui lòng thử lại sau giây lát.
       pdf_encrypted: Chưa hỗ trợ tệp PDF được mã hóa hoặc bảo vệ bằng mật khẩu.
       pdf_no_text: Tệp PDF này không có văn bản có thể trích xuất. PDF dạng ảnh cần OCR, hiện chưa được hỗ trợ.
       pdf_timeout: Quá trình xử lý PDF mất quá nhiều thời gian.

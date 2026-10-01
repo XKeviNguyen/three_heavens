@@ -93,7 +93,25 @@ module DocumentIoTestHelper
     )
   end
 
+  # ZIP entries record a modification time, which rubyzip stamps from the
+  # clock in two-second steps. A fixed time makes the same logical DOCX the
+  # same bytes whenever it is built, so a test that uploads it twice under one
+  # request key really replays the same file.
+  DOCX_ENTRY_TIME = Time.utc(2024, 1, 1).freeze
+  # Traditional ZIP encryption starts every entry with random header bytes,
+  # so each encrypted DOCX is built once and its bytes reused.
+  ENCRYPTED_DOCX_CACHE = {}
+
   def build_docx(document_xml: basic_document_xml, entries: {}, encrypted: false)
+    if encrypted
+      key = [ document_xml.dup.freeze, entries.transform_values { it.dup.freeze }.freeze ].freeze
+      return ENCRYPTED_DOCX_CACHE[key] ||= write_docx(document_xml:, entries:, encrypted: true).freeze
+    end
+
+    write_docx(document_xml:, entries:, encrypted: false)
+  end
+
+  def write_docx(document_xml:, entries:, encrypted:)
     options = encrypted ? { encrypter: Zip::TraditionalEncrypter.new("test-password") } : {}
     buffer = Zip::OutputStream.write_buffer(**options) do |zip|
       {
@@ -101,7 +119,7 @@ module DocumentIoTestHelper
         "_rels/.rels" => PACKAGE_RELATIONSHIPS_XML,
         "word/document.xml" => document_xml
       }.merge(entries).each do |name, contents|
-        zip.put_next_entry(name)
+        zip.put_next_entry(Zip::Entry.new("", name, time: DOCX_ENTRY_TIME))
         zip.write(contents)
       end
     end

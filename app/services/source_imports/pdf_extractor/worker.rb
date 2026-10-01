@@ -10,8 +10,14 @@ module SourceImports
     # a status line, which the parent treats as an unreadable PDF.
     module Worker
       Failure = Class.new(StandardError)
+      OOM_SCORE_ADJ_PATH = "/proc/self/oom_score_adj"
+      # The highest score: if memory runs out despite the parent's limit on
+      # concurrent workers, the kernel stops this worker before the web
+      # process. Raising one's own score needs no privilege.
+      OOM_SCORE_ADJ = 1000
 
       def self.run(input: $stdin, output: $stdout, max_pages: Integer(ARGV.fetch(0)), max_characters: Integer(ARGV.fetch(1)))
+        prefer_as_oom_victim
         output.binmode
         text = extract(input.binmode.read, max_pages:, max_characters:)
         output.write("ok\n", text)
@@ -24,6 +30,15 @@ module SourceImports
         output.write("error malformed_pdf\n")
       ensure
         output.flush
+      end
+
+      # Best effort: where the setting cannot be written (no /proc, or a
+      # restricted container), extraction proceeds under the same limits.
+      def self.prefer_as_oom_victim(path = OOM_SCORE_ADJ_PATH)
+        File.write(path, OOM_SCORE_ADJ.to_s)
+        true
+      rescue SystemCallError, IOError
+        false
       end
 
       def self.extract(bytes, max_pages:, max_characters:)

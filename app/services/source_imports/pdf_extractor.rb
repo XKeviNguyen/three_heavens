@@ -17,8 +17,24 @@ module SourceImports
   # multilingual, 100-page, vector-heavy, and 9 MB image PDFs peak between 95
   # and 118 MB of address space (24 to 47 MB resident), while a 1 MB PDF that
   # inflates to 1 GiB previously grew the web process by about 850 MB and is
-  # now stopped at about 150 MB resident in the worker. Each Puma thread runs
-  # at most one worker, so the worst case is RAILS_MAX_THREADS workers.
+  # now stopped at about 150 MB resident in the worker.
+  #
+  # That bounds one worker; MAX_ACTIVE_WORKERS bounds them all. Puma runs a
+  # single process (config/puma.rb refuses WEB_CONCURRENCY above 1), so
+  # WORKER_SLOTS counts every PDF worker in the container. Measured in the
+  # production image under a 768 MiB no-swap limit, with Solid Queue in Puma:
+  # the container holds about 260 to 290 MiB idle and about 370 to 400 MiB
+  # after serving uploads (about 320 MiB of it not reclaimable). One worker
+  # at its full 256 MiB therefore stays below about 660 MiB; two could need
+  # about 880 MiB. Without a limit, three simultaneous hostile PDFs drove the
+  # container to its 768 MiB cap, where the kernel kills a process. Hence one
+  # worker at a time.
+  #
+  # Parsing typical PDFs takes under a second, so a caller waits up to
+  # ADMISSION_WAIT_SECONDS for the running worker and is otherwise told to
+  # retry, holding a web thread for well under the parse time limit. A PDF
+  # near the extracted character limit takes about 2.6 seconds, so of two
+  # such uploads at the same moment one is asked to retry.
   class PdfExtractor
     MEMORY_LIMIT_BYTES = 256.megabytes
     MAX_OUTPUT_BYTES = (Limits::MAX_EXTRACTED_CHARACTERS * 4) + 64
@@ -26,6 +42,7 @@ module SourceImports
     WORKER_PATH = File.expand_path("pdf_extractor/worker.rb", __dir__)
     MESSAGES = {
       "malformed_pdf" => "The selected PDF could not be read safely.",
+      "pdf_busy" => "The server is busy processing other PDFs. Try again in a moment.",
       "pdf_encrypted" => "Encrypted or password-protected PDFs are not supported.",
       "pdf_no_text" => "This PDF does not contain extractable text. Scanned PDFs need OCR, which is not supported yet.",
       "pdf_timeout" => "This PDF took too long to process.",
@@ -38,25 +55,29 @@ module SourceImports
     JIT_ARGUMENTS = (defined?(RubyVM::YJIT) ? %w[--yjit --yjit-mem-size=16] : []).freeze
     # CPU-limit signals: SIGXCPU at the soft limit, SIGKILL at the hard limit.
     CPU_LIMIT_SIGNALS = [ Signal.list.fetch("XCPU"), Signal.list.fetch("KILL") ].freeze
+    MAX_ACTIVE_WORKERS = 1
+    ADMISSION_WAIT_SECONDS = 2
+    WORKER_SLOTS = WorkerSlots.new(limit: MAX_ACTIVE_WORKERS, wait_seconds: ADMISSION_WAIT_SECONDS)
 
-    def self.call(bytes, time_limit: Limits::MAX_PDF_PARSE_SECONDS)
-      new(bytes, time_limit:).call
+    def self.call(bytes, time_limit: Limits::MAX_PDF_PARSE_SECONDS, slots: WORKER_SLOTS)
+      new(bytes, time_limit:, slots:).call
     end
 
-    def initialize(bytes, time_limit:)
+    def initialize(bytes, time_limit:, slots: WORKER_SLOTS)
       @bytes = bytes.b
       @time_limit = time_limit
+      @slots = slots
     end
 
     def call
       raise ArgumentError, "PDF exceeds the upload limit" if bytes.bytesize > Limits::MAX_UPLOAD_BYTES
 
-      interpret(run_worker)
+      interpret(slots.hold { run_worker })
     end
 
     private
 
-    attr_reader :bytes, :time_limit
+    attr_reader :bytes, :time_limit, :slots
 
     # Returns the worker's output and exit status, or :timeout or
     # :output_too_large after killing it.

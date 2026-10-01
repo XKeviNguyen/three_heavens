@@ -11,7 +11,28 @@ class PumaConfigurationTest < ActiveSupport::TestCase
     assert_equal RequestBodyLimit::MAX_BYTES, probe_configuration.content_length_limit
   end
 
+  # PDF extraction admits one worker per Puma process, sized for the whole
+  # container, so more processes would multiply its memory bound.
+  test "Puma refuses to start more than one process per container" do
+    [ nil, "", "0", "1" ].each do |value|
+      assert_nothing_raised { with_web_concurrency(value) { probe_configuration } }
+    end
+    [ "2", "auto" ].each do |value|
+      error = assert_raises(RuntimeError, value) { with_web_concurrency(value) { probe_configuration } }
+      assert_match(/WEB_CONCURRENCY must be 1/, error.message)
+    end
+  end
+
   private
+
+  def with_web_concurrency(value)
+    original_value = ENV.delete("WEB_CONCURRENCY")
+    ENV["WEB_CONCURRENCY"] = value if value
+    yield
+  ensure
+    ENV.delete("WEB_CONCURRENCY")
+    ENV["WEB_CONCURRENCY"] = original_value if original_value
+  end
 
   def plugins_for(solid_queue_in_puma)
     original_value = ENV.delete("SOLID_QUEUE_IN_PUMA")

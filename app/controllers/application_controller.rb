@@ -9,7 +9,7 @@ class ApplicationController < ActionController::Base
   around_action :with_locale
   before_action :require_authentication
 
-  helper_method :current_user, :authenticated?, :current_appearance
+  helper_method :current_user, :authenticated?, :current_appearance, :current_appearance_revision
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
@@ -69,6 +69,10 @@ class ApplicationController < ActionController::Base
     return current_user.appearance if current_user
 
     ui_preferences.appearance || "system"
+  end
+
+  def current_appearance_revision
+    ui_preferences.appearance_revision
   end
 
   def google_identity_ceremony(intent)
@@ -158,8 +162,10 @@ class ApplicationController < ActionController::Base
     destination
   end
 
+  # The display cookies already hold the account's preferences (written at
+  # sign-in and on every change), so signing out keeps the same look without
+  # rewriting them from a user that a still-saving change may have outdated.
   def end_authenticated_session!
-    ui_preferences.mirror(current_user) if current_user
     reset_session
     GoogleIdentity::PendingLink.clear(cookies)
   end

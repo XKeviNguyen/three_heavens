@@ -51,6 +51,8 @@ module SourceImports
       extracted_text = failure = nil
       begin
         extracted_text = TextExtractor.call(format: payload.detection.format, bytes: payload.bytes)
+      rescue Busy
+        raise
       rescue Error => error
         failure = error
       end

@@ -201,6 +201,7 @@ ja:
       malformed_pdf: PDFファイルを安全に読み取れませんでした。
       mismatched_type: ファイルの種類と拡張子が一致しません。
       missing_file: アップロードするファイルを選択してください。
+      pdf_busy: サーバーが他のPDFを処理中です。しばらくしてからもう一度お試しください。
       pdf_encrypted: 暗号化またはパスワード保護されたPDFには対応していません。
       pdf_no_text: このPDFからテキストを抽出できません。画像だけのPDFにはOCRが必要ですが、現在は対応していません。
       pdf_timeout: PDFの処理に時間がかかりすぎました。

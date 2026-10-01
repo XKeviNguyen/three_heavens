@@ -13,9 +13,10 @@ class AppearancesController < ApplicationController
     else
       ui_preferences.choose_as_guest(appearance: appearance)
     end
+    revision = ui_preferences.advance_appearance_revision
 
     respond_to do |format|
-      format.json { head :no_content }
+      format.json { render json: { appearance:, revision: } }
       format.html { redirect_back_to_same_origin }
     end
   end

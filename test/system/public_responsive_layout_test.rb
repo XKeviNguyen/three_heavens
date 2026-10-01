@@ -148,8 +148,11 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
       assert_current_path history_path
       page.go_back
       assert_current_path projects_path
+      # The URL changes before Turbo renders the restored page, so wait for
+      # the Projects page itself rather than reading the History page's DOM.
+      assert_selector "main h1", text: I18n.t("projects_ui.heading")
       assert_selector "aside#app-sidebar", visible: :hidden
-      assert_equal "false", find("button[data-action='sidebar#open']")["aria-expanded"]
+      assert_selector "button[data-action='sidebar#open'][aria-expanded='false']"
     end
   ensure
     clear_browser_viewport

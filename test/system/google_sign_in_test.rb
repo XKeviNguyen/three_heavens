@@ -8,6 +8,9 @@ class GoogleSignInSystemTest < ApplicationSystemTestCase
     install_google_identity_stand_in
     with_google_verifier(NonceEchoVerifier.new) do
       visit login_path
+      # The button is configured after its ceremony is fetched; it is rendered
+      # only once configured.
+      assert_selector "button[data-theme='outline']"
       config = page.evaluate_script("window.__gis.config")
       assert_equal "redirect", config["ux_mode"]
       assert_equal false, config["auto_select"]

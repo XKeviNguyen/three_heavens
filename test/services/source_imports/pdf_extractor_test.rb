@@ -153,6 +153,100 @@ module SourceImports
       assert wait_until { processes_with_argument(marker).empty? }, "the worker's own child survived"
     end
 
+    test "every way a worker can end returns its slot" do
+      slots = PdfExtractor::WorkerSlots.new(limit: 1, wait_seconds: 0)
+      outcomes = {
+        "sleep 30" => "pdf_timeout",
+        "exit! 3" => "malformed_pdf",
+        "raise NoMemoryError" => "malformed_pdf",
+        "STDOUT.write(%(ok\\n) + (%(x) * #{PdfExtractor::MAX_OUTPUT_BYTES}))" => "malformed_pdf"
+      }
+
+      outcomes.each do |program, code|
+        error = assert_raises(Error) { self.class.fake_extractor(program).call(pdf_with_text("Hello"), time_limit: 1, slots:) }
+        assert_equal code, error.code, program
+        assert_equal 0, slots.active, program
+      end
+      assert_equal "malformed_pdf", assert_raises(Error) { PdfExtractor.call("%PDF-1.4\nnot a document", slots:) }.code
+      assert_equal 0, slots.active
+    end
+
+    test "a failure before the worker starts or after the slot is taken returns the slot" do
+      slots = PdfExtractor::WorkerSlots.new(limit: 1, wait_seconds: 0)
+      assert_raises(ArgumentError) { PdfExtractor.call("%PDF-".b + ("a" * Limits::MAX_UPLOAD_BYTES), slots:) }
+      assert_equal 0, slots.active
+
+      unstartable = Class.new(PdfExtractor) { define_method(:command) { [ "/nonexistent/pdf-worker" ] } }
+      assert_raises(Errno::ENOENT) { unstartable.call(pdf_with_text("Hello"), slots:) }
+      assert_equal 0, slots.active
+
+      exploding = Class.new(PdfExtractor) { define_method(:exchange) { |*| raise IOError, "pipe closed" } }
+      assert_raises(IOError) { exploding.call(pdf_with_text("Hello"), slots:) }
+      assert_equal 0, slots.active
+      assert_equal "Hello", PdfExtractor.call(pdf_with_text("Hello"), slots:).strip
+    end
+
+    # Six simultaneous ~1 MB PDFs that each inflate to 1 GiB. Without a limit
+    # each gets a worker of up to MEMORY_LIMIT_BYTES at the same moment.
+    test "simultaneous hostile PDFs never run more workers than the limit and the excess is told to retry" do
+      slots = PdfExtractor::WorkerSlots.new(limit: 1, wait_seconds: 0.5)
+      bomb = inflating_pdf(1.gigabyte)
+      most_workers = 0
+      done = false
+      watcher = Thread.new do
+        until done
+          most_workers = [ most_workers, (child_process_ids - @children_before).size ].max
+          sleep 0.005
+        end
+      end
+
+      codes = 6.times.map { Thread.new { assert_raises(Error) { PdfExtractor.call(bomb, slots:) }.code } }.map(&:value)
+      done = true
+      watcher.join
+
+      assert_equal 1, most_workers
+      assert_includes codes, "malformed_pdf"
+      assert_includes codes, "pdf_busy"
+      assert_equal [ "malformed_pdf", "pdf_busy" ], codes.uniq.sort
+      assert_equal 0, slots.active
+    end
+
+    test "the process-wide limit is the documented one and every caller shares it" do
+      assert_equal 1, PdfExtractor::MAX_ACTIVE_WORKERS
+      assert_same PdfExtractor::WORKER_SLOTS, PdfExtractor.new("", time_limit: 1).send(:slots)
+      assert_equal PdfExtractor::MAX_ACTIVE_WORKERS, PdfExtractor::WORKER_SLOTS.limit
+      assert_operator PdfExtractor::ADMISSION_WAIT_SECONDS, :<, Limits::MAX_PDF_PARSE_SECONDS
+    end
+
+    test "the worker asks the kernel to stop it first if memory runs out" do
+      slow = Thread.new { assert_raises(Error) { PdfExtractor.call(inflating_pdf(64.megabytes), time_limit: 2) } }
+      worker = nil
+      assert wait_until(5) { worker = (child_process_ids - @children_before).first }, "no worker started"
+      score = nil
+      assert wait_until(3) { (score = File.read("/proc/#{worker}/oom_score_adj").to_i) == PdfExtractor::Worker::OOM_SCORE_ADJ }
+      assert_equal 1000, score
+    ensure
+      slow&.join
+    end
+
+    test "the worker still extracts when its out-of-memory preference cannot be set" do
+      Dir.mktmpdir do |directory|
+        writable = File.join(directory, "oom_score_adj")
+        assert PdfExtractor::Worker.prefer_as_oom_victim(writable)
+        assert_equal "1000", File.read(writable)
+
+        assert_not PdfExtractor::Worker.prefer_as_oom_victim(File.join(directory, "missing", "oom_score_adj"))
+      end
+      # Also keeps this test process's own out-of-memory score unchanged.
+      original = PdfExtractor::Worker.method(:prefer_as_oom_victim)
+      PdfExtractor::Worker.define_singleton_method(:prefer_as_oom_victim) { |*| false }
+      output = StringIO.new
+      PdfExtractor::Worker.run(input: StringIO.new(pdf_with_text("Still extracted")), output:, max_pages: 1, max_characters: 1_000)
+      assert_match(/\Aok\n.*Still extracted/m, output.string)
+    ensure
+      PdfExtractor::Worker.define_singleton_method(:prefer_as_oom_victim, original) if original
+    end
+
     private
 
     def child_process_ids

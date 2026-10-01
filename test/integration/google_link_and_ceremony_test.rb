@@ -111,7 +111,7 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_no_session_cookie_written
     patch appearance_path, params: { appearance: "dark" }, as: :json
-    assert_response :no_content
+    assert_response :success
     assert_no_session_cookie_written
     patch appearance_path, params: { appearance: "light", return_to: "/projects" }
     assert_redirected_to "/projects"

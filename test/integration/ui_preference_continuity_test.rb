@@ -6,7 +6,7 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   SIGNED_IN = { "en" => "Signed in successfully.", "vi" => "Đăng nhập thành công.", "ja" => "ログインしました。" }.freeze
-  CROSS_SITE_WITHHELD = %w[_three_heavens_session ui_locale ui_appearance ui_preference_override].freeze
+  CROSS_SITE_WITHHELD = %w[_three_heavens_session ui_locale ui_appearance ui_locale_override ui_appearance_override].freeze
 
   setup do
     @account = users(:normal)
@@ -180,7 +180,8 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
 
   test "tampered or invalid preference cookies are ignored and never touch other attributes" do
     @account.update!(locale: "ja", appearance: "dark")
-    cookies[:ui_preference_override] = { locale: "vi", role: "admin" }.to_json
+    cookies[:ui_locale_override] = "vi"
+    cookies[:ui_appearance_override] = { appearance: "light", role: "admin" }.to_json
     cookies[:ui_locale] = "xx"
     cookies[:ui_appearance] = "neon"
     get login_path
@@ -194,8 +195,9 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
   test "display cookies and the pending override are separate" do
     choose_as_guest(locale: "vi")
     assert_equal "vi", cookies[:ui_locale]
-    assert cookies[:ui_preference_override].present?, "an explicit signed-out change is recorded as pending"
-    assert_not_includes cookies[:ui_preference_override], "vi", "the pending override is signed, not plain"
+    assert cookies[:ui_locale_override].present?, "an explicit signed-out change is recorded as pending"
+    assert_not_includes cookies[:ui_locale_override], "vi", "the pending override is signed, not plain"
+    assert_nil cookies[:ui_appearance_override], "only the changed preference is recorded"
 
     password_sign_in(@account)
     assert_no_pending_override
@@ -204,7 +206,83 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
     assert_no_pending_override
   end
 
+  test "overlapping signed-out locale and appearance changes are both adopted at sign-in, in any order" do
+    each_overlap do |order, arrival|
+      reset!
+      @account.update!(locale: "en", appearance: "light")
+      get root_path
+      changes = { locale: -> { choose_as_guest(locale: "ja") }, appearance: -> { choose_as_guest(appearance: "dark") } }
+      deliver_overlapping(*changes.values_at(*order), arrival:)
+
+      assert_rendered("ja", "dark", root_path)
+      password_sign_in(@account)
+      assert_signed_in_render("ja", "dark")
+      assert_account(@account, "ja", "dark")
+    end
+  end
+
+  test "overlapping signed-in changes never leave an older value for after sign-out, in any order" do
+    each_overlap do |order, arrival|
+      reset!
+      @account.update!(locale: "en", appearance: "light")
+      password_sign_in(@account)
+      changes = {
+        locale: -> { patch locale_path, params: { locale_code: "ja" } },
+        appearance: -> { patch appearance_path, params: { appearance: "dark" }, as: :json }
+      }
+      deliver_overlapping(*changes.values_at(*order), arrival:)
+
+      assert_account(@account, "ja", "dark")
+      assert_equal [ "ja", "dark" ], [ cookies[:ui_locale], cookies[:ui_appearance] ]
+    end
+  end
+
+  test "signing out while an appearance change is still being saved keeps that change, in any order" do
+    each_overlap(:appearance, :sign_out) do |order, arrival|
+      reset!
+      @account.update!(locale: "ja", appearance: "light")
+      password_sign_in(@account)
+      changes = {
+        appearance: -> { patch appearance_path, params: { appearance: "dark" }, as: :json },
+        sign_out: -> { delete session_path }
+      }
+      deliver_overlapping(*changes.values_at(*order), arrival:)
+
+      assert_account(@account, "ja", "dark")
+      assert_rendered("ja", "dark", login_path)
+      assert_select ".appearance-menu[data-appearance-revision-value='1']"
+    end
+  end
+
   private
+
+  # Every order in which the server can run two overlapping requests, each
+  # with both orders in which their responses can reach the browser.
+  def each_overlap(first = :locale, second = :appearance)
+    [ [ first, second ], [ second, first ] ].product([ :as_run, :reversed ]).each do |order, arrival|
+      yield order, arrival
+    end
+  end
+
+  # Runs the requests in order, each sent with the cookies the browser holds
+  # now (as when one is sent before another's response has arrived), then
+  # lets the browser store their responses' cookies in order of arrival.
+  def deliver_overlapping(*requests, arrival:)
+    sent_with = cookies.to_hash
+    responses = requests.map do |request|
+      restore_cookies(sent_with)
+      request.call
+      Array(response.headers["Set-Cookie"]).join("\n")
+    end
+    restore_cookies(sent_with)
+    responses.reverse! if arrival == :reversed
+    responses.each { |set_cookie| cookies.merge(set_cookie, URI("http://www.example.com/")) }
+  end
+
+  def restore_cookies(values)
+    cookies.to_hash.each_key { |name| cookies.delete(name) }
+    values.each { |name, value| cookies[name] = value }
+  end
 
   def choose_as_guest(locale: nil, appearance: nil)
     patch locale_path, params: { locale_code: locale } if locale
@@ -264,6 +342,6 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
   end
 
   def assert_no_pending_override
-    assert cookies[:ui_preference_override].blank?, "no pending signed-out override remains"
+    assert cookies[:ui_locale_override].blank? && cookies[:ui_appearance_override].blank?, "no pending signed-out override remains"
   end
 end
