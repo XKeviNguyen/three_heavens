@@ -175,6 +175,36 @@ class PreferenceContinuitySystemTest < ApplicationSystemTestCase
     assert_equal [ "ja", "system" ], user.reload.values_at(:locale, :appearance)
   end
 
+  # Tabs share the account and cookies, so a choice saved from one tab must
+  # never be overwritten by an earlier choice from another that reached the
+  # server later. Tab A's save is held before it is sent while tab B makes a
+  # later choice.
+  test "an earlier choice from another tab never overwrites a later one" do
+    user = users(:normal)
+    user.update!(appearance: "light")
+    sign_in_with_password(user)
+    tab_a = current_window
+    tab_b = open_new_window
+    within_window(tab_b) { visit new_translation_workspace_path }
+
+    hold_fetch("/appearance", until_released: :request)
+    request_appearance("dark")
+    within_window(tab_b) { request_appearance("system") }
+    release_fetch("/appearance")
+    assert_until { page.evaluate_script("window.__appearanceSaved") == "dark" }
+    within_window(tab_b) { assert_until { page.evaluate_script("window.__appearanceSaved") == "system" } }
+
+    assert_equal "system", user.reload.appearance
+    [ tab_a, tab_b ].each do |tab|
+      within_window(tab) do
+        visit new_translation_workspace_path
+        assert_selector "html[data-appearance='system']"
+      end
+    end
+  ensure
+    tab_b&.close
+  end
+
   private
 
   def choose_landing_locale(name)

@@ -2,6 +2,10 @@ import { Controller } from "@hotwired/stimulus"
 
 // Saves run one after another so rapid choices persist in the order made, and
 // the latest unsaved choice survives Turbo visits that render an older value.
+// Every tab of the browser shares its cookies and account, so a Web Lock makes
+// saves from all tabs take turns in the order the choices were made; without
+// one, saves from this page still run in order.
+const SAVE_LOCK = "appearance-save"
 let saves = Promise.resolve()
 let pendingAppearance = null
 let savedAppearance = null
@@ -41,7 +45,7 @@ export default class extends Controller {
       this.summaryTarget.focus()
     }
 
-    saves = saves.then(async () => {
+    inTurn(async () => {
       try {
         const response = await fetch(form.action, {
           method: "POST", body, credentials: "same-origin", headers: { Accept: "application/json" }
@@ -70,4 +74,10 @@ export default class extends Controller {
     document.querySelectorAll("[data-appearance-target='summary']").forEach(summary => summary.setAttribute("aria-label", `${this.labelsValue.heading}: ${this.labelsValue[appearance]}`))
     document.dispatchEvent(new CustomEvent("appearance:change", { detail: { appearance } }))
   }
+}
+
+function inTurn(save) {
+  if (navigator.locks) return navigator.locks.request(SAVE_LOCK, save)
+  saves = saves.then(save)
+  return saves
 }
