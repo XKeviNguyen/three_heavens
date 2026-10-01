@@ -538,6 +538,41 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_equal 1, locations.uniq.size
   end
 
+  test "a PDF upload while every PDF worker is busy stores nothing, says so, and the same upload succeeds on retry" do
+    key = SecureRandom.hex(16)
+    deliver = lambda do |format: :json|
+      post source_imports_path(format:), params: {
+        source_import: { source_file: uploaded_file(pdf_with_text("Retry later"), filename: "busy.pdf", content_type: "application/pdf"), request_key: key }
+      }
+    end
+    holding, finish = Queue.new, Queue.new
+    holder = Thread.new { SourceImports::PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }
+    holding.pop
+
+    assert_no_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ] do
+      deliver.call
+      assert_response :service_unavailable
+      assert_equal SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s, response.headers["Retry-After"]
+      assert_equal I18n.t("source_imports.errors.pdf_busy"), response.parsed_body.fetch("error")
+
+      patch locale_path, params: { locale_code: "ja" }
+      deliver.call(format: :html)
+      assert_response :service_unavailable
+      assert_select "[role='alert']", text: I18n.t("source_imports.errors.pdf_busy", locale: :ja)
+      assert_no_match(/WorkerSlots|SourceImports::Busy|oom_score/, response.body)
+    end
+    finish << true
+    holder.join
+
+    deliver.call
+    assert_response :created
+    assert_includes response.parsed_body.fetch("extracted_text"), "Retry later"
+    assert users(:normal).source_imports.find_by!(request_key: key).ready?
+  ensure
+    finish << true if holder&.alive?
+    holder&.join
+  end
+
   test "a storage failure is reported and every replay of that upload converges on it" do
     ActiveStorage::Blob.service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
     key = SecureRandom.hex(16)

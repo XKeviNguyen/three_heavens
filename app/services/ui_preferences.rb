@@ -6,15 +6,27 @@
 #   without one, the account's stored preferences win (defaults such as
 #   Accept-Language or the OS theme never overwrite an account).
 # - Signed-in changes are saved to the account. The account's values are
-#   mirrored to the cookies at sign-in, on every change and at sign-out, so
-#   signing out keeps the same look without creating an override.
+#   mirrored to the cookies at sign-in and each change is written to its
+#   cookie, so signing out keeps the same look without creating an override.
+#
+# Language and appearance changes are separate requests that can overlap, and
+# each response's cookies replace the browser's. Every cookie therefore holds
+# one preference and is written only by a change to that preference, so a
+# response can never carry an older value of the other one.
 #
 # Only these two allowlisted values are handled; nothing here can affect
 # identity, authorization, or any other account attribute.
 class UiPreferences
   LOCALE_COOKIE = :ui_locale
   APPEARANCE_COOKIE = :ui_appearance
-  OVERRIDE_COOKIE = :ui_preference_override
+  OVERRIDE_COOKIES = { "locale" => :ui_locale_override, "appearance" => :ui_appearance_override }.freeze
+  # The browser numbers its appearance choices in the order made. The latest
+  # saved number is rendered with every page, so a page rendered before a
+  # newer choice was saved (a slow or prefetched visit) is recognized as older
+  # instead of switching the appearance back.
+  APPEARANCE_REVISION_COOKIE = :ui_appearance_revision
+  # At most 15 digits, so every revision is an exact JavaScript number.
+  APPEARANCE_REVISION_FORMAT = /\A[1-9][0-9]{0,14}\z/
   ALLOWED = { "locale" => User::SUPPORTED_LOCALES, "appearance" => User::APPEARANCES }.freeze
 
   def self.sanitize(values)
@@ -36,23 +48,34 @@ class UiPreferences
     @cookies[APPEARANCE_COOKIE].presence_in(User::APPEARANCES)
   end
 
+  def appearance_revision
+    value = @cookies[APPEARANCE_REVISION_COOKIE].to_s
+    value.match?(APPEARANCE_REVISION_FORMAT) ? Integer(value, 10) : 0
+  end
+
+  def record_appearance_revision(revision)
+    revision = revision.to_s
+    raise ArgumentError, "invalid appearance revision" unless revision.match?(APPEARANCE_REVISION_FORMAT)
+
+    write(APPEARANCE_REVISION_COOKIE, revision, expires: 1.year.from_now)
+  end
+
   def pending_overrides
-    self.class.sanitize(JSON.parse(@cookies.signed[OVERRIDE_COOKIE].to_s))
-  rescue JSON::ParserError
-    {}
+    self.class.sanitize(OVERRIDE_COOKIES.transform_values { |name| @cookies.signed[name] })
   end
 
   # A signed-out visitor's explicit choice: shown now, applied at next sign-in.
   def choose_as_guest(**choices)
     choices = self.class.sanitize(choices)
     write_display(choices)
-    write(OVERRIDE_COOKIE, pending_overrides.merge(choices).to_json, signed: true, expires: 30.days.from_now)
+    choices.each { |key, value| write(OVERRIDE_COOKIES.fetch(key), value, signed: true, expires: 30.days.from_now) }
   end
 
   # A signed-in user's choice: saved to the account and kept for after sign-out.
   def choose_as_user(user, **choices)
-    user.update!(self.class.sanitize(choices))
-    mirror(user)
+    choices = self.class.sanitize(choices)
+    user.update!(choices)
+    write_display(choices)
     clear_overrides
   end
 
@@ -71,7 +94,7 @@ class UiPreferences
   # Written unconditionally: cookies.delete is a no-op when the request did not
   # carry the cookie, as with Google's cross-site sign-in callback.
   def clear_overrides
-    write(OVERRIDE_COOKIE, "", expires: Time.at(0))
+    OVERRIDE_COOKIES.each_value { |name| write(name, "", expires: Time.at(0)) }
   end
 
   private

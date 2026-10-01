@@ -119,6 +119,32 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     assert_raises(ActiveRecord::StatementInvalid) { user.update_column(:appearance, "neon") }
   end
 
+  test "the latest saved appearance revision is rendered with every page and malformed revisions are refused" do
+    get login_path
+    assert_select ".appearance-menu[data-appearance-revision-value='0']"
+
+    patch appearance_path, params: { appearance: "dark", revision: "1727000000123" }, as: :json
+    assert_response :no_content
+    get login_path
+    assert_select ".appearance-menu[data-appearance-current-value='dark'][data-appearance-revision-value='1727000000123']"
+
+    sign_in_as users(:normal)
+    patch appearance_path, params: { appearance: "light", revision: "1727000000456" }, as: :json
+    get new_translation_workspace_path
+    assert_select ".appearance-menu[data-appearance-current-value='light'][data-appearance-revision-value='1727000000456']"
+
+    [ "0", "-1", "12a", "1" * 17, [ "1" ] ].each do |revision|
+      patch appearance_path, params: { appearance: "dark", revision: }, as: :json
+      assert_response :bad_request, revision.inspect
+    end
+    assert_equal "1727000000456", cookies[:ui_appearance_revision]
+    assert_equal "light", users(:normal).reload.appearance
+
+    cookies[:ui_appearance_revision] = "not-a-number"
+    get new_translation_workspace_path
+    assert_select ".appearance-menu[data-appearance-revision-value='0']"
+  end
+
   test "appearance labels are localized" do
     { "vi" => "Giao diện: Theo hệ thống", "ja" => "外観: システム設定" }.each do |locale, label|
       patch locale_path, params: { locale_code: locale }

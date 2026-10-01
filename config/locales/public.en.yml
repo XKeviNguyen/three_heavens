@@ -201,6 +201,7 @@ en:
       malformed_pdf: The PDF could not be read safely.
       mismatched_type: The file type does not match its extension.
       missing_file: Choose a file to upload.
+      pdf_busy: The server is busy processing other PDFs. Try again in a moment.
       pdf_encrypted: Encrypted or password-protected PDFs are not supported.
       pdf_no_text: This PDF does not contain extractable text. Scanned PDFs need OCR, which is not supported yet.
       pdf_timeout: This PDF took too long to process.

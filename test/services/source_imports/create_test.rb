@@ -160,11 +160,34 @@ module SourceImports
       key = SecureRandom.hex(16)
       upload = -> { uploaded_file(build_docx(document_xml: "not valid XML"), filename: "broken.docx", content_type: Detector::DOCX_MIME) }
       first = assert_raises(Error) { Create.call(user: users(:normal), upload: upload.call, request_key: key) }
+      # The replay is rebuilt after the clock crosses a ZIP timestamp step, so
+      # it must still be the same bytes for the replay to be recognized.
+      travel 3.seconds
 
       assert_no_difference stored_counts do
         replay = assert_raises(Error) { Create.call(user: users(:normal), upload: upload.call, request_key: key) }
         assert_equal [ first.code, first.source_import.id ], [ replay.code, replay.source_import.id ]
       end
+    end
+
+    test "a busy PDF extractor records no outcome, so the same upload action is processed when retried" do
+      key = SecureRandom.hex(16)
+      upload = -> { uploaded_file(pdf_with_text("Retried"), filename: "retried.pdf", content_type: "application/pdf") }
+      holding, finish = Queue.new, Queue.new
+      holder = Thread.new { PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }
+      holding.pop
+
+      assert_no_difference stored_counts do
+        error = assert_raises(Busy) { Create.call(user: users(:normal), upload: upload.call, request_key: key) }
+        assert_equal [ "pdf_busy", nil ], [ error.code, error.source_import ]
+      end
+      finish << true
+      holder.join
+
+      assert Create.call(user: users(:normal), upload: upload.call, request_key: key).ready?
+    ensure
+      finish << true if holder&.alive?
+      holder&.join
     end
 
     test "a replay after the import expired is refused rather than reused" do

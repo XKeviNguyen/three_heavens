@@ -107,6 +107,74 @@ class PreferenceContinuitySystemTest < ApplicationSystemTestCase
     assert_equal baseline, page_footprint
   end
 
+  # A language change is a Turbo visit to a page the server renders with the
+  # appearance it holds at that moment. Holding that page in the browser
+  # while a newer appearance is chosen and saved makes the visit render an
+  # older appearance than the latest saved choice, deterministically.
+  test "a language page rendered before a newer appearance was saved does not revert it" do
+    user = users(:normal)
+    user.update!(locale: "en", appearance: "light")
+    visit root_path
+    hold_fetch("/locale", until_released: :response)
+
+    choose_landing_locale("日本語")
+    assert_until { held_fetch_state("/locale") == "served" }
+    choose_appearance("dark")
+    release_fetch("/locale")
+
+    assert_selector "html[lang='ja']"
+    assert_appearance_stays("dark")
+    sign_in_with_password(user, heading: "ログイン")
+    assert_selector "html[lang='ja'][data-appearance='dark']"
+    assert_equal [ "ja", "dark" ], user.reload.values_at(:locale, :appearance)
+  end
+
+  test "an appearance chosen before a language change but saved after its page was rendered is kept" do
+    user = users(:normal)
+    user.update!(locale: "en", appearance: "light")
+    visit root_path
+    hold_fetch("/appearance", until_released: :request)
+    hold_fetch("/locale", until_released: :response)
+
+    request_appearance("dark")
+    choose_landing_locale("日本語")
+    assert_until { held_fetch_state("/locale") == "served" }
+    release_fetch("/appearance")
+    assert_until { page.evaluate_script("window.__appearanceSaved") == "dark" }
+    release_fetch("/locale")
+
+    assert_selector "html[lang='ja']"
+    assert_appearance_stays("dark")
+    sign_in_with_password(user, heading: "ログイン")
+    assert_equal [ "ja", "dark" ], user.reload.values_at(:locale, :appearance)
+  end
+
+  test "signed in, rapid appearance changes during a language change end on the last choice through sign-out and sign-in" do
+    user = users(:normal)
+    user.update!(locale: "en", appearance: "light")
+    emulate_color_scheme("dark")
+    sign_in_with_password(user)
+    hold_fetch("/locale", until_released: :response)
+
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { held_fetch_state("/locale") == "served" }
+    %w[dark light].each { |appearance| request_appearance(appearance) }
+    choose_appearance("system")
+    release_fetch("/locale")
+
+    assert_selector "html[lang='ja']"
+    assert_appearance_stays("system")
+    assert_equal DARK_CANVAS, body_background
+    assert_equal [ "ja", "system" ], user.reload.values_at(:locale, :appearance)
+
+    within("aside#app-sidebar") { click_button "ログアウト" }
+    assert_current_path login_path
+    assert_selector "html[lang='ja'][data-appearance='system']"
+    sign_in_with_password(user, heading: "ログイン")
+    assert_selector "html[lang='ja'][data-appearance='system']"
+    assert_equal [ "ja", "system" ], user.reload.values_at(:locale, :appearance)
+  end
+
   private
 
   def choose_landing_locale(name)
@@ -118,13 +186,64 @@ class PreferenceContinuitySystemTest < ApplicationSystemTestCase
 
   # Waits for the save itself, since sign-in must see the stored choice.
   def choose_appearance(value)
+    request_appearance(value)
+    assert_until { page.evaluate_script("window.__appearanceSaved") == value }
+  end
+
+  def request_appearance(value)
     page.execute_script(<<~JS)
       window.__appearanceSaved = null;
-      document.addEventListener("appearance:saved", (event) => { window.__appearanceSaved = event.detail.appearance }, { once: true });
+      document.addEventListener("appearance:saved", (event) => { window.__appearanceSaved = event.detail.appearance });
       document.querySelector(`.appearance-option[data-appearance='#{value}']`).form.requestSubmit();
     JS
     assert_selector "html[data-appearance='#{value}']"
-    assert_until { page.evaluate_script("window.__appearanceSaved") == value }
+  end
+
+  # The appearance shown, and the control's state, after every pending
+  # response has had the chance to render.
+  def assert_appearance_stays(value)
+    page.evaluate_async_script("requestAnimationFrame(() => setTimeout(arguments[0], 200))")
+    assert_selector "html[data-appearance='#{value}']"
+    assert_selector ".appearance-option[data-appearance='#{value}'][aria-pressed='true']", visible: :all
+  end
+
+  # Holds the next fetch whose URL contains the fragment until release_fetch:
+  # before it is sent (:request), or after the server has answered it and
+  # before the page sees the answer (:response). Turbo visits and form
+  # submissions, and the appearance saves, all go through window.fetch.
+  def hold_fetch(fragment, until_released:)
+    page.execute_script(<<~JS, fragment, until_released.to_s)
+      const [fragment, stage] = arguments
+      if (!window.__heldFetches) {
+        window.__heldFetches = {}
+        const realFetch = window.fetch
+        window.fetch = function (input, init) {
+          const url = String(input instanceof Request ? input.url : input)
+          const hold = Object.entries(window.__heldFetches).find(([part, held]) => held.state === "armed" && url.includes(part))?.[1]
+          if (!hold) return realFetch.call(this, input, init)
+
+          if (hold.stage === "request") {
+            hold.state = "held"
+            return new Promise((resolve) => { hold.release = () => resolve(realFetch.call(window, input, init)) })
+          }
+          hold.state = "sent"
+          return realFetch.call(this, input, init).then((response) => {
+            hold.state = "served"
+            return new Promise((resolve) => { hold.release = () => resolve(response) })
+          })
+        }
+      }
+      window.__heldFetches[fragment] = { stage, state: "armed" }
+    JS
+  end
+
+  def held_fetch_state(fragment)
+    page.evaluate_script("window.__heldFetches[#{fragment.to_json}].state")
+  end
+
+  def release_fetch(fragment)
+    assert_until { page.evaluate_script("typeof window.__heldFetches[#{fragment.to_json}].release") == "function" }
+    page.execute_script("window.__heldFetches[#{fragment.to_json}].state = 'released'; window.__heldFetches[#{fragment.to_json}].release()")
   end
 
   def sign_in_with_password(user, heading: nil)

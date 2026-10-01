@@ -31,14 +31,14 @@ class SourceImportsController < ApplicationController
         source_import_project_token: project_binding
       ), notice: t("source_imports.imported_notice")
     end
+  rescue SourceImports::Busy => error
+    # Temporary and nothing was stored, so a retry is processed afresh: the
+    # workspace uploader resends the same request key after a 5xx, and the
+    # upload form issues a new one.
+    response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    render_import_failure(error, status: :service_unavailable)
   rescue SourceImports::Error => error
-    @source_import = SourceImport.new
-    if request.format.json?
-      render json: { error: t("source_imports.errors.#{error.code}", default: error.message) }, status: :unprocessable_content
-    else
-      flash.now[:alert] = t("source_imports.errors.#{error.code}", default: error.message)
-      render :new, status: :unprocessable_content
-    end
+    render_import_failure(error, status: :unprocessable_content)
   rescue ActionController::ParameterMissing, ActionController::BadRequest
     @source_import = SourceImport.new
     if request.format.json?
@@ -71,6 +71,17 @@ class SourceImportsController < ApplicationController
   end
 
   private
+
+  def render_import_failure(error, status:)
+    @source_import = SourceImport.new
+    message = t("source_imports.errors.#{error.code}", default: error.message)
+    if request.format.json?
+      render json: { error: message }, status:
+    else
+      flash.now[:alert] = message
+      render :new, status:
+    end
+  end
 
   def source_import_params
     submitted = params.require(:source_import)

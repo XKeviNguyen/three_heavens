@@ -1,4 +1,4 @@
-<details class="appearance-menu" data-controller="appearance disclosure" data-appearance-current-value="<%= current_appearance %>" data-appearance-labels-value="<%= appearance_labels.to_json %>" data-action="click@document->disclosure#closeOutside keydown.esc@document->disclosure#closeOnEscape">
+<details class="appearance-menu" data-controller="appearance disclosure" data-appearance-current-value="<%= current_appearance %>" data-appearance-revision-value="<%= current_appearance_revision %>" data-appearance-labels-value="<%= appearance_labels.to_json %>" data-action="click@document->disclosure#closeOutside keydown.esc@document->disclosure#closeOnEscape">
   <summary data-appearance-target="summary" title="<%= t("appearance.label") %>" aria-label="<%= t("appearance.label") %>: <%= appearance_labels.fetch(current_appearance) %>">
     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3a7 7 0 0 1 0 14Z" fill="currentColor"/></svg>
   </summary>

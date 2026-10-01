@@ -42,7 +42,7 @@
           <% end %>
         </nav>
         <%= render "landing/locale_options" %>
-        <div data-controller="appearance" data-appearance-current-value="<%= current_appearance %>" data-appearance-labels-value="<%= appearance_labels.to_json %>">
+        <div data-controller="appearance" data-appearance-current-value="<%= current_appearance %>" data-appearance-revision-value="<%= current_appearance_revision %>" data-appearance-labels-value="<%= appearance_labels.to_json %>">
           <%= render "shared/appearance_options", class_name: "landing-appearance-options" %>
         </div>
       </div>
