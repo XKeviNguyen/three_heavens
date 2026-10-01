@@ -115,6 +115,20 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     assert_selector "html[data-appearance='light']"
   end
 
+  test "without Web Locks, rapid appearance choices from one page still persist in order" do
+    user = users(:normal)
+    sign_in_in_browser(user, "correct horse battery staple")
+    visit projects_path
+    page.execute_script("Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })")
+    assert_nil page.evaluate_script("navigator.locks")
+    page.execute_script(%w[dark system dark light].map { |choice| "document.querySelector(`.appearance-option[data-appearance='#{choice}']`).form.requestSubmit();" }.join)
+
+    assert_selector "html[data-appearance='light']"
+    Timeout.timeout(5) { sleep 0.05 until user.reload.appearance == "light" }
+    refresh
+    assert_selector "html[data-appearance='light']"
+  end
+
   test "System follows the operating system live and explicit choices override it" do
     visit login_path
     emulate_color_scheme("dark")

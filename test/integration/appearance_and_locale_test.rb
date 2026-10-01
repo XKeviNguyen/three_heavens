@@ -111,7 +111,7 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     sign_in_as user
 
     patch appearance_path, params: { appearance: "light" }, as: :json
-    assert_response :no_content
+    assert_response :success
     assert_equal "light", user.reload.appearance
 
     get new_translation_workspace_path
@@ -119,30 +119,32 @@ class AppearanceAndLocaleTest < ActionDispatch::IntegrationTest
     assert_raises(ActiveRecord::StatementInvalid) { user.update_column(:appearance, "neon") }
   end
 
-  test "the latest saved appearance revision is rendered with every page and malformed revisions are refused" do
+  test "each appearance save is numbered by the server and the latest number is rendered with every page" do
     get login_path
     assert_select ".appearance-menu[data-appearance-revision-value='0']"
 
-    patch appearance_path, params: { appearance: "dark", revision: "1727000000123" }, as: :json
-    assert_response :no_content
+    patch appearance_path, params: { appearance: "dark", revision: "9999" }, as: :json
+    assert_equal({ "appearance" => "dark", "revision" => 1 }, response.parsed_body, "a client-supplied number is ignored")
     get login_path
-    assert_select ".appearance-menu[data-appearance-current-value='dark'][data-appearance-revision-value='1727000000123']"
+    assert_select ".appearance-menu[data-appearance-current-value='dark'][data-appearance-revision-value='1']"
 
     sign_in_as users(:normal)
-    patch appearance_path, params: { appearance: "light", revision: "1727000000456" }, as: :json
+    patch appearance_path, params: { appearance: "light" }, as: :json
+    assert_equal 2, response.parsed_body.fetch("revision")
+    patch appearance_path, params: { appearance: "system" }
+    assert_response :redirect
     get new_translation_workspace_path
-    assert_select ".appearance-menu[data-appearance-current-value='light'][data-appearance-revision-value='1727000000456']"
-
-    [ "0", "-1", "12a", "1" * 17, [ "1" ] ].each do |revision|
-      patch appearance_path, params: { appearance: "dark", revision: }, as: :json
-      assert_response :bad_request, revision.inspect
-    end
-    assert_equal "1727000000456", cookies[:ui_appearance_revision]
-    assert_equal "light", users(:normal).reload.appearance
+    assert_select ".appearance-menu[data-appearance-current-value='system'][data-appearance-revision-value='3']"
 
     cookies[:ui_appearance_revision] = "not-a-number"
     get new_translation_workspace_path
     assert_select ".appearance-menu[data-appearance-revision-value='0']"
+    patch appearance_path, params: { appearance: "dark" }, as: :json
+    assert_equal 1, response.parsed_body.fetch("revision")
+
+    cookies[:ui_appearance_revision] = UiPreferences::MAX_APPEARANCE_REVISION.to_s
+    patch appearance_path, params: { appearance: "light" }, as: :json
+    assert_equal UiPreferences::MAX_APPEARANCE_REVISION, response.parsed_body.fetch("revision")
   end
 
   test "appearance labels are localized" do

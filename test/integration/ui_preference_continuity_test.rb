@@ -243,14 +243,14 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
       @account.update!(locale: "ja", appearance: "light")
       password_sign_in(@account)
       changes = {
-        appearance: -> { patch appearance_path, params: { appearance: "dark", revision: "1727000000123" }, as: :json },
+        appearance: -> { patch appearance_path, params: { appearance: "dark" }, as: :json },
         sign_out: -> { delete session_path }
       }
       deliver_overlapping(*changes.values_at(*order), arrival:)
 
       assert_account(@account, "ja", "dark")
       assert_rendered("ja", "dark", login_path)
-      assert_select ".appearance-menu[data-appearance-revision-value='1727000000123']"
+      assert_select ".appearance-menu[data-appearance-revision-value='1']"
     end
   end
 

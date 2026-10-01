@@ -8,20 +8,15 @@ class AppearancesController < ApplicationController
     appearance = params[:appearance].to_s
     raise ActionController::BadRequest unless User::APPEARANCES.include?(appearance)
 
-    revision = params[:revision]
-    unless revision.nil? || (revision.is_a?(String) && revision.match?(UiPreferences::APPEARANCE_REVISION_FORMAT))
-      raise ActionController::BadRequest
-    end
-
     if current_user
       ui_preferences.choose_as_user(current_user, appearance: appearance)
     else
       ui_preferences.choose_as_guest(appearance: appearance)
     end
-    ui_preferences.record_appearance_revision(revision) if revision
+    revision = ui_preferences.advance_appearance_revision
 
     respond_to do |format|
-      format.json { head :no_content }
+      format.json { render json: { appearance:, revision: } }
       format.html { redirect_back_to_same_origin }
     end
   end

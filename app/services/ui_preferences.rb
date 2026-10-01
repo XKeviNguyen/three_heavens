@@ -20,13 +20,16 @@ class UiPreferences
   LOCALE_COOKIE = :ui_locale
   APPEARANCE_COOKIE = :ui_appearance
   OVERRIDE_COOKIES = { "locale" => :ui_locale_override, "appearance" => :ui_appearance_override }.freeze
-  # The browser numbers its appearance choices in the order made. The latest
-  # saved number is rendered with every page, so a page rendered before a
+  # Each appearance save numbers itself one past the browser's last saved
+  # number, which is rendered with every page, so a page rendered before a
   # newer choice was saved (a slow or prefetched visit) is recognized as older
-  # instead of switching the appearance back.
+  # instead of switching the appearance back. A browser's saves reach the
+  # server one at a time (appearance_controller.js), so the numbers follow
+  # the order its choices were made; no client clock is involved.
   APPEARANCE_REVISION_COOKIE = :ui_appearance_revision
   # At most 15 digits, so every revision is an exact JavaScript number.
   APPEARANCE_REVISION_FORMAT = /\A[1-9][0-9]{0,14}\z/
+  MAX_APPEARANCE_REVISION = 999_999_999_999_999
   ALLOWED = { "locale" => User::SUPPORTED_LOCALES, "appearance" => User::APPEARANCES }.freeze
 
   def self.sanitize(values)
@@ -53,11 +56,11 @@ class UiPreferences
     value.match?(APPEARANCE_REVISION_FORMAT) ? Integer(value, 10) : 0
   end
 
-  def record_appearance_revision(revision)
-    revision = revision.to_s
-    raise ArgumentError, "invalid appearance revision" unless revision.match?(APPEARANCE_REVISION_FORMAT)
-
-    write(APPEARANCE_REVISION_COOKIE, revision, expires: 1.year.from_now)
+  # Records that this browser saved another appearance choice; returns its number.
+  def advance_appearance_revision
+    revision = [ appearance_revision + 1, MAX_APPEARANCE_REVISION ].min
+    write(APPEARANCE_REVISION_COOKIE, revision.to_s, expires: 1.year.from_now)
+    revision
   end
 
   def pending_overrides
