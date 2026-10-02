@@ -302,7 +302,9 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal 0, draft.lock_version
 
     accept_confirm { click_button "Discard draft" }
+    # The reset page is the same URL; wait until it has replaced this one.
     assert_current_path new_translation_workspace_path
+    assert_field "Project name", with: ""
     assert_equal 0, users(:normal).translation_workspace_drafts.count
   end
 
