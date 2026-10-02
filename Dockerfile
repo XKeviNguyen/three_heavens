@@ -20,11 +20,15 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
+# jemalloc returns freed pages at once: request bodies arriving on many
+# connections (Puma copies every chunk of a chunked body) otherwise keep
+# hundreds of MiB of freed memory resident and can exhaust a small container.
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development:test" \
-    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so" \
+    MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0"
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
