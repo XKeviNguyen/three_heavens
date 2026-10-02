@@ -353,8 +353,12 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     baseline = TranslationWorkspaceSubmission.count
     visit new_translation_workspace_path
     2.times { refresh }
+    # Turbo visits return before the next page renders, and the sidebar is on
+    # both pages, so wait for each destination before using the sidebar.
     click_link "Projects"
+    assert_selector "h1", text: "Projects"
     click_link "New translation"
+    assert_field "Project name"
     within("aside#app-sidebar") { select "日本語", from: "Interface language" }
     assert_selector "html[lang='ja']"
     within("aside#app-sidebar") { select "English", from: "表示言語" }
