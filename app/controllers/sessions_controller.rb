@@ -7,7 +7,14 @@ class SessionsController < ApplicationController
   skip_before_action :require_authentication, only: %i[new create]
   rate_limit to: LOGIN_RATE_LIMIT,
              within: LOGIN_RATE_LIMIT_WINDOW,
+             by: :client_network,
              with: :render_rate_limited,
+             only: :create
+  rate_limit to: LOGIN_RATE_LIMIT,
+             within: LOGIN_RATE_LIMIT_WINDOW,
+             by: -> { SignInThrottle.account_key(cookies, submitted_email) },
+             with: :render_rate_limited,
+             name: "account",
              only: :create
 
   def new
@@ -26,7 +33,7 @@ class SessionsController < ApplicationController
     credentials = session_params
     @email = redisplayable_email(credentials[:email])
 
-    unless credentials_within_size_limits?(credentials)
+    unless acceptable_credentials?(credentials)
       return render_invalid_credentials
     end
 
@@ -80,13 +87,21 @@ class SessionsController < ApplicationController
     submitted.permit(*ALLOWED_SESSION_ATTRIBUTES)
   end
 
-  def credentials_within_size_limits?(credentials)
-    credentials[:email].to_s.length <= User::MAXIMUM_EMAIL_LENGTH &&
+  def submitted_email
+    submitted = params[:session]
+    submitted[:email] if submitted.is_a?(ActionController::Parameters)
+  end
+
+  # No stored email or password contains a NUL byte, and the database driver
+  # refuses to send one.
+  def acceptable_credentials?(credentials)
+    credentials.values_at(:email, :password).none? { |value| value.to_s.include?("\0") } &&
+      credentials[:email].to_s.length <= User::MAXIMUM_EMAIL_LENGTH &&
       credentials[:password].to_s.length <= User::MAXIMUM_PASSWORD_LENGTH
   end
 
   def redisplayable_email(email)
-    email if email && email.length <= User::MAXIMUM_EMAIL_LENGTH
+    email if email && email.length <= User::MAXIMUM_EMAIL_LENGTH && !email.include?("\0")
   end
 
   def render_invalid_credentials(status: :unprocessable_content)

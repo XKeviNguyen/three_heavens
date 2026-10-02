@@ -2,7 +2,7 @@ class RegistrationsController < ApplicationController
   layout "public"
   ALLOWED_ATTRIBUTES = %w[email password password_confirmation].freeze
   skip_before_action :require_authentication
-  rate_limit to: 5, within: 1.hour, only: :create, with: :render_rate_limited
+  rate_limit to: 5, within: 1.hour, by: :client_network, only: :create, with: :render_rate_limited
 
   def new
     @user = User.new

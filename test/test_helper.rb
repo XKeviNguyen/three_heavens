@@ -36,6 +36,12 @@ module AuthenticationTestHelper
     delete session_path
   end
 
+  # The account the integration session's cookie authenticates as, via its
+  # server-side session row.
+  def signed_in_user_id
+    Session.find_by(id: session[:authentication_session_id])&.user_id
+  end
+
   def issue_translation_workspace_token(user: users(:normal), at: Time.current)
     TranslationWorkspaceSubmission.issue_token(user: user, at: at)
   end
@@ -63,3 +69,6 @@ module AuthenticationTestHelper
 end
 
 ActionDispatch::IntegrationTest.include(AuthenticationTestHelper)
+# Each example starts with independent login throttle windows; the per-account
+# budget would otherwise carry over between examples signing in as a fixture.
+ActionDispatch::IntegrationTest.setup { ActionController::Base.cache_store.clear }

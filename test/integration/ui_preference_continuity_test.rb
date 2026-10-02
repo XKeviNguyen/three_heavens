@@ -237,6 +237,9 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Sign-out ends the server session, so a change the server runs after it is
+  # a guest's: the browser keeps it, as a signed-out choice that the next
+  # sign-in on this browser adopts, but it no longer writes to the account.
   test "signing out while an appearance change is still being saved keeps that change, in any order" do
     each_overlap(:appearance, :sign_out) do |order, arrival|
       reset!
@@ -248,7 +251,7 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
       }
       deliver_overlapping(*changes.values_at(*order), arrival:)
 
-      assert_account(@account, "ja", "dark")
+      assert_account(@account, "ja", order.first == :appearance ? "dark" : "light")
       assert_rendered("ja", "dark", login_path)
       assert_select ".appearance-menu[data-appearance-revision-value='1']"
     end
@@ -303,8 +306,10 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
   def google_sign_in(subject:, email: @account.email)
     ceremony = mint_ceremony("sign_in")
     with_google_verifier(FakeVerifier.new(claims: google_claims(subject: subject, email: email, nonce: ceremony))) do
-      post_cross_site_callback
+      post_cross_site_callback(keep_browser_cookies: true)
     end
+    assert_redirected_to google_identity_completion_path
+    follow_redirect!
     follow_redirect!
   end
 

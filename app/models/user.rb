@@ -29,6 +29,7 @@ class User < ApplicationRecord
   has_many :translation_workspace_submissions, dependent: :restrict_with_error
   has_many :translation_workspace_drafts, dependent: :delete_all
   has_many :federated_identities, dependent: :delete_all
+  has_many :sessions, dependent: :delete_all
 
   enum :role, { user: "user", admin: "admin" }, validate: true
   enum :status, { active: "active", disabled: "disabled" }, validate: true
@@ -48,6 +49,10 @@ class User < ApplicationRecord
   validate :sign_in_method_present
   validates :locale, inclusion: { in: SUPPORTED_LOCALES }
   validates :appearance, inclusion: { in: APPEARANCES }
+
+  # A disabled account's sessions end, so re-enabling it later does not bring
+  # back cookies issued before it was disabled.
+  after_save -> { sessions.delete_all }, if: -> { saved_change_to_status? && disabled? }
 
   def email_verified?
     email_verified_at.present?

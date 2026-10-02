@@ -1,5 +1,6 @@
 require_relative "boot"
 require_relative "../app/middleware/request_body_limit"
+require_relative "../app/middleware/client_ip_header_filter"
 
 require "rails/all"
 
@@ -22,6 +23,7 @@ module ThreeHeavens
     # parameter parsing still returns 413 instead of a generic error response.
     config.middleware.insert_before 0, RequestBodyLimit
     config.middleware.insert_after ActionDispatch::ShowExceptions, RequestBodyLimit
+    config.middleware.insert_before ActionDispatch::RemoteIp, ClientIpHeaderFilter
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

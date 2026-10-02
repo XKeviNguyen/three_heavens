@@ -19,6 +19,17 @@ class ApplicationController < ActionController::Base
 
   private
 
+  # The rate-limit key for the client. request.remote_ip is the nearest address
+  # the trusted proxies appended to X-Forwarded-For, which a client cannot
+  # choose behind kamal-proxy and Thruster. An IPv6 client usually controls a
+  # whole /64, so IPv6 addresses share their /64's budget.
+  def client_network
+    address = IPAddr.new(request.remote_ip.to_s).native
+    address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
+  rescue IPAddr::Error
+    request.remote_ip.to_s
+  end
+
   def with_locale(&action)
     I18n.with_locale(current_user&.locale || preferred_public_locale, &action)
   end
@@ -104,7 +115,8 @@ class ApplicationController < ActionController::Base
   def current_user
     return @current_user if defined?(@current_user)
 
-    @current_user = User.active.where.not(email_verified_at: nil).find_by(id: session[:user_id])
+    @current_user = User.active.where.not(email_verified_at: nil).joins(:sessions).merge(Session.unexpired)
+                        .find_by(sessions: { id: session[:authentication_session_id] })
   end
 
   def authenticated?
@@ -114,7 +126,9 @@ class ApplicationController < ActionController::Base
   def require_authentication
     return if authenticated?
 
-    reset_session if session[:user_id].present?
+    # session[:user_id] is a pre-v1.1 cookie; clearing it keeps a rollback
+    # from authenticating it again.
+    reset_session if session[:authentication_session_id].present? || session[:user_id].present?
     session[:return_to_after_authenticating] = request.fullpath if request.get? && request.format.html?
     redirect_to login_path, alert: I18n.t("authentication.sign_in_required")
   end
@@ -153,20 +167,31 @@ class ApplicationController < ActionController::Base
   end
 
   # Every sign-in (password or Google) reconciles interface preferences here,
-  # before the first signed-in page renders.
+  # before the first signed-in page renders. The browser's previous server
+  # session, if any, ends with its cookie, so a copy of that cookie cannot
+  # authenticate after the new one is issued.
   def start_authenticated_session!(user, preference_overrides: ui_preferences.pending_overrides)
     ui_preferences.apply_at_sign_in(user, preference_overrides)
     destination = session.delete(:return_to_after_authenticating)
+    delete_server_session
     reset_session
-    session[:user_id] = user.id
+    session[:authentication_session_id] = user.sessions.create!.id
+    SignInThrottle.remember_device(cookies, user)
     destination
   end
 
   # The display cookies already hold the account's preferences (written at
   # sign-in and on every change), so signing out keeps the same look without
   # rewriting them from a user that a still-saving change may have outdated.
+  # Only this browser's server session ends; other devices stay signed in.
   def end_authenticated_session!
+    delete_server_session
     reset_session
     GoogleIdentity::PendingLink.clear(cookies)
+  end
+
+  def delete_server_session
+    session_id = session[:authentication_session_id]
+    Session.where(id: session_id).delete_all if session_id
   end
 end

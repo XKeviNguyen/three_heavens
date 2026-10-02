@@ -34,6 +34,10 @@ production:
     class: TranslationWorkspaceDraftCleanupJob
     queue: operations
     schedule: every hour at minute 47
+  cleanup_expired_sessions:
+    class: SessionCleanupJob
+    queue: operations
+    schedule: every hour at minute 57
   cleanup_unattached_active_storage_blobs:
     class: ActiveStorageCleanupJob
     queue: operations

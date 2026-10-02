@@ -56,7 +56,7 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
     assert_redirected_to settings_account_path
     follow_redirect!
     assert_response :success
-    assert_equal @owner.id, session[:user_id]
+    assert_equal @owner.id, signed_in_user_id
     assert_select "[role='status']", text: /owner@gmail\.com/
 
     post settings_account_google_identity_path
@@ -70,7 +70,7 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
     post settings_account_google_identity_path
     follow_redirect!
 
-    assert_equal @owner.id, session[:user_id]
+    assert_equal @owner.id, signed_in_user_id
     assert_select "[role='alert']", text: "This Google account is already connected to another account."
     assert_not @owner.federated_identities.exists?
   end
@@ -80,7 +80,7 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
     with_google_verifier(FakeVerifier.new(error: :signature)) { post_cross_site_callback }
     assert_redirected_to login_path
     follow_redirect!
-    assert_nil session[:user_id]
+    assert_nil signed_in_user_id
     assert_select "[role='alert']", text: "Google sign-in could not be completed. Please try again."
   end
 
@@ -184,7 +184,7 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
     follow_redirect! while response.redirect?
     assert_equal settings_account_path, path, label
     assert_response :success, label
-    assert_equal @owner.id, session[:user_id], label
+    assert_equal @owner.id, signed_in_user_id, label
     assert_select "[role='alert']", { text: "Google could not be connected. Please try again." }, label
     assert_no_match(/eyJsecret/, response.body, label)
   end

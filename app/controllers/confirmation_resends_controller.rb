@@ -1,7 +1,7 @@
 class ConfirmationResendsController < ApplicationController
   layout "public"
   skip_before_action :require_authentication
-  rate_limit to: 3, within: 1.hour, only: :create, with: :render_rate_limited
+  rate_limit to: 3, within: 1.hour, by: :client_network, only: :create, with: :render_rate_limited
 
   def new
   end
