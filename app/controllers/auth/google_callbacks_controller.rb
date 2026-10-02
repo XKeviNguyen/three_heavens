@@ -4,9 +4,9 @@ module Auth
   # SameSite=Lax session cookie arrives here; Google's g_csrf_token
   # double-submit check replaces the authenticity token for this action only,
   # and the signed ceremony in the ID-token nonce replaces session context.
-  # For the same reason this action never writes a session cookie unless it
-  # completes a sign-in: a new cookie would replace, and so sign out, the
-  # browser's existing session (e.g. a signed-in user linking Google).
+  # For the same reason this action never writes a session cookie: it could
+  # not end the session that cookie replaces. A verified sign-in is handed to
+  # GoogleCompletionsController, which runs with the session cookie.
   class GoogleCallbacksController < ApplicationController
     CSRF_TOKEN_NAME = "g_csrf_token".freeze
     MAXIMUM_CSRF_TOKEN_LENGTH = 256
@@ -26,7 +26,7 @@ module Auth
     prepend_before_action { request.session_options[:skip] = true }
     skip_before_action :require_authentication
     skip_forgery_protection only: :create
-    rate_limit to: RATE_LIMIT, within: RATE_LIMIT_WINDOW, only: :create, with: -> { reject(:rate_limited) }
+    rate_limit to: RATE_LIMIT, within: RATE_LIMIT_WINDOW, by: :client_network, only: :create, with: -> { reject(:rate_limited) }
     before_action :reject_unexpected_request, :verify_google_csrf_token
 
     def create
@@ -48,14 +48,10 @@ module Auth
       result = GoogleIdentity::SignIn.call(claims: claims, ceremony: ceremony)
       return reject(result.status) unless result.signed_in?
 
-      request.session_options[:skip] = false
       # The callback cannot read preference cookies (cross-site); the ceremony
       # carries the explicit signed-out choices captured when it was minted.
-      start_authenticated_session!(result.user, preference_overrides: ceremony.preference_overrides)
-      I18n.with_locale(result.user.locale) do
-        redirect_to ceremony.return_path || new_translation_workspace_path,
-                    notice: t("authentication.signed_in"), status: :see_other
-      end
+      GoogleIdentity::PendingSignIn.store(cookies, user: result.user, ceremony: ceremony)
+      redirect_to google_identity_completion_path, status: :see_other
     end
 
     # Linking finishes on the account page, where the session proves which

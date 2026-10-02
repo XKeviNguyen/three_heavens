@@ -78,6 +78,16 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert_equal "3600", response.headers["Retry-After"]
   end
 
+  test "registration rate limit counts a whole IPv6 /64 as one client" do
+    attributes = { user: { email: "invalid", password: "short", password_confirmation: "short" } }
+    5.times do |attempt|
+      post registration_path, params: attributes, headers: { "REMOTE_ADDR" => "2001:db8:5:5::#{attempt + 1}" }
+      assert_response :unprocessable_content
+    end
+    post registration_path, params: attributes, headers: { "REMOTE_ADDR" => "2001:db8:5:5:ffff::1" }
+    assert_response :too_many_requests
+  end
+
   test "confirmation token expires and resend invalidates the earlier link" do
     user = User.create!(email: "resend@example.test", password: "a long secure password",
                         confirmation_sent_at: 4.minutes.ago)

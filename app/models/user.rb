@@ -50,6 +50,10 @@ class User < ApplicationRecord
   validates :locale, inclusion: { in: SUPPORTED_LOCALES }
   validates :appearance, inclusion: { in: APPEARANCES }
 
+  # A disabled account's sessions end, so re-enabling it later does not bring
+  # back cookies issued before it was disabled.
+  after_save -> { sessions.delete_all }, if: -> { saved_change_to_status? && disabled? }
+
   def email_verified?
     email_verified_at.present?
   end

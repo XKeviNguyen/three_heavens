@@ -9,6 +9,7 @@ Rails.application.routes.draw do
   # Sign in with Google (GIS redirect mode) posts the credential here.
   post "auth/google/callback", to: "auth/google_callbacks#create", as: :google_identity_callback
   post "auth/google/ceremony", to: "auth/google_ceremonies#create", as: :google_identity_ceremony
+  get "auth/google/complete", to: "auth/google_completions#show", as: :google_identity_completion
   namespace :settings do
     resource :account, only: :show do
       resource :google_identity, only: %i[create destroy] do

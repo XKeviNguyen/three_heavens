@@ -37,6 +37,17 @@ class RequestBodyLimitTest < ActiveSupport::TestCase
     assert_equal 204, middleware.call({}).first
   end
 
+  test "public form paths, including sign-in, get the small limit however the router spells them" do
+    middleware = RequestBodyLimit.new(->(_environment) { [ 204, {}, [] ] })
+    oversized = (RequestBodyLimit::PUBLIC_FORM_MAX_BYTES + 1).to_s
+
+    %w[/session /session/ //session /session.html /registration/ //auth//google/callback.html].each do |path|
+      assert_equal 413, middleware.call("PATH_INFO" => path, "CONTENT_LENGTH" => oversized).first, path
+    end
+    assert_equal 204, middleware.call("PATH_INFO" => "/session", "CONTENT_LENGTH" => RequestBodyLimit::PUBLIC_FORM_MAX_BYTES.to_s).first
+    assert_equal 204, middleware.call("PATH_INFO" => "/source_imports", "CONTENT_LENGTH" => oversized).first
+  end
+
   test "wraps reads above and below the exception renderer" do
     stack = Rails.application.middleware.map(&:klass)
     positions = stack.each_index.select { |index| stack[index] == RequestBodyLimit }

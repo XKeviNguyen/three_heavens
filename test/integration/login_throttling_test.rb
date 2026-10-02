@@ -69,13 +69,13 @@ class LoginThrottlingTest < ActionDispatch::IntegrationTest
     SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
       post session_path,
            params: { session: { email: spellings[attempt % spellings.size], password: "incorrect password value" } },
-           headers: { "REMOTE_ADDR" => "2001:db8::#{attempt + 1}" }
+           headers: { "REMOTE_ADDR" => "2001:db8:#{attempt + 1}::1" }
       assert_response :unprocessable_content
     end
 
     post session_path,
          params: { session: { email: "uSeR@example.test", password: "correct horse battery staple" } },
-         headers: { "REMOTE_ADDR" => "2001:db8::ff" }
+         headers: { "REMOTE_ADDR" => "2001:db8:ff::1" }
     assert_response :too_many_requests
     assert_nil signed_in_user_id
   end
@@ -84,28 +84,120 @@ class LoginThrottlingTest < ActionDispatch::IntegrationTest
     SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
       post session_path,
            params: { session: { email: "user@example.test", password: "incorrect password value" } },
-           headers: { "REMOTE_ADDR" => "2001:db8::#{attempt + 1}" }
+           headers: { "REMOTE_ADDR" => "2001:db8:#{attempt + 1}::1" }
     end
 
     post session_path,
          params: { session: { email: "other@example.test", password: "other secure password value" } },
-         headers: { "REMOTE_ADDR" => "2001:db8::ff" }
+         headers: { "REMOTE_ADDR" => "2001:db8:ff::1" }
 
     assert_redirected_to new_translation_workspace_path
     assert_equal users(:other).id, signed_in_user_id
   end
 
-  test "a Client-Ip header that disagrees with the proxies is refused before any password check" do
-    assert_no_difference "Session.count" do
-      assert_raises(ActionDispatch::RemoteIp::IpSpoofAttackError) do
-        post session_path,
-             params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
-             headers: {
-               "REMOTE_ADDR" => THRUSTER_ADDRESS,
-               "X-Forwarded-For" => "198.51.100.11, #{KAMAL_PROXY_ADDRESS}",
-               "Client-Ip" => "203.0.113.50"
-             }
-      end
+  test "a Client-Ip header neither chooses the client address nor fails the request" do
+    post session_path,
+         params: { session: { email: "user@example.test", password: "incorrect password value" } },
+         headers: {
+           "REMOTE_ADDR" => THRUSTER_ADDRESS,
+           "X-Forwarded-For" => "198.51.100.11, #{KAMAL_PROXY_ADDRESS}",
+           "Client-Ip" => "203.0.113.50"
+         }
+    assert_response :unprocessable_content
+    assert_equal "198.51.100.11", request.remote_ip
+
+    post session_path,
+         params: { session: { email: "user@example.test", password: "incorrect password value" } },
+         headers: { "REMOTE_ADDR" => THRUSTER_ADDRESS, "Client-Ip" => "203.0.113.51" }
+    assert_response :unprocessable_content
+    assert_equal THRUSTER_ADDRESS, request.remote_ip
+  end
+
+  test "IPv6 clients share their /64's budget" do
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      attempt_login "unknown-#{attempt}@example.test", from: "2001:db8:abcd:1::#{attempt + 1}"
+      assert_response :unprocessable_content
+    end
+
+    attempt_login "unknown-final@example.test", from: "2001:db8:abcd:1:ffff::1"
+    assert_response :too_many_requests
+
+    attempt_login "unknown-other@example.test", from: "2001:db8:abcd:2::1"
+    assert_response :unprocessable_content
+  end
+
+  test "IPv4-mapped IPv6 clients keep their own IPv4 budget" do
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      attempt_login "unknown-#{attempt}@example.test", from: "::ffff:198.51.100.20"
+    end
+    attempt_login "unknown-final@example.test", from: "198.51.100.20"
+    assert_response :too_many_requests
+
+    attempt_login "unknown-other@example.test", from: "::ffff:198.51.100.21"
+    assert_response :unprocessable_content
+  end
+
+  test "failed attempts from elsewhere do not lock the owner out of a browser that signed in before" do
+    owner = open_session
+    owner.post session_path,
+               params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
+               headers: { "REMOTE_ADDR" => "198.51.100.30" }
+    owner.assert_redirected_to new_translation_workspace_path
+    owner.delete session_path
+
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      post session_path,
+           params: { session: { email: "user@example.test", password: "incorrect password value" } },
+           headers: { "REMOTE_ADDR" => "203.0.113.#{attempt + 1}" }
+    end
+    post session_path,
+         params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
+         headers: { "REMOTE_ADDR" => "203.0.113.99" }
+    assert_response :too_many_requests
+
+    owner.post session_path,
+               params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
+               headers: { "REMOTE_ADDR" => "198.51.100.30" }
+    owner.assert_redirected_to new_translation_workspace_path
+  end
+
+  test "a device cookie for one account gives no separate budget for another" do
+    sign_in_as users(:other)
+    sign_out
+
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      post session_path,
+           params: { session: { email: "user@example.test", password: "incorrect password value" } },
+           headers: { "REMOTE_ADDR" => "203.0.113.#{attempt + 1}" }
+    end
+    post session_path,
+         params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
+         headers: { "REMOTE_ADDR" => "203.0.113.99" }
+
+    assert_response :too_many_requests
+    assert_nil signed_in_user_id
+  end
+
+  test "an unparseable client address is still throttled rather than failing" do
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      post session_path,
+           params: { session: { email: "unknown-#{attempt}@example.test", password: "incorrect password value" } },
+           headers: { "REMOTE_ADDR" => "garbage" }
+      assert_response :unprocessable_content
+    end
+    post session_path,
+         params: { session: { email: "unknown-final@example.test", password: "incorrect password value" } },
+         headers: { "REMOTE_ADDR" => "garbage" }
+    assert_response :too_many_requests
+  end
+
+  test "over-long and NUL-containing emails are refused as invalid credentials" do
+    [ "user\u0000@example.test", "#{"a" * 250}@example.test" ].each_with_index do |email, attempt|
+      post session_path,
+           params: { session: { email: email, password: "correct horse battery staple" } },
+           headers: { "REMOTE_ADDR" => "198.51.100.#{40 + attempt}" }
+      assert_response :unprocessable_content
+      assert_nil signed_in_user_id
     end
   end
 

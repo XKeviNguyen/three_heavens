@@ -19,6 +19,17 @@ class ApplicationController < ActionController::Base
 
   private
 
+  # The rate-limit key for the client. request.remote_ip is the nearest address
+  # the trusted proxies appended to X-Forwarded-For, which a client cannot
+  # choose behind kamal-proxy and Thruster. An IPv6 client usually controls a
+  # whole /64, so IPv6 addresses share their /64's budget.
+  def client_network
+    address = IPAddr.new(request.remote_ip.to_s).native
+    address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
+  rescue IPAddr::Error
+    request.remote_ip.to_s
+  end
+
   def with_locale(&action)
     I18n.with_locale(current_user&.locale || preferred_public_locale, &action)
   end
@@ -104,8 +115,8 @@ class ApplicationController < ActionController::Base
   def current_user
     return @current_user if defined?(@current_user)
 
-    @current_user = User.active.where.not(email_verified_at: nil)
-                        .joins(:sessions).find_by(sessions: { id: session[:authentication_session_id] })
+    @current_user = User.active.where.not(email_verified_at: nil).joins(:sessions).merge(Session.unexpired)
+                        .find_by(sessions: { id: session[:authentication_session_id] })
   end
 
   def authenticated?
@@ -115,7 +126,9 @@ class ApplicationController < ActionController::Base
   def require_authentication
     return if authenticated?
 
-    reset_session if session[:authentication_session_id].present?
+    # session[:user_id] is a pre-v1.1 cookie; clearing it keeps a rollback
+    # from authenticating it again.
+    reset_session if session[:authentication_session_id].present? || session[:user_id].present?
     session[:return_to_after_authenticating] = request.fullpath if request.get? && request.format.html?
     redirect_to login_path, alert: I18n.t("authentication.sign_in_required")
   end
@@ -163,6 +176,7 @@ class ApplicationController < ActionController::Base
     delete_server_session
     reset_session
     session[:authentication_session_id] = user.sessions.create!.id
+    SignInThrottle.remember_device(cookies, user)
     destination
   end
 

@@ -6,6 +6,7 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   CSRF = "csrf-token-from-google".freeze
+  SESSION_COOKIE = "_three_heavens_session".freeze
 
   test "the callback accepts only POST" do
     get "/auth/google/callback"
@@ -285,9 +286,16 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     else
       cookies.delete(:g_csrf_token)
     end
+    # Google posts cross-site, so the browser withholds its SameSite=Lax
+    # session cookie; a verified sign-in then completes on a same-site GET.
+    held_session = cookies[SESSION_COOKIE]
+    cookies.delete(SESSION_COOKIE)
     post google_identity_callback_path,
          params: { credential: credential, g_csrf_token: csrf_param, select_by: "btn" }.compact.merge(extra),
          headers: login_rate_limit_headers
+    assert_nil response.headers["Set-Cookie"].to_s[/#{SESSION_COOKIE}=/], "the callback never writes a session"
+    cookies[SESSION_COOKIE] = held_session if held_session
+    follow_redirect! if response.redirect? && URI(response.location).path == google_identity_completion_path
   end
 
   def assert_rejected(message = "Google sign-in could not be completed. Please try again.")

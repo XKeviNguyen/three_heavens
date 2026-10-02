@@ -6,7 +6,7 @@ class RequestBodyLimit
   MULTIPART_OVERHEAD_BYTES = 1 * 1024 * 1024
   MAX_BYTES = (MAX_FILES_PER_REQUEST * MAX_FILE_UPLOAD_BYTES) + MULTIPART_OVERHEAD_BYTES
   PUBLIC_FORM_MAX_BYTES = 8 * 1024
-  PUBLIC_FORM_PATHS = %w[/registration /confirmation_resend /email_confirmation /locale /appearance /auth/google/callback /auth/google/ceremony].freeze
+  PUBLIC_FORM_PATHS = %w[/session /registration /confirmation_resend /email_confirmation /locale /appearance /auth/google/callback /auth/google/ceremony].freeze
 
   # Rails parses a JSON body into parameters for every action before any
   # callback runs (the request log records them), so JSON is bounded here for
@@ -155,10 +155,16 @@ class RequestBodyLimit
   attr_reader :app
 
   def limit_for(environment)
-    path = environment["PATH_INFO"]
+    path = routed_path(environment["PATH_INFO"])
     return JSON_PATH_MAX_BYTES.fetch(path, JSON_MAX_BYTES) if parsed_as_parameters?(environment)
 
     PUBLIC_FORM_PATHS.include?(path) ? PUBLIC_FORM_MAX_BYTES : MAX_BYTES
+  end
+
+  # The path the router matches: it squeezes repeated slashes and ignores a
+  # trailing slash, and every route accepts an optional ".format" suffix.
+  def routed_path(path)
+    path.to_s.squeeze("/").sub(%r{(?<=.)/\z}, "").sub(%r{\.[^./]*\z}, "")
   end
 
   # True for exactly the content types Rails hands to a registered parameter

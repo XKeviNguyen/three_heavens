@@ -4906,6 +4906,13 @@ CREATE INDEX index_review_segment_runs_on_running_last_claimed_at ON public.revi
 
 
 --
+-- Name: index_sessions_on_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_sessions_on_created_at ON public.sessions USING btree (created_at);
+
+
+--
 -- Name: index_sessions_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -10,7 +10,7 @@ module Auth
     # or a late response could overwrite a sign-in completed meanwhile.
     before_action { request.session_options[:skip] = true }
     skip_before_action :require_authentication
-    rate_limit to: RATE_LIMIT, within: RATE_LIMIT_WINDOW, with: -> { head :too_many_requests }
+    rate_limit to: RATE_LIMIT, within: RATE_LIMIT_WINDOW, by: :client_network, with: -> { head :too_many_requests }
 
     def create
       intent = params[:intent].to_s
