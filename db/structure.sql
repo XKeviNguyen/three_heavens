@@ -2885,6 +2885,37 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sessions (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sessions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sessions_id_seq OWNED BY public.sessions.id;
+
+
+--
 -- Name: source_imports; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3631,6 +3662,13 @@ ALTER TABLE ONLY public.review_segment_runs ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
+-- Name: sessions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions ALTER COLUMN id SET DEFAULT nextval('public.sessions_id_seq'::regclass);
+
+
+--
 -- Name: source_imports id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3985,6 +4023,14 @@ ALTER TABLE ONLY public.review_segment_runs
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
 
 
 --
@@ -4857,6 +4903,13 @@ CREATE INDEX index_review_segment_runs_on_recent_failures ON public.review_segme
 --
 
 CREATE INDEX index_review_segment_runs_on_running_last_claimed_at ON public.review_segment_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_sessions_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_sessions_on_user_id ON public.sessions USING btree (user_id);
 
 
 --
@@ -5976,6 +6029,14 @@ ALTER TABLE ONLY public.translation_workspace_drafts
 
 
 --
+-- Name: sessions fk_rails_758836b4f0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT fk_rails_758836b4f0 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: experiments fk_rails_78c1da6c54; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6262,6 +6323,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261002090000'),
 ('20260930090000'),
 ('20260929120200'),
 ('20260929120100'),

@@ -29,6 +29,7 @@ class User < ApplicationRecord
   has_many :translation_workspace_submissions, dependent: :restrict_with_error
   has_many :translation_workspace_drafts, dependent: :delete_all
   has_many :federated_identities, dependent: :delete_all
+  has_many :sessions, dependent: :delete_all
 
   enum :role, { user: "user", admin: "admin" }, validate: true
   enum :status, { active: "active", disabled: "disabled" }, validate: true

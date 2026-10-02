@@ -33,16 +33,16 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   end
 
   test "login attempts are rate limited by remote IP" do
-    SessionsController::LOGIN_RATE_LIMIT.times do
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
       submit_login session: {
-        email: "unknown@example.test",
+        email: "unknown-#{attempt}@example.test",
         password: "incorrect password value"
       }
       assert_response :unprocessable_content
     end
 
     submit_login session: {
-      email: "unknown@example.test",
+      email: "another-unknown@example.test",
       password: "incorrect password value"
     }
 

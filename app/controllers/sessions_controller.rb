@@ -5,9 +5,21 @@ class SessionsController < ApplicationController
   LOGIN_RATE_LIMIT_WINDOW = 3.minutes
 
   skip_before_action :require_authentication, only: %i[new create]
+  # request.remote_ip is the nearest address the trusted proxies appended to
+  # X-Forwarded-For, which a client cannot choose behind kamal-proxy and
+  # Thruster. The account limit holds even where that does not: rotating
+  # forwarding headers or client addresses cannot buy more guesses against one
+  # account, at the cost that a flood can briefly block password sign-in for
+  # that email (Google sign-in is unaffected).
   rate_limit to: LOGIN_RATE_LIMIT,
              within: LOGIN_RATE_LIMIT_WINDOW,
              with: :render_rate_limited,
+             only: :create
+  rate_limit to: LOGIN_RATE_LIMIT,
+             within: LOGIN_RATE_LIMIT_WINDOW,
+             by: :submitted_account_rate_limit_key,
+             with: :render_rate_limited,
+             name: "account",
              only: :create
 
   def new
@@ -78,6 +90,15 @@ class SessionsController < ApplicationController
     end
 
     submitted.permit(*ALLOWED_SESSION_ATTRIBUTES)
+  end
+
+  # Digested so the shared cache never stores email addresses; malformed
+  # submissions share the blank-email budget.
+  def submitted_account_rate_limit_key
+    submitted = params[:session]
+    email = submitted[:email] if submitted.is_a?(ActionController::Parameters)
+    email = "" unless email.is_a?(String)
+    Digest::SHA256.hexdigest(User.normalize_value_for(:email, email))
   end
 
   def credentials_within_size_limits?(credentials)

@@ -237,6 +237,8 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Sign-out ends the server session, so a change the server runs after it is
+  # a guest's: the browser keeps it, but it no longer writes to the account.
   test "signing out while an appearance change is still being saved keeps that change, in any order" do
     each_overlap(:appearance, :sign_out) do |order, arrival|
       reset!
@@ -248,7 +250,7 @@ class UiPreferenceContinuityTest < ActionDispatch::IntegrationTest
       }
       deliver_overlapping(*changes.values_at(*order), arrival:)
 
-      assert_account(@account, "ja", "dark")
+      assert_account(@account, "ja", order.first == :appearance ? "dark" : "light")
       assert_rendered("ja", "dark", login_path)
       assert_select ".appearance-menu[data-appearance-revision-value='1']"
     end

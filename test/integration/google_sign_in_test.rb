@@ -59,7 +59,7 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     assert_equal "Đăng nhập thành công.", flash[:notice]
     user = User.find_by!(email: "google.person@gmail.com")
     assert_equal [ "user", "active", false, "vi" ], [ user.role, user.status, user.managed_ai_access, user.locale ]
-    assert_equal user.id, session[:user_id]
+    assert_equal user.id, signed_in_user_id
     assert_nil session[:return_to_after_authenticating]
     assert_not_equal session_before, cookies["_three_heavens_session"]
 
@@ -86,7 +86,19 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     with_google_verifier(FakeVerifier.new(claims: claims_for(sign_in_ceremony))) do
       assert_no_difference([ "User.count", "FederatedIdentity.count" ]) { post_callback }
     end
-    assert_equal User.find_by!(email: "google.person@gmail.com").id, session[:user_id]
+    assert_equal User.find_by!(email: "google.person@gmail.com").id, signed_in_user_id
+  end
+
+  test "a Google session cookie copied before sign-out stops authenticating after sign-out" do
+    with_google_verifier(FakeVerifier.new(claims: claims_for(sign_in_ceremony))) { post_callback }
+    copied_cookie = cookies["_three_heavens_session"]
+    delete session_path
+
+    replay = open_session
+    replay.cookies["_three_heavens_session"] = copied_cookie
+    replay.get history_path
+    replay.assert_redirected_to login_path
+    assert_not User.find_by!(email: "google.person@gmail.com").sessions.exists?
   end
 
   test "the ceremony return path is honoured and scoped to this site" do
@@ -248,7 +260,7 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='google-sign-in']", count: 0
     assert_select "form[action='#{registration_path}'] input[type='password']", 2
     sign_in_as users(:normal)
-    assert_equal users(:normal).id, session[:user_id]
+    assert_equal users(:normal).id, signed_in_user_id
   ensure
     Rails.configuration.x.google_identity.client_id = original
   end
@@ -281,7 +293,7 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
   def assert_rejected(message = "Google sign-in could not be completed. Please try again.")
     assert_redirected_to login_path
     assert_response :see_other
-    assert_nil session[:user_id]
+    assert_nil signed_in_user_id
     follow_redirect!
     assert_select "[role='alert']", text: message
   end
