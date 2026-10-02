@@ -47,7 +47,8 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     raw[:secrets_path] = secrets.path
     config = Kamal::Configuration.new(raw, version: "contract")
     role = config.role(:web)
-    puts JSON.generate(secret_names: raw.fetch(:env).fetch("secret"), env: role.env(config.primary_host).to_h)
+    puts JSON.generate(secret_names: raw.fetch(:env).fetch("secret"), env: role.env(config.primary_host).to_h,
+                       docker_options: role.option_args)
   RUBY
 
   BOOT_SCRIPT = <<~'RUBY'
@@ -100,6 +101,19 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
                                        chdir: Rails.root.to_s, unsetenv_others: true)
     assert_not status.success?, "Kamal rendered deploy.yml without GOOGLE_CLIENT_ID"
     assert_match(/GOOGLE_CLIENT_ID/, stderr)
+  end
+
+  # Many simultaneous request bodies (for example chunked uploads) otherwise
+  # grow kernel socket buffers and freed allocator memory past a small
+  # container's memory; see config/deploy.yml and the Dockerfile.
+  test "the web container caps socket buffers and returns freed memory promptly" do
+    options = render_deploy_configuration.fetch("docker_options")
+    sysctls = options.each_slice(2).filter_map { |flag, value| value.delete('"') if flag == "--sysctl" }
+
+    assert_equal [ "net.ipv4.tcp_rmem=4096 65536 262144", "net.ipv4.tcp_wmem=4096 65536 262144" ], sysctls.sort
+    dockerfile = Rails.root.join("Dockerfile").read
+    assert_match(%r{LD_PRELOAD="/usr/local/lib/libjemalloc\.so"}, dockerfile)
+    assert_match(/MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0"/, dockerfile)
   end
 
   test "deploy.yml keeps credential-bearing mail settings out of clear environment" do
