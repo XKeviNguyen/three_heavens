@@ -70,8 +70,18 @@ module TranslationWorkspaceDrafts
       return Result.new(draft:, conflict: true) unless draft.writable_by?(editor_id:, public_id: draft_id, version:)
       return saved(draft) if editor_id && draft.editor_id == editor_id && sequence <= draft.editor_sequence
 
+      saved(replace(draft))
+    end
+
+    # A draft that no longer decrypts cannot be compared with its new value.
+    # The page said it could not be restored and that the next change saved
+    # replaces it, so this save does exactly that.
+    def replace(draft)
       draft.update!(written_attributes)
-      saved(draft)
+      draft
+    rescue ActiveRecord::Encryption::Errors::Decryption
+      draft.delete
+      user.translation_workspace_drafts.create!(context_key:, **written_attributes)
     end
 
     def written_attributes

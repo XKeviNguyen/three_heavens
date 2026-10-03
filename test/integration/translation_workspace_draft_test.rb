@@ -133,6 +133,44 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     assert_equal "Replacement", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
+  test "a draft that no longer decrypts is kept but not restored, and is replaced only by the next saved change" do
+    other_key = ActiveRecord::Encryption::DerivedSecretKeyProvider.new("a secret key base this deployment no longer has")
+    ActiveRecord::Encryption.with_encryption_context(key_provider: other_key) do
+      post translation_workspace_draft_path, params: { workspace: payload("source_text" => "Unreadable draft") }, as: :json
+    end
+    draft = users(:normal).translation_workspace_drafts.sole
+    stored = draft.workspace_payload_before_type_cast
+
+    get new_translation_workspace_path
+    assert_response :success
+    assert_select "p[role='status']", text: /could not be read, so it was not restored/
+    assert_select "textarea[name='translation_workspace[source_text]']", text: ""
+    assert_select "[data-workspace-guard-needs-save-value='false']"
+    assert_select "input[name='translation_workspace_draft_id'][value='#{draft.public_id}']"
+    assert_equal stored, draft.reload.workspace_payload_before_type_cast, "rendering never touches the stored draft"
+
+    post translation_workspace_draft_path, params: {
+      draft_id: draft.public_id, version: draft.lock_version, workspace: payload("source_text" => "New work")
+    }, as: :json
+    assert_response :success
+    assert_equal "New work", users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text")
+
+    get new_translation_workspace_path
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "New work"
+  end
+
+  test "an unreadable draft can be discarded" do
+    ActiveRecord::Encryption.with_encryption_context(key_provider: ActiveRecord::Encryption::DerivedSecretKeyProvider.new("old secret")) do
+      post translation_workspace_draft_path, params: { workspace: payload }, as: :json
+    end
+    draft = users(:normal).translation_workspace_drafts.sole
+    assert_nil draft.readable_payload
+
+    delete translation_workspace_draft_path, params: { draft_id: draft.public_id, version: draft.lock_version }, as: :json
+    assert_response :no_content
+    assert_not users(:normal).translation_workspace_drafts.exists?
+  end
+
   test "invalid source import is detached on restore while reviewed text remains" do
     post translation_workspace_draft_path, params: {
       workspace: payload("source_import_id" => "999999999", "source_text" => "Reviewed private text")
