@@ -252,7 +252,7 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
 
       browser = page.driver.browser
       browser.execute_cdp("Performance.enable")
-      samples = 6.times.map do
+      samples = 8.times.map do
         visit login_path
         visit root_path
         wait_for_landing_motion
@@ -260,9 +260,12 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
         javascript_heap_size(browser)
       end
 
-      assert samples.each_cons(2).any? { |previous, current| current <= previous },
-             "Expected repeated landing visits not to grow monotonically: #{samples.inspect}"
+      # The first visits warm Chrome's caches (about 1.8 MB each, measured).
+      # Once settled, a visit moves the collected heap by allocator noise of
+      # about a kilobyte either way, so net growth, not its sign, shows a leak.
       stabilized = samples.last(4)
+      assert_operator stabilized.last - stabilized.first, :<=, 64.kilobytes,
+                      "Expected repeated landing visits not to keep growing the heap: #{samples.inspect}"
       assert_operator stabilized.max - stabilized.min, :<=, 1.megabyte,
                       "Expected landing heap to stabilize: #{samples.inspect}"
     end
