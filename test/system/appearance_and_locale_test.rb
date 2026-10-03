@@ -279,7 +279,6 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
   test "text meets AA contrast on the main pages in light and dark" do
     user = users(:admin)
     %w[light dark].each do |appearance|
-      page.driver.browser.execute_cdp("Network.clearBrowserCookies")
       visit login_path
       page.execute_script("document.addEventListener('appearance:saved', (event) => { document.documentElement.dataset.testAppearanceSaved = event.detail.appearance })")
       page.execute_script("document.querySelector(`.appearance-option[data-appearance='#{appearance}']`).form.requestSubmit()")
@@ -295,6 +294,10 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
         assert_selector "html[data-appearance='#{appearance}']"
         assert_empty page.evaluate_script(CONTRAST_AUDIT), "#{appearance} #{path}"
       end
+      # Clearing cookies instead would race responses still in flight, which
+      # can restore the session cookie (seen with injected latency).
+      within("aside#app-sidebar") { click_button "Log out" }
+      assert_selector "main form input[type=submit]"
     end
   end
 

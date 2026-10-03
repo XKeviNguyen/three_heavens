@@ -1,19 +1,21 @@
 require "test_helper"
 
 # bin/ci (config/ci.rb) is the local gate and GitHub Actions runs the same
-# checks split across jobs. A check added to one but not the other, as
-# happened with git diff --check, fails here.
+# checks split across jobs. A local check that no CI job runs, as happened
+# with git diff --check, fails here. (CI also has setup steps with no local
+# equivalent, so the reverse is not checked.)
 class CiGateTest < ActiveSupport::TestCase
-  # CI prepares its database from db/structure.sql and fails on a pending
-  # migration, so the migration status listing is only useful locally.
-  LOCAL_ONLY = [ "bin/rails db:migrate:status" ].freeze
+  # CI prepares its database from db/structure.sql and its tests fail on a
+  # pending migration, so these database checks are only useful locally.
+  LOCAL_ONLY = [ "bin/rails db:migrate:status", "bin/rails runner 'ActiveRecord::Migration.check_all_pending!'" ].freeze
 
   test "every local gate check runs in GitHub Actions" do
-    local = Rails.root.join("config/ci.rb").read.scan(/^\s*step "[^"]+", "([^"]+)"/).flatten
+    source = Rails.root.join("config/ci.rb").read
+    local = source.scan(/^\s*step "[^"]+", "([^"]+)"/).flatten
     workflow = YAML.safe_load(Rails.root.join(".github/workflows/ci.yml").read)
     runs = workflow.fetch("jobs").values.flat_map { |job| job.fetch("steps").filter_map { |step| step["run"] } }
 
-    assert_operator local.size, :>=, 9
+    assert_equal source.scan(/^\s*step /).size, local.size, "every step in config/ci.rb is parsed"
     (local - LOCAL_ONLY).each do |command|
       covered = runs.any? do |run|
         if command.start_with?("bin/rails ")

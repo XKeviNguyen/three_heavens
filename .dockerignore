@@ -56,10 +56,10 @@
 /.codex/
 /.vscode/
 /.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+**/*.swp
+**/*.swo
+**/*~
+**/.DS_Store
 
 # Ignore tests, test output, documentation, and host-side scripts; the image
 # runs none of them.

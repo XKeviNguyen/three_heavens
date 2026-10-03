@@ -13,9 +13,13 @@ the same production-like image (Thruster → Puma → Rails, 768 MiB limit), wit
 TLS from a throwaway local CA that the client verified (verification was never
 disabled):
 
-- **kamal-proxy v0.9.2**, deployed with exactly the options Kamal renders from
-  `config/deploy.yml`: `--tls`, `--health-check-path=/up`,
+- **kamal-proxy v0.9.2**, deployed with the options Kamal renders from
+  `config/deploy.yml` that affect requests: `--tls`, `--health-check-path=/up`,
   `--buffer-requests`, `--buffer-responses`, `--max-request-body=22020096`.
+  Kamal also passes 30-second deploy and drain timeouts (kamal-proxy's
+  defaults) and request-header logging, which were left at their defaults,
+  and production obtains its certificate from Let's Encrypt rather than a
+  file.
 - **Traefik v3.5** with a file provider: HTTP→HTTPS redirect, a TLS router for
   the host, the `buffering` middleware with `maxRequestBodyBytes: 22020096`,
   and a `/up` health check on the service. This configuration exists only
@@ -38,7 +42,7 @@ tmp/edge_proxy.json`.
 | Malformed chunk framing | 500 from the proxy ("Error buffering request: invalid byte in chunk length"); never reaches the application | 500 from the proxy |
 | Two 10 MiB files in one multipart request | reaches the application | reaches the application |
 | 150 clients sending headers one byte per second, `/login` probed meanwhile | 10/10 200, slowest 0.033 s | 10/10 200, slowest 0.046 s |
-| Memory idle → peak during 40 simultaneous 30 MiB bodies | about 11.5 MiB idle, at most 14.4 MiB (two runs); 1.2 s CPU for the 40 bodies | about 23 MiB idle, at most 28.4 MiB (two runs); 1.35 s CPU for the 40 bodies |
+| Memory idle → peak during 40 simultaneous 30 MiB bodies | about 11.5 MiB idle, peaks of 11.6 to 20.4 MiB (three runs); 1.2 s CPU for the 40 bodies | about 23 MiB idle, peaks of 27.8 to 54.9 MiB (three runs); 1.35 s CPU for the 40 bodies |
 | Deploy to a second container and roll back, under ~15 requests/s | 0 failed of 144 requests; each switch waited for `/up` and took 0.17 s | 0 failed of 224 requests, but only because the script waited a fixed 3 s after each change before stopping the old container |
 
 Both proxies terminate TLS, route by host, buffer and limit bodies before they

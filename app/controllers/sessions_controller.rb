@@ -47,13 +47,13 @@ class SessionsController < ApplicationController
       return render :new, status: :unprocessable_content
     end
 
-    destination = start_authenticated_session!(user) if user
-    if destination == false || user.nil?
-      render_invalid_credentials
-    else
-      redirect_to destination.presence || new_translation_workspace_path,
-                  notice: I18n.with_locale(user.locale) { t("authentication.signed_in") }
-    end
+    return render_invalid_credentials unless user
+
+    destination = start_authenticated_session!(user)
+    return render_invalid_credentials if destination == false
+
+    redirect_to destination.presence || new_translation_workspace_path,
+                notice: I18n.with_locale(user.locale) { t("authentication.signed_in") }
   rescue ActionController::ParameterMissing, ActionController::BadRequest
     @email = ""
     render_invalid_credentials(status: :bad_request)

@@ -38,9 +38,10 @@ class DatabaseSchemaFormatTest < ActiveSupport::TestCase
     end
 
     assert_operator constraints.size, :>, 100
+    assert_operator indexes.size, :>, 50
     constraints.each do |name, definition|
-      assert_includes structure, "CONSTRAINT #{name} #{definition}"
+      assert structure.include?("CONSTRAINT #{name} #{definition}"), "structure.sql does not spell #{name} as: #{definition}"
     end
-    indexes.each { |definition| assert_includes structure, "#{definition};" }
+    indexes.each { |definition| assert structure.include?("#{definition};"), "structure.sql does not spell the index as: #{definition}" }
   end
 end
