@@ -144,9 +144,12 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
 
   test "a saved Dark preference paints dark with scripts disabled" do
     visit login_path
+    # Dark is shown at once but saved in the background; the next page can
+    # only render it once that save has set the preference cookie.
+    page.execute_script("document.addEventListener('appearance:saved', (event) => { document.documentElement.dataset.testAppearanceSaved = event.detail.appearance })")
     find(".appearance-menu summary").click
     click_button "Dark"
-    assert_selector "html[data-appearance='dark']"
+    assert_selector "html[data-appearance='dark'][data-test-appearance-saved='dark']"
 
     page.driver.browser.execute_cdp("Emulation.setScriptExecutionDisabled", value: true)
     visit new_registration_path
