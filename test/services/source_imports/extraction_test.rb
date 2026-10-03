@@ -245,6 +245,20 @@ module SourceImports
       assert_equal content, TextExtractor.call(format: "docx", bytes:)
     end
 
+    test "DOCX export drops only XML-forbidden characters and keeps every part well-formed" do
+      content = "神は愛です\u0001 Tiếng Việt\f 😀\u000B\tend\uFFFE\r\nnext\rlast\u001F"
+      bytes = DocumentExports::Docx.call(title: "Title\u0001 \u0007😀", content:)
+
+      Zip::File.open_buffer(StringIO.new(bytes)) do |archive|
+        archive.entries.each do |entry|
+          Nokogiri::XML(entry.get_input_stream.read) { |config| config.strict.nonet }
+        end
+        title = Nokogiri::XML(archive.read("docProps/core.xml")).at_xpath("//dc:title", "dc" => DocumentExports::Docx::DUBLIN_CORE)
+        assert_equal "Title 😀", title.text
+      end
+      assert_equal "神は愛です Tiếng Việt 😀\tend\nnext\nlast", TextExtractor.call(format: "docx", bytes:)
+    end
+
     test "extracts deterministic numbering notes headers and footers exactly once" do
       content_types = CONTENT_TYPES_XML.sub(
         "</Types>",
