@@ -67,6 +67,29 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a registration that loses a race for its email gets the duplicate-address answer and sends nothing" do
+    # The other registration commits after this one passed its uniqueness
+    # validation and before its insert, so only the unique index sees it.
+    # (Simulated inside this request's transaction, so it rolls back too.)
+    competitor = lambda do |user|
+      User.insert!({ email: user.email, password_digest: user.password_digest, role: "user", status: "active",
+                     locale: "en", appearance: "system", confirmation_sent_at: Time.current })
+    end
+    User.set_callback(:create, :before, competitor)
+    begin
+      assert_no_enqueued_emails do
+        post registration_path, params: { user: { email: "race@example.test", password: "a long secure password",
+                                                  password_confirmation: "a long secure password" } }
+      end
+    ensure
+      User.skip_callback(:create, :before, competitor)
+    end
+
+    assert_response :unprocessable_content
+    assert_select "#user_email[value=?]", "race@example.test"
+    assert_select "[role='alert']", text: /already been taken/
+  end
+
   test "registration rate limit rejects the sixth request" do
     attributes = { user: { email: "invalid", password: "short", password_confirmation: "short" } }
     5.times do
