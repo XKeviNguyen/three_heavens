@@ -151,6 +151,10 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
               if (focused.width === 0 && focused.height === 0) return false
               const header = document.getElementById("app-header")
               const launch = document.getElementById("workspace-launch")
+              // The bars' own controls and fixed overlays such as the skip link
+              // are drawn above the bars, so they are never hidden by them.
+              const element = document.activeElement
+              if (launch.contains(element) || header?.contains(element) || getComputedStyle(element).position === "fixed") return false
               const top = header && getComputedStyle(header).position === "sticky" && header.offsetParent ? header.getBoundingClientRect().bottom : 0
               const bottom = getComputedStyle(launch).position === "fixed" ? launch.getBoundingClientRect().top : window.innerHeight
               return focused.bottom <= top || focused.top >= bottom
