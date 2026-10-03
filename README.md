@@ -180,7 +180,7 @@ Required non-secret runtime variable names are:
 - `APP_HOST`
 - `MAIL_FROM` (the sender address of account emails, for example `Three Heavens <no-reply@APP_HOST_PLACEHOLDER>`)
 - `SMTP_HOST`
-- optional `SMTP_PORT` (default `587`; delivery uses STARTTLS and PLAIN authentication, so implicit-TLS port 465 is not supported)
+- optional `SMTP_PORT` (default `587`). Port 465 uses implicit TLS (SMTPS); every other port must offer STARTTLS, and delivery fails rather than sending the PLAIN credentials unencrypted when it does not.
 - optional `RAILS_LOG_LEVEL`
 - optional `RAILS_MAX_THREADS`
 - optional `JOB_CONCURRENCY`

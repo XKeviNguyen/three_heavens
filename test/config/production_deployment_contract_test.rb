@@ -77,6 +77,36 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     )
   RUBY
 
+  # Delivers through the booted SMTP settings to a local server that offers
+  # no STARTTLS, and reports whether it received an AUTH command.
+  SMTP_TRANSPORT_SCRIPT = <<~'RUBY'
+    require "socket"
+    settings = ActionMailer::Base.smtp_settings
+    server = TCPServer.new("127.0.0.1", 0)
+    received = []
+    Thread.new do
+      client = server.accept
+      client.write "220 contract ESMTP\r\n"
+      while (line = client.gets)
+        received << line
+        client.write(line.start_with?("EHLO") ? "250-contract\r\n250 AUTH PLAIN\r\n" : "250 ok\r\n")
+      end
+    rescue IOError, SystemCallError
+      nil
+    end
+    mail = Mail.new(from: "a@example.test", to: "b@example.test", subject: "contract", body: "contract")
+    mail.delivery_method :smtp, settings.merge(address: "127.0.0.1", port: server.addr[1], read_timeout: 1, open_timeout: 1)
+    begin
+      mail.deliver
+    rescue StandardError
+      nil
+    end
+    puts "SMTP_RESULT=" + JSON.generate(
+      transport: settings.slice(:tls, :enable_starttls).transform_values { |value| value.is_a?(Symbol) ? value.to_s : value },
+      authenticated_in_clear: received.any? { |line| line.start_with?("AUTH") }
+    )
+  RUBY
+
   test "the rendered Kamal environment supplies every variable production requires" do
     rendered = render_deploy_configuration
     names = rendered.fetch("env").keys
@@ -157,6 +187,18 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
       output = preflight(root, without_google)
       assert_includes output, "google_client_id: unavailable"
       assert_includes output, "Preflight failed"
+
+      # A server that does not offer STARTTLS (or a man in the middle that
+      # strips it) used to receive AUTH PLAIN in the clear; port 465 used to
+      # boot and then time out on every delivery.
+      { "587" => { "enable_starttls" => "always" }, "465" => { "tls" => true } }.each do |port, transport|
+        stdout, stderr, status = boot(root, container.merge("SMTP_PORT" => port), SMTP_TRANSPORT_SCRIPT)
+        assert status.success?, "production did not boot with SMTP_PORT=#{port}: #{stderr.lines.first(2).join}"
+        result = JSON.parse(stdout.lines.find { |line| line.start_with?("SMTP_RESULT=") }.delete_prefix("SMTP_RESULT="))
+        assert_equal transport, result.fetch("transport")
+        assert_not result.fetch("authenticated_in_clear"), "credentials reached a server without TLS on port #{port}"
+        assert_no_secret_values(stdout + stderr, container)
+      end
 
       %w[abc 0 70000].each do |port|
         _, stderr, status = boot(root, container.merge("SMTP_PORT" => port), "puts :booted")
