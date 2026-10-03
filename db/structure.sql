@@ -1509,6 +1509,38 @@ CREATE TABLE public.ar_internal_metadata (
 
 
 --
+-- Name: consumed_nonces; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.consumed_nonces (
+    id bigint NOT NULL,
+    digest character varying(64) NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT consumed_nonces_digest_format CHECK (((digest)::text ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+--
+-- Name: consumed_nonces_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.consumed_nonces_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: consumed_nonces_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.consumed_nonces_id_seq OWNED BY public.consumed_nonces.id;
+
+
+--
 -- Name: document_execution_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3459,6 +3491,13 @@ ALTER TABLE ONLY public.ai_provider_attempts ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: consumed_nonces id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.consumed_nonces ALTER COLUMN id SET DEFAULT nextval('public.consumed_nonces_id_seq'::regclass);
+
+
+--
 -- Name: document_execution_plans id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3783,6 +3822,14 @@ ALTER TABLE ONLY public.ai_provider_attempts
 
 ALTER TABLE ONLY public.ar_internal_metadata
     ADD CONSTRAINT ar_internal_metadata_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: consumed_nonces consumed_nonces_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.consumed_nonces
+    ADD CONSTRAINT consumed_nonces_pkey PRIMARY KEY (id);
 
 
 --
@@ -4196,6 +4243,20 @@ CREATE UNIQUE INDEX index_ai_provider_attempts_on_run_and_attempt ON public.ai_p
 --
 
 CREATE INDEX index_ai_provider_attempts_on_status_and_completed_at_and_id ON public.ai_provider_attempts USING btree (status, completed_at, id);
+
+
+--
+-- Name: index_consumed_nonces_on_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_consumed_nonces_on_digest ON public.consumed_nonces USING btree (digest);
+
+
+--
+-- Name: index_consumed_nonces_on_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_consumed_nonces_on_expires_at ON public.consumed_nonces USING btree (expires_at);
 
 
 --
@@ -6330,6 +6391,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261003090000'),
 ('20261002090000'),
 ('20260930090000'),
 ('20260929120200'),

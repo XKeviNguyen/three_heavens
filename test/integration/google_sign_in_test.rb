@@ -161,15 +161,13 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
       assert_rejected
     end
 
-    with_memory_cache do
-      ceremony = sign_in_ceremony
-      with_google_verifier(FakeVerifier.new(claims: claims_for(ceremony))) do
-        post_callback
-        assert_redirected_to new_translation_workspace_path
-        delete session_path
-        post_callback
-        assert_rejected
-      end
+    ceremony = sign_in_ceremony
+    with_google_verifier(FakeVerifier.new(claims: claims_for(ceremony))) do
+      post_callback
+      assert_redirected_to new_translation_workspace_path
+      delete session_path
+      post_callback
+      assert_rejected
     end
   end
 

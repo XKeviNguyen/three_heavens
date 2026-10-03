@@ -30,7 +30,7 @@ module GoogleIdentity
       cookies.delete(COOKIE, path: COOKIE_PATH)
       return unless payload.is_a?(Hash) && payload["n"].is_a?(String) && payload["u"].is_a?(Integer)
       return unless payload["x"].is_a?(Integer) && payload["x"] > Time.current.to_i
-      return unless Rails.cache.write("google_identity/pending_sign_in/#{payload["n"]}", true, unless_exist: true, expires_in: TTL + 1.minute)
+      return unless ConsumedNonce.consume("google_identity/pending_sign_in", payload["n"], expires_at: Time.zone.at(payload["x"]))
 
       new(payload)
     rescue JSON::ParserError

@@ -63,13 +63,4 @@ module GoogleIdentityTestHelper
   ensure
     GoogleIdentity.verifier = original
   end
-
-  # The test environment uses a null cache store; replay protection needs a real one.
-  def with_memory_cache
-    original = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    yield
-  ensure
-    Rails.cache = original
-  end
 end

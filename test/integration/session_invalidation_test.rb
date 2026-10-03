@@ -114,18 +114,16 @@ class SessionInvalidationTest < ActionDispatch::IntegrationTest
   test "a pending Google sign-in completes once, before it expires, and only for an active account" do
     users(:normal).federated_identities.create!(provider: "google", provider_uid: "pending-sub")
 
-    with_memory_cache do
-      google_sign_in_cross_site(subject: "pending-sub", complete: false)
-      pending_cookie = cookies["google_identity_pending_sign_in"]
-      get google_identity_completion_path
-      assert_redirected_to new_translation_workspace_path
-      sign_out
+    google_sign_in_cross_site(subject: "pending-sub", complete: false)
+    pending_cookie = cookies["google_identity_pending_sign_in"]
+    get google_identity_completion_path
+    assert_redirected_to new_translation_workspace_path
+    sign_out
 
-      cookies["google_identity_pending_sign_in"] = pending_cookie
-      get google_identity_completion_path
-      assert_redirected_to login_path
-      assert_nil signed_in_user_id
-    end
+    cookies["google_identity_pending_sign_in"] = pending_cookie
+    get google_identity_completion_path
+    assert_redirected_to login_path
+    assert_nil signed_in_user_id
 
     google_sign_in_cross_site(subject: "pending-sub", complete: false)
     travel(GoogleIdentity::PendingSignIn::TTL + 1.second) { get google_identity_completion_path }

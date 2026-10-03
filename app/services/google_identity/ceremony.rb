@@ -69,7 +69,7 @@ module GoogleIdentity
 
     # True only for the first caller; a replayed credential carries a used nonce.
     def consume!
-      Rails.cache.write("google_identity/ceremony/#{id}", true, unless_exist: true, expires_in: TTL + 1.minute)
+      ConsumedNonce.consume("google_identity/ceremony", id, expires_at: TTL.from_now)
     end
   end
 end
