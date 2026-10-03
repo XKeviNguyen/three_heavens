@@ -15,6 +15,7 @@ begin
   puts "Attachments: #{integrity.attachment_count}"
   puts "Disk objects found: #{integrity.found_disk_objects}"
   puts "Missing disk objects: #{integrity.missing_disk_objects}"
+  puts "Disk objects with different bytes: #{integrity.corrupt_disk_objects}"
   puts "Unreferenced disk objects: #{integrity.unreferenced_disk_objects}"
   puts "Critical problems: #{integrity.critical_count}"
   puts "Warnings: #{integrity.warning_count}"

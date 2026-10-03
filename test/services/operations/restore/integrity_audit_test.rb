@@ -71,4 +71,37 @@ class Operations::Restore::IntegrityAuditTest < ActiveSupport::TestCase
     Document.where(id: document&.id).delete_all
     Project.where(id: project&.id).delete_all
   end
+
+  test "a restored object whose bytes differ from its blob record is a problem, critical for a document source" do
+    project = Project.create!(user: users(:normal), name: "Restore bytes #{SecureRandom.hex(4)}",
+                              source_language: "Vietnamese", target_language: "Japanese")
+    document = project.documents.create!(title: "Restore source", source_text: "private source", source_kind: :pasted_text)
+    document.source_file.attach(io: StringIO.new("exact restored bytes"), filename: "source.txt", content_type: "text/plain")
+    staged = ActiveStorage::Blob.create_and_upload!(io: StringIO.new("unattached staged bytes"), filename: "staged.txt")
+    path = ->(blob) { ActiveStorage::Blob.service.path_for(blob.key) }
+    audit = lambda do
+      Operations::Restore::IntegrityAudit.call(
+        database_url: "isolated-test-connection", storage_path: ActiveStorage::Blob.service.root,
+        connector: ExistingConnection.new(ActiveRecord::Base.connection.raw_connection)
+      )
+    end
+    baseline = audit.call
+
+    File.binwrite(path.call(staged), "unattached staged byteZ")
+    altered = audit.call
+    assert_equal baseline.corrupt_disk_objects + 1, altered.corrupt_disk_objects
+    assert_equal baseline.warning_count + 1, altered.warning_count
+    assert_equal baseline.critical_count, altered.critical_count
+
+    File.binwrite(path.call(document.source_file.blob), "exact restored")
+    truncated = audit.call
+    assert_equal baseline.corrupt_disk_objects + 2, truncated.corrupt_disk_objects
+    assert_equal baseline.critical_count + 1, truncated.critical_count
+    assert_not truncated.successful?
+  ensure
+    document&.source_file&.purge
+    staged&.purge
+    Document.where(id: document&.id).delete_all
+    Project.where(id: project&.id).delete_all
+  end
 end

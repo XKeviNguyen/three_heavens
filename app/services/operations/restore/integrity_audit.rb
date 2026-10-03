@@ -18,6 +18,7 @@ module Operations
         :expected_disk_objects,
         :found_disk_objects,
         :missing_disk_objects,
+        :corrupt_disk_objects,
         :unreferenced_disk_objects,
         :critical_count,
         :warning_count,
@@ -55,11 +56,12 @@ module Operations
         warning_count = 0
         found_count = 0
         missing_count = 0
+        corrupt_count = 0
         last_id = 0
 
         loop do
           rows = connection.exec_params(
-            "SELECT id, key FROM active_storage_blobs WHERE id > $1 ORDER BY id LIMIT $2",
+            "SELECT id, key, byte_size, checksum FROM active_storage_blobs WHERE id > $1 ORDER BY id LIMIT $2",
             [ last_id, BATCH_SIZE ]
           ).to_a
           break if rows.empty?
@@ -71,11 +73,15 @@ module Operations
             key = row.fetch("key")
             last_id = blob_id
             if valid_key?(key) && regular_disk_object?(key)
-              found_count += 1
-              next
+              if recorded_bytes?(key, Integer(row.fetch("byte_size")), row.fetch("checksum"))
+                found_count += 1
+                next
+              end
+              corrupt_count += 1
+            else
+              missing_count += 1
             end
 
-            missing_count += 1
             types = attachment_types.fetch(blob_id, Set.new)
             if types.include?([ "Document", "source_file" ]) || (types.any? && !types.include?([ "SourceImport", "source_file" ]))
               critical_count += 1
@@ -96,6 +102,7 @@ module Operations
           expected_disk_objects: blob_count,
           found_disk_objects: found_count,
           missing_disk_objects: missing_count,
+          corrupt_disk_objects: corrupt_count,
           unreferenced_disk_objects: unreferenced_count,
           critical_count: critical_count,
           warning_count: warning_count,
@@ -156,6 +163,21 @@ module Operations
           path.exist? && !path.symlink? && path.lstat.file?
       rescue Errno::ENOENT
         false
+      end
+
+      # The object holds exactly the bytes Active Storage recorded at upload:
+      # the same length and, when one was recorded, the same base64 MD5.
+      def recorded_bytes?(key, byte_size, checksum)
+        path = disk_path(key)
+        return false unless path.size == byte_size
+        return true if checksum.nil?
+
+        digest = OpenSSL::Digest::MD5.new
+        path.open("rb") do |file|
+          buffer = "".b
+          digest << buffer while file.read(1.megabyte, buffer)
+        end
+        ActiveSupport::SecurityUtils.secure_compare(digest.base64digest, checksum)
       end
 
       def count_unreferenced(connection)
