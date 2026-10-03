@@ -27,10 +27,13 @@ threads threads_count, threads_count
 
 # One process per container: SourceImports::PdfExtractor limits concurrent
 # PDF workers per process, sized for the container's whole memory budget.
-# Puma would otherwise start one process per WEB_CONCURRENCY on its own.
+# Puma would otherwise start one process per WEB_CONCURRENCY on its own, and
+# WEB_CONCURRENCY=1 would still mean cluster mode: a control process plus one
+# worker. Single mode serves the same threads in one process.
 unless [ "", "0", "1" ].include?(ENV["WEB_CONCURRENCY"].to_s.strip)
   raise "WEB_CONCURRENCY must be 1: PDF extraction is sized for one Puma process per container"
 end
+workers 0
 
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)

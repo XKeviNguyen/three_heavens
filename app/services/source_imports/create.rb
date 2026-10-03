@@ -145,7 +145,8 @@ module SourceImports
       lock_key = Digest::SHA256.digest("source_import_request:#{user.id}:#{request_key}").unpack1("q>")
       SourceImport.transaction(requires_new: true) do
         connection.execute("SET LOCAL lock_timeout = '#{Limits::REQUEST_LOCK_WAIT_SECONDS}s'")
-        connection.select_value(SourceImport.sanitize_sql_array([ "SELECT pg_advisory_lock(?)", lock_key ]))
+        # pg_advisory_lock returns void, which select_value would warn it cannot map.
+        connection.execute(SourceImport.sanitize_sql_array([ "SELECT pg_advisory_lock(?)", lock_key ]))
       end
       locked = true
       yield

@@ -1,4 +1,6 @@
 require "test_helper"
+require "puma"
+require "puma/configuration"
 
 class PumaConfigurationTest < ActiveSupport::TestCase
   test "Solid Queue in Puma is enabled only when explicitly true" do
@@ -20,6 +22,18 @@ class PumaConfigurationTest < ActiveSupport::TestCase
     [ "2", "auto" ].each do |value|
       error = assert_raises(RuntimeError, value) { with_web_concurrency(value) { probe_configuration } }
       assert_match(/WEB_CONCURRENCY must be 1/, error.message)
+    end
+  end
+
+  test "one Puma process serves the container whatever WEB_CONCURRENCY allows" do
+    [ nil, "", "0", "1" ].each do |value|
+      with_web_concurrency(value) do
+        configuration = Puma::Configuration.new({ config_files: [ Rails.root.join("config/puma.rb").to_s ] }, {}, ENV)
+        configuration.load
+        configuration.clamp
+
+        assert_equal 0, configuration.options[:workers], "WEB_CONCURRENCY=#{value.inspect} must run Puma in single mode"
+      end
     end
   end
 
@@ -59,6 +73,7 @@ class PumaConfigurationTest < ActiveSupport::TestCase
     end
 
     def threads(*) = nil
+    def workers(*) = nil
     def port(*) = nil
     def pidfile(*) = nil
 
