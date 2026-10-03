@@ -10,6 +10,9 @@ class TranslationReferencesController < ApplicationController
   FILE_KEYS = %w[source_file approved_translation_file].freeze
 
   before_action :set_translation_reference, only: %i[show edit update activate deactivate]
+  # Both forms extract uploaded files; see SourceImports::Limits::UPLOADS_PER_WINDOW.
+  rate_limit to: SourceImports::Limits::UPLOADS_PER_WINDOW, within: SourceImports::Limits::UPLOAD_WINDOW,
+             by: -> { current_user.id }, with: :render_rate_limited, only: %i[create update]
 
   def index
     @translation_references = paginate(
@@ -83,6 +86,13 @@ class TranslationReferencesController < ApplicationController
   end
 
   private
+
+  def render_rate_limited
+    response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)
+    @form_values = safe_submitted_values
+    @form_errors = [ t("source_imports.errors.rate_limited") ]
+    render(action_name == "create" ? :new : :edit, status: :too_many_requests)
+  end
 
   def set_translation_reference
     @translation_reference = current_user.translation_references.includes(:current_revision).find(params[:id])
