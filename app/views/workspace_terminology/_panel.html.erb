@@ -32,12 +32,13 @@
       <p class="mt-1 text-xs leading-5 text-slate-500"><%= t("terminology_sheet.panel_intro") %></p>
     <% end %>
 
-    <div class="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold">
+    <%# On phones the saved-glossary menu spans this row, which always fits the screen; from sm it hangs under its button. %>
+    <div class="relative mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold">
       <%= link_to t("terminology_sheet.add_terminology"), new_workspace_terminology_path, data: { turbo_frame: "workspace-terminology-editor" }, class: "rounded-lg border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50" %>
       <% if glossaries.any? %>
-        <details class="relative">
+        <details class="sm:relative">
           <summary class="cursor-pointer list-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100"><%= t("terminology_sheet.choose_saved") %> <span aria-hidden="true">⌄</span></summary>
-          <div class="absolute left-0 z-20 mt-2 w-[min(22rem,75vw)] space-y-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+          <div class="absolute inset-x-0 z-20 mt-2 space-y-1 sm:right-auto sm:w-[22rem] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
             <label class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 hover:bg-slate-50">
               <%= radio_button_tag "translation_workspace[glossary_revision_id]", "", selected_revision_id.blank?, id: "translation_workspace_glossary_revision_id_none", class: "mt-0.5 size-4", data: { workspace_summary_name: t("workspace_ui.summary.none") } %>
               <span><span class="block text-xs font-semibold text-slate-900"><%= t("terminology_sheet.no_terminology") %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500"><%= t("terminology_sheet.continue_without") %></span></span>

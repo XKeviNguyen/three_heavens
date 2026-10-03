@@ -108,6 +108,32 @@ class PublicResponsiveLayoutTest < ApplicationSystemTestCase
     clear_browser_viewport
   end
 
+  # The saved-glossary menu used to hang from its button, which wraps to the
+  # middle of the row on phones, so it ran off the right edge and widened
+  # the whole page (and the launch bar) by up to 80 px.
+  test "the saved glossary menu stays on screen at phone widths" do
+    user = users(:normal)
+    Glossaries::Create.call(user:, attributes: {
+      name: "Glossary_" * 16, description: "", source_language: "Vietnamese", target_language: "Japanese",
+      entries: [ { source_term: "Sabbath", preferred_target_term: "安息日", note: "" } ]
+    })
+    sign_in_in_browser(user, "correct horse battery staple")
+    [ 320, 390, 430, 640 ].each do |width|
+      with_browser_viewport(width, 900, mobile: width < 640) do
+        visit new_translation_workspace_path
+        within("#workspace-terminology") { find("summary", text: "Choose saved glossary").click }
+        menu = find("#workspace-terminology details[open] > div")
+        assert_text "Glossary_Glossary_"
+        bounds = page.evaluate_script("(() => { const r = arguments[0].getBoundingClientRect(); return [r.left, r.right] })()", menu)
+        assert_operator bounds.first, :>=, 0, "menu starts on screen at #{width}px"
+        assert_operator bounds.last, :<=, width, "menu ends on screen at #{width}px"
+        assert_no_horizontal_overflow("saved glossary menu #{width}px")
+      end
+    end
+  ensure
+    clear_browser_viewport
+  end
+
   # WCAG 2.4.11: keyboard focus must not end up entirely under the sticky
   # header or the workspace launch bar, including at high zoom equivalents.
   test "tabbing through the workspace never hides focus behind the sticky bars" do

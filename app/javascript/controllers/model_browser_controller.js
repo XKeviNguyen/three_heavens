@@ -336,7 +336,7 @@ export default class extends Controller {
 
   compatItem(label, compatible) {
     const span = document.createElement("span")
-    span.className = compatible ? "font-medium text-emerald-700" : "text-slate-400"
+    span.className = compatible ? "font-medium text-emerald-700" : "text-slate-500"
     span.textContent = `${label} ${compatible ? "✓" : "—"}`
     return span
   }

@@ -26,7 +26,7 @@
     <p class="mt-0.5 text-xs text-slate-500"><%= t("shared_ui.upload.or") %></p>
     <button type="button" data-action="file-drop#browse" class="mt-1.5 inline-flex rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><%= t("shared_ui.upload.choose") %></button>
     <p class="mt-3 text-xs text-slate-500"><%= t("shared_ui.upload.formats") %></p>
-    <p class="mt-0.5 text-xs text-slate-400"><%= t("shared_ui.upload.limit", maximum: SourceImports::Limits::MAX_UPLOAD_BYTES / 1.megabyte) %></p>
+    <p class="mt-0.5 text-xs text-slate-500"><%= t("shared_ui.upload.limit", maximum: SourceImports::Limits::MAX_UPLOAD_BYTES / 1.megabyte) %></p>
     <p data-file-drop-target="filename" class="mt-2 text-xs font-medium text-emerald-700" role="status" aria-live="polite"></p>
 
   </div>

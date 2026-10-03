@@ -78,6 +78,9 @@
   --th-warning-soft: #fff5e5;
   --th-danger: #c9342f;
   --th-danger-soft: #fff0f0;
+  /* Muted text sits on white, the canvas, the sidebar and tinted panels;
+     Tailwind's slate-500 drops to 4.3:1 on the sidebar, this keeps 4.8:1. */
+  --color-slate-500: #5b6b82;
 
   @variant dark {
     color-scheme: dark;
