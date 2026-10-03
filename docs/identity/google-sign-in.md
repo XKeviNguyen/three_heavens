@@ -48,6 +48,15 @@ Outcomes travel in a one-minute signed cookie holding an allowlisted code: a
 failed link returns the signed-in user to **Account**; other failures show on
 the sign-in page.
 
+The pending sign-in is not bound to the browser that started the ceremony.
+Planting another account's pending sign-in in a victim's browser needs the
+ability to set cookies for this host (cross-site scripting, or cookie
+tossing from a sibling host), which would equally let an attacker plant
+that account's session cookie directly; the path-scoped, two-minute,
+single-use pending cookie adds nothing to that. Binding it to a browser
+cookie set before the redirect to Google would therefore not close an
+additional attack, so it is left as it is.
+
 ## Account rules
 
 - **Identity** is `(provider = "google", provider_uid = sub)` in

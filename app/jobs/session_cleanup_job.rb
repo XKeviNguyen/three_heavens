@@ -1,3 +1,5 @@
+# Purges expired authentication state: session rows past Session::LIFETIME
+# and consumed single-use values (ConsumedNonce) past their expiry.
 class SessionCleanupJob < ApplicationJob
   queue_as :operations
 
