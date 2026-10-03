@@ -21,7 +21,7 @@ class RequestBodyRouteLimitsTest < ActionDispatch::IntegrationTest
 
     %w[/projects /workflow_profiles /settings/models /nonexistent].each do |path|
       post path, params: body, headers: { "CONTENT_TYPE" => "multipart/form-data; boundary=#{boundary}" }
-      assert_response :payload_too_large
+      assert_response :content_too_large
     end
   end
 
