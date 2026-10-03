@@ -186,13 +186,18 @@ class ApplicationController < ActionController::Base
   # Every sign-in (password or Google) reconciles interface preferences here,
   # before the first signed-in page renders. The browser's previous server
   # session, if any, ends with its cookie, so a copy of that cookie cannot
-  # authenticate after the new one is issued.
+  # authenticate after the new one is issued. Returns false, changing
+  # nothing, if the account was disabled after it was authenticated;
+  # otherwise the stored return path, if any.
   def start_authenticated_session!(user, preference_overrides: ui_preferences.pending_overrides)
+    server_session = Session.start(user)
+    return false unless server_session
+
     ui_preferences.apply_at_sign_in(user, preference_overrides)
     destination = session.delete(:return_to_after_authenticating)
     delete_server_session
     reset_session
-    session[:authentication_session_id] = user.sessions.create!.id
+    session[:authentication_session_id] = server_session.id
     SignInThrottle.remember_device(cookies, user)
     destination
   end
