@@ -1,5 +1,6 @@
 require "test_helper"
 require "stringio"
+require "tmpdir"
 
 class Operations::Restore::IntegrityAuditTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
@@ -78,10 +79,19 @@ class Operations::Restore::IntegrityAuditTest < ActiveSupport::TestCase
     document = project.documents.create!(title: "Restore source", source_text: "private source", source_kind: :pasted_text)
     document.source_file.attach(io: StringIO.new("exact restored bytes"), filename: "source.txt", content_type: "text/plain")
     staged = ActiveStorage::Blob.create_and_upload!(io: StringIO.new("unattached staged bytes"), filename: "staged.txt")
-    path = ->(blob) { ActiveStorage::Blob.service.path_for(blob.key) }
+    # Audit a private copy of just these objects: parallel workers share the
+    # service root, and their files would change the counts between audits.
+    storage_root = Dir.mktmpdir("restore-bytes")
+    path = lambda do |blob|
+      File.join(storage_root, blob.key[0..1], blob.key[2..3], blob.key).tap do |copy|
+        FileUtils.mkdir_p(File.dirname(copy))
+        FileUtils.cp(ActiveStorage::Blob.service.path_for(blob.key), copy) unless File.exist?(copy)
+      end
+    end
+    [ document.source_file.blob, staged ].each(&path)
     audit = lambda do
       Operations::Restore::IntegrityAudit.call(
-        database_url: "isolated-test-connection", storage_path: ActiveStorage::Blob.service.root,
+        database_url: "isolated-test-connection", storage_path: storage_root,
         connector: ExistingConnection.new(ActiveRecord::Base.connection.raw_connection)
       )
     end
@@ -99,6 +109,7 @@ class Operations::Restore::IntegrityAuditTest < ActiveSupport::TestCase
     assert_equal baseline.critical_count + 1, truncated.critical_count
     assert_not truncated.successful?
   ensure
+    FileUtils.rm_rf(storage_root) if storage_root
     document&.source_file&.purge
     staged&.purge
     Document.where(id: document&.id).delete_all
