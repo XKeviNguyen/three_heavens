@@ -1,6 +1,7 @@
 class SourceImportsController < ApplicationController
   rate_limit to: SourceImports::Limits::UPLOADS_PER_WINDOW, within: SourceImports::Limits::UPLOAD_WINDOW,
-             by: -> { current_user.id }, with: :render_rate_limited, only: :create
+             scope: SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, by: -> { current_user.id },
+             with: :render_rate_limited, only: :create
 
   def new
     @project = find_owned_project(project_id_param)
@@ -39,6 +40,7 @@ class SourceImportsController < ApplicationController
     # workspace uploader resends the same request key after a 5xx, and the
     # upload form issues a new one.
     response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    refund_upload_budget
     render_import_failure(error, status: :service_unavailable)
   rescue SourceImports::Error => error
     render_import_failure(error, status: :unprocessable_content)
@@ -74,6 +76,12 @@ class SourceImportsController < ApplicationController
   end
 
   private
+
+  # A busy answer extracted nothing, so its retries must not spend the
+  # budget that bounds slot use. The key is the one rate_limit counts under.
+  def refund_upload_budget
+    cache_store.decrement([ "rate-limit", SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, current_user.id ].join(":"))
+  end
 
   def render_rate_limited
     response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)

@@ -48,4 +48,13 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     assert_equal "[FILTERED]", filtered.dig("final_translation", "change_note")
     assert_equal "operational-value", filtered.dig("unrelated", "content")
   end
+
+  test "logs any other long value truncated and short values unchanged" do
+    filtered = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters).filter(
+      "unknown" => "x" * 5_000, "page" => "2"
+    )
+
+    assert_equal "#{"x" * 200}[TRUNCATED]", filtered["unknown"]
+    assert_equal "2", filtered["page"]
+  end
 end

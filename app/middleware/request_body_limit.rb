@@ -1,4 +1,5 @@
 require "strscan"
+require "rack/multipart"
 
 class RequestBodyLimit
   MAX_FILE_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -47,6 +48,15 @@ class RequestBodyLimit
   JSON_MAX_TOKENS = 1_000
 
   class ExceededError < StandardError; end
+
+  # Rack::MethodOverride parses form bodies outside Rails' exception
+  # handling, so a body over one of Rack's multipart limits (non-file field
+  # bytes, parts, files) would otherwise reach Puma as a 500.
+  MULTIPART_LIMIT_ERRORS = [
+    Rack::Multipart::BoundaryTooLongError,
+    Rack::Multipart::MultipartPartLimitError,
+    Rack::Multipart::MultipartTotalPartLimitError
+  ].freeze
 
   JSON_STRING = /"(?:[^"\\]++|\\.)*+"/m
   JSON_UNCOUNTED = /[^"\[{,]+/
@@ -171,6 +181,8 @@ class RequestBodyLimit
     app.call(environment)
   rescue ExceededError
     payload_too_large
+  rescue *MULTIPART_LIMIT_ERRORS
+    bad_request
   end
 
   private
@@ -204,6 +216,14 @@ class RequestBodyLimit
     symbol.present? && ActionDispatch::Request.parameter_parsers.key?(symbol)
   rescue Mime::Type::InvalidMimeType
     false
+  end
+
+  def bad_request
+    [
+      400,
+      { "content-type" => "text/plain; charset=utf-8", "content-length" => "12", "cache-control" => "no-store" },
+      [ "Bad request\n" ]
+    ]
   end
 
   def payload_too_large

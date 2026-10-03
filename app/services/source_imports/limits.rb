@@ -9,10 +9,13 @@ module SourceImports
     MAX_PDF_PARSE_SECONDS = 5
     BUSY_RETRY_AFTER_SECONDS = 5
     # Every upload is extracted here and all PDFs share one worker slot, so
-    # each account gets a budget of uploads per form: at the 5-second parse
-    # limit, 10 uploads hold the slot for at most a sixth of the window.
+    # each account has one budget of file-carrying requests across the
+    # upload forms. A translation reference request can carry two PDFs, so
+    # at the 5-second parse limit 10 requests hold the slot for at most a
+    # third of the window.
     UPLOADS_PER_WINDOW = 10
     UPLOAD_WINDOW = 5.minutes
+    UPLOAD_RATE_LIMIT_SCOPE = "uploads"
     MAX_DOCX_ENTRIES = 500
     MAX_DOCX_UNCOMPRESSED_BYTES = 50.megabytes
     MAX_DOCUMENT_XML_BYTES = 8.megabytes

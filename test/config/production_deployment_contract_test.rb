@@ -103,7 +103,8 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     end
     puts "SMTP_RESULT=" + JSON.generate(
       transport: settings.slice(:tls, :enable_starttls).transform_values { |value| value.is_a?(Symbol) ? value.to_s : value },
-      authenticated_in_clear: received.any? { |line| line.start_with?("AUTH") }
+      authenticated_in_clear: received.any? { |line| line.start_with?("AUTH") },
+      greeted_in_clear: received.any? { |line| line.start_with?("EHLO") }
     )
   RUBY
 
@@ -144,6 +145,9 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     dockerfile = Rails.root.join("Dockerfile").read
     assert_match(%r{LD_PRELOAD="/usr/local/lib/libjemalloc\.so"}, dockerfile)
     assert_match(/MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0"/, dockerfile)
+    # Form fields that are not files stay in memory while Rack parses them,
+    # before authentication; legitimate forms carry at most about 1 MiB.
+    assert_match(/RACK_MULTIPART_BUFFERED_UPLOAD_BYTESIZE_LIMIT="2097152"/, dockerfile)
   end
 
   test "deploy.yml keeps credential-bearing mail settings out of clear environment" do
@@ -197,6 +201,8 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
         result = JSON.parse(stdout.lines.find { |line| line.start_with?("SMTP_RESULT=") }.delete_prefix("SMTP_RESULT="))
         assert_equal transport, result.fetch("transport")
         assert_not result.fetch("authenticated_in_clear"), "credentials reached a server without TLS on port #{port}"
+        # Implicit TLS starts with a handshake, so nothing is sent in the clear.
+        assert_not result.fetch("greeted_in_clear"), "port 465 spoke plaintext SMTP" if port == "465"
         assert_no_secret_values(stdout + stderr, container)
       end
 

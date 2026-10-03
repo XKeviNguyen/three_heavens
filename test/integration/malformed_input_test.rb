@@ -75,4 +75,37 @@ class MalformedInputTest < ActionDispatch::IntegrationTest
       assert_response :bad_request
     end
   end
+
+  test "a NUL byte in an uploaded file's name is not a server error" do
+    sign_in_as users(:normal)
+    boundary = "NulFilenameBoundary"
+    body = "--#{boundary}\r\nContent-Disposition: form-data; name=\"source_import[request_key]\"\r\n\r\n#{SecureRandom.hex(16)}\r\n" \
+      "--#{boundary}\r\nContent-Disposition: form-data; name=\"source_import[source_file]\"; filename=\"a%00b.txt\"\r\n" \
+      "Content-Type: text/plain\r\n\r\nSource text\r\n--#{boundary}--\r\n"
+
+    post source_imports_path, params: body, headers: { "CONTENT_TYPE" => "multipart/form-data; boundary=#{boundary}" }
+
+    assert_response :redirect
+    assert_equal "ab.txt", SourceImport.order(:id).last.original_filename
+  end
+
+  # Rack parses these before Rails' exception handling (in Rack::MethodOverride).
+  test "a form body over one of Rack's multipart limits is a bad request, signed out" do
+    boundary = "LimitBoundary"
+    part = ->(name, value, filename = nil) do
+      disposition = "form-data; name=\"#{name}\"#{"; filename=\"#{filename}\"" if filename}"
+      "--#{boundary}\r\nContent-Disposition: #{disposition}\r\n\r\n#{value}\r\n"
+    end
+    bodies = {
+      "17 MiB of field data" => part.call("field", "a" * (17 * 1024 * 1024)),
+      "4,100 parts" => Array.new(4_100) { |index| part.call("p#{index}", "v") }.join,
+      "130 files" => Array.new(130) { |index| part.call("f#{index}", "v", "f#{index}.txt") }.join
+    }
+
+    bodies.each do |label, body|
+      post source_imports_path, params: "#{body}--#{boundary}--\r\n",
+                                headers: { "CONTENT_TYPE" => "multipart/form-data; boundary=#{boundary}" }
+      assert_response :bad_request, label
+    end
+  end
 end

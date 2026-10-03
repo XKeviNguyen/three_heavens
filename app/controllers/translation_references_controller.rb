@@ -10,9 +10,11 @@ class TranslationReferencesController < ApplicationController
   FILE_KEYS = %w[source_file approved_translation_file].freeze
 
   before_action :set_translation_reference, only: %i[show edit update activate deactivate]
-  # Both forms extract uploaded files; see SourceImports::Limits::UPLOADS_PER_WINDOW.
+  # Requests that carry files share the account's upload budget with source
+  # imports (SourceImports::Limits::UPLOADS_PER_WINDOW); text-only edits do not.
   rate_limit to: SourceImports::Limits::UPLOADS_PER_WINDOW, within: SourceImports::Limits::UPLOAD_WINDOW,
-             by: -> { current_user.id }, with: :render_rate_limited, only: %i[create update]
+             scope: SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, by: -> { current_user.id },
+             with: :render_rate_limited, only: %i[create update], if: :uploading_files?
 
   def index
     @translation_references = paginate(
@@ -92,6 +94,11 @@ class TranslationReferencesController < ApplicationController
     @form_values = safe_submitted_values
     @form_errors = [ t("source_imports.errors.rate_limited") ]
     render(action_name == "create" ? :new : :edit, status: :too_many_requests)
+  end
+
+  def uploading_files?
+    submitted = params[:translation_reference]
+    submitted.is_a?(ActionController::Parameters) && FILE_KEYS.any? { |key| submitted[key].present? }
   end
 
   def set_translation_reference
