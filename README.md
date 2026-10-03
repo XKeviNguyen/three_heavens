@@ -217,20 +217,7 @@ Populate Kamal secrets through the operator's approved secret manager or local K
 
 ## Validation
 
-The complete local quality gate is:
-
-```sh
-bin/rails db:migrate
-bin/rails db:migrate:status
-bin/rails test
-bin/rails test:system
-bin/rubocop
-bin/brakeman --no-pager
-bin/bundler-audit
-bin/importmap audit
-git diff --check
-bin/rails zeitwerk:check
-```
+The complete local quality gate is `bin/ci` (defined in `config/ci.rb`): RuboCop, whitespace (`git diff --check` against the empty tree, so every tracked file), Bundler Audit, importmap audit, Brakeman (`--ensure-latest`), Zeitwerk, migration status, and the unit, integration and system tests. Run `bin/rails db:migrate` first when the branch adds a migration. GitHub Actions runs the same checks split across its five jobs (`scan_ruby`, `scan_js`, `lint`, `test`, `system-test`); `test/config/ci_gate_test.rb` fails if a check is added to one but not the other.
 
 Tests use deterministic fakes and Active Job's test adapter. They require PostgreSQL and a local Chrome/Chromium browser for system tests, but never require `OPENROUTER_API_KEY` and never make a real provider request.
 

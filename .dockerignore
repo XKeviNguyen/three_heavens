@@ -49,3 +49,21 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Ignore local agent and editor tooling, which can hold private settings or
+# transcripts, and operating-system artifacts.
+/.claude/
+/.codex/
+/.vscode/
+/.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore tests, test output, documentation, and host-side scripts; the image
+# runs none of them.
+/test/
+/coverage/
+/docs/
+/script/
