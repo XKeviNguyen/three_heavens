@@ -92,16 +92,13 @@ class SessionsController < ApplicationController
     submitted[:email] if submitted.is_a?(ActionController::Parameters)
   end
 
-  # No stored email or password contains a NUL byte, and the database driver
-  # refuses to send one.
   def acceptable_credentials?(credentials)
-    credentials.values_at(:email, :password).none? { |value| value.to_s.include?("\0") } &&
-      credentials[:email].to_s.length <= User::MAXIMUM_EMAIL_LENGTH &&
+    credentials[:email].to_s.length <= User::MAXIMUM_EMAIL_LENGTH &&
       credentials[:password].to_s.length <= User::MAXIMUM_PASSWORD_LENGTH
   end
 
   def redisplayable_email(email)
-    email if email && email.length <= User::MAXIMUM_EMAIL_LENGTH && !email.include?("\0")
+    email if email && email.length <= User::MAXIMUM_EMAIL_LENGTH
   end
 
   def render_invalid_credentials(status: :unprocessable_content)

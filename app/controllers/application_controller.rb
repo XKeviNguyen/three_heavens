@@ -7,6 +7,7 @@ class ApplicationController < ActionController::Base
   # action (such as the sign-in redirect) use the visitor's language rather
   # than whatever locale the serving thread was left with.
   around_action :with_locale
+  before_action :reject_null_bytes
   before_action :require_authentication
 
   helper_method :current_user, :authenticated?, :current_appearance, :current_appearance_revision
@@ -28,6 +29,22 @@ class ApplicationController < ActionController::Base
     address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
   rescue IPAddr::Error
     request.remote_ip.to_s
+  end
+
+  # PostgreSQL text cannot hold U+0000 and its driver raises when asked to
+  # send one, so a parameter containing it is malformed input (400) rather
+  # than a server error wherever it would have reached a query.
+  def reject_null_bytes
+    raise ActionController::BadRequest, "Parameters contain a null byte" if contains_null_byte?(request.parameters)
+  end
+
+  def contains_null_byte?(value)
+    case value
+    when String then value.include?("\0")
+    when Hash then value.any? { |key, nested| contains_null_byte?(key) || contains_null_byte?(nested) }
+    when Array then value.any? { |nested| contains_null_byte?(nested) }
+    else false
+    end
   end
 
   def with_locale(&action)

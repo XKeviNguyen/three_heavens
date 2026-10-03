@@ -8,6 +8,29 @@ class RequestBodyLimit
   PUBLIC_FORM_MAX_BYTES = 8 * 1024
   PUBLIC_FORM_PATHS = %w[/session /registration /confirmation_resend /email_confirmation /locale /appearance /auth/google/callback /auth/google/ceremony].freeze
 
+  # Rails parses a form body (multipart into tempfiles) for any route before
+  # authentication runs, so a body is held to the smallest limit its route
+  # needs. Every request gets DEFAULT_MAX_BYTES unless its routed path is one
+  # of the explicit exceptions below, and only for the methods that submit
+  # forms (POST, and PATCH/PUT before Rack::MethodOverride runs).
+  DEFAULT_MAX_BYTES = 64 * 1024
+  BODY_METHODS = %w[POST PATCH PUT].freeze
+  # Forms whose fields may each hold a whole document (100,000 characters,
+  # up to 12 bytes each once UTF-8 and percent-encoded) or a 100-entry
+  # glossary.
+  LONG_TEXT_MAX_BYTES = 2 * 1024 * 1024
+  LONG_TEXT_PATHS = [
+    %r{\A/translation_workspace(?:/options)?\z},
+    %r{\A/final_translations/[^/]+/save_revision\z},
+    %r{\A/(?:glossaries|methodology_profiles)(?:/[^/]+)?\z},
+    %r{\A/workspace_terminology\z}
+  ].freeze
+  # The only forms that carry files: up to MAX_FILES_PER_REQUEST uploads.
+  UPLOAD_PATHS = [
+    %r{\A/source_imports\z},
+    %r{\A/translation_references(?:/[^/]+)?\z}
+  ].freeze
+
   # Rails parses a JSON body into parameters for every action before any
   # callback runs (the request log records them), so JSON is bounded here for
   # signed-out requests too. Parsed JSON takes over a hundred times its size
@@ -157,8 +180,12 @@ class RequestBodyLimit
   def limit_for(environment)
     path = routed_path(environment["PATH_INFO"])
     return JSON_PATH_MAX_BYTES.fetch(path, JSON_MAX_BYTES) if parsed_as_parameters?(environment)
+    return PUBLIC_FORM_MAX_BYTES if PUBLIC_FORM_PATHS.include?(path)
+    return DEFAULT_MAX_BYTES unless BODY_METHODS.include?(environment["REQUEST_METHOD"])
+    return MAX_BYTES if UPLOAD_PATHS.any? { |pattern| pattern.match?(path) }
+    return LONG_TEXT_MAX_BYTES if LONG_TEXT_PATHS.any? { |pattern| pattern.match?(path) }
 
-    PUBLIC_FORM_PATHS.include?(path) ? PUBLIC_FORM_MAX_BYTES : MAX_BYTES
+    DEFAULT_MAX_BYTES
   end
 
   # The path the router matches: it squeezes repeated slashes and ignores a
