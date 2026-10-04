@@ -1,7 +1,9 @@
 # See https://git-scm.com/docs/gitattributes for more about git attribute files.
 
-# Mark the database schema as having been generated.
+# Mark the database schema as having been generated. Rails ends the generated
+# structure.sql with a blank line, so whitespace checks do not apply to it.
 db/schema.rb linguist-generated
+db/structure.sql linguist-generated -whitespace
 
 # Mark any vendored files as having been vendored.
 vendor/* linguist-vendored

@@ -191,14 +191,18 @@ class LoginThrottlingTest < ActionDispatch::IntegrationTest
     assert_response :too_many_requests
   end
 
-  test "over-long and NUL-containing emails are refused as invalid credentials" do
-    [ "user\u0000@example.test", "#{"a" * 250}@example.test" ].each_with_index do |email, attempt|
-      post session_path,
-           params: { session: { email: email, password: "correct horse battery staple" } },
-           headers: { "REMOTE_ADDR" => "198.51.100.#{40 + attempt}" }
-      assert_response :unprocessable_content
-      assert_nil signed_in_user_id
-    end
+  test "over-long emails are refused as invalid credentials and NUL-containing ones as malformed" do
+    post session_path,
+         params: { session: { email: "#{"a" * 250}@example.test", password: "correct horse battery staple" } },
+         headers: { "REMOTE_ADDR" => "198.51.100.40" }
+    assert_response :unprocessable_content
+    assert_nil signed_in_user_id
+
+    post session_path,
+         params: { session: { email: "user\u0000@example.test", password: "correct horse battery staple" } },
+         headers: { "REMOTE_ADDR" => "198.51.100.41" }
+    assert_response :bad_request
+    assert_nil signed_in_user_id
   end
 
   private

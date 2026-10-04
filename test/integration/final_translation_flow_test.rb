@@ -169,7 +169,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "nav[aria-label='Versions pagination']", text: /Page 2 of 2/
     assert_select "article", text: /Version 1 · Seed/
-    assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}'] input[value='#{seed.id}']", count: 1
+    assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}'] input[name='restore[version_id]'][value='#{seed.id}']", count: 1
 
     post restore_revision_final_translation_path(@final_translation), params: {
       restore: { version_id: seed.id, expected_version_number: @final_translation.current_version.version_number }

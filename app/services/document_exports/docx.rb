@@ -9,14 +9,19 @@ module DocumentExports
     OFFICE_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
     CORE_PROPERTIES = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
     DUBLIN_CORE = "http://purl.org/dc/elements/1.1/"
+    # XML 1.0 forbids these code points even as character references, and
+    # Word refuses a part that contains one. Tab, LF and CR are allowed.
+    XML_FORBIDDEN_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/
+    # Text edited in a browser arrives with CRLF line ends.
+    LINE_BREAK = /\r\n|\r|\n/
 
     def self.call(title:, content:)
       new(title:, content:).call
     end
 
     def initialize(title:, content:)
-      @title = title.to_s
-      @content = content.to_s
+      @title = title.to_s.gsub(XML_FORBIDDEN_CHARACTERS, "")
+      @content = content.to_s.gsub(XML_FORBIDDEN_CHARACTERS, "")
     end
 
     def call
@@ -96,7 +101,7 @@ module DocumentExports
       Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
         xml["w"].document("xmlns:w" => WORD_NAMESPACE) do
           xml["w"].body do
-            content.split("\n", -1).each { |paragraph| append_paragraph(xml, paragraph) }
+            content.split(LINE_BREAK, -1).each { |paragraph| append_paragraph(xml, paragraph) }
             xml["w"].sectPr
           end
         end

@@ -10,6 +10,7 @@ ja:
     paid_plan_role: '%{role}：処理%{runs}件 × セグメント%{segments}件 = リクエスト%{requests}件'
     draft_import_detached: 元のアップロードファイルは添付されていません。確認済みの原文は保持されています。
     draft_configuration_changed: 保存した設定の一部は利用できなくなりました。残りの選択内容を確認してください。
+    draft_unreadable: "保存した下書きを読み取れなかったため、復元しませんでした。次に変更を保存すると置き換えられます。今すぐ削除するには「下書きを破棄」を選択してください。"
     repeat_profile_unavailable: 以前の自動プロファイルには、この原文に必要なモデル性能データがありません。現在有効な翻訳モデルを手動実行に設定しました。処理を許可する前に確認または変更してください。
     profile_unavailable: 利用できません
     repeat_of: '%{name} の再実行'

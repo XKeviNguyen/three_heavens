@@ -9,5 +9,9 @@ Rails.application.config.filter_parameters += [
   :translated_text, :translation_text, :suggested_translation, :proposed_translation,
   :approved_translation, :approved_translation_file, :reference_source_text,
   "methodology_profile.guidance", :source_term, :preferred_target_term, "glossary.entries.note",
-  "final_translation.content", "final_translation.change_note", :workspace_payload, :workspace
+  "final_translation.content", "final_translation.change_note", :workspace_payload, :workspace,
+  # Parameters are logged before authentication, so any other long value
+  # (an unknown field in a signed-out request, for example) is truncated
+  # rather than written to the log in full.
+  ->(_key, value) { value.replace("#{value[0, 200]}[TRUNCATED]") if value.is_a?(String) && value.length > 200 }
 ]

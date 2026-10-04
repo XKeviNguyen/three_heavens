@@ -80,14 +80,17 @@ Rails.application.configure do
 
     config.action_mailer.delivery_method = :smtp
     config.action_mailer.raise_delivery_errors = true
+    # Credentials never cross the network unencrypted. Port 465 (SMTPS) speaks
+    # TLS from its first byte; every other port must upgrade with STARTTLS,
+    # and delivery fails rather than authenticating in the clear when the
+    # server (or anything in between) does not offer it.
     config.action_mailer.smtp_settings = {
       address: ENV.fetch("SMTP_HOST"),
       port: smtp_port,
       user_name: ENV.fetch("SMTP_USERNAME"),
       password: ENV.fetch("SMTP_PASSWORD"),
-      authentication: :plain,
-      enable_starttls_auto: true
-    }
+      authentication: :plain
+    }.merge(smtp_port == 465 ? { tls: true } : { enable_starttls: :always })
   end
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to

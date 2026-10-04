@@ -54,7 +54,7 @@
           <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="<%= t("navigation.primary") %>">
             <% sidebar_sections.each do |section| %>
               <div>
-                <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400"><%= section[:label] %></p>
+                <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500"><%= section[:label] %></p>
                 <ul class="space-y-0.5">
                   <% section[:items].each do |item| %>
                     <li><%= sidebar_link(item, compact: true) %></li>

@@ -23,7 +23,7 @@ class RegistrationsController < ApplicationController
                      password_confirmation: attributes[:password_confirmation],
                      role: :user, status: :active, managed_ai_access: false, locale: I18n.locale.to_s)
     @user.confirmation_sent_at = Time.current
-    if @user.save
+    if save_registration
       AccountMailer.confirm_email(@user).deliver_later
       redirect_to new_confirmation_resend_path, notice: t("registration.check_email")
     else
@@ -35,6 +35,16 @@ class RegistrationsController < ApplicationController
   end
 
   private
+
+  # A registration that commits between this one's uniqueness validation
+  # and its insert is caught by the unique email index; the loser gets the
+  # same answer as any duplicate address and no email is sent.
+  def save_registration
+    @user.save
+  rescue ActiveRecord::RecordNotUnique
+    @user.errors.add(:email, :taken)
+    false
+  end
 
   def render_rate_limited
     response.set_header("Retry-After", 1.hour.to_i.to_s)

@@ -44,11 +44,9 @@ class GoogleIdentity::CeremonyTest < ActiveSupport::TestCase
   end
 
   test "each ceremony can be consumed once" do
-    with_memory_cache do
-      ceremony = GoogleIdentity::Ceremony.resolve(GoogleIdentity::Ceremony.issue(intent: "sign_in", locale: "en", appearance: "system"))
-      assert ceremony.consume!
-      assert_not GoogleIdentity::Ceremony.resolve(GoogleIdentity::Ceremony.issue(intent: "sign_in", locale: "en", appearance: "system")).nil?
-      assert_not ceremony.consume!
-    end
+    ceremony = GoogleIdentity::Ceremony.resolve(GoogleIdentity::Ceremony.issue(intent: "sign_in", locale: "en", appearance: "system"))
+    assert ceremony.consume!
+    assert_not GoogleIdentity::Ceremony.resolve(GoogleIdentity::Ceremony.issue(intent: "sign_in", locale: "en", appearance: "system")).nil?
+    assert_not ceremony.consume!
   end
 end

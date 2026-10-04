@@ -49,4 +49,52 @@ class TranslationReferences::AuthoringAttributesTest < ActiveSupport::TestCase
     end
     assert_includes error.message, "10 MiB limit"
   end
+
+  test "a saturated real worker slot preserves Busy and stops before the second file" do
+    slots = SourceImports::PdfExtractor::WorkerSlots.new(limit: 1, wait_seconds: 0)
+    holding, release = Queue.new, Queue.new
+    holder = Thread.new { slots.hold { holding << true; release.pop } }
+    holding.pop
+    original = SourceImports::PdfExtractor.method(:call)
+    calls = 0
+    SourceImports::PdfExtractor.define_singleton_method(:call) do |bytes|
+      calls += 1
+      original.call(bytes, slots:)
+    end
+    error = assert_raises TranslationReferences::AuthoringAttributes::Busy do
+      TranslationReferences::AuthoringAttributes.call(
+        "source_file" => uploaded_file(pdf_with_text("Source"), filename: "source.pdf", content_type: "application/pdf"),
+        "approved_translation_file" => uploaded_file(pdf_with_text("Approved"), filename: "approved.pdf", content_type: "application/pdf"),
+        "title" => "Kept"
+      )
+    end
+    assert_not error.work_consumed
+    assert_equal 1, calls
+    assert_equal "Kept", error.resolved_attributes["title"]
+  ensure
+    SourceImports::PdfExtractor.singleton_class.define_method(:call, original.unbind) if original
+    release << true if release
+    holder&.join
+  end
+
+  test "a failed extraction before Busy also keeps the budget charge" do
+    original = SourceImports::TextExtractor.method(:call)
+    calls = 0
+    SourceImports::TextExtractor.define_singleton_method(:call) do |**|
+      calls += 1
+      raise SourceImports::Error.new("pdf_invalid", "Invalid PDF") if calls == 1
+
+      raise SourceImports::Busy.new("pdf_busy", "Busy")
+    end
+    error = assert_raises TranslationReferences::AuthoringAttributes::Busy do
+      TranslationReferences::AuthoringAttributes.call(
+        "source_file" => uploaded_file("Source", filename: "source.txt"),
+        "approved_translation_file" => uploaded_file("Approved", filename: "approved.txt")
+      )
+    end
+    assert error.work_consumed
+    assert_equal 2, calls
+  ensure
+    SourceImports::TextExtractor.singleton_class.define_method(:call, original.unbind) if original
+  end
 end

@@ -28,7 +28,8 @@ ENV RAILS_ENV="production" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development:test" \
     LD_PRELOAD="/usr/local/lib/libjemalloc.so" \
-    MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0"
+    MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0" \
+    RACK_MULTIPART_BUFFERED_UPLOAD_BYTESIZE_LIMIT="2097152"
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build

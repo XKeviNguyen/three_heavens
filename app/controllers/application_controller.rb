@@ -7,6 +7,7 @@ class ApplicationController < ActionController::Base
   # action (such as the sign-in redirect) use the visitor's language rather
   # than whatever locale the serving thread was left with.
   around_action :with_locale
+  before_action :reject_null_bytes
   before_action :require_authentication
 
   helper_method :current_user, :authenticated?, :current_appearance, :current_appearance_revision
@@ -28,6 +29,22 @@ class ApplicationController < ActionController::Base
     address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
   rescue IPAddr::Error
     request.remote_ip.to_s
+  end
+
+  # PostgreSQL text cannot hold U+0000 and its driver raises when asked to
+  # send one, so a parameter containing it is malformed input (400) rather
+  # than a server error wherever it would have reached a query.
+  def reject_null_bytes
+    raise ActionController::BadRequest, "Parameters contain a null byte" if contains_null_byte?(request.parameters)
+  end
+
+  def contains_null_byte?(value)
+    case value
+    when String then value.include?("\0")
+    when Hash then value.any? { |key, nested| contains_null_byte?(key) || contains_null_byte?(nested) }
+    when Array then value.any? { |nested| contains_null_byte?(nested) }
+    else false
+    end
   end
 
   def with_locale(&action)
@@ -169,13 +186,18 @@ class ApplicationController < ActionController::Base
   # Every sign-in (password or Google) reconciles interface preferences here,
   # before the first signed-in page renders. The browser's previous server
   # session, if any, ends with its cookie, so a copy of that cookie cannot
-  # authenticate after the new one is issued.
+  # authenticate after the new one is issued. Returns false, changing
+  # nothing, if the account was disabled after it was authenticated;
+  # otherwise the stored return path, if any.
   def start_authenticated_session!(user, preference_overrides: ui_preferences.pending_overrides)
+    server_session = Session.start(user)
+    return false unless server_session
+
     ui_preferences.apply_at_sign_in(user, preference_overrides)
     destination = session.delete(:return_to_after_authenticating)
     delete_server_session
     reset_session
-    session[:authentication_session_id] = user.sessions.create!.id
+    session[:authentication_session_id] = server_session.id
     SignInThrottle.remember_device(cookies, user)
     destination
   end

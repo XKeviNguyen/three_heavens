@@ -12,8 +12,11 @@ module TranslationWorkspaceDrafts
       @project = project
     end
 
+    # Returns nil when the draft cannot be read; it is then left as it is.
     def call
-      attributes = draft.payload.symbolize_keys
+      attributes = draft.readable_payload&.symbolize_keys
+      return unless attributes
+
       removed = false
       import_notice = nil
       source_import_id = attributes[:source_import_id]

@@ -95,6 +95,14 @@ class TranslationWorkspaceDraft < ApplicationRecord
     JSON.parse(workspace_payload)
   end
 
+  # The payload, or nil when it cannot be read: it no longer decrypts (for
+  # example after the secret key base changed) or is not a valid draft.
+  def readable_payload
+    self.class.validate_payload!(payload)
+  rescue ActiveRecord::Encryption::Errors::Decryption, JSON::ParserError, ArgumentError
+    nil
+  end
+
   # An editor is one browser page load. The editor that wrote the draft last
   # may keep writing even if it never received the latest version, because
   # every change since its own acknowledged version is its own. Anyone else

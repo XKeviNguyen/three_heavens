@@ -30,15 +30,32 @@ confirmation are unchanged.
    and expiry. Google's public keys are fetched with 3 s/5 s timeouts,
    refreshed at most once a minute, and trusted for at most an hour.
 6. The claims must contain a bounded `sub`, a valid email, and a nonce that is
-   an unexpired ceremony issued by this server and not used before.
+   an unexpired ceremony issued by this server and not used before. Use is
+   recorded as a digest in the primary database (`consumed_nonces`), whose
+   unique index accepts exactly one use even when several processes receive
+   the same credential at once.
+7. A verified sign-in is stored in a two-minute, encrypted, single-use cookie
+   scoped to `/auth/google/complete`, and the callback redirects there with
+   303. That same-site navigation carries the session cookie, so the session
+   starts there and ends the one it replaces. The pending sign-in is consumed
+   the same way as the ceremony.
 
 Google's cross-site POST does not carry the SameSite=Lax session cookie; that
 is why the ceremony, not the session, carries the sign-in context. For the same
-reason the callback never writes a session cookie unless it completes a sign-in
-(a new cookie would replace, and so sign out, the browser's real session).
+reason the callback never writes a session cookie (a new cookie would replace,
+and so sign out, the browser's real session without ending its server session).
 Outcomes travel in a one-minute signed cookie holding an allowlisted code: a
 failed link returns the signed-in user to **Account**; other failures show on
 the sign-in page.
+
+The pending sign-in is not bound to the browser that started the ceremony.
+Planting another account's pending sign-in in a victim's browser needs the
+ability to set cookies for this host (cross-site scripting, or cookie
+tossing from a sibling host), which would equally let an attacker plant
+that account's session cookie directly; the path-scoped, two-minute,
+single-use pending cookie adds nothing to that. Binding it to a browser
+cookie set before the redirect to Google would therefore not close an
+additional attack, so it is left as it is.
 
 ## Account rules
 

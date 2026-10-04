@@ -10,4 +10,14 @@ class Session < ApplicationRecord
 
   scope :unexpired, -> { where(created_at: LIFETIME.ago..) }
   scope :expired, -> { where(created_at: ...LIFETIME.ago) }
+
+  # Starts a session only while the account is active, else returns nil.
+  # Disabling an account updates its row and deletes its sessions in one
+  # transaction. Locking that row first orders the two, so a sign-in racing a
+  # disable cannot write a session that re-enabling the account would revive.
+  def self.start(user)
+    transaction do
+      create!(user:) if User.active.where(id: user.id).lock("FOR SHARE").exists?
+    end
+  end
 end

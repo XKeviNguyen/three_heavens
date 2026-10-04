@@ -1,4 +1,7 @@
 class SourceImportsController < ApplicationController
+  include UploadBudgetAdmission
+  before_action :admit_upload, only: :create
+
   def new
     @project = find_owned_project(project_id_param)
     @source_import = SourceImport.new
@@ -36,6 +39,7 @@ class SourceImportsController < ApplicationController
     # workspace uploader resends the same request key after a 5xx, and the
     # upload form issues a new one.
     response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    refund_upload_budget
     render_import_failure(error, status: :service_unavailable)
   rescue SourceImports::Error => error
     render_import_failure(error, status: :unprocessable_content)
@@ -72,9 +76,17 @@ class SourceImportsController < ApplicationController
 
   private
 
+  def render_rate_limited
+    response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)
+    render_import_failure_message(t("source_imports.errors.rate_limited"), status: :too_many_requests)
+  end
+
   def render_import_failure(error, status:)
+    render_import_failure_message(t("source_imports.errors.#{error.code}", default: error.message), status:)
+  end
+
+  def render_import_failure_message(message, status:)
     @source_import = SourceImport.new
-    message = t("source_imports.errors.#{error.code}", default: error.message)
     if request.format.json?
       render json: { error: message }, status:
     else

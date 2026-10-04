@@ -25,10 +25,10 @@ jobs:
 
       - name: Scan for common Rails security vulnerabilities using static analysis
         run: bin/brakeman --no-pager
-      
+
       - name: Scan for known security vulnerabilities in gems used
         run: bin/bundler-audit
-      
+
   scan_js:
     runs-on: ubuntu-latest
 
@@ -79,6 +79,11 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+      # Compares the empty tree with the checkout, so every tracked file is
+      # checked (generated files opt out in .gitattributes).
+      - name: Check for whitespace errors
+        run: git diff --check $(git hash-object -t tree /dev/null)
+
   test:
     runs-on: ubuntu-latest
     env:
@@ -124,6 +129,12 @@ jobs:
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
           # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test
+
+      - name: Check autoloading
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        run: bin/rails zeitwerk:check
 
   system-test:
     runs-on: ubuntu-latest

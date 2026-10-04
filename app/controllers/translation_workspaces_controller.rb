@@ -141,6 +141,11 @@ class TranslationWorkspacesController < ApplicationController
     return unless @draft
 
     result = TranslationWorkspaceDrafts::Restore.call(draft: @draft, user: current_user, project:)
+    unless result
+      @draft_unreadable = true
+      return
+    end
+
     @draft_configuration_notice = result.configuration_notice
     @draft_import_notice = result.import_notice
     @draft_restored = true

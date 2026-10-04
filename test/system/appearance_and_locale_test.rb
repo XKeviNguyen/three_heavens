@@ -68,6 +68,40 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     })();
   JS
 
+  # WCAG 1.4.3: visible text against its composited background, 4.5:1 or
+  # 3:1 for large text. Colours are resolved through a canvas because the
+  # light palette is oklch. Returns the offenders.
+  CONTRAST_AUDIT = <<~JS.freeze
+    (() => {
+      const canvas = document.createElement("canvas"); canvas.width = canvas.height = 1; const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const parse = (c) => { if (!c || c === "transparent") return null; ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = "rgba(0,0,0,0)"; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return { r, g, b, a: a / 255 }; };
+      const lum = ({ r, g, b }) => { const ch = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b); };
+      const blend = (top, bottom) => ({ r: top.r * top.a + bottom.r * (1 - top.a), g: top.g * top.a + bottom.g * (1 - top.a), b: top.b * top.a + bottom.b * (1 - top.a), a: 1 });
+      const background = (el) => {
+        const layers = [];
+        for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.backgroundImage !== "none") return null; const c = parse(s.backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; } }
+        let base = { r: 255, g: 255, b: 255, a: 1 };
+        for (const layer of layers.reverse()) base = blend(layer, base);
+        return base;
+      };
+      const out = [];
+      for (const el of document.querySelectorAll("body *")) {
+        if (!([...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))) continue;
+        const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+        if (r.width < 1 || r.height < 1 || r.bottom < 0 || s.visibility === "hidden" || s.display === "none" || el.closest("[aria-hidden='true'], .sr-only, svg") || s.opacity === "0") continue;
+        if (el.closest("input, select, textarea, [disabled]")) continue;
+        const fg = parse(s.color); const bg = background(el); if (!fg || !bg) continue;
+        const color = fg.a < 1 ? blend(fg, bg) : fg;
+        const [hi, lo] = [lum(color), lum(bg)].sort((a, b) => b - a);
+        const ratio = (hi + 0.05) / (lo + 0.05);
+        const size = parseFloat(s.fontSize); const bold = Number(s.fontWeight) >= 700;
+        const needed = (size >= 24 || (bold && size >= 18.66)) ? 3 : 4.5;
+        if (ratio < needed) out.push(`${ratio.toFixed(2)} ${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 5).join(".")} «${el.textContent.trim().slice(0, 40)}»`);
+      }
+      return [...new Set(out)].slice(0, 25);
+    })()
+  JS
+
   teardown do
     page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", features: [])
   end
@@ -83,6 +117,7 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     assert_no_selector ".appearance-menu[open]"
     assert page.evaluate_script("document.activeElement.matches('.appearance-menu summary')")
 
+    page.execute_script("document.addEventListener('appearance:saved', (event) => { document.documentElement.dataset.testAppearanceSaved = event.detail.appearance })")
     summary.click
     click_button "Dark"
     assert_selector "html[data-appearance='dark']"
@@ -91,6 +126,10 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     assert_equal "Appearance: Dark", find(".appearance-menu summary")[:"aria-label"]
     assert_equal CANVAS_DARK, body_background
 
+    # Dark is shown at once but saved in the background; a reload before the
+    # save lands renders the previous preference (reproduced with 400 ms of
+    # network latency).
+    assert_selector "html[data-test-appearance-saved='dark']"
     refresh
     assert_selector "html[data-appearance='dark']"
     assert_selector "meta[name='color-scheme'][content='dark']", visible: :all
@@ -113,6 +152,36 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     Timeout.timeout(5) { sleep 0.05 until user.reload.appearance == "light" }
     refresh
     assert_selector "html[data-appearance='light']"
+  end
+
+  test "a failed appearance save shows the saved choice again, and an unanswered one converges on the next page" do
+    user = users(:normal)
+    sign_in_in_browser(user, "correct horse battery staple")
+    visit projects_path
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.appearanceFetchMode = "fail"
+      window.fetch = async (url, options) => {
+        if (!String(url).includes("/appearance")) return original(url, options)
+        if (window.appearanceFetchMode === "fail") return new Response("", { status: 500 })
+        await original(url, options)
+        throw new TypeError("the response was lost")
+      }
+    JS
+
+    page.execute_script("document.querySelector(`.appearance-option[data-appearance='dark']`).form.requestSubmit()")
+    assert_selector "html[data-appearance='system']"
+    assert_equal "system", user.reload.appearance
+
+    # The server saves Dark, but the page never learns it and shows its last
+    # confirmed choice until the next server-rendered page.
+    page.execute_script("window.appearanceFetchMode = 'lose'")
+    page.execute_script("document.querySelector(`.appearance-option[data-appearance='dark']`).form.requestSubmit()")
+    Timeout.timeout(5) { sleep 0.05 until user.reload.appearance == "dark" }
+    assert_selector "html[data-appearance='system']"
+    within("aside#app-sidebar") { click_link "History" }
+    assert_selector "h1", text: "Experiment history"
+    assert_selector "html[data-appearance='dark']"
   end
 
   test "without Web Locks, rapid appearance choices from one page still persist in order" do
@@ -205,6 +274,31 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     # Last: its health checks query Solid tables absent from the test database,
     # which aborts the shared test transaction for any later request.
     assert_dark_readable(settings_operations_path)
+  end
+
+  test "text meets AA contrast on the main pages in light and dark" do
+    user = users(:admin)
+    %w[light dark].each do |appearance|
+      visit login_path
+      page.execute_script("document.addEventListener('appearance:saved', (event) => { document.documentElement.dataset.testAppearanceSaved = event.detail.appearance })")
+      page.execute_script("document.querySelector(`.appearance-option[data-appearance='#{appearance}']`).form.requestSubmit()")
+      assert_selector "html[data-test-appearance-saved='#{appearance}']"
+      [ root_path, login_path ].each do |path|
+        visit path
+        assert_selector "html[data-appearance='#{appearance}']"
+        assert_empty page.evaluate_script(CONTRAST_AUDIT), "#{appearance} #{path}"
+      end
+      sign_in_in_browser(user, "admin secure password value")
+      [ new_translation_workspace_path, projects_path, glossaries_path, settings_models_path ].each do |path|
+        visit path
+        assert_selector "html[data-appearance='#{appearance}']"
+        assert_empty page.evaluate_script(CONTRAST_AUDIT), "#{appearance} #{path}"
+      end
+      # Clearing cookies instead would race responses still in flight, which
+      # can restore the session cookie (seen with injected latency).
+      within("aside#app-sidebar") { click_button "Log out" }
+      assert_selector "main form input[type=submit]"
+    end
   end
 
   test "the mobile navigation and launch bar are dark on a phone" do

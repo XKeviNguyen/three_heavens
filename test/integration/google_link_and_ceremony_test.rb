@@ -35,14 +35,12 @@ class GoogleLinkAndCeremonyTest < ActionDispatch::IntegrationTest
   end
 
   test "a replayed link ceremony keeps the session and links nothing twice" do
-    with_memory_cache do
-      claims = google_claims(subject: "replay-sub", nonce: link_ceremony)
-      with_google_verifier(FakeVerifier.new(claims: claims)) do
-        post_cross_site_callback
-        assert_redirected_to settings_account_path
-        post settings_account_google_identity_path
-        post_cross_site_callback
-      end
+    claims = google_claims(subject: "replay-sub", nonce: link_ceremony)
+    with_google_verifier(FakeVerifier.new(claims: claims)) do
+      post_cross_site_callback
+      assert_redirected_to settings_account_path
+      post settings_account_google_identity_path
+      post_cross_site_callback
     end
 
     assert_link_failure_kept_session("replay")

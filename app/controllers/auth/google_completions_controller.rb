@@ -11,6 +11,8 @@ module Auth
       return reject unless user
 
       destination = start_authenticated_session!(user, preference_overrides: pending.preference_overrides)
+      return reject if destination == false
+
       I18n.with_locale(user.locale) do
         redirect_to pending.return_path || destination.presence || new_translation_workspace_path,
                     notice: t("authentication.signed_in"), status: :see_other

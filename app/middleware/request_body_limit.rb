@@ -1,4 +1,5 @@
 require "strscan"
+require "rack/multipart"
 
 class RequestBodyLimit
   MAX_FILE_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -7,6 +8,29 @@ class RequestBodyLimit
   MAX_BYTES = (MAX_FILES_PER_REQUEST * MAX_FILE_UPLOAD_BYTES) + MULTIPART_OVERHEAD_BYTES
   PUBLIC_FORM_MAX_BYTES = 8 * 1024
   PUBLIC_FORM_PATHS = %w[/session /registration /confirmation_resend /email_confirmation /locale /appearance /auth/google/callback /auth/google/ceremony].freeze
+
+  # Rails parses a form body (multipart into tempfiles) for any route before
+  # authentication runs, so a body is held to the smallest limit its route
+  # needs. Every request gets DEFAULT_MAX_BYTES unless its routed path is one
+  # of the explicit exceptions below, and only for the methods that submit
+  # forms (POST, and PATCH/PUT before Rack::MethodOverride runs).
+  DEFAULT_MAX_BYTES = 64 * 1024
+  BODY_METHODS = %w[POST PATCH PUT].freeze
+  # Forms whose fields may each hold a whole document (100,000 characters,
+  # up to 12 bytes each once UTF-8 and percent-encoded) or a 100-entry
+  # glossary.
+  LONG_TEXT_MAX_BYTES = 2 * 1024 * 1024
+  LONG_TEXT_PATHS = [
+    %r{\A/translation_workspace(?:/options)?\z},
+    %r{\A/final_translations/[^/]+/save_revision\z},
+    %r{\A/(?:glossaries|methodology_profiles)(?:/[^/]+)?\z},
+    %r{\A/workspace_terminology\z}
+  ].freeze
+  # The only forms that carry files: up to MAX_FILES_PER_REQUEST uploads.
+  UPLOAD_PATHS = [
+    %r{\A/source_imports\z},
+    %r{\A/translation_references(?:/[^/]+)?\z}
+  ].freeze
 
   # Rails parses a JSON body into parameters for every action before any
   # callback runs (the request log records them), so JSON is bounded here for
@@ -24,6 +48,15 @@ class RequestBodyLimit
   JSON_MAX_TOKENS = 1_000
 
   class ExceededError < StandardError; end
+
+  # Rack::MethodOverride parses form bodies outside Rails' exception
+  # handling, so a body over one of Rack's multipart limits (non-file field
+  # bytes, parts, files) would otherwise reach Puma as a 500.
+  MULTIPART_LIMIT_ERRORS = [
+    Rack::Multipart::BoundaryTooLongError,
+    Rack::Multipart::MultipartPartLimitError,
+    Rack::Multipart::MultipartTotalPartLimitError
+  ].freeze
 
   JSON_STRING = /"(?:[^"\\]++|\\.)*+"/m
   JSON_UNCOUNTED = /[^"\[{,]+/
@@ -148,6 +181,8 @@ class RequestBodyLimit
     app.call(environment)
   rescue ExceededError
     payload_too_large
+  rescue *MULTIPART_LIMIT_ERRORS
+    bad_request
   end
 
   private
@@ -157,8 +192,12 @@ class RequestBodyLimit
   def limit_for(environment)
     path = routed_path(environment["PATH_INFO"])
     return JSON_PATH_MAX_BYTES.fetch(path, JSON_MAX_BYTES) if parsed_as_parameters?(environment)
+    return PUBLIC_FORM_MAX_BYTES if PUBLIC_FORM_PATHS.include?(path)
+    return DEFAULT_MAX_BYTES unless BODY_METHODS.include?(environment["REQUEST_METHOD"])
+    return MAX_BYTES if UPLOAD_PATHS.any? { |pattern| pattern.match?(path) }
+    return LONG_TEXT_MAX_BYTES if LONG_TEXT_PATHS.any? { |pattern| pattern.match?(path) }
 
-    PUBLIC_FORM_PATHS.include?(path) ? PUBLIC_FORM_MAX_BYTES : MAX_BYTES
+    DEFAULT_MAX_BYTES
   end
 
   # The path the router matches: it squeezes repeated slashes and ignores a
@@ -177,6 +216,14 @@ class RequestBodyLimit
     symbol.present? && ActionDispatch::Request.parameter_parsers.key?(symbol)
   rescue Mime::Type::InvalidMimeType
     false
+  end
+
+  def bad_request
+    [
+      400,
+      { "content-type" => "text/plain; charset=utf-8", "content-length" => "12", "cache-control" => "no-store" },
+      [ "Bad request\n" ]
+    ]
   end
 
   def payload_too_large

@@ -111,21 +111,32 @@ class SessionInvalidationTest < ActionDispatch::IntegrationTest
     assert_cookie_does_not_authenticate password_session_cookie
   end
 
+  test "a sign-in that the account's disabling overtakes leaves no session for a later re-enable" do
+    with_account_disabled_after_password_check(users(:normal)) do
+      post session_path, params: { session: { email: "user@example.test", password: "correct horse battery staple" } },
+                         headers: { "REMOTE_ADDR" => "203.0.113.70" }
+    end
+    assert_response :unprocessable_content
+    copied_cookie = session_cookie
+
+    assert_not users(:normal).sessions.exists?
+    users(:normal).update!(status: "active")
+    assert_cookie_does_not_authenticate copied_cookie
+  end
+
   test "a pending Google sign-in completes once, before it expires, and only for an active account" do
     users(:normal).federated_identities.create!(provider: "google", provider_uid: "pending-sub")
 
-    with_memory_cache do
-      google_sign_in_cross_site(subject: "pending-sub", complete: false)
-      pending_cookie = cookies["google_identity_pending_sign_in"]
-      get google_identity_completion_path
-      assert_redirected_to new_translation_workspace_path
-      sign_out
+    google_sign_in_cross_site(subject: "pending-sub", complete: false)
+    pending_cookie = cookies["google_identity_pending_sign_in"]
+    get google_identity_completion_path
+    assert_redirected_to new_translation_workspace_path
+    sign_out
 
-      cookies["google_identity_pending_sign_in"] = pending_cookie
-      get google_identity_completion_path
-      assert_redirected_to login_path
-      assert_nil signed_in_user_id
-    end
+    cookies["google_identity_pending_sign_in"] = pending_cookie
+    get google_identity_completion_path
+    assert_redirected_to login_path
+    assert_nil signed_in_user_id
 
     google_sign_in_cross_site(subject: "pending-sub", complete: false)
     travel(GoogleIdentity::PendingSignIn::TTL + 1.second) { get google_identity_completion_path }
@@ -175,6 +186,18 @@ class SessionInvalidationTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  # The password check passes, then an administrator's disable commits
+  # before the session row is written.
+  def with_account_disabled_after_password_check(user)
+    original = User.method(:authenticate_by_email)
+    User.define_singleton_method(:authenticate_by_email) do |**credentials|
+      original.call(**credentials).tap { User.find(user.id).update!(status: "disabled") }
+    end
+    yield
+  ensure
+    User.singleton_class.define_method(:authenticate_by_email, original.unbind)
+  end
 
   def session_cookie
     cookies[session_cookie_name]

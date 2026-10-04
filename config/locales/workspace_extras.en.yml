@@ -11,6 +11,7 @@ en:
     paid_plan_role: '%{role}: %{runs} runs × %{segments} segments = %{requests} requests'
     draft_import_detached: The original upload is no longer attached. Your reviewed source text remains.
     draft_configuration_changed: Some saved configuration is no longer available. Review the remaining selections.
+    draft_unreadable: "Your saved draft could not be read, so it was not restored. Your next saved change replaces it, or choose Discard draft to remove it now."
     repeat_profile_unavailable: The historical automatic profile no longer has the model capability data required for this
       source. A manual launch has been prefilled with its currently active translation models; review or replace them before
       authorizing work.
