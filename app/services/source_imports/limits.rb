@@ -15,7 +15,6 @@ module SourceImports
     # third of the window.
     UPLOADS_PER_WINDOW = 10
     UPLOAD_WINDOW = 5.minutes
-    UPLOAD_RATE_LIMIT_SCOPE = "uploads"
     MAX_DOCX_ENTRIES = 500
     MAX_DOCX_UNCOMPRESSED_BYTES = 50.megabytes
     MAX_DOCUMENT_XML_BYTES = 8.megabytes

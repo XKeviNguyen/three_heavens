@@ -1,7 +1,6 @@
 class SourceImportsController < ApplicationController
-  rate_limit to: SourceImports::Limits::UPLOADS_PER_WINDOW, within: SourceImports::Limits::UPLOAD_WINDOW,
-             scope: SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, by: -> { current_user.id },
-             with: :render_rate_limited, only: :create
+  include UploadBudgetAdmission
+  before_action :admit_upload, only: :create
 
   def new
     @project = find_owned_project(project_id_param)
@@ -76,12 +75,6 @@ class SourceImportsController < ApplicationController
   end
 
   private
-
-  # A busy answer extracted nothing, so its retries must not spend the
-  # budget that bounds slot use. The key is the one rate_limit counts under.
-  def refund_upload_budget
-    cache_store.decrement([ "rate-limit", SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, current_user.id ].join(":"))
-  end
 
   def render_rate_limited
     response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)

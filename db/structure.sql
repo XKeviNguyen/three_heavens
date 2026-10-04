@@ -3301,6 +3301,40 @@ ALTER SEQUENCE public.translation_workspace_submissions_id_seq OWNED BY public.t
 
 
 --
+-- Name: upload_budgets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.upload_budgets (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    window_id bigint NOT NULL,
+    count integer NOT NULL,
+    receipts uuid[] NOT NULL,
+    CONSTRAINT upload_budgets_count_bounds CHECK (((count >= 0) AND (count <= 10))),
+    CONSTRAINT upload_budgets_receipt_count CHECK ((count = cardinality(receipts)))
+);
+
+
+--
+-- Name: upload_budgets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.upload_budgets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: upload_budgets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.upload_budgets_id_seq OWNED BY public.upload_budgets.id;
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3757,6 +3791,13 @@ ALTER TABLE ONLY public.translation_workspace_submissions ALTER COLUMN id SET DE
 
 
 --
+-- Name: upload_budgets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets ALTER COLUMN id SET DEFAULT nextval('public.upload_budgets_id_seq'::regclass);
+
+
+--
 -- Name: users id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -4134,6 +4175,14 @@ ALTER TABLE ONLY public.translation_workspace_drafts
 
 ALTER TABLE ONLY public.translation_workspace_submissions
     ADD CONSTRAINT translation_workspace_submissions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: upload_budgets upload_budgets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets
+    ADD CONSTRAINT upload_budgets_pkey PRIMARY KEY (id);
 
 
 --
@@ -5191,6 +5240,13 @@ CREATE INDEX index_translation_workspace_submissions_on_user_id_and_status ON pu
 
 
 --
+-- Name: index_upload_budgets_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_upload_budgets_on_user_id ON public.upload_budgets USING btree (user_id);
+
+
+--
 -- Name: index_users_on_lower_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6041,6 +6097,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: upload_budgets fk_rails_570a83c4ee; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets
+    ADD CONSTRAINT fk_rails_570a83c4ee FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- Name: workflow_profile_revisions fk_rails_583a4f3dd8; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6391,6 +6455,7 @@ ALTER TABLE ONLY public.workflow_profiles
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261004090000'),
 ('20261003090000'),
 ('20261002090000'),
 ('20260930090000'),

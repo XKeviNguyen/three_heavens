@@ -1,4 +1,5 @@
 class TranslationReferencesController < ApplicationController
+  include UploadBudgetAdmission
   SCALAR_KEYS = %w[
     title
     source_language
@@ -12,9 +13,7 @@ class TranslationReferencesController < ApplicationController
   before_action :set_translation_reference, only: %i[show edit update activate deactivate]
   # Requests that carry files share the account's upload budget with source
   # imports (SourceImports::Limits::UPLOADS_PER_WINDOW); text-only edits do not.
-  rate_limit to: SourceImports::Limits::UPLOADS_PER_WINDOW, within: SourceImports::Limits::UPLOAD_WINDOW,
-             scope: SourceImports::Limits::UPLOAD_RATE_LIMIT_SCOPE, by: -> { current_user.id },
-             with: :render_rate_limited, only: %i[create update], if: :uploading_files?
+  before_action :admit_upload, only: %i[create update], if: :uploading_files?
 
   def index
     @translation_references = paginate(
@@ -33,6 +32,8 @@ class TranslationReferencesController < ApplicationController
     )
     reference = TranslationReferences::Create.call(user: current_user, attributes: attributes)
     redirect_to reference, notice: t("flash_ui.reference.created")
+  rescue TranslationReferences::AuthoringAttributes::Busy => error
+    render_busy(error)
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values.merge(attributes || {})
     @form_values.merge!(error.resolved_attributes) if error.is_a?(TranslationReferences::AuthoringAttributes::Error)
@@ -60,6 +61,8 @@ class TranslationReferencesController < ApplicationController
       attributes: attributes
     )
     redirect_to @translation_reference, notice: t("flash_ui.reference.revision", version: revision.version)
+  rescue TranslationReferences::AuthoringAttributes::Busy => error
+    render_busy(error)
   rescue TranslationReferences::Revise::StaleRevisionError => error
     @current_revision = @translation_reference.reload.current_revision
     @form_values = attributes.merge(
@@ -88,6 +91,14 @@ class TranslationReferencesController < ApplicationController
   end
 
   private
+
+  def render_busy(error)
+    refund_upload_budget unless error.work_consumed
+    response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    @form_values = safe_submitted_values.merge(error.resolved_attributes)
+    @form_errors = [ t("source_imports.errors.#{error.code}", default: error.message) ]
+    render(action_name == "create" ? :new : :edit, status: :service_unavailable)
+  end
 
   def render_rate_limited
     response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)
