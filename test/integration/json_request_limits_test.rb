@@ -152,7 +152,7 @@ class JsonRequestLimitsTest < ActionDispatch::IntegrationTest
 
   # The request the browser sends (workspace_guard_controller.js#persist).
   def draft_body(workspace)
-    JSON.generate(project_id: "", draft_id: "", version: "", editor_id: ReplayIdentity.issue, sequence: 1, workspace:)
+    JSON.generate(project_id: "", draft_id: "", version: "", editor_id: ReplayIdentity.issue(user: users(:normal), context_key: "new"), sequence: 1, workspace:)
   end
 
   # Every field at its limit, with the source text filled to just under the

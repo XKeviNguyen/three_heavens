@@ -113,4 +113,30 @@ module ProcessBarrier
       end
     end
   end
+
+  # The pipe proves the independent PostgreSQL session owns the lock before
+  # cleanup runs. Releasing it is explicit; no timing assumptions or sleeps.
+  def with_process_lock(sql)
+    ActiveRecord::Base.connection_handler.clear_all_connections!
+    ready_read, ready_write = IO.pipe
+    release_read, release_write = IO.pipe
+    pid = fork do
+      ready_read.close
+      release_write.close
+      ActiveRecord::Base.transaction do
+        ActiveRecord::Base.connection.execute(sql)
+        ready_write.write("r")
+        release_read.read(1)
+      end
+      exit! 0
+    end
+    ready_write.close
+    release_read.close
+    Timeout.timeout(15) { assert_equal "r", ready_read.read(1) }
+    yield
+  ensure
+    release_write&.write("g") unless release_write&.closed?
+    Process.wait(pid) if pid
+    [ ready_read, ready_write, release_read, release_write ].compact.each { |pipe| pipe.close unless pipe.closed? }
+  end
 end

@@ -14,8 +14,8 @@ module TranslationWorkspaceDrafts
   #   (TranslationWorkspaceDraft#writable_by?), so another tab's newer draft is
   #   reported as a conflict instead of being overwritten.
   #
-  # Saves without an editor identity (pages loaded before this protocol) keep
-  # the plain optimistic-concurrency behaviour.
+  # Editors rejected by an ordering conflict or terminal action remain retired
+  # through their admission lease. Reloading obtains a new page identity.
   class Save
     Result = Data.define(:draft, :conflict) do
       def conflict?
@@ -58,20 +58,23 @@ module TranslationWorkspaceDrafts
     def save_locked
       @editor = TranslationWorkspaceDraftEditor.lock_for(user:, context_key:, editor_id:)
       draft = user.translation_workspace_drafts.lock.find_by(context_key:)
+      return Result.new(draft:, conflict: true) if @editor&.rejected?
       if draft && draft.expires_at <= at
         draft.delete
         draft = nil
       end
 
       if draft.nil?
-        raise ActiveRecord::RecordNotFound, "The saved draft no longer exists" if draft_id
+        if draft_id
+          raise ActiveRecord::RecordNotFound, "The saved draft no longer exists" unless @editor
+          return rejected(draft)
+        end
         return Result.new(draft: nil, conflict: true) if @editor && sequence <= @editor.sequence
 
         return saved(user.translation_workspace_drafts.create!(context_key:, **written_attributes))
       end
       unless draft.writable_by?(editor_id:, public_id: draft_id, version:)
-        @editor.destroy! if @editor&.sequence == 0
-        return Result.new(draft:, conflict: true)
+        return rejected(draft)
       end
       return saved(draft) if editor_id && draft.editor_id == editor_id && sequence <= draft.editor_sequence
 
@@ -101,6 +104,11 @@ module TranslationWorkspaceDrafts
     def saved(draft)
       @editor.update!(sequence:) if @editor && sequence > @editor.sequence
       Result.new(draft:, conflict: false)
+    end
+
+    def rejected(draft)
+      @editor.update!(sequence: [ @editor.sequence, sequence ].max, rejected: true) if @editor
+      Result.new(draft:, conflict: true)
     end
   end
 end

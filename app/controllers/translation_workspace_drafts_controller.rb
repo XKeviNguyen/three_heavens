@@ -24,6 +24,8 @@ class TranslationWorkspaceDraftsController < ApplicationController
                    saved_at: draft.updated_at.iso8601 }
   rescue TranslationWorkspaceDraftEditor::Expired, ActiveRecord::RecordNotUnique, ActiveRecord::StaleObjectError
     render_conflict
+  rescue ReplayIdentity::AdmissionExceeded
+    render json: { error: "Too many recent workspace sessions. Try again later." }, status: :too_many_requests
   rescue ArgumentError, ActionController::ParameterMissing, ActionController::BadRequest
     head :bad_request
   end
@@ -32,14 +34,16 @@ class TranslationWorkspaceDraftsController < ApplicationController
   # wrote the draft last may discard it without knowing its latest version.
   def destroy
     project = find_owned_project(params[:project_id])
-    identity = params[:sequence].present? ? editor_identity(allow_zero: true) : { editor_id: params[:editor_id].presence }
+    identity = editor_identity(allow_zero: true)
     conflict = TranslationWorkspaceDrafts::Discard.call(
       user: current_user, context_key: TranslationWorkspaceDraft.context_key(project),
       draft_id: params[:draft_id], version: params[:version].nil? ? nil : supplied_version, **identity
     )
-    conflict ? render_conflict(conflict) : head(:no_content)
+    conflict ? render_conflict(conflict.is_a?(TranslationWorkspaceDraft) ? conflict : nil) : head(:no_content)
   rescue TranslationWorkspaceDraftEditor::Expired, ActiveRecord::StaleObjectError
     render_conflict
+  rescue ReplayIdentity::AdmissionExceeded
+    render json: { error: "Too many recent workspace sessions. Try again later." }, status: :too_many_requests
   rescue ArgumentError, ActionController::BadRequest
     head :bad_request
   end
@@ -68,7 +72,6 @@ class TranslationWorkspaceDraftsController < ApplicationController
   end
 
   def editor_identity(allow_zero: false)
-    return {} if params[:editor_id].blank? && params[:sequence].blank?
     pattern = allow_zero ? /\A(?:0|[1-9]\d{0,15})\z/ : /\A[1-9]\d{0,15}\z/
     raise ActionController::BadRequest if params[:editor_id].blank? || !params[:sequence].to_s.match?(pattern)
 

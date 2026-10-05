@@ -157,9 +157,8 @@ class TranslationWorkspacesController < ApplicationController
     version = params[:translation_workspace_draft_version]
     return if public_id.blank? || !version.to_s.match?(/\A\d+\z/)
 
-    current_user.translation_workspace_drafts
-      .where(public_id:, context_key: TranslationWorkspaceDraft.context_key(project), lock_version: version.to_i)
-      .delete_all
+    TranslationWorkspaceDrafts::Discard.after_launch(user: current_user,
+      public_id:, context_key: TranslationWorkspaceDraft.context_key(project), version: version.to_i)
   end
 
   def prepare_repeat_preview(revision, historical)

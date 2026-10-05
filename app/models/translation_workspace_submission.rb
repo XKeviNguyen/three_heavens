@@ -52,10 +52,14 @@ class TranslationWorkspaceSubmission < ApplicationRecord
     return if expires_at <= at
 
     # Concurrent first attempts race here; exactly one row is inserted.
-    insert(
-      { user_id: user.id, token_digest: digest(token), status: "available", expires_at:, created_at: at, updated_at: at },
-      unique_by: :token_digest
-    )
+    transaction do
+      ReplayIdentity.admit!(ledger: self, user:, identity: { token_digest: digest(token) },
+        scope: where(user_id: user.id, status: "available"))
+      insert(
+        { user_id: user.id, token_digest: digest(token), status: "available", expires_at:, created_at: at, updated_at: at },
+        unique_by: :token_digest
+      )
+    end
     user.translation_workspace_submissions.find_by!(token_digest: digest(token))
   end
 

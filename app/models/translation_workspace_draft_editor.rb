@@ -10,11 +10,15 @@ class TranslationWorkspaceDraftEditor < ApplicationRecord
   # Called inside the save/discard transaction. Inserting before locking also
   # orders a discard that reaches the server before the editor's first save.
   def self.lock_for(user:, context_key:, editor_id:)
-    return unless editor_id.present?
+    raise Expired unless editor_id.present?
 
     new(user:, context_key:, editor_id:, sequence: 0).validate!
     existing = find_by(user_id: user.id, context_key:, editor_id:)
     raise Expired unless ReplayIdentity.valid?(editor_id, existing:)
+    unless existing && editor_id.match?(ReplayIdentity::LEGACY_FORMAT)
+      raise Expired unless ReplayIdentity.complete?(editor_id, user:, context_key:)
+    end
+    ReplayIdentity.admit!(ledger: self, user:, identity: { context_key:, editor_id: }) unless existing
 
     insert_all([ { user_id: user.id, context_key:, editor_id:, sequence: 0,
       expires_at: ReplayIdentity.expires_at(editor_id) || existing.expires_at } ],

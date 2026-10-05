@@ -44,7 +44,7 @@ class ReplayLifecycleTest < ActiveSupport::TestCase
 
   test "discard keeps a protective watermark and expired editors cannot overwrite a newer tab" do
     freeze_time
-    editor_a, editor_b = ReplayIdentity.issue, ReplayIdentity.issue
+    editor_a, editor_b = Array.new(2) { ReplayIdentity.issue(user: users(:normal), context_key: "new") }
     saved = save(editor_a, 1, "A")
     TranslationWorkspaceDrafts::Discard.call(user: users(:normal), context_key: "new", draft_id: nil,
       version: nil, editor_id: editor_a, sequence: 1)
@@ -70,7 +70,7 @@ class ReplayLifecycleTest < ActiveSupport::TestCase
 
   test "expired draft deletion retains its still valid editor watermark" do
     freeze_time
-    editor = ReplayIdentity.issue
+    editor = ReplayIdentity.issue(user: users(:normal), context_key: "new")
     draft = save(editor, 3, "Expired content").draft
     draft.update!(expires_at: Time.current)
     assert_equal({ drafts: 1, editors: 0 }, TranslationWorkspaceDraftCleanupJob.perform_now)
@@ -171,7 +171,7 @@ class ReplayLifecycleTest < ActiveSupport::TestCase
       perform_enqueued_jobs(only: job) { perform_enqueued_jobs(only: job) }
       assert_equal [ recent.id ], model.pluck(:id)
       assert_enqueued_jobs 0, only: job
-      assert_performed_jobs model == TranslationReferenceCreation ? 2 : 1, only: job
+      assert_performed_jobs 1, only: job
     end
   end
 

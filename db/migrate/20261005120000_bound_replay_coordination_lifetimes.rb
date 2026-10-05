@@ -1,66 +1,78 @@
 class BoundReplayCoordinationLifetimes < ActiveRecord::Migration[8.1]
-  TABLE_KEYS = {
-    source_import_retirements: :request_key,
-    translation_workspace_draft_editors: :editor_id,
-    translation_reference_creations: :creation_key
+  disable_ddl_transaction!
+  IDENTITY_SQL = "'^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\\.[0-9a-f]{32}$'"
+  CHECKS = {
+    source_imports: [ :request_key, "source_imports_request_key_check" ],
+    translation_workspace_drafts: [ :editor_id, "workspace_drafts_editor_id_check" ]
   }.freeze
-  IDENTITY_SQL = "'^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\\.[0-9a-f]{32}$'"
 
   def up
-    TABLE_KEYS.each do |table, key|
-      change_column table, key, :string, limit: 512, null: false
-      # Existing identities get a full admission window after the upgrade,
-      # independent of how old the draft/action happened to be beforehand.
-      add_column table, :expires_at, :datetime, null: false,
-        default: -> { "CURRENT_TIMESTAMP + interval '24 hours'" }
-      add_index table, %i[expires_at id], name: "index_#{table}_on_expiry"
+    with_short_locks do
+      replace_checks(IDENTITY_SQL)
+      # Nullable metadata addition has no backfill or heap rewrite. A failed
+      # cleanup retains the blob and its bounded retry deadline on that row.
+      add_column :active_storage_blobs, :cleanup_retry_at, :datetime unless column_exists?(:active_storage_blobs, :cleanup_retry_at)
+      build_index(:active_storage_blobs, "(COALESCE(cleanup_retry_at, created_at + interval '7 days')), id",
+        name: "index_active_storage_blobs_on_cleanup_deadline")
+      remove_index :active_storage_blobs, name: "index_active_storage_blobs_for_cleanup", algorithm: :concurrently,
+        if_exists: true
+      build_index(:source_imports, %i[expires_at id], name: "index_source_imports_on_cleanup_deadline",
+        where: "status IN ('pending', 'ready', 'failed')")
+      remove_index :source_imports, name: "index_source_imports_for_cleanup", algorithm: :concurrently, if_exists: true
     end
-    change_column :source_imports, :request_key, :string, limit: 512
-    change_column :translation_workspace_drafts, :editor_id, :string, limit: 512
-    replace_checks(new_format: true)
-    remove_index :translation_reference_creations, name: "index_reference_creations_on_expiring_failure"
-    add_index :translation_reference_creations, %i[created_at id], where: "status = 'failed'",
-      name: "index_reference_creations_on_expiring_failure"
   end
 
   def down
-    # Signed identities cannot be represented by the old protocol. Rollback
-    # is supported before new traffic; never silently truncate protective keys.
-    tables = TABLE_KEYS.merge(source_imports: :request_key, translation_workspace_drafts: :editor_id)
-    tables.each do |table, key|
-      if select_value("SELECT EXISTS (SELECT 1 FROM #{table} WHERE length(#{key}) > 32)")
-        raise ActiveRecord::IrreversibleMigration, "Signed identities exist; rollback requires draining their lifecycle first"
+    with_short_locks do
+      keys = CHECKS.transform_values(&:first).merge(
+        source_import_retirements: :request_key, translation_workspace_draft_editors: :editor_id,
+        translation_reference_creations: :creation_key)
+      keys.each do |table, key|
+        if select_value("SELECT EXISTS (SELECT 1 FROM #{table} WHERE length(#{key}) > 32)")
+          raise ActiveRecord::IrreversibleMigration, "Signed identities exist; use a forward correction"
+        end
       end
+      replace_checks("'^[0-9a-f]{32}$'")
+      build_index(:source_imports, %i[status expires_at id], name: "index_source_imports_for_cleanup")
+      remove_index :source_imports, name: "index_source_imports_on_cleanup_deadline", algorithm: :concurrently
+      add_index :active_storage_blobs, %i[created_at id], name: "index_active_storage_blobs_for_cleanup", algorithm: :concurrently
+      remove_index :active_storage_blobs, name: "index_active_storage_blobs_on_cleanup_deadline", algorithm: :concurrently
+      remove_column :active_storage_blobs, :cleanup_retry_at
     end
-    replace_checks(new_format: false)
-    TABLE_KEYS.each do |table, key|
-      remove_index table, name: "index_#{table}_on_expiry"
-      remove_column table, :expires_at
-      change_column table, key, :string, limit: 32, null: false
-    end
-    change_column :source_imports, :request_key, :string, limit: nil
-    change_column :translation_workspace_drafts, :editor_id, :string, limit: nil
-    remove_index :translation_reference_creations, name: "index_reference_creations_on_expiring_failure"
-    add_index :translation_reference_creations, :created_at, where: "status = 'failed'",
-      name: "index_reference_creations_on_expiring_failure"
   end
 
   private
 
-  def replace_checks(new_format:)
-    format = new_format ? IDENTITY_SQL : "'^[0-9a-f]{32}$'"
-    {
-      source_import_retirements: [ :request_key, "source_import_retirements_request_key_check" ],
-      translation_workspace_draft_editors: [ :editor_id, "workspace_draft_editors_identity_check" ],
-      translation_reference_creations: [ :creation_key, "reference_creations_identity_check" ],
-      source_imports: [ :request_key, "source_imports_request_key_check" ],
-      translation_workspace_drafts: [ :editor_id, "workspace_drafts_editor_id_check" ]
-    }.each do |table, (key, name)|
-      remove_check_constraint table, name: name
-      expression = "#{key} ~ #{format}"
-      expression += " AND payload_digest ~ '^[0-9a-f]{64}$'" if table == :translation_reference_creations
-      expression = "#{key} IS NULL OR (#{expression})" if table.in?([ :source_imports, :translation_workspace_drafts ])
-      add_check_constraint table, expression, name: name
+  # Interrupted concurrent builds can leave an INVALID index. Only these
+  # migration-owned indexes are repaired, preserving the old serving index
+  # until its replacement is valid.
+  def build_index(table, columns, name:, **options)
+    valid = select_value(<<~SQL)
+      SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(#{connection.quote(name)})
+    SQL
+    return if valid == true
+
+    remove_index table, name:, algorithm: :concurrently if valid == false
+    add_index table, columns, name:, algorithm: :concurrently, **options
+  end
+
+  def replace_checks(format)
+    CHECKS.each do |table, (key, name)|
+      # Swap under a brief metadata lock, without scanning while holding it.
+      transaction do
+        remove_check_constraint table, name: name
+        add_check_constraint table, "#{key} IS NULL OR #{key} ~ #{format}", name:, validate: false
+      end
+      # This separate validation allows normal reads/writes throughout its scan.
+      validate_check_constraint table, name: name
     end
+  end
+
+  def with_short_locks
+    previous = select_value("SHOW lock_timeout")
+    execute "SET lock_timeout = '1s'"
+    yield
+  ensure
+    execute "SET lock_timeout = #{connection.quote(previous)}" if previous
   end
 end

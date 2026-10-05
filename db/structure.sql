@@ -1377,7 +1377,8 @@ CREATE TABLE public.active_storage_blobs (
     byte_size bigint NOT NULL,
     checksum character varying,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    cleanup_retry_at timestamp(6) without time zone
 );
 
 
@@ -2957,7 +2958,7 @@ CREATE TABLE public.source_import_retirements (
     request_key character varying(512) NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
-    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))
+    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))
 );
 
 
@@ -3002,13 +3003,13 @@ CREATE TABLE public.source_imports (
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    request_key character varying(512),
+    request_key character varying,
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
     CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text, ('pdf'::character varying)::text])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
-    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
+    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
     CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text, ('consumed'::character varying)::text])))
 );
@@ -3049,8 +3050,8 @@ CREATE TABLE public.translation_reference_creations (
     updated_at timestamp(6) without time zone NOT NULL,
     expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
     CONSTRAINT reference_creations_failure_size_check CHECK (((failure IS NULL) OR (octet_length(failure) <= 2097152))),
-    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
-    CONSTRAINT reference_creations_outcome_check CHECK (((((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('expired'::character varying)::text])) AND (translation_reference_id IS NULL) AND (failure IS NULL)) OR (((status)::text = 'completed'::text) AND (translation_reference_id IS NOT NULL) AND (failure IS NULL)) OR (((status)::text = 'failed'::text) AND (translation_reference_id IS NULL) AND (failure IS NOT NULL))))
+    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT reference_creations_outcome_check CHECK (((((status)::text = ANY ((ARRAY['pending'::character varying, 'expired'::character varying])::text[])) AND (translation_reference_id IS NULL) AND (failure IS NULL)) OR (((status)::text = 'completed'::text) AND (translation_reference_id IS NOT NULL) AND (failure IS NULL)) OR (((status)::text = 'failed'::text) AND (translation_reference_id IS NULL) AND (failure IS NOT NULL))))
 );
 
 
@@ -3299,9 +3300,10 @@ CREATE TABLE public.translation_workspace_draft_editors (
     user_id bigint NOT NULL,
     context_key character varying(80) NOT NULL,
     editor_id character varying(512) NOT NULL,
+    rejected boolean DEFAULT false NOT NULL,
     sequence bigint DEFAULT 0 NOT NULL,
     expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
-    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text)),
+    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text)),
     CONSTRAINT workspace_draft_editors_sequence_check CHECK (((sequence >= 0) AND (sequence <= '9007199254740991'::bigint)))
 );
 
@@ -3339,10 +3341,10 @@ CREATE TABLE public.translation_workspace_drafts (
     expires_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    editor_id character varying(512),
+    editor_id character varying,
     editor_sequence bigint,
     CONSTRAINT workspace_drafts_context_key_check CHECK ((char_length((context_key)::text) <= 80)),
-    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
+    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
     CONSTRAINT workspace_drafts_editor_pair_check CHECK (((editor_id IS NULL) = (editor_sequence IS NULL))),
     CONSTRAINT workspace_drafts_editor_sequence_check CHECK (((editor_sequence IS NULL) OR (editor_sequence > 0))),
     CONSTRAINT workspace_drafts_lock_version_check CHECK ((lock_version >= 0))
@@ -4420,10 +4422,10 @@ CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active
 
 
 --
--- Name: index_active_storage_blobs_for_cleanup; Type: INDEX; Schema: public; Owner: -
+-- Name: index_active_storage_blobs_on_cleanup_deadline; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_active_storage_blobs_for_cleanup ON public.active_storage_blobs USING btree (created_at, id);
+CREATE INDEX index_active_storage_blobs_on_cleanup_deadline ON public.active_storage_blobs USING btree (COALESCE(cleanup_retry_at, (created_at + '7 days'::interval)), id);
 
 
 --
@@ -5218,10 +5220,10 @@ CREATE UNIQUE INDEX index_source_import_retirements_on_owner_and_key ON public.s
 
 
 --
--- Name: index_source_imports_for_cleanup; Type: INDEX; Schema: public; Owner: -
+-- Name: index_source_imports_on_cleanup_deadline; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_source_imports_for_cleanup ON public.source_imports USING btree (status, expires_at, id);
+CREATE INDEX index_source_imports_on_cleanup_deadline ON public.source_imports USING btree (expires_at, id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying])::text[]));
 
 
 --

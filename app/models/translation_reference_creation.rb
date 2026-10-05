@@ -34,15 +34,23 @@ class TranslationReferenceCreation < ApplicationRecord
   # record survives deletion. Skip even expired pending rows while a live
   # creator owns the session lock; abandoned pending rows can be purged.
   def self.purge_expired(at: Time.current, batch_size: 100)
+    purge_batch(at:, batch_size:).fetch(:purged)
+  end
+
+  def self.purge_batch(at: Time.current, batch_size: 100, after: nil)
     limit = Integer(batch_size).clamp(1, 100)
     transaction do
-      candidates = where(expires_at: ..at).order(:expires_at, :id).limit(limit)
-        .lock("FOR UPDATE SKIP LOCKED").pluck(:id, :user_id, :creation_key)
-      ids = candidates.filter_map do |id, user_id, creation_key|
+      scope = where(expires_at: ..at)
+      scope = scope.where("(expires_at, id) > (?, ?)", *after) if after
+      candidates = scope.order(:expires_at, :id).limit(limit)
+        .lock("FOR UPDATE SKIP LOCKED").pluck(:id, :user_id, :creation_key, :expires_at)
+      ids = candidates.filter_map do |id, user_id, creation_key, _|
         key = lock_key(user_id:, creation_key:)
         id if connection.select_value(sanitize_sql_array([ "SELECT pg_try_advisory_xact_lock(?)", key ]))
       end
-      where(id: ids).delete_all
+      purged = where(id: ids).delete_all
+      last = candidates.last
+      { purged:, cursor: last ? [ last[3].iso8601(6), last[0] ] : after, more: candidates.size == limit }
     end
   end
 end

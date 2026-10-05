@@ -1,8 +1,8 @@
 class SourceImportCleanupJob < ApplicationJob
   queue_as :operations
 
-  def perform
-    result = SourceImports::Cleanup.call
+  def perform(after: nil, cutoff: Time.current.iso8601(6))
+    result = SourceImports::Cleanup.call(after:, cutoff: Time.iso8601(cutoff))
     Operations::EventLogger.emit(
       "source_import_cleanup_completed",
       active_job_id: job_id,
@@ -11,8 +11,10 @@ class SourceImportCleanupJob < ApplicationJob
     )
     Operations::EventLogger.emit("source_import_retirement_cleanup_completed", active_job_id: job_id,
       outcome: "success", count: result.retirements_purged_count)
-    # Partial progress can include a candidate skipped for a live action lock.
-    self.class.perform_later if result.purged_count.positive? || result.retirements_purged_count == SourceImports::Limits::CLEANUP_BATCH_SIZE
+    # Move past even a completely locked batch; never restart this sweep.
+    if result.more_imports || result.retirements_purged_count == SourceImports::Limits::CLEANUP_BATCH_SIZE
+      self.class.perform_later(after: result.cursor, cutoff:)
+    end
     result
   end
 end

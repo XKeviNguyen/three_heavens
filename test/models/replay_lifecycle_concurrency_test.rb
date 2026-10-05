@@ -117,9 +117,6 @@ class ReplayLifecycleConcurrencyTest < ActiveSupport::TestCase
   end
 
   test "source cleanup continuation progresses past a live locked candidate and stops without spinning" do
-    original_wait = SourceImports::Limits::REQUEST_LOCK_WAIT_SECONDS
-    SourceImports::Limits.send(:remove_const, :REQUEST_LOCK_WAIT_SECONDS)
-    SourceImports::Limits.const_set(:REQUEST_LOCK_WAIT_SECONDS, 0.01)
     imports = Array.new(101) do
       @user.source_imports.create!(status: :failed, original_filename: "synthetic.txt",
         request_key: ReplayIdentity.issue(at: 2.days.ago), expires_at: 1.day.ago)
@@ -132,42 +129,9 @@ class ReplayLifecycleConcurrencyTest < ActiveSupport::TestCase
       perform_enqueued_jobs(only: SourceImportCleanupJob) { perform_enqueued_jobs(only: SourceImportCleanupJob) }
       assert_equal [ oldest.id ], @user.source_imports.pluck(:id)
       assert_enqueued_jobs 0, only: SourceImportCleanupJob
-      assert_performed_jobs 2, only: SourceImportCleanupJob
+      assert_performed_jobs 1, only: SourceImportCleanupJob
     end
     perform_enqueued_jobs(only: SourceImportCleanupJob) { assert_equal 1, SourceImportCleanupJob.perform_now.purged_count }
     assert_empty @user.source_imports.reload
-  ensure
-    if original_wait
-      SourceImports::Limits.send(:remove_const, :REQUEST_LOCK_WAIT_SECONDS)
-      SourceImports::Limits.const_set(:REQUEST_LOCK_WAIT_SECONDS, original_wait)
-    end
-  end
-
-  private
-
-  # The pipe proves the independent PostgreSQL session owns the lock before
-  # cleanup runs. Releasing it is explicit; no timing assumptions or sleeps.
-  def with_process_lock(sql)
-    ActiveRecord::Base.connection_handler.clear_all_connections!
-    ready_read, ready_write = IO.pipe
-    release_read, release_write = IO.pipe
-    pid = fork do
-      ready_read.close
-      release_write.close
-      ActiveRecord::Base.transaction do
-        ActiveRecord::Base.connection.execute(sql)
-        ready_write.write("r")
-        release_read.read(1)
-      end
-      exit! 0
-    end
-    ready_write.close
-    release_read.close
-    Timeout.timeout(15) { assert_equal "r", ready_read.read(1) }
-    yield
-  ensure
-    release_write&.write("g") unless release_write&.closed?
-    Process.wait(pid) if pid
-    [ ready_read, ready_write, release_read, release_write ].compact.each { |pipe| pipe.close unless pipe.closed? }
   end
 end

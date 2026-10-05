@@ -2,9 +2,10 @@
 
 A page action has a nonrenewable 24-hour admission lease, matching the existing
 workspace submission token lifetime and staged import availability window.
-`ReplayIdentity` signs that deadline without writing a database row. Browsers
-append a random 128-bit suffix per upload action or editor. Changing the deadline
-changes the identity; changing a suffix creates a distinct action. These tokens
+`ReplayIdentity` signs that deadline without writing a database row. Uploads
+append a random 128-bit suffix under the authoritative upload budget. Editors
+use a complete signed nonce bound to the user and context; references require
+a complete signed nonce too. Changing a signed nonce is invalid. These tokens
 are admission metadata, not authorization: each ledger still scopes ownership.
 
 The deadline is checked inside the action lock, including after waiting. A
@@ -20,14 +21,22 @@ receive a conflict and keep the browser's local text until the user reloads.
 | TranslationWorkspaceDraftEditor | Keeps the editor's sequence after discard, launch, or draft deletion until its signed deadline. No sliding timestamp updates. | TranslationWorkspaceDraftCleanupJob, hourly at minute 47; `(expires_at, id)` | Save/discard insert and lock the watermark, recheck admission after locking; cleanup skips locked rows. |
 | TranslationReferenceCreation | Pending, completed, failed, and expired identities retain the outcome until the later of their signed deadline or 24 hours after admission. Failed encrypted recovery is cleared at 24 hours after admission, independently of identity purge. | TranslationReferenceCreationCleanupJob, hourly at minute 32; `(expires_at, id)` and partial `(created_at, id) WHERE status = 'failed'` | Cleanup skips locked rows and acquires the same action advisory lock without waiting before bulk deletion. Live actions are retained even past expiry. |
 
-Each cleanup phase selects at most 100 rows, in timestamp/id order. A full batch schedules a bounded successor, so throughput is not limited to
-100 rows/hour. Import and reference purge continue while making progress, including
-partial batches that skipped live action locks, and stops on zero progress. A
-delayed scheduler catches up through these successors; no job drains an entire ledger.
-Parallel workers may skip work owned by another worker; subsequent scheduled
-invocations converge once live locks are released. Jobs emit count-only events
-through Operations::EventLogger and let failures reach normal job failure handling.
-No identity, text, recovery payload, or file content is included in these events.
+Each cleanup phase selects at most 100 rows in timestamp/id order. Source
+and reference jobs carry a forward cursor and fixed cutoff through bounded
+successors, including completely advisory-locked batches. A sweep never restarts
+itself; the next hourly trigger retries skipped rows. Row-lock selections use
+SKIP LOCKED directly. Blob cleanup claims its batch with a one-hour retry deadline
+before storage work; a failing prefix cannot monopolize later healthy candidates.
+Jobs emit count-only events through Operations::EventLogger and let unexpected
+failures reach normal job failure handling. No identity, text, recovery payload,
+or file content is included in these events.
+
+Editors, reference outcomes and available workspace submissions each have a
+256-row account admission ceiling, enforced before insertion under a PostgreSQL
+owner lock. Existing deliveries replay at capacity. Rejected editor messages keep
+a terminal marker until admission expiry; discard and launch retire the old page.
+A refresh creates a new editor, while old exact/higher requests stay rejected.
+Unsigned draft requests are refused rather than bypassing sequencing.
 
 ## Reference outcomes
 
@@ -46,17 +55,22 @@ submission. There is no promise of permanent idempotency for a new action key.
 
 ## Upgrade and rollback
 
-The new migration retains the old 32-character format for existing records and
-adds a full 24-hour grace period at migration time. Unknown legacy keys cannot
-create new actions or watermark rows. Therefore deleting their final protective
-row cannot resurrect them. Widened columns store the signed protocol and retain
-existing owner/key unique indexes and foreign keys.
+The four PR-only unmerged migrations define the new ledgers directly with final
+key formats, deadlines and cleanup indexes. The editor backfill retains existing
+32-character editor/sequence records with a full 24-hour grace from insertion.
+Unknown legacy keys cannot create new actions or watermark rows. Canonical import
+and draft keys keep their unconstrained varchar type; CHECK constraints supply
+the domain bound. Metadata CHECK swaps use short locks and separate online
+validation; canonical indexes are built concurrently. A previously migrated local
+PR database requires a disposable rehearsal/rebuild rather than treating the old
+branch schema as a shipped migration.
 
 Rollback is safe before signed identities are stored. Once signed identities
-exist, rollback deliberately fails instead of truncating keys or removing
-protection. Consumed import provenance may retain signed keys permanently, so
-draining ephemeral rows does not always permit a downgrade. Use a forward
-correction; do not erase canonical records merely to force a rollback.
+exist, rollback deliberately fails instead of removing protection. Consumed import
+provenance may retain signed keys permanently; use a forward correction rather
+than erasing canonical records to force a downgrade. See
+[the failure-mode audit](pr72_failure_modes.md) for DDL locks, cardinality,
+negative-state and cleanup fairness evidence.
 
 ## PR #72 durable-state audit
 

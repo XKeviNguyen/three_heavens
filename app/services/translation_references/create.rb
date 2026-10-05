@@ -26,9 +26,11 @@ module TranslationReferences
           raise Interrupted, "This reference action has expired. Start a new submission."
         end
         next replay(existing, digest) if existing
+        raise Interrupted, "This reference action is invalid. Start a new submission." unless ReplayIdentity.complete?(creation_key)
 
         receipt = action = nil
         TranslationReferenceCreation.transaction(requires_new: true) do
+          ReplayIdentity.admit!(ledger: TranslationReferenceCreation, user:, identity: { creation_key: })
           receipt = UploadBudget.consume(user:) if uploading_files?
           raise SourceImports::Create::RateLimited if uploading_files? && !receipt
 
@@ -39,6 +41,8 @@ module TranslationReferences
         end
         perform(action, receipt)
       end
+    rescue ReplayIdentity::AdmissionExceeded
+      raise Interrupted, "Too many recent reference submissions. Try again later."
     end
 
     private

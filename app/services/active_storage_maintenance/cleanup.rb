@@ -2,6 +2,8 @@ module ActiveStorageMaintenance
   class Cleanup
     DEFAULT_AGE = 7.days
     MAX_BATCH_SIZE = 100
+    RETRY_DELAY = 1.hour
+    ELIGIBILITY_SQL = "COALESCE(active_storage_blobs.cleanup_retry_at, active_storage_blobs.created_at + interval '7 days')"
     Result = Data.define(:candidate_count, :purged_count)
 
     def self.call(cutoff: Time.current - DEFAULT_AGE, batch_size: MAX_BATCH_SIZE, execute: false)
@@ -16,7 +18,7 @@ module ActiveStorageMaintenance
     end
 
     def call
-      ids = candidate_ids
+      ids = execute ? claim_candidates : candidate_scope.limit(batch_size).pluck(:id)
       return Result.new(candidate_count: ids.size, purged_count: 0) unless execute
 
       purged_count = ids.count { |blob_id| purge_if_still_abandoned(blob_id) }
@@ -27,24 +29,28 @@ module ActiveStorageMaintenance
 
     attr_reader :batch_size, :cutoff, :execute
 
-    def candidate_ids
+    def candidate_scope
       ActiveStorage::Blob.unattached
         .where(created_at: ..cutoff)
-        .order(:created_at, :id)
-        .limit(batch_size)
-        .pluck(:id)
+        .where("#{ELIGIBILITY_SQL} <= ?", Time.current)
+        .order(Arel.sql(ELIGIBILITY_SQL), :id)
+    end
+
+    def claim_candidates
+      ActiveStorage::Blob.transaction do
+        ids = candidate_scope.limit(batch_size).lock("FOR UPDATE OF active_storage_blobs SKIP LOCKED").pluck(:id)
+        # Commit a retry deadline before filesystem work. Failure or process
+        # death remains discoverable, but cannot monopolize the oldest batch.
+        ActiveStorage::Blob.where(id: ids).update_all(cleanup_retry_at: RETRY_DELAY.from_now)
+        ids
+      end
     end
 
     def purge_if_still_abandoned(blob_id)
-      blob = ActiveStorage::Blob.transaction do
-        blob = ActiveStorage::Blob.lock.find_by(id: blob_id)
-        next unless blob && blob.created_at <= cutoff && blob.attachments.none?
-
-        blob
-      end
+      blob = ActiveStorage::Blob.find_by(id: blob_id)
       return false unless blob
 
-      Purge.call(blob:)
+      Purge.call(blob:, cutoff:, skip_locked: true)
     end
   end
 end
