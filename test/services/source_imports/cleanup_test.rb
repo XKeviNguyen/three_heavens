@@ -141,7 +141,7 @@ module SourceImports
       cleanup = Cleanup.new(cutoff: Time.current, batch_size: 1)
       project = projects(:one)
 
-      cleanup.define_singleton_method(:candidate_ids) do
+      cleanup.define_singleton_method(:candidate_rows) do
         source_import.update!(expires_at: 1.hour.from_now)
         document = project.documents.build(title: "Won race", source_text: "Reviewed")
         SourceImport.transaction do
@@ -150,7 +150,7 @@ module SourceImports
           document.save!
           Consume.finish!(source_import: locked, document:)
         end
-        [ source_import.id ]
+        [ [ source_import.id, source_import.expires_at ] ]
       end
       assert_equal 0, cleanup.call.purged_count
 

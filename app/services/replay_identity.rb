@@ -41,8 +41,9 @@ class ReplayIdentity
   def self.admit!(ledger:, user:, identity:, scope: nil)
     lock_key = Digest::SHA256.digest("replay_admission:#{ledger.table_name}:#{user.id}").unpack1("q>")
     ledger.connection.select_value(ledger.sanitize_sql_array([ "SELECT pg_advisory_xact_lock(?)", lock_key ]))
-    scope ||= ledger.where(user_id: user.id)
-    return if scope.where(identity).exists?
+    owned = ledger.where(user_id: user.id)
+    return if owned.where(identity).exists?
+    scope ||= owned
     raise AdmissionExceeded if scope.limit(MAX_IDENTITIES_PER_USER).count >= MAX_IDENTITIES_PER_USER
   end
 

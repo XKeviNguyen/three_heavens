@@ -11,6 +11,39 @@ class SourceImportReplayTest < ApplicationSystemTestCase
     assert_text "Signed in successfully."
   end
 
+  test "retrying a committed cancellation after response loss clears stale provenance" do
+    visit new_translation_workspace_path(project_id: projects(:one).id)
+    source = Tempfile.new([ "cancel-response", ".txt" ])
+    source.write("Reviewed source retained")
+    source.flush
+    click_button "Upload file"
+    attach_file "Source file", source.path
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "Reviewed source retained"
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (!window.__cancelDropped && new URL(url, location.origin).pathname.startsWith("/source_imports/") && options.method === "DELETE") {
+          window.__cancelDropped = true
+          await response.arrayBuffer()
+          throw new TypeError("synthetic response loss")
+        }
+        return response
+      }
+    JS
+    click_button "Remove import"
+    assert_text "The import could not be removed. Try again."
+    assert_empty users(:normal).source_imports.reload
+    click_button "Remove import"
+    assert_text "Import removed. The reviewed text remains in the editor."
+    assert_equal "", find("#translation_workspace_source_import_id", visible: :all).value
+    assert_equal "", find("#translation_workspace_source_import_project_token", visible: :all).value
+    assert_field "Source text", with: "Reviewed source retained"
+  ensure
+    source&.close!
+  end
+
   # The first delivery is stored and answered by the server, but the browser
   # discards the answer as if the connection dropped. Uploading the same chosen
   # file again must resolve to that import rather than storing a second copy.

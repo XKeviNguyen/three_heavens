@@ -42,7 +42,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
   scope :current, -> { where("expires_at > ?", Time.current) }
 
   def self.context_key(project)
-    project ? "project:#{project.id}" : "new"
+    project&.id ? "project:#{project.id}" : "new"
   end
 
   def self.validate_payload!(value)

@@ -183,10 +183,11 @@ module Operations
           expires_at: 1.day.from_now
         )
         source_import.source_file.attach(io: StringIO.new(bytes), filename: "synthetic-import.txt", content_type: "text/plain")
+        source_import.source_file.blob.update!(cleanup_retry_at: 1.hour.from_now)
         retired_key = SecureRandom.hex(16)
         user.source_import_retirements.create!(request_key: retired_key)
         draft_editor = SecureRandom.hex(16)
-        user.translation_workspace_draft_editors.create!(context_key: "new", editor_id: draft_editor, sequence: 1)
+        user.translation_workspace_draft_editors.create!(context_key: "new", editor_id: draft_editor, sequence: 1, state: :retired)
         user.translation_workspace_drafts.create!(
           context_key: TranslationWorkspaceDraft.context_key(project),
           workspace_payload: JSON.generate("source_text" => DRAFT_SOURCE_TEXT),

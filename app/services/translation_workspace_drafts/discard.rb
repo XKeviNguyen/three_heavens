@@ -4,22 +4,23 @@ module TranslationWorkspaceDrafts
       TranslationWorkspaceDraft.transaction do
         editor = TranslationWorkspaceDraftEditor.lock_for(user:, context_key:, editor_id:)
         draft = user.translation_workspace_drafts.current.lock.find_by(context_key:)
+        next draft if editor&.retired?
         if editor&.rejected? || (draft.nil? && draft_id.present?)
           raise ActiveRecord::RecordNotFound if !editor && draft_id.present?
-          editor.update!(rejected: true, sequence: [ editor.sequence, sequence || 0 ].max) if editor
+          editor.update!(state: :rejected, sequence: [ editor.sequence, sequence || 0 ].max) if editor
           next draft || :conflict
         end
         raise ActionController::BadRequest if draft && draft_id.present? && version.nil?
 
         if draft && (!draft.writable_by?(editor_id:, public_id: draft_id.presence, version:) ||
             (sequence && draft.editor_id == editor_id && draft.editor_sequence > sequence))
-          editor.update!(rejected: true, sequence: [ editor.sequence, sequence || 0 ].max) if editor
+          editor.update!(state: :rejected, sequence: [ editor.sequence, sequence || 0 ].max) if editor
           next draft
         end
 
         if editor
           watermark = [ editor.sequence, sequence || 0, draft&.editor_id == editor_id ? draft.editor_sequence : 0 ].max
-          editor.update!(sequence: watermark, rejected: true)
+          editor.update!(sequence: watermark, state: :retired)
         end
         draft&.destroy!
         nil
@@ -35,7 +36,7 @@ module TranslationWorkspaceDrafts
         current = user.translation_workspace_drafts.lock.find_by(id: draft.id, lock_version: version)
         next unless current
 
-        editor.update!(rejected: true) if editor
+        editor.update!(state: :retired) if editor
         current.delete
       end
     end

@@ -1,6 +1,7 @@
 class TranslationWorkspaceDraftEditor < ApplicationRecord
   class Expired < StandardError; end
   belongs_to :user
+  enum :state, { active: "active", rejected: "rejected", retired: "retired" }, validate: true
   attr_readonly :user_id, :context_key, :editor_id
   validates :context_key, presence: true, length: { maximum: 80 }
   validates :editor_id, format: { with: TranslationWorkspaceDraft::EDITOR_ID_FORMAT }

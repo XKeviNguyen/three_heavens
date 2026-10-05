@@ -12,14 +12,75 @@ class ReplayAdversarialConcurrencyTest < ActiveSupport::TestCase
   end
 
   teardown do
-    @user.translation_workspace_draft_editors.delete_all
-    @user.translation_workspace_drafts.delete_all
-    @user.translation_reference_creations.delete_all
-    @user.source_import_retirements.delete_all
-    @user.source_imports.delete_all
-    @user.translation_workspace_submissions.delete_all
+    TranslationWorkspaceDraftEditor.where(user: @user).delete_all
+    TranslationWorkspaceDraft.where(user: @user).delete_all
+    TranslationReferenceCreation.where(user: @user).delete_all
+    SourceImportRetirement.where(user: @user).delete_all
+    SourceImport.where(user: @user).delete_all
+    TranslationWorkspaceSubmission.where(user: @user).delete_all
     @user.delete
     @blobs&.each { |blob| ActiveStorageMaintenance::Purge.call(blob:) }
+  end
+
+  test "delayed duplicate first claim at capacity replays a now-consumed identity" do
+    owner = @user
+    assert_equal 0, owner.translation_workspace_submissions.available.count
+    keys = Array.new(257) { TranslationWorkspaceSubmission.issue_token(user: owner) }
+    digests = keys.map { |key| Digest::SHA256.hexdigest(key) }
+    keys.first(255).each { |token| TranslationWorkspaceSubmission.claim!(user: owner, token:) }
+    project = owner.projects.create!(name: "Synthetic replay", source_language: "Japanese", target_language: "English")
+    document = project.documents.create!(title: "Synthetic", source_text: "Synthetic")
+    experiment = document.experiments.create!(instruction_prompt: "Synthetic instruction")
+    duplicate_key = keys[255]
+    ActiveRecord::Base.connection_handler.clear_all_connections!
+    reached_read, reached_write = IO.pipe
+    release_read, release_write = IO.pipe
+    result_read, result_write = IO.pipe
+    pid = fork do
+      reached_read.close
+      release_write.close
+      result_read.close
+      original = ReplayIdentity.method(:admit!)
+      ReplayIdentity.define_singleton_method(:admit!) do |**arguments|
+        reached_write.write("r")
+        release_read.read(1)
+        original.call(**arguments)
+      end
+      begin
+        result = TranslationWorkspaceSubmission.claim!(user: owner, token: duplicate_key)
+        Marshal.dump({ outcome: :replayed, status: result.status }, result_write)
+      rescue ReplayIdentity::AdmissionExceeded
+        Marshal.dump({ outcome: :limited }, result_write)
+      rescue StandardError => error
+        Marshal.dump({ outcome: :error, error: error.class.name }, result_write)
+      ensure
+        result_write.close
+        exit! 0
+      end
+    end
+    reached_write.close
+    release_read.close
+    result_write.close
+    Timeout.timeout(20) { assert_equal "r", reached_read.read(1) }
+    first = TranslationWorkspaceSubmission.claim!(user: owner, token: duplicate_key)
+    first.update!(status: :consumed, consumed_at: Time.current, experiment:)
+    TranslationWorkspaceSubmission.claim!(user: owner, token: keys[256])
+    assert_equal 256, owner.translation_workspace_submissions.available.count
+    release_write.write("g")
+    result = Timeout.timeout(20) { Marshal.load(result_read) }
+    Process.wait(pid)
+    pid = nil
+    assert_equal :replayed, result.fetch(:outcome), "An existing consumed identity must replay when unrelated available actions fill capacity"
+  ensure
+    if pid
+      Process.kill("KILL", pid) rescue nil
+      Process.wait(pid) rescue nil
+    end
+    [ reached_read, reached_write, release_read, release_write, result_read, result_write ].compact.each { |pipe| pipe.close unless pipe.closed? }
+    TranslationWorkspaceSubmission.where(user: owner, token_digest: digests).delete_all if digests
+    experiment&.delete
+    document&.delete
+    project&.delete
   end
 
   test "independent editor admissions cannot exceed the last available owner slot" do

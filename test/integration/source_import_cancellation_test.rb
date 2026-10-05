@@ -215,7 +215,10 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
     assert_equal 0, ActiveStorageMaintenance::Cleanup.call(cutoff: 1.minute.from_now, execute: true).purged_count
     assert ActiveStorage::Blob.exists?(blob.id)
     service.singleton_class.define_method(:delete, original_delete.unbind)
-    assert_equal 1, ActiveStorageMaintenance::Cleanup.call(cutoff: 1.minute.from_now, execute: true).purged_count
+    assert_equal 0, ActiveStorageMaintenance::Cleanup.call(cutoff: 1.minute.from_now, execute: true).purged_count
+    travel_to blob.reload.cleanup_retry_at, with_usec: true do
+      assert_equal 1, ActiveStorageMaintenance::Cleanup.call(cutoff: 1.minute.from_now, execute: true).purged_count
+    end
     assert_equal 204, cancel(failed.id).first
     assert_retired(failed.id, budget: 1)
   ensure
@@ -254,18 +257,17 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
     release << true if holder&.alive?
   end
 
-  test "cleanup waits for a live creator and rechecks refreshed expiration" do
+  test "cleanup skips a live creator and rechecks refreshed expiration" do
     with_paused_extraction do |reached, release|
       creator = async { upload }
       await_queue(reached)
       pending = @user.source_imports.sole
       pending.update!(expires_at: 1.minute.ago)
       cleanup = async { SourceImports::Cleanup.call }
-      await_lock_waiters(1)
+      assert_equal 0, finish(cleanup).purged_count
       assert SourceImport.exists?(pending.id)
       release << true
       assert_equal 201, finish(creator).first
-      assert_equal 0, finish(cleanup).purged_count
       assert pending.reload.available?
       assert pending.source_file.blob.service.exist?(pending.source_file.blob.key)
       pending.update!(expires_at: 1.minute.ago)
@@ -288,10 +290,9 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
     pending = @user.source_imports.sole
     pending.update!(expires_at: 1.minute.ago)
     cleanup = async { SourceImports::Cleanup.call }
-    await_lock_waiters(1)
+    assert_equal 0, finish(cleanup).purged_count
     release << true
     assert_equal 201, finish(creator).first
-    assert_equal 0, finish(cleanup).purged_count
     assert pending.reload.available?
     assert pending.source_file.blob.service.exist?(pending.source_file.blob.key)
     assert_budget(1)

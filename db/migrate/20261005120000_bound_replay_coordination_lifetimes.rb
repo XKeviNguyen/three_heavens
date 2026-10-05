@@ -12,12 +12,12 @@ class BoundReplayCoordinationLifetimes < ActiveRecord::Migration[8.1]
       # Nullable metadata addition has no backfill or heap rewrite. A failed
       # cleanup retains the blob and its bounded retry deadline on that row.
       add_column :active_storage_blobs, :cleanup_retry_at, :datetime unless column_exists?(:active_storage_blobs, :cleanup_retry_at)
-      build_index(:active_storage_blobs, "(COALESCE(cleanup_retry_at, created_at + interval '7 days')), id",
+      build_index(:active_storage_blobs, "(COALESCE(cleanup_retry_at, created_at + make_interval(days => 7))), id",
         name: "index_active_storage_blobs_on_cleanup_deadline")
       remove_index :active_storage_blobs, name: "index_active_storage_blobs_for_cleanup", algorithm: :concurrently,
         if_exists: true
       build_index(:source_imports, %i[expires_at id], name: "index_source_imports_on_cleanup_deadline",
-        where: "status IN ('pending', 'ready', 'failed')")
+        where: "status::text = ANY (ARRAY['pending'::text, 'ready'::text, 'failed'::text])")
       remove_index :source_imports, name: "index_source_imports_for_cleanup", algorithm: :concurrently, if_exists: true
     end
   end
@@ -34,10 +34,10 @@ class BoundReplayCoordinationLifetimes < ActiveRecord::Migration[8.1]
       end
       replace_checks("'^[0-9a-f]{32}$'")
       build_index(:source_imports, %i[status expires_at id], name: "index_source_imports_for_cleanup")
-      remove_index :source_imports, name: "index_source_imports_on_cleanup_deadline", algorithm: :concurrently
-      add_index :active_storage_blobs, %i[created_at id], name: "index_active_storage_blobs_for_cleanup", algorithm: :concurrently
-      remove_index :active_storage_blobs, name: "index_active_storage_blobs_on_cleanup_deadline", algorithm: :concurrently
-      remove_column :active_storage_blobs, :cleanup_retry_at
+      remove_index :source_imports, name: "index_source_imports_on_cleanup_deadline", algorithm: :concurrently, if_exists: true
+      build_index(:active_storage_blobs, %i[created_at id], name: "index_active_storage_blobs_for_cleanup")
+      remove_index :active_storage_blobs, name: "index_active_storage_blobs_on_cleanup_deadline", algorithm: :concurrently, if_exists: true
+      remove_column :active_storage_blobs, :cleanup_retry_at if column_exists?(:active_storage_blobs, :cleanup_retry_at)
     end
   end
 

@@ -76,8 +76,9 @@
               <p class="mt-1 text-xs text-slate-500"><%= t("workspace_ui.file_limits", maximum: SourceImports::Limits::MAX_UPLOAD_BYTES / 1.megabyte) %></p>
               <input id="workspace-upload-file" type="file" accept=".txt,.md,.docx,.pdf,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-workspace-upload-target="file" class="mt-3 block w-full text-sm text-slate-700">
               <button type="button" data-action="workspace-upload#upload" data-workspace-upload-target="button" class="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"><%= t("workspace_ui.upload_review") %></button>
-              <p data-workspace-upload-target="message" role="status" aria-live="polite" class="mt-2 text-sm text-slate-600"></p>
             </div>
+
+            <p data-workspace-upload-target="message" role="status" aria-live="polite" class="mt-2 text-sm text-slate-600"></p>
 
             <div id="workspace-source-import" data-workspace-upload-target="import" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 <%= 'hidden' unless @translation_workspace.source_import %>">
               <p class="text-sm font-semibold text-emerald-950" data-workspace-upload-target="filename"><%= @translation_workspace.source_import&.original_filename %></p>

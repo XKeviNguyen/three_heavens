@@ -97,4 +97,41 @@ class Operations::ReplayMigrationLockTest < ActiveSupport::TestCase
     drill&.send(:drop_databases!, admin) if admin
     admin&.close
   end
+  test "a timed out reference index build leaves no ledger and reruns safely" do
+    require Rails.root.join("db/migrate/20261004170000_add_translation_reference_creation_identity")
+    drill = Operations::Restore::LocalDrill.new(environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" })
+    original = ActiveRecord::Base.connection_db_config.configuration_hash
+    admin = PG.connect(drill.send(:pg_options, original, database: "postgres"))
+    database = drill.send(:create_database!, admin, "retry")
+    ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+    ActiveRecord::Base.establish_connection(original.merge(database:))
+    connection = ActiveRecord::Base.connection
+    connection.execute(<<~SQL)
+      CREATE TABLE users (id bigint PRIMARY KEY);
+      CREATE TABLE translation_references (id bigint PRIMARY KEY, user_id bigint NOT NULL);
+      INSERT INTO users VALUES (1);
+      INSERT INTO translation_references VALUES (1, 1);
+    SQL
+    migration = AddTranslationReferenceCreationIdentity.new
+    with_process_lock("UPDATE translation_references SET user_id = user_id WHERE id = 1") do
+      began = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      assert_raises(ActiveRecord::LockWaitTimeout) { migration.migrate(:up) }
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - began, :<, 3
+      assert_not connection.table_exists?(:translation_reference_creations)
+      assert_equal false, connection.select_value("SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass('index_translation_references_on_owner_and_id')")
+      assert_equal "0", connection.select_value("SHOW lock_timeout")
+    end
+    migration.migrate(:up)
+    assert connection.table_exists?(:translation_reference_creations)
+    assert_equal true, connection.select_value("SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass('index_translation_references_on_owner_and_id')")
+    migration.migrate(:up)
+    migration.migrate(:down)
+    migration.migrate(:down)
+    migration.migrate(:up)
+    assert connection.table_exists?(:translation_reference_creations)
+  ensure
+    drill&.send(:restore_application_connection, original) if original
+    drill&.send(:drop_databases!, admin) if admin
+    admin&.close
+  end
 end

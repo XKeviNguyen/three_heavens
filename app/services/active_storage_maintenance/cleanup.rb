@@ -3,7 +3,7 @@ module ActiveStorageMaintenance
     DEFAULT_AGE = 7.days
     MAX_BATCH_SIZE = 100
     RETRY_DELAY = 1.hour
-    ELIGIBILITY_SQL = "COALESCE(active_storage_blobs.cleanup_retry_at, active_storage_blobs.created_at + interval '7 days')"
+    ELIGIBILITY_SQL = "COALESCE(active_storage_blobs.cleanup_retry_at, active_storage_blobs.created_at + make_interval(days => 7))"
     Result = Data.define(:candidate_count, :purged_count)
 
     def self.call(cutoff: Time.current - DEFAULT_AGE, batch_size: MAX_BATCH_SIZE, execute: false)
@@ -32,7 +32,8 @@ module ActiveStorageMaintenance
     def candidate_scope
       ActiveStorage::Blob.unattached
         .where(created_at: ..cutoff)
-        .where("#{ELIGIBILITY_SQL} <= ?", Time.current)
+        .where("#{ELIGIBILITY_SQL} <= ?", cutoff + DEFAULT_AGE)
+        .where("cleanup_retry_at IS NULL OR cleanup_retry_at <= ?", Time.current)
         .order(Arel.sql(ELIGIBILITY_SQL), :id)
     end
 

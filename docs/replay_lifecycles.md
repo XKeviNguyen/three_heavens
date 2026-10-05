@@ -34,7 +34,9 @@ or file content is included in these events.
 Editors, reference outcomes and available workspace submissions each have a
 256-row account admission ceiling, enforced before insertion under a PostgreSQL
 owner lock. Existing deliveries replay at capacity. Rejected editor messages keep
-a terminal marker until admission expiry; discard and launch retire the old page.
+a rejected state until admission expiry; discard and launch retire the old page.
+Successful discard retries acknowledge retirement only when no newer draft exists;
+rejected conflict retries remain conflicts. The page counter survives reconnects.
 A refresh creates a new editor, while old exact/higher requests stay rejected.
 Unsigned draft requests are refused rather than bypassing sequencing.
 
@@ -96,3 +98,8 @@ materially changed durable records have intentional lifecycles:
 Regression coverage: `test/models/replay_lifecycle_test.rb` and
 `test/models/replay_lifecycle_concurrency_test.rb`, plus the existing replay,
 crash, multi-tab, Back/Forward, and cancellation suites.
+
+Missing legacy storage services retain their blob/retry deadline while healthy peers
+continue. Import cancellation retries that report 404 clear only matching browser
+provenance. Migration metadata is atomic; editor backfill runs after releasing parent
+FK locks, and interrupted concurrent indexes are repaired before proceeding.

@@ -6,13 +6,14 @@ const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
 export default class extends Controller {
   static targets = ["form", "dialog", "status"]
   // The server's draft field lists, so only fields it stores count as edits.
-  static values = { editorId: String, saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object, scalarFields: Array, arrayFields: Array }
+  static values = { editorId: String, sequence: Number, saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object, scalarFields: Array, arrayFields: Array }
 
   connect() {
     // One editor per page load. Only this random identifier and save counter
-    // live in memory; the draft itself is stored encrypted on the server.
+    // stay on this page, including Stimulus reconnects and Turbo snapshots.
+    // The draft itself is stored encrypted on the server.
     this.editorId = this.editorIdValue
-    this.sequence = 0
+    this.sequence = this.sequenceValue
     this.unacknowledged = null
     this.retryCount = 0
     this.lastSavedState = this.needsSaveValue ? null : this.state()
@@ -67,6 +68,7 @@ export default class extends Controller {
     if (this.launching || this.discarding) return
     if (!this.draftChange(event)) return
     this.retryCount = 0
+    this.needsSaveValue = true
     window.clearTimeout(this.saveTimer)
     if (!this.editPending) {
       this.editPending = true
@@ -115,12 +117,15 @@ export default class extends Controller {
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
     if (this.unacknowledged === null && snapshot === this.lastSavedState) {
+      this.needsSaveValue = false
       this.setStatus(this.settledStatus)
       return true
     }
     // Resending unchanged content whose outcome is unknown is a replay of the
     // same save; any other content is a newer save.
     const sequence = this.unacknowledged?.snapshot === snapshot ? this.unacknowledged.sequence : ++this.sequence
+    this.sequenceValue = this.sequence
+    this.needsSaveValue = true
     this.unacknowledged = { sequence, snapshot }
     this.setStatus(this.messagesValue.saving)
     const saving = this.persist(workspace, sequence)
@@ -136,6 +141,7 @@ export default class extends Controller {
       this.formTarget.elements.translation_workspace_draft_id.value = result.id
       this.formTarget.elements.translation_workspace_draft_version.value = result.version
       this.lastSavedState = snapshot
+      this.needsSaveValue = !!this.editPending
       this.settledStatus = this.messagesValue.saved
       // Edits made while this save was in flight have their own timer.
       if (!this.editPending) this.setStatus(this.messagesValue.saved)

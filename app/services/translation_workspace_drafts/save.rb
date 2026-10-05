@@ -58,7 +58,7 @@ module TranslationWorkspaceDrafts
     def save_locked
       @editor = TranslationWorkspaceDraftEditor.lock_for(user:, context_key:, editor_id:)
       draft = user.translation_workspace_drafts.lock.find_by(context_key:)
-      return Result.new(draft:, conflict: true) if @editor&.rejected?
+      return Result.new(draft:, conflict: true) if @editor && !@editor.active?
       if draft && draft.expires_at <= at
         draft.delete
         draft = nil
@@ -107,7 +107,7 @@ module TranslationWorkspaceDrafts
     end
 
     def rejected(draft)
-      @editor.update!(sequence: [ @editor.sequence, sequence ].max, rejected: true) if @editor
+      @editor.update!(sequence: [ @editor.sequence, sequence ].max, state: :rejected) if @editor
       Result.new(draft:, conflict: true)
     end
   end

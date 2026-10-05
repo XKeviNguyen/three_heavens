@@ -6,6 +6,57 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     sign_in_in_browser
   end
 
+  test "reconnecting the same page preserves autosave ordering" do
+    visit new_translation_workspace_path
+    fill_in "Source text", with: "Before reconnect"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    page.execute_script(<<~JS)
+      const element = document.querySelector("[data-controller='workspace-guard']")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+      controller.disconnect()
+      controller.connect()
+    JS
+    fill_in "Source text", with: "After reconnect"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "After reconnect", users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text")
+  end
+
+  test "retrying a committed discard after response loss reaches a fresh workspace" do
+    visit new_translation_workspace_path
+    fill_in "Source text", with: "Discard once"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    original_editor = page.evaluate_script("document.querySelector('[data-controller=workspace-guard]').dataset.workspaceGuardEditorIdValue")
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (!window.__discardDropped && new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "DELETE") {
+          window.__discardDropped = true
+          await response.arrayBuffer()
+          throw new TypeError("synthetic response loss")
+        }
+        return response
+      }
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.discard_failed"), wait: 10
+    assert_empty users(:normal).translation_workspace_drafts.reload
+    accept_confirm { click_button "Discard draft" }
+    assert_field "Source text", with: "", wait: 10
+    assert_until do
+      page.evaluate_script(<<~JS, original_editor)
+        (() => {
+          const element = document.querySelector("[data-controller='workspace-guard']")
+          const controller = element && window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+          return !!controller?.editorId && controller.editorId !== arguments[0]
+        })()
+      JS
+    end
+    fill_in "Source text", with: "Fresh page after retry"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "Fresh page after retry", users(:normal).translation_workspace_drafts.reload.sole.payload.fetch("source_text")
+  end
+
   test "language search requires selection and Escape restores the committed value" do
     visit new_translation_workspace_path
     choose_language("Source language", "Vietnamese")

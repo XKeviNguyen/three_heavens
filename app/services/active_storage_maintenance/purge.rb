@@ -8,6 +8,13 @@ module ActiveStorageMaintenance
         next false unless current && ActiveRecord::Base.uncached { current.attachments.none? }
         next false if cutoff && current.created_at > cutoff
 
+        begin
+          current.service
+        rescue KeyError
+          Rails.logger.error("active_storage_purge_failed blob_id=#{current.id} error=UnavailableService")
+          next false
+        end
+
         # Attachment inserts also need the blob's FK lock: they cannot attach
         # between this check and deletion, including from another process.
         current.delete

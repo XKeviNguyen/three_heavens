@@ -6,7 +6,7 @@ module SourceImports
       new(cutoff:, batch_size:, after:).call
     end
 
-    def initialize(cutoff:, batch_size:, after:)
+    def initialize(cutoff:, batch_size:, after: nil)
       @cutoff = cutoff
       @after = after
       @batch_size = [ Integer(batch_size), Limits::CLEANUP_BATCH_SIZE ].min

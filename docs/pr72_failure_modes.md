@@ -55,16 +55,16 @@ legacy keys and expired signed credentials cannot create missing state.
 
 ## Failure-mode table
 
-| Mechanism | Normal path | Attacker input | Durable cardinality | Replay horizon | Failure state / lost response | Cleanup / poison behavior | Concurrency | Migration implication |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Upload admission / source import | One extraction/blob per keyed action | Upload suffix and bounded file | <=10 charged new actions/5min/account; one budget row/account, <=10 receipts | Signed 24h; staged availability 24h after storage | Pending survives process loss; replay returns outcome; pre-work Busy is retryable with no durable effect | Hourly bounded forward sweep; live action/row locks do not monopolize the candidate window | Atomic budget UPSERT, per-action advisory lock, row locks | Canonical key remains varchar; format validation online; partial expiry/id index concurrent |
-| Import retirement | Cancelled action stays unavailable | Existing owned import/key | At most one tombstone per admitted action, within upload bound | Signed deadline; legacy 24h grace | Lost cancel/replay never resurrects import, even after purge | Hourly, <=100, SKIP LOCKED; bulk delete | Action lock plus independently expired admission | New empty table, final key/deadline/index definitions directly |
-| Editor watermark | Sequence orders one page's save/discard | Complete credential and bounded integer sequence | One row/credential/context; <=256/account | Nonrenewable signed 24h | Ordering loser stays rejected through winner discard/launch/expiry; exact and higher retries conflict | Hourly, <=100, SKIP LOCKED; no per-autosave lifetime churn | Owner admission lock for first insertion, editor then draft locks | New table plus existing-draft backfill; canonical draft key not altered |
-| Encrypted draft | One encrypted content row per owned context | Allowlisted, bounded payload | One/user/context; contexts follow canonical owned projects | Editor lease separate from rolling 7-day content | Unknown save outcome retries same sequence; stale conflict requires fresh page; terminal discard rejects old-page saves | Hourly <=100 expiry batch; SKIP LOCKED advances past row locks | Editor lock then draft lock, owner/context unique index | Existing key CHECK swapped briefly then validated online |
-| Reference creation | One immutable creation outcome | Complete key; bounded text/file | One/key/account; <=256/account; file admissions share UploadBudget | Signed 24h; ledger at least 24h after admission | All statuses retain outcome; failed encrypted recovery cleared at 24h; pending interruption never duplicates reference; unperformed Busy may retry | Hourly <=100 phases; forward keyset sweep passes advisory-locked prefix; recovery phase SKIP LOCKED | Action lock, owner admission lock, row locks, owner FK | New table/indexes; canonical owner index concurrent; FK NOT VALID then validate |
-| Workspace launch | One launch per complete owner-bound token | Signed token and validated workspace | <=256 available/account; consumed rows intentional canonical history | Signed 24h; consumed replay canonical | Invalid form retains available action for correction; response loss replays consumed workflow, never launches twice | Hourly <=100 available-row bulk delete, SKIP LOCKED and bounded successors | Owner admission lock, token unique index, submission row lock, domain constraints | Existing table/schema unchanged |
-| Blob recovery/purge | Delete storage before losing retry identity | Owned bounded uploads; no public cleanup marker setter | One retry field on the existing blob; no auxiliary retry rows | Unattached age 7d; failed attempts eligible again after 1h | I/O failure rolls back row deletion; claim deadline survives crash; attachment recheck prevents deletion | Daily trigger plus bounded successors; <=100 claims; failing prefix deferred, no immediate retry storm | Claim FOR UPDATE OF blobs SKIP LOCKED; purge row lock plus attachment FK locking | Nullable column without backfill/rewrite; expression deadline/id index concurrent |
-| Reference revisions / canonical history | Explicit revision with optimistic version | Owner-scoped revision/version/content | Canonical business data, intentional retention | Version precondition remains tied to immutable revision history | Exact stale version cannot become current after later immutable revisions | No deletion of canonical history to satisfy this audit | Ownership, optimistic version, immutable history constraints | No additional DDL in this corrective pass |
+| Mechanism | Normal path | Attacker input | Max durable cardinality | Replay horizon | Failure state | Lost response | Cleanup policy | Poison behavior | Concurrency | Migration |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Upload admission/source import | One extraction/blob per keyed action | Suffix; bounded file | 10 charged actions/5min/account; one budget row, <=10 receipts | Signed 24h; storage availability 24h | Pending/failed retained; prework Busy removes unperformed action and refunds exact receipt | Replays outcome without extraction/charge | Hourly fixed-cutoff forward sweep, <=100/job | Skip action/row locks; advance past prefix | Atomic budget UPSERT, action advisory and row locks | Canonical varchar unchanged; CHECK online; partial index concurrent |
+| Import retirement | Cancellation blocks resurrection | Owned import/key | <=1 tombstone/admitted action | Signed deadline; legacy 24h | No retained content | Retry 404 clears only matching UI provenance; expired credential cannot recreate | Hourly <=100 SKIP LOCKED | Locked rows do not occupy limit | Action lock; independently expired admission | Atomic new-table metadata |
+| Editor watermark | Orders page save/discard | Complete owner/context credential, integer sequence | <=1/credential/context; <=256/account | Signed nonrenewable 24h | Single active/rejected/retired state; losers remain rejected | Rejected retries conflict; successful retirement retries succeed only with no newer draft | Hourly <=100 SKIP LOCKED | Locked rows skipped | First-admission owner lock; editor then draft | Atomic new-table metadata; resumable backfill outside parent locks |
+| Encrypted draft | One encrypted row/context | Allowlisted bounded payload | <=1/account/context; owned project contexts | Rolling content 7d; editor 24h | Stale conflict preserves winner; unreadable content explicitly replaceable | Same-sequence retry; DOM counter/dirty bit survive reconnect without browser content storage | Hourly <=100 expiry batch | SKIP LOCKED | Editor then draft; owner/context unique index | Brief CHECK swap then online validation |
+| Reference creation | One immutable outcome | Complete key; bounded text/file | <=1/key/account; <=256/account; files share upload budget | Signed 24h; ledger >=24h from admission | Pending/failed/completed retained; recovery ciphertext cleared at24h | Returns original outcome; pending interrupted never creates duplicate | Hourly <=100/phase forward sweep | Skip action locks; recovery SKIP LOCKED | Action/owner/row locks; owner FK | Canonical concurrent index repaired before atomic new table |
+| Workspace launch | One launch/token | Complete owner token; validated form | <=256 available/account; consumed intentional history | Signed24h; consumed replay canonical | Invalid form retains correction action | All-status identity rechecked under admission lock at capacity; consumed workflow reused | Hourly <=100 available rows, bounded successors | SKIP LOCKED | Owner admission/token unique/submission row lock | Existing schema unchanged |
+| Blob recovery/purge | Delete disk objects while retaining retry identity until success | Bounded uploads; no public retry setter | One field/existing blob; no auxiliary rows | Default age7d; retry1h | Filesystem failure rolls back deletion; missing service retains row | Claim deadline survives crash; idempotent disk delete | Daily trigger, <=100 claims/job, bounded successors; explicit cutoff respected | Failure/service outage isolates item, later healthy peers continue; no immediate retry storm | Blob claim/purge row lock; attachment FK lock | Nullable no-default column; concurrent expression index |
+| Reference revisions/history | Explicit immutable revision | Owner version/content | Intentional canonical business history | Immutable version | Stale version never becomes current | Optimistic comparison remains valid after later revisions | Canonical history retained | No cleanup queue | Ownership/optimistic version/immutable constraints | No new DDL |
 
 ## Cleanup fairness and throughput
 
@@ -102,13 +102,13 @@ develop. No merged migration is rewritten.
 
 | Operation | Data / size | Lock and scan/rewrite | Deployment and rollback |
 | --- | --- | --- | --- |
-| Create three coordination tables with final keys, NOT NULL deadlines/defaults and indexes | New empty ephemeral tables | New-table locks and brief parent FK metadata locks; empty index/check scans; no existing heap rewrite | 1s lock timeout; backfill existing editor/sequence with fresh grace; down removes new table before new traffic |
-| Canonical reference owner unique index | Potentially large reference history | Concurrent build scans history with SHARE UPDATE EXCLUSIVE; allows normal reads/writes | Outside migration transaction; reverse concurrent drop |
-| Composite reference owner FK | New empty ledger references canonical history | Brief SHARE ROW EXCLUSIVE metadata locks; NOT VALID followed by separate validation | 1s acquisition timeout; ownership remains authoritative |
+| Create three coordination tables with final keys, NOT NULL deadlines/defaults and indexes | New empty ephemeral tables | New-table locks and brief parent FK metadata locks; empty index/check scans; no existing heap rewrite | 1s lock timeout restored on exit; atomic metadata; resumable phases; down removes new table before new traffic |
+| Canonical reference owner unique index | Potentially large reference history | Concurrent build scans history with SHARE UPDATE EXCLUSIVE; allows normal reads/writes | Outside metadata transaction, before ledger creation; invalid build repaired on retry; reverse concurrent drop |
+| Composite reference owner FK | New empty ledger references canonical history | Brief SHARE ROW EXCLUSIVE metadata locks; NOT VALID followed by empty-table validation inside atomic metadata transaction | 1s acquisition timeout; ownership remains authoritative |
 | Source/draft identity CHECK replacement | Canonical imports; seven-day draft content | Brief ACCESS EXCLUSIVE swap, NOT VALID; separate SHARE UPDATE EXCLUSIVE validation scan; no heap/type rewrite | Each swap commits before validation; 1s lock timeout; no accumulated long exclusive locks |
 | Blob nullable retry metadata | Potentially large blob history | Brief ACCESS EXCLUSIVE ADD COLUMN, no default/backfill/table scan or rewrite | 1s lock timeout; guarded reverse metadata removal |
 | Blob deadline and source expiry/id indexes | Potentially large history | Concurrent build/drop; no write-blocking regular build | Old serving index retained until replacement valid; interrupted INVALID replacement is repaired on rerun |
-| Editor existing-draft backfill | Existing ephemeral drafts | ACCESS SHARE on drafts; inserts into new ledger, no canonical update | Full grace from insertion; ON CONFLICT idempotent; refresh required for unknown legacy identities |
+| Editor existing-draft backfill | Existing ephemeral drafts | ACCESS SHARE on drafts; inserts into new ledger, no canonical update | Outside parent FK metadata transaction; full grace from insertion; ON CONFLICT idempotent; refresh for unknown legacy identities |
 
 An unavoidable metadata swap can wait up to one second; failure aborts safely
 instead of queuing indefinitely. The independent-process rehearsal holds an
@@ -134,3 +134,34 @@ production traffic demand; reaching it refuses new actions until cleanup frees
 capacity. Canonical references/revisions, consumed imports and consumed launch
 history intentionally remain permanent. Production latency, storage/provider
 behavior, and deployment have not been exercised by local rehearsals.
+
+## Additional adversarial findings
+
+Independent reviewers reproduced consumed-launch retry refusal when a duplicate
+claim loses its initial lookup race and capacity fills; successful discard retry
+returning 409; cancellation retry404 leaving stale browser provenance; a removed
+legacy storage service aborting all healthy batch peers; hidden cancellation feedback in the inactive upload tab, and interrupted concurrent
+index creation leaving a ledger that prevented migration retry. These are fixed at
+the owner lookup, terminal editor state, guarded UI removal, service lookup, and
+atomic/resumable migration boundaries. Cancellation feedback now remains visible
+in either source tab. A real Chrome reconnect test
+also reproduced acknowledged-but-unpersisted text when the same credential's
+counter reset. The page now retains its counter and dirty bit through reconnects.
+The complete credential contains no source text or secrets.
+
+Explicit cleanup cutoffs still admit younger abandoned blobs, while retry deadlines
+always prevent immediate repeated failures. Unexpected storage programming exceptions
+remain visible; only missing service configuration and filesystem failures are
+classified as recoverable purge failures.
+
+For a simple throughput model, let arrivals be lambda eligible rows/minute and
+J completed cleanup jobs/minute. Healthy service capacity is at most 100J rows/minute;
+sustained drainage requires 100J > lambda, plus capacity for retry attempts.
+For example, 100 accounts at the upload bound can admit 200 actions/minute. Their
+cleanup needs more than two full jobs/minute when those actions become eligible;
+a daily 100-row invocation alone cannot sustain that rate. Bounded successors
+provide drainage, contingent on worker throughput. A finite snapshot N costs
+floor(N/100)+1 jobs, even with a completely locked prefix. Scheduler/worker outages
+and permanently failed disk objects can grow upload/blob backlog; the three resident
+ledger caps remain hard bounds during those outages. No production throughput SLA
+is inferred from the disposable concurrency tests.

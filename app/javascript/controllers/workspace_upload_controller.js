@@ -73,7 +73,7 @@ export default class extends Controller {
         method: "DELETE", credentials: "same-origin",
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
-      if (!response.ok) throw new Error()
+      if (!response.ok && response.status !== 404) throw new Error()
       if (this.field("source_import_id").value !== id) return
       const currentAction = this.requestKey === requestKey
       if (currentAction) {

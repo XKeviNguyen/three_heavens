@@ -2,6 +2,7 @@ require "test_helper"
 require "stringio"
 
 class ReplayAdversarialTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
   setup { sign_in_as users(:normal) }
 
   test "one page credential cannot manufacture editor identities through suffix mutation" do
@@ -137,6 +138,29 @@ class ReplayAdversarialTest < ActionDispatch::IntegrationTest
     end
   ensure
     service&.define_singleton_method(:delete, original_delete) if original_delete
+    blobs&.each { |blob| ActiveStorageMaintenance::Purge.call(blob:) }
+  end
+
+  test "an unavailable legacy service cannot abort healthy cleanup or its successor" do
+    freeze_time
+    blobs = Array.new(105) do |index|
+      ActiveStorage::Blob.create_and_upload!(io: StringIO.new("synthetic"), filename: "legacy-#{index}.txt", identify: false)
+        .tap { |blob| blob.update_column(:created_at, 8.days.ago + index.seconds) }
+    end
+    original_service = blobs.first.service_name
+    blobs.first.update_column(:service_name, "unavailable_legacy_service")
+    result = ActiveStorageCleanupJob.perform_now
+    assert_equal 100, result.candidate_count
+    assert_equal 99, result.purged_count
+    assert_enqueued_jobs 1, only: ActiveStorageCleanupJob
+    perform_enqueued_jobs(only: ActiveStorageCleanupJob)
+    assert_equal [ blobs.first.id ], ActiveStorage::Blob.where(id: blobs.map(&:id)).pluck(:id)
+    assert_equal 0, ActiveStorageMaintenance::Cleanup.call(execute: true).candidate_count
+    blobs.first.update!(service_name: original_service)
+    travel ActiveStorageMaintenance::Cleanup::RETRY_DELAY do
+      assert_equal 1, ActiveStorageMaintenance::Cleanup.call(execute: true).purged_count
+    end
+  ensure
     blobs&.each { |blob| ActiveStorageMaintenance::Purge.call(blob:) }
   end
 

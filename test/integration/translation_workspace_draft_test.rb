@@ -435,7 +435,7 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     assert_response :no_content
     assert_equal 0, users(:normal).translation_workspace_drafts.count
     delete_draft params: { sequence: 1, editor_id: editor, draft_id: "", version: "" }
-    assert_response :conflict
+    assert_response :no_content
     editor = new_editor_id
 
     post_draft params: { editor_id: editor, sequence: 2, workspace: payload("project_name" => "Lost response") }, as: :json
@@ -472,6 +472,8 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     submitted = { editor_id: editor, sequence: 1, draft_id: "", version: "", workspace: payload }
     post_draft params: submitted, as: :json
     assert_response :success
+    delete_draft params: { editor_id: editor, sequence: 1 }, as: :json
+    assert_response :no_content
     delete_draft params: { editor_id: editor, sequence: 1 }, as: :json
     assert_response :no_content
     3.times do
