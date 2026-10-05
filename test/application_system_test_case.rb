@@ -5,6 +5,11 @@ require "test_helper"
 ENV["SE_AVOID_STATS"] = "true"
 require_relative "support/open_router_catalog_fixture"
 
+# Assert observable browser state instead of treating Capybara's two-second
+# default as an application deadline. Concurrent Chrome processes can take
+# longer to finish a request or replace the document even after Rails responds.
+Capybara.default_max_wait_time = 10
+
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   driven_by :selenium,
             using: :headless_chrome,

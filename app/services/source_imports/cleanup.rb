@@ -14,14 +14,14 @@ module SourceImports
     def call
       purged_count = 0
       candidate_ids.each do |source_import_id|
-        SourceImport.transaction do
-          source_import = SourceImport.lock.find_by(id: source_import_id)
-          next unless source_import&.status.in?(%w[pending ready failed])
-          next unless source_import.expires_at <= cutoff
+        source_import = SourceImport.find_by(id: source_import_id)
+        next unless source_import
 
-          source_import.destroy!
-          purged_count += 1
-        end
+        purged_count += 1 if Retire.call(source_import:, cutoff:)
+      rescue ActiveRecord::RecordNotFound, RequestLock::Unavailable
+        # Another action removed it, or a live creator still owns it. A later
+        # bounded cleanup batch can retry without deleting live content.
+        next
       end
       Result.new(purged_count:)
     end

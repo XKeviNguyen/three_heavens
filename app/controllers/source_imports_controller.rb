@@ -1,7 +1,4 @@
 class SourceImportsController < ApplicationController
-  include UploadBudgetAdmission
-  before_action :admit_upload, only: :create
-
   def new
     @project = find_owned_project(project_id_param)
     @source_import = SourceImport.new
@@ -34,12 +31,10 @@ class SourceImportsController < ApplicationController
         source_import_project_token: project_binding
       ), notice: t("source_imports.imported_notice")
     end
+  rescue SourceImports::Create::RateLimited
+    render_rate_limited
   rescue SourceImports::Busy => error
-    # Temporary and nothing was stored, so a retry is processed afresh: the
-    # workspace uploader resends the same request key after a 5xx, and the
-    # upload form issues a new one.
     response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
-    refund_upload_budget
     render_import_failure(error, status: :service_unavailable)
   rescue SourceImports::Error => error
     render_import_failure(error, status: :unprocessable_content)
@@ -55,23 +50,22 @@ class SourceImportsController < ApplicationController
 
   def destroy
     source_import = current_user.source_imports.find(params[:id])
-    SourceImport.transaction do
-      source_import.lock!
-      unless source_import.status.in?(%w[pending ready failed])
-        if request.format.json?
-          render json: { error: t("source_imports.cancel_unavailable") }, status: :conflict
-        else
-          redirect_to new_translation_workspace_path, alert: t("source_imports.cancel_unavailable")
-        end
-        return
+    unless SourceImports::Retire.call(source_import:)
+      if request.format.json?
+        render json: { error: t("source_imports.cancel_unavailable") }, status: :conflict
+      else
+        redirect_to new_translation_workspace_path, alert: t("source_imports.cancel_unavailable")
       end
-      source_import.destroy!
+      return
     end
     if request.format.json?
       head :no_content
     else
       redirect_to new_translation_workspace_path, notice: t("source_imports.canceled")
     end
+  rescue SourceImports::RequestLock::Unavailable => error
+    response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    render_import_failure(error, status: :service_unavailable)
   end
 
   private
@@ -82,13 +76,13 @@ class SourceImportsController < ApplicationController
   end
 
   def render_import_failure(error, status:)
-    render_import_failure_message(t("source_imports.errors.#{error.code}", default: error.message), status:)
+    render_import_failure_message(t("source_imports.errors.#{error.code}", default: error.message), status:, code: error.code)
   end
 
-  def render_import_failure_message(message, status:)
+  def render_import_failure_message(message, status:, code: nil)
     @source_import = SourceImport.new
     if request.format.json?
-      render json: { error: message }, status:
+      render json: { error: message, code: }, status:
     else
       flash.now[:alert] = message
       render :new, status:

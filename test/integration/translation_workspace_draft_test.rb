@@ -466,6 +466,57 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     assert_equal 0, users(:normal).translation_workspace_drafts.count
   end
 
+  test "discard after response loss rejects a delayed first-save replay but allows a newer edit" do
+    editor = new_editor_id
+    submitted = { editor_id: editor, sequence: 1, draft_id: "", version: "", workspace: payload }
+    post translation_workspace_draft_path, params: submitted, as: :json
+    assert_response :success
+    delete translation_workspace_draft_path, params: { editor_id: editor, sequence: 1 }, as: :json
+    assert_response :no_content
+    3.times do
+      post translation_workspace_draft_path, params: submitted, as: :json
+      assert_response :conflict
+      assert_empty users(:normal).translation_workspace_drafts.reload
+    end
+    post translation_workspace_draft_path, params: submitted.merge(sequence: 2), as: :json
+    assert_response :success
+  end
+
+  test "discard before first-save delivery retires every sequence the page already started" do
+    editor = new_editor_id
+    delete translation_workspace_draft_path, params: { editor_id: editor, sequence: 2 }, as: :json
+    assert_response :no_content
+    [ 1, 2 ].each do |sequence|
+      post translation_workspace_draft_path, params: { editor_id: editor, sequence:, workspace: payload }, as: :json
+      assert_response :conflict
+    end
+    assert_empty users(:normal).translation_workspace_drafts.reload
+    post translation_workspace_draft_path, params: { editor_id: editor, sequence: 3, workspace: payload }, as: :json
+    assert_response :success
+    delete translation_workspace_draft_path, params: { editor_id: editor, sequence: 2 }, as: :json
+    assert_response :conflict
+    assert_equal 3, users(:normal).translation_workspace_drafts.reload.sole.editor_sequence
+  end
+
+  test "discard preserves earlier editor watermarks and expiry cleanup cannot resurrect their old saves" do
+    first, second = new_editor_id, new_editor_id
+    post translation_workspace_draft_path, params: { editor_id: first, sequence: 1, workspace: payload }, as: :json
+    identity = response.parsed_body
+    post translation_workspace_draft_path, params: { editor_id: second, sequence: 1, draft_id: identity.fetch("id"), version: identity.fetch("version"), workspace: payload }, as: :json
+    assert_response :success
+    delete translation_workspace_draft_path, params: { editor_id: second, sequence: 1 }, as: :json
+    assert_response :no_content
+    post translation_workspace_draft_path, params: { editor_id: first, sequence: 1, workspace: payload }, as: :json
+    assert_response :conflict
+    post translation_workspace_draft_path, params: { editor_id: second, sequence: 2, workspace: payload }, as: :json
+    assert_response :success
+    users(:normal).translation_workspace_drafts.sole.update_columns(expires_at: 1.minute.ago)
+    TranslationWorkspaceDraftCleanupJob.perform_now
+    post translation_workspace_draft_path, params: { editor_id: second, sequence: 2, workspace: payload }, as: :json
+    assert_response :conflict
+    assert_empty users(:normal).translation_workspace_drafts.reload
+  end
+
   private
 
   def payload(overrides = {})

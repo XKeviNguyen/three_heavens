@@ -56,6 +56,7 @@ module TranslationWorkspaceDrafts
     attr_reader :at, :context_key, :draft_id, :editor_id, :payload, :sequence, :user, :version
 
     def save_locked
+      @editor = TranslationWorkspaceDraftEditor.lock_for(user:, context_key:, editor_id:)
       draft = user.translation_workspace_drafts.lock.find_by(context_key:)
       if draft && draft.expires_at <= at
         draft.delete
@@ -64,10 +65,14 @@ module TranslationWorkspaceDrafts
 
       if draft.nil?
         raise ActiveRecord::RecordNotFound, "The saved draft no longer exists" if draft_id
+        return Result.new(draft: nil, conflict: true) if @editor && sequence <= @editor.sequence
 
         return saved(user.translation_workspace_drafts.create!(context_key:, **written_attributes))
       end
-      return Result.new(draft:, conflict: true) unless draft.writable_by?(editor_id:, public_id: draft_id, version:)
+      unless draft.writable_by?(editor_id:, public_id: draft_id, version:)
+        @editor.destroy! if @editor&.sequence == 0
+        return Result.new(draft:, conflict: true)
+      end
       return saved(draft) if editor_id && draft.editor_id == editor_id && sequence <= draft.editor_sequence
 
       saved(replace(draft))
@@ -94,6 +99,7 @@ module TranslationWorkspaceDrafts
     end
 
     def saved(draft)
+      @editor.update!(sequence:) if @editor && sequence > @editor.sequence
       Result.new(draft:, conflict: false)
     end
   end

@@ -36,6 +36,7 @@ module SourceImports
       singleton.remove_method(:upload) if singleton.method_defined?(:upload, false)
       @threads&.each { |thread| thread.kill.join(5) }
       @user.source_imports.find_each(&:destroy!)
+      UploadBudget.where(user: @user).delete_all
       @user.delete
     end
 

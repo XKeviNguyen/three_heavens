@@ -17,6 +17,12 @@ module SourceImports
   # removed. No delivery can therefore report success for bytes that are not
   # stored, and no failed or losing delivery leaves an orphan blob behind.
   class Create
+    class RateLimited < Error
+      def initialize
+        super("rate_limited", "The upload budget is exhausted.")
+      end
+    end
+
     STORAGE_FAILURE_MESSAGE = "The file could not be stored. Choose it again and retry."
 
     def self.call(user:, upload:, request_key:)
@@ -33,11 +39,32 @@ module SourceImports
       raise ArgumentError, "invalid source import request key" unless request_key.to_s.match?(Limits::REQUEST_KEY_FORMAT)
 
       payload = UploadPayload.call(upload:)
-      with_request_lock do
+      RequestLock.with(user_id: user.id, request_key:) do
+        if SourceImportRetirement.exists?(user_id: user.id, request_key:)
+          raise Error.new("import_unavailable", "This upload is no longer available. Upload the file again.")
+        end
         existing = user.source_imports.find_by(request_key:)
         next replay(existing, payload) if existing
 
-        store(payload)
+        receipt = source_import = nil
+        SourceImport.transaction(requires_new: true) do
+          receipt = UploadBudget.consume(user:)
+          raise RateLimited unless receipt
+
+          # Admission and the interrupted-action identity commit together.
+          # A worker killed during extraction leaves an unavailable pending
+          # import whose replay spends nothing and never starts work again.
+          source_import = user.source_imports.create!(import_attributes(payload:, extracted_text: nil, failure: nil).merge(extraction_version: nil))
+        end
+        begin
+          store(source_import, payload)
+        rescue Busy
+          SourceImport.transaction(requires_new: true) do
+            UploadBudget.refund(receipt)
+            source_import.destroy!
+          end
+          raise
+        end
       end
     ensure
       upload.rewind if upload.respond_to?(:rewind)
@@ -47,7 +74,7 @@ module SourceImports
 
     attr_reader :request_key, :user, :upload
 
-    def store(payload)
+    def store(source_import, payload)
       extracted_text = failure = nil
       begin
         extracted_text = TextExtractor.call(format: payload.detection.format, bytes: payload.bytes)
@@ -56,7 +83,7 @@ module SourceImports
       rescue Error => error
         failure = error
       end
-      source_import = create_import(payload:, extracted_text:, failure:)
+      source_import = create_import(source_import:, payload:, extracted_text:, failure:)
       failure ||= storage_failure unless source_import.ready?
       raise Error.new(failure.code, failure.message, source_import:) if failure
 
@@ -65,12 +92,12 @@ module SourceImports
 
     # Active Storage writes the object after the transaction commits, so the
     # import is committed as pending and becomes ready only once that write
-    # has returned. A failure before the commit leaves nothing behind; a
-    # failure after it marks the import failed and removes its blob.
-    def create_import(payload:, extracted_text:, failure:)
-      created = nil
+    # has returned. The admitted pending action already exists; any storage
+    # failure finalizes it as failed and removes its blob.
+    def create_import(source_import:, payload:, extracted_text:, failure:)
+      created = source_import
       SourceImport.transaction(requires_new: true) do
-        created = user.source_imports.create!(import_attributes(payload:, extracted_text:, failure:))
+        created.update!(import_attributes(payload:, extracted_text:, failure:))
         created.source_file.attach(
           io: StringIO.new(payload.bytes),
           filename: payload.filename,
@@ -78,7 +105,9 @@ module SourceImports
           identify: false
         )
       end
-      created.update!(status: :ready) unless failure
+      # The availability period starts after durable storage, whose latency is
+      # not bounded by the extraction deadline.
+      created.update!(status: :ready, expires_at: Limits::IMPORT_EXPIRATION.from_now) unless failure
       created
     rescue StandardError => error
       raise unless created&.id && SourceImport.exists?(created.id)
@@ -88,12 +117,16 @@ module SourceImports
     end
 
     def discard_unstored_object!(source_import, failure)
-      source_import.source_file.purge if source_import.source_file.attached?
       outcome = failure || storage_failure
-      source_import.update!(
-        status: :failed, extracted_text: nil, extraction_version: nil,
-        failure_code: outcome.code, failure_message: outcome.message
-      )
+      blob = source_import.source_file.blob if source_import.source_file.attached?
+      SourceImport.transaction(requires_new: true) do
+        source_import.source_file.detach if blob
+        source_import.update!(
+          status: :failed, extracted_text: nil, extraction_version: nil,
+          failure_code: outcome.code, failure_message: outcome.message
+        )
+      end
+      ActiveStorageMaintenance::Purge.call(blob:) if blob
       source_import
     end
 
@@ -135,27 +168,6 @@ module SourceImports
       end
 
       source_import
-    end
-
-    # A session-level advisory lock, so it spans the separate transactions of
-    # one delivery. Waiting is bounded; a delivery that cannot get the lock in
-    # time reports that the upload is still in progress.
-    def with_request_lock
-      connection = SourceImport.connection
-      lock_key = Digest::SHA256.digest("source_import_request:#{user.id}:#{request_key}").unpack1("q>")
-      SourceImport.transaction(requires_new: true) do
-        connection.execute("SET LOCAL lock_timeout = '#{Limits::REQUEST_LOCK_WAIT_SECONDS}s'")
-        # pg_advisory_lock returns void, which select_value would warn it cannot map.
-        connection.execute(SourceImport.sanitize_sql_array([ "SELECT pg_advisory_lock(?)", lock_key ]))
-      end
-      locked = true
-      yield
-    rescue ActiveRecord::LockWaitTimeout
-      raise if locked
-
-      raise Error.new("import_in_progress", "This upload is still being processed. Try again in a moment.")
-    ensure
-      connection.select_value(SourceImport.sanitize_sql_array([ "SELECT pg_advisory_unlock(?)", lock_key ])) if locked
     end
   end
 end

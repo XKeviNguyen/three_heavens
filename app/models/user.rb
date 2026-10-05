@@ -16,6 +16,7 @@ class User < ApplicationRecord
 
   has_many :projects, dependent: :restrict_with_error
   has_many :source_imports, dependent: :restrict_with_error
+  has_many :source_import_retirements, dependent: :restrict_with_error
   has_many :documents, through: :projects
   has_many :experiments, through: :documents
   has_many :review_rounds, through: :experiments
@@ -25,9 +26,11 @@ class User < ApplicationRecord
   has_many :glossaries, dependent: :restrict_with_error
   has_many :methodology_profiles, dependent: :restrict_with_error
   has_many :translation_references, dependent: :restrict_with_error
+  has_many :translation_reference_creations, dependent: :restrict_with_error
   has_many :pipeline_runs, through: :experiments
   has_many :translation_workspace_submissions, dependent: :restrict_with_error
   has_many :translation_workspace_drafts, dependent: :delete_all
+  has_many :translation_workspace_draft_editors, dependent: :delete_all
   has_many :federated_identities, dependent: :delete_all
   has_many :sessions, dependent: :delete_all
 

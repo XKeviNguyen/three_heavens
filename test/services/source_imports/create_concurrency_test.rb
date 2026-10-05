@@ -18,6 +18,7 @@ module SourceImports
 
     teardown do
       @user.source_imports.find_each(&:destroy!)
+      UploadBudget.where(user: @user).delete_all
       @user.delete
     end
 
@@ -51,7 +52,7 @@ module SourceImports
       holder.join
 
       assert_equal [ "pdf_busy", "pdf_busy" ], results.map { it.is_a?(Busy) ? it.code : it }
-      assert_empty @user.source_imports
+      assert_empty @user.source_imports.reload
       assert concurrently(1) { request_lock_free?(key) }.sole, "a busy delivery kept its request lock"
       assert concurrently(1) { Create.call(user: @user, upload: upload.call, request_key: key) }.sole.ready?
     ensure
@@ -63,7 +64,7 @@ module SourceImports
 
     def request_lock_free?(key)
       connection = ActiveRecord::Base.connection
-      lock_key = Digest::SHA256.digest("source_import_request:#{@user.id}:#{key}").unpack1("q>")
+      lock_key = RequestLock.key(user_id: @user.id, request_key: key)
       locked = connection.select_value(ActiveRecord::Base.sanitize_sql_array([ "SELECT pg_try_advisory_lock(?)", lock_key ]))
       connection.select_value(ActiveRecord::Base.sanitize_sql_array([ "SELECT pg_advisory_unlock(?)", lock_key ])) if locked
       locked

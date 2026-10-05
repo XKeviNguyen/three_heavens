@@ -25,7 +25,7 @@ class UploadBudgetConcurrencyTest < ActionDispatch::IntegrationTest
                     headers: { "Accept" => "application/json" }
       else
         client.post translation_references_path, params: { translation_reference: {
-          title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
+          creation_key: SecureRandom.hex(16), title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
           source_file: upload, approved_translation: "Approved"
         } }
       end
@@ -41,6 +41,7 @@ class UploadBudgetConcurrencyTest < ActionDispatch::IntegrationTest
       # These rows were committed by child processes, outside Rails' test
       # transaction. Remove only this test's history using the established
       # fixture-cleanup boundary; production history remains sealed.
+      TranslationReferenceCreation.where(translation_reference_id: TranslationReference.where.not(id: original_reference_ids).select(:id)).delete_all
       mutate_historical_fixture do
         references = TranslationReference.where.not(id: original_reference_ids)
         TranslationReferenceRevision.where(translation_reference_id: references.select(:id)).delete_all

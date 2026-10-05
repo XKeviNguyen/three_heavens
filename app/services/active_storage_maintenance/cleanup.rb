@@ -44,10 +44,7 @@ module ActiveStorageMaintenance
       end
       return false unless blob
 
-      # Active Storage rechecks attachments while destroying the blob. Keep the
-      # potentially remote service deletion outside the database transaction.
-      blob.purge
-      !blob.persisted?
+      Purge.call(blob:)
     end
   end
 end

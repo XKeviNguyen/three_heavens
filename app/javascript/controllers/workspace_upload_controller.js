@@ -32,9 +32,10 @@ export default class extends Controller {
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
-        // The server decided this action, so uploading again is a new action.
-        // A lost response or a server error keeps the key, so a retry replays.
-        if (response.status < 500) this.uploadedFile = null
+        // Admission and an in-progress delivery leave the action unresolved.
+        // A terminal validation/extraction failure lets an explicit retry
+        // begin a new action; ambiguous transport outcomes keep this key.
+        if (response.status < 500 && response.status !== 429 && result.code !== "import_in_progress") this.uploadedFile = null
         throw new Error(result.error || this.messagesValue.importFailed)
       }
 
@@ -62,6 +63,8 @@ export default class extends Controller {
   async remove() {
     const id = this.field("source_import_id").value
     if (!id) return
+    const requestKey = this.requestKey
+    const selectedFile = this.fileTarget.files[0]
 
     try {
       const response = await fetch(`/source_imports/${encodeURIComponent(id)}.json`, {
@@ -69,14 +72,16 @@ export default class extends Controller {
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
       if (!response.ok) throw new Error()
+      if (this.field("source_import_id").value !== id || this.requestKey !== requestKey) return
       this.field("source_import_id").value = ""
       this.field("source_import_project_token").value = ""
       this.importTarget.classList.add("hidden")
       document.querySelector("label[for='translation_workspace_source_text']").textContent = this.messagesValue.sourceText
-      this.fileTarget.value = ""
+      if (this.fileTarget.files[0] === selectedFile) this.fileTarget.value = ""
       this.messageTarget.textContent = this.messagesValue.removed
       this.element.dispatchEvent(new Event("input", { bubbles: true }))
     } catch {
+      if (this.field("source_import_id").value !== id || this.requestKey !== requestKey) return
       this.messageTarget.textContent = this.messagesValue.removeFailed
     }
   }

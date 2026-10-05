@@ -26,6 +26,10 @@ production:
     class: SourceImportCleanupJob
     queue: operations
     schedule: every hour at minute 27
+  cleanup_expired_reference_creation_recovery:
+    command: "TranslationReferenceCreation.expire_failures"
+    queue: operations
+    schedule: every 5 minutes
   cleanup_abandoned_workspace_submissions:
     class: TranslationWorkspaceSubmissionCleanupJob
     queue: operations

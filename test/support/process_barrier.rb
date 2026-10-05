@@ -1,6 +1,66 @@
 require "timeout"
 
 module ProcessBarrier
+  # Kill a real independent worker at extractor entry, after its admission
+  # transaction has committed. A pipe barrier, rather than timing, selects
+  # the exact crash boundary.
+  def crash_at_extraction(&work)
+    crash_at_boundary(work:) do |reached, hold|
+      SourceImports::TextExtractor.define_singleton_method(:call) do |**|
+        reached.write("r")
+        hold.read(1)
+      end
+    end
+  end
+
+  def crash_at_storage(after_write:, &work)
+    crash_at_boundary(work:) do |reached, hold|
+      original = ActiveStorage::Blob.service.method(:upload)
+      ActiveStorage::Blob.service.define_singleton_method(:upload) do |*arguments, **options|
+        original.call(*arguments, **options) if after_write
+        reached.write("r")
+        hold.read(1)
+      end
+    end
+  end
+
+  def crash_at_storage_delete(after_delete:, &work)
+    crash_at_boundary(work:) do |reached, hold|
+      original = ActiveStorage::Blob.service.method(:delete)
+      ActiveStorage::Blob.service.define_singleton_method(:delete) do |*arguments|
+        original.call(*arguments) if after_delete
+        reached.write("r")
+        hold.read(1)
+      end
+    end
+  end
+
+  def crash_at_boundary(work:)
+    ActiveRecord::Base.connection_handler.clear_all_connections!
+    reached_read, reached_write = IO.pipe
+    hold_read, hold_write = IO.pipe
+    pid = fork do
+      reached_read.close
+      hold_write.close
+      yield reached_write, hold_read
+      work.call
+      exit! 1
+    end
+    reached_write.close
+    hold_read.close
+    Timeout.timeout(15) { raise "worker missed extraction barrier" unless reached_read.read(1) == "r" }
+    Process.kill("KILL", pid)
+    Process.wait(pid)
+    pid = nil
+  ensure
+    if pid
+      Process.kill("KILL", pid) rescue nil
+      Process.wait(pid) rescue nil
+    end
+    [ reached_read, reached_write, hold_read, hold_write ].compact.each { |pipe| pipe.close unless pipe.closed? }
+  end
+  private :crash_at_boundary
+
   # Every child starts on its own PostgreSQL connection after all children
   # have reached the pipe barrier. No sleeps or inherited database sessions.
   def in_processes(count, &work)

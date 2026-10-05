@@ -210,19 +210,29 @@ module SourceImports
       assert_equal users(:other).id, theirs.user_id
     end
 
-    test "a failure inside the transaction leaves no record, blob, attachment, or stored file" do
+    test "attachment transaction failure leaves a charged terminal action without any stored object" do
       uploads = count_storage_uploads
+      key = SecureRandom.hex(16)
       ActiveRecord::Base.connection.execute(<<~SQL)
         ALTER TABLE active_storage_attachments
         ADD CONSTRAINT reject_source_import_attachment CHECK (record_type <> 'SourceImport')
       SQL
-
-      assert_no_difference stored_counts do
-        assert_raises(ActiveRecord::StatementInvalid) do
-          Create.call(user: users(:normal), upload: uploaded_file("Rolled back", filename: "rollback.txt"), request_key: SecureRandom.hex(16))
+      assert_difference "SourceImport.count", 1 do
+        assert_no_difference [ -> { ActiveStorage::Blob.count }, -> { ActiveStorage::Attachment.count } ] do
+          error = assert_raises(Error) do
+            Create.call(user: users(:normal), upload: uploaded_file("Rolled back", filename: "rollback.txt"), request_key: key)
+          end
+          assert_equal "storage_unavailable", error.code
+          assert error.source_import.failed?
         end
       end
       assert_equal 0, uploads.call
+      assert_equal 1, UploadBudget.find_by!(user: users(:normal)).count
+      replay = assert_raises(Error) do
+        Create.call(user: users(:normal), upload: uploaded_file("Rolled back", filename: "rollback.txt"), request_key: key)
+      end
+      assert_equal "storage_unavailable", replay.code
+      assert_equal 1, UploadBudget.find_by!(user: users(:normal)).count
     ensure
       restore_storage_uploads
     end

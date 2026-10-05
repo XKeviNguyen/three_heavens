@@ -2948,6 +2948,38 @@ ALTER SEQUENCE public.sessions_id_seq OWNED BY public.sessions.id;
 
 
 --
+-- Name: source_import_retirements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_import_retirements (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    request_key character varying(32) NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$'::text))
+);
+
+
+--
+-- Name: source_import_retirements_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.source_import_retirements_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_import_retirements_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.source_import_retirements_id_seq OWNED BY public.source_import_retirements.id;
+
+
+--
 -- Name: source_imports; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2998,6 +3030,45 @@ CREATE SEQUENCE public.source_imports_id_seq
 --
 
 ALTER SEQUENCE public.source_imports_id_seq OWNED BY public.source_imports.id;
+
+
+--
+-- Name: translation_reference_creations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_reference_creations (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    translation_reference_id bigint,
+    creation_key character varying(32) NOT NULL,
+    payload_digest character varying(64) NOT NULL,
+    status character varying DEFAULT 'pending'::character varying NOT NULL,
+    failure text,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT reference_creations_failure_size_check CHECK (((failure IS NULL) OR (octet_length(failure) <= 2097152))),
+    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT reference_creations_outcome_check CHECK (((((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('expired'::character varying)::text])) AND (translation_reference_id IS NULL) AND (failure IS NULL)) OR (((status)::text = 'completed'::text) AND (translation_reference_id IS NOT NULL) AND (failure IS NULL)) OR (((status)::text = 'failed'::text) AND (translation_reference_id IS NULL) AND (failure IS NOT NULL))))
+);
+
+
+--
+-- Name: translation_reference_creations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_reference_creations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_reference_creations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_reference_creations_id_seq OWNED BY public.translation_reference_creations.id;
 
 
 --
@@ -3215,6 +3286,40 @@ CREATE SEQUENCE public.translation_segment_runs_id_seq
 --
 
 ALTER SEQUENCE public.translation_segment_runs_id_seq OWNED BY public.translation_segment_runs.id;
+
+
+--
+-- Name: translation_workspace_draft_editors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_workspace_draft_editors (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    context_key character varying(80) NOT NULL,
+    editor_id character varying(32) NOT NULL,
+    sequence bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$'::text)),
+    CONSTRAINT workspace_draft_editors_sequence_check CHECK (((sequence >= 0) AND (sequence <= '9007199254740991'::bigint)))
+);
+
+
+--
+-- Name: translation_workspace_draft_editors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_workspace_draft_editors_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_workspace_draft_editors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_workspace_draft_editors_id_seq OWNED BY public.translation_workspace_draft_editors.id;
 
 
 --
@@ -3742,10 +3847,24 @@ ALTER TABLE ONLY public.sessions ALTER COLUMN id SET DEFAULT nextval('public.ses
 
 
 --
+-- Name: source_import_retirements id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements ALTER COLUMN id SET DEFAULT nextval('public.source_import_retirements_id_seq'::regclass);
+
+
+--
 -- Name: source_imports id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_imports ALTER COLUMN id SET DEFAULT nextval('public.source_imports_id_seq'::regclass);
+
+
+--
+-- Name: translation_reference_creations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations ALTER COLUMN id SET DEFAULT nextval('public.translation_reference_creations_id_seq'::regclass);
 
 
 --
@@ -3774,6 +3893,13 @@ ALTER TABLE ONLY public.translation_runs ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.translation_segment_runs ALTER COLUMN id SET DEFAULT nextval('public.translation_segment_runs_id_seq'::regclass);
+
+
+--
+-- Name: translation_workspace_draft_editors id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors ALTER COLUMN id SET DEFAULT nextval('public.translation_workspace_draft_editors_id_seq'::regclass);
 
 
 --
@@ -4122,11 +4248,27 @@ ALTER TABLE ONLY public.sessions
 
 
 --
+-- Name: source_import_retirements source_import_retirements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements
+    ADD CONSTRAINT source_import_retirements_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: source_imports source_imports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_imports
     ADD CONSTRAINT source_imports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_reference_creations translation_reference_creations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT translation_reference_creations_pkey PRIMARY KEY (id);
 
 
 --
@@ -4159,6 +4301,14 @@ ALTER TABLE ONLY public.translation_runs
 
 ALTER TABLE ONLY public.translation_segment_runs
     ADD CONSTRAINT translation_segment_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_workspace_draft_editors translation_workspace_draft_editors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors
+    ADD CONSTRAINT translation_workspace_draft_editors_pkey PRIMARY KEY (id);
 
 
 --
@@ -4236,6 +4386,13 @@ CREATE UNIQUE INDEX idx_on_methodology_profile_id_version_9a54e7270e ON public.m
 --
 
 CREATE INDEX idx_on_status_expires_at_ed9c9803ce ON public.translation_workspace_submissions USING btree (status, expires_at);
+
+
+--
+-- Name: idx_on_translation_reference_id_4839cc91cb; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_translation_reference_id_4839cc91cb ON public.translation_reference_creations USING btree (translation_reference_id);
 
 
 --
@@ -4904,6 +5061,20 @@ CREATE INDEX index_projects_on_user_id ON public.projects USING btree (user_id);
 
 
 --
+-- Name: index_reference_creations_on_expiring_failure; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_reference_creations_on_expiring_failure ON public.translation_reference_creations USING btree (created_at) WHERE ((status)::text = 'failed'::text);
+
+
+--
+-- Name: index_reference_creations_on_owner_and_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_reference_creations_on_owner_and_key ON public.translation_reference_creations USING btree (user_id, creation_key);
+
+
+--
 -- Name: index_review_evaluations_on_review_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5030,6 +5201,13 @@ CREATE INDEX index_sessions_on_user_id ON public.sessions USING btree (user_id);
 
 
 --
+-- Name: index_source_import_retirements_on_owner_and_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_source_import_retirements_on_owner_and_key ON public.source_import_retirements USING btree (user_id, request_key);
+
+
+--
 -- Name: index_source_imports_for_cleanup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5083,6 +5261,13 @@ CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_id ON
 --
 
 CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_version ON public.translation_reference_revisions USING btree (translation_reference_id, version);
+
+
+--
+-- Name: index_translation_references_on_owner_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_references_on_owner_and_id ON public.translation_references USING btree (user_id, id);
 
 
 --
@@ -5181,6 +5366,20 @@ CREATE INDEX index_translation_segment_runs_on_recent_failures ON public.transla
 --
 
 CREATE INDEX index_translation_segment_runs_on_running_last_claimed_at ON public.translation_segment_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_translation_workspace_draft_editors_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_draft_editors_on_user_id ON public.translation_workspace_draft_editors USING btree (user_id);
+
+
+--
+-- Name: index_workspace_draft_editors_on_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_workspace_draft_editors_on_identity ON public.translation_workspace_draft_editors USING btree (user_id, context_key, editor_id);
 
 
 --
@@ -5945,6 +6144,14 @@ ALTER TABLE ONLY public.finalization_runs
 
 
 --
+-- Name: source_import_retirements fk_rails_2192db283c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements
+    ADD CONSTRAINT fk_rails_2192db283c FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: source_imports fk_rails_258d226d74; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6153,6 +6360,14 @@ ALTER TABLE ONLY public.judge_evaluations
 
 
 --
+-- Name: translation_workspace_draft_editors fk_rails_c47ab55a2b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors
+    ADD CONSTRAINT fk_rails_c47ab55a2b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: translation_workspace_drafts fk_rails_72cbb19784; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6278,6 +6493,14 @@ ALTER TABLE ONLY public.methodology_profiles
 
 ALTER TABLE ONLY public.glossary_revisions
     ADD CONSTRAINT fk_rails_a1c3a688ad FOREIGN KEY (glossary_id) REFERENCES public.glossaries(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: translation_reference_creations fk_rails_a2770b12b1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT fk_rails_a2770b12b1 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -6449,12 +6672,23 @@ ALTER TABLE ONLY public.workflow_profiles
 
 
 --
+-- Name: translation_reference_creations reference_creations_owner_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT reference_creations_owner_fk FOREIGN KEY (user_id, translation_reference_id) REFERENCES public.translation_references(user_id, id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261005110000'),
+('20261005100000'),
+('20261004170000'),
 ('20261004090000'),
 ('20261003090000'),
 ('20261002090000'),
@@ -6507,4 +6741,3 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260824050254'),
 ('20260824050253'),
 ('20260824050252');
-

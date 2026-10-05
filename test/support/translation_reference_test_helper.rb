@@ -15,6 +15,16 @@ module TranslationReferenceTestHelper
     }
   end
 
+  # Each ordinary POST is an intentional new action. Replay tests supply
+  # their own stable key and use post directly.
+  def post_new_reference(path, params:, **options)
+    submitted = params[:translation_reference]
+    if submitted.is_a?(Hash)
+      params = params.merge(translation_reference: { creation_key: SecureRandom.hex(16) }.merge(submitted))
+    end
+    post path, params: params, **options
+  end
+
   def create_translation_reference(user: users(:normal), **attributes)
     TranslationReferences::Create.call(
       user: user,

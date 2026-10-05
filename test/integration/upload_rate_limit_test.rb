@@ -1,6 +1,7 @@
 require "test_helper"
 require_relative "../support/document_io_test_helper"
 require_relative "../support/upload_budget_clock"
+require_relative "../support/translation_reference_test_helper"
 
 # All PDFs share one worker slot, and a 24 KB PDF can hold it for the whole
 # 5-second parse limit. Each account has one budget of file-carrying requests
@@ -9,6 +10,7 @@ require_relative "../support/upload_budget_clock"
 class UploadRateLimitTest < ActionDispatch::IntegrationTest
   include DocumentIoTestHelper
   include UploadBudgetClock
+  include TranslationReferenceTestHelper
 
   BUDGET = SourceImports::Limits::UPLOADS_PER_WINDOW
 
@@ -50,12 +52,12 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
       assert_response :created
     end
     (BUDGET - (BUDGET / 2)).times do |index|
-      post translation_references_path, params: { translation_reference: reference_params("Reference #{index}") }
+      post_new_reference translation_references_path, params: { translation_reference: reference_params("Reference #{index}") }
       assert_response :redirect
     end
 
     assert_no_difference "TranslationReference.count" do
-      post translation_references_path, params: { translation_reference: reference_params("One too many") }
+      post_new_reference translation_references_path, params: { translation_reference: reference_params("One too many") }
     end
     assert_response :too_many_requests
     assert_select "input[name='translation_reference[title]'][value='One too many']"
@@ -66,7 +68,7 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
 
   test "text-only reference edits never count toward the upload budget" do
     sign_in_as users(:normal)
-    post translation_references_path, params: { translation_reference: text_reference_params("Pasted", "Version 1") }
+    post_new_reference translation_references_path, params: { translation_reference: text_reference_params("Pasted", "Version 1") }
     reference = TranslationReference.order(:id).last
 
     (BUDGET + 2).times do |index|
@@ -103,7 +105,7 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
     with_pdf_busy_after(0) do
       (BUDGET + 1).times do
         assert_no_difference [ "TranslationReference.count", "TranslationReferenceRevision.count" ] do
-          post translation_references_path, params: { translation_reference: reference_params("Still submitted") }
+          post_new_reference translation_references_path, params: { translation_reference: reference_params("Still submitted") }
         end
         assert_response :service_unavailable
         assert_equal "5", response.headers["Retry-After"]
@@ -117,7 +119,7 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
     sign_in_as users(:normal)
     with_pdf_busy_after(1) do
       assert_no_difference [ "TranslationReference.count", "TranslationReferenceRevision.count" ] do
-        post translation_references_path, params: { translation_reference: reference_params("Partial") }
+        post_new_reference translation_references_path, params: { translation_reference: reference_params("Partial") }
       end
     end
     assert_response :service_unavailable
@@ -128,7 +130,7 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
 
   test "reference update Busy refunds without creating a revision and preserves the version" do
     sign_in_as users(:normal)
-    post translation_references_path, params: { translation_reference: text_reference_params("Original", "Original source") }
+    post_new_reference translation_references_path, params: { translation_reference: text_reference_params("Original", "Original source") }
     reference = TranslationReference.order(:id).last
     version = reference.current_revision.version
     with_pdf_busy_after(0) do

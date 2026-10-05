@@ -1,6 +1,10 @@
 # The complete local quality gate (AGENTS.md). Run it with bin/ci.
 # .github/workflows/ci.yml runs these same checks, split across its jobs;
 # test/config/ci_gate_test.rb fails if a check here has no CI step.
+# Both local and hosted gates use four test processes, independent of host CPU
+# count. PARALLEL_WORKERS remains an explicit override for concurrency probes.
+ENV["PARALLEL_WORKERS"] ||= "4"
+
 CI.run do
   step "Style: Ruby", "bin/rubocop"
   step "Style: Whitespace", "git diff --check $(git hash-object -t tree /dev/null)"

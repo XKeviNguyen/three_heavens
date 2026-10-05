@@ -119,11 +119,15 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_current_path new_translation_workspace_path
     fill_in "Project name", with: "Back protected"
 
+    page.execute_script("document.body.dataset.historyDocument = 'workspace'")
     page.go_back
+    assert_no_selector "body[data-history-document='workspace']"
     assert_selector "h1", text: "Projects"
     assert_current_path projects_path
     assert_no_selector "dialog[open]", text: "Leave this translation?"
+    page.execute_script("document.body.dataset.historyDocument = 'projects'")
     page.go_forward
+    assert_no_selector "body[data-history-document='projects']"
     assert_selector "h1", text: "New translation"
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: "Back protected"

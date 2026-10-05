@@ -91,6 +91,7 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_PORT: 5432
+      PARALLEL_WORKERS: 4
 
     services:
       postgres:
@@ -143,6 +144,7 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_PORT: 5432
+      PARALLEL_WORKERS: 4
 
     services:
       postgres:

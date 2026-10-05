@@ -23,10 +23,12 @@ export default class extends Controller {
     this.onBeforeRender = this.onBeforeRender.bind(this)
     this.onBeforeVisit = this.onBeforeVisit.bind(this)
     this.onBeforeUnload = this.onBeforeUnload.bind(this)
+    this.onPopState = this.onPopState.bind(this)
     this.onOnline = this.onOnline.bind(this)
     document.addEventListener("turbo:before-render", this.onBeforeRender)
     document.addEventListener("turbo:before-visit", this.onBeforeVisit)
     window.addEventListener("beforeunload", this.onBeforeUnload)
+    window.addEventListener("popstate", this.onPopState, true)
     window.addEventListener("online", this.onOnline)
     if (this.needsSaveValue) this.scheduleSave()
   }
@@ -36,6 +38,7 @@ export default class extends Controller {
     document.removeEventListener("turbo:before-render", this.onBeforeRender)
     document.removeEventListener("turbo:before-visit", this.onBeforeVisit)
     window.removeEventListener("beforeunload", this.onBeforeUnload)
+    window.removeEventListener("popstate", this.onPopState, true)
     window.removeEventListener("online", this.onOnline)
     if (this.hasDialogTarget) this.dialogTarget.close?.()
   }
@@ -108,6 +111,7 @@ export default class extends Controller {
       try { await this.saving } catch { return false }
     }
 
+    if (this.discarding) return false
     this.editPending = false
     const workspace = this.payload()
     const snapshot = JSON.stringify(workspace)
@@ -199,40 +203,81 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    if (this.launching) {
+    if (this.launching || this.discarding) {
       event.preventDefault()
       return
     }
+    this.cancelNavigation()
     event.detail.pending.push(this.flush())
   }
 
+  onPopState() {
+    if (this.allowVisit || this.launching || this.discarding) return
+    if (this.navigation || this.dirty()) this.navigateAfterSave(window.location.href, "history")
+  }
+
   onBeforeVisit(event) {
-    if (this.allowVisit || this.launching || !this.dirty()) return
+    if (this.allowVisit || this.launching) return
+    if (!this.discarding && !this.navigation && !this.dirty()) return
     event.preventDefault()
-    this.navigateAfterSave(event.detail.url)
+    if (!this.discarding) this.navigateAfterSave(event.detail.url, "visit")
   }
 
   onBeforeRender(event) {
-    if (this.allowVisit || this.launching || !this.dirty() || window.location.href === this.currentUrl) return
-    event.preventDefault()
-    const destination = window.location.href
-    this.pendingRender = event.detail.resume
-    this.navigateAfterSave(destination, "render")
+    if (this.allowVisit || this.launching) return
+    if (!this.discarding && !this.navigation && (!this.dirty() || window.location.href === this.currentUrl)) return
+    // Finish Turbo's render lifecycle without inserting a response fetched
+    // before the save. Leaving its render promise suspended would block a
+    // later visit after Stay, a failed discard, or a failed save.
+    event.detail.render = () => {}
+    if (["failed", "cancelled"].includes(this.navigation?.phase)) {
+      this.navigation = null
+      return
+    }
+    if (!this.discarding && !this.navigation) this.navigateAfterSave(window.location.href, "history")
   }
 
-  async navigateAfterSave(destination, action) {
-    if (this.navigating) return
-    this.navigating = true
+  async navigateAfterSave(destination, kind) {
+    // One flush owns navigation. Later Back/Forward events replace its
+    // destination, including a return to this very URL. No pre-save response
+    // may render a workspace with an obsolete draft identity.
+    if (this.navigation?.phase === "saving") {
+      Object.assign(this.navigation, { destination, kind })
+      return
+    }
+    const navigation = { destination, kind, phase: "saving" }
+    this.navigation = navigation
     const saved = await this.flush()
-    this.navigating = false
+    if (this.discarding || this.navigation !== navigation || navigation.phase !== "saving") return
     if (saved) {
-      this.allowVisit = true
-      if (action === "render") this.pendingRender()
-      else window.Turbo.visit(destination)
+      if (navigation.kind === "history") {
+        navigation.phase = "allowed"
+        // History already moved. Replace that entry with a fresh document
+        // fetched after acknowledgement, preserving the user's latest
+        // history position without retaining sensitive draft data in history.
+        window.location.replace(navigation.destination)
+      } else {
+        this.navigation = null
+        window.Turbo.visit(navigation.destination)
+      }
     } else {
-      if (action === "render") window.history.pushState(this.currentHistoryState, "", this.currentUrl)
-      this.destination = destination
+      // Keep ownership until the outstanding history response is ignored,
+      // even though the visible URL is restored before it arrives.
+      this.navigation = navigation.kind === "history" ? Object.assign(navigation, { phase: "failed" }) : null
+      if (navigation.kind === "history") window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+      this.destination = navigation.destination
       this.dialogTarget.showModal()
+    }
+  }
+
+  cancelNavigation() {
+    if (this.navigation?.kind === "history") {
+      window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+      // The old history GET can arrive after Discard fails or a locale flush
+      // finishes. Retain its provenance until its render is ignored.
+      this.navigation.phase = "cancelled"
+    } else {
+      this.navigation = null
     }
   }
 
@@ -243,6 +288,11 @@ export default class extends Controller {
   }
 
   async beforeSubmit(event) {
+    if (this.discarding) {
+      event.preventDefault()
+      return
+    }
+    this.cancelNavigation()
     if (this.allowSubmit || !this.dirty()) return
     event.preventDefault()
     const submitter = event.submitter
@@ -280,6 +330,7 @@ export default class extends Controller {
     // Discarding is terminal for this page: no timer, retry, or reconnect may
     // save again, or a late save could recreate the discarded draft.
     this.discarding = true
+    this.cancelNavigation()
     window.clearTimeout(this.saveTimer)
     while (this.saving) {
       try { await this.saving } catch {}
@@ -295,7 +346,8 @@ export default class extends Controller {
           project_id: this.formTarget.elements["translation_workspace[project_id]"]?.value || "",
           draft_id: this.draftIdValue || "",
           version: this.draftIdValue ? this.versionValue : "",
-          editor_id: this.editorId
+          editor_id: this.editorId,
+          sequence: this.sequence
         })
       }).catch(() => null)
       if (!response || (!response.ok && response.status !== 404)) {
