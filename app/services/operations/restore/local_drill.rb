@@ -176,7 +176,7 @@ module Operations
           )
         )
         source_import = user.source_imports.create!(
-          status: :ready, request_key: SecureRandom.hex(16), original_filename: "synthetic-import.txt",
+          status: :ready, request_key: ReplayIdentity.issue, original_filename: "synthetic-import.txt",
           detected_content_type: "text/plain",
           imported_format: "txt", byte_size: bytes.bytesize, sha256: Digest::SHA256.hexdigest(bytes),
           extracted_text: "Synthetic import text", extraction_version: "restore-drill-v1",

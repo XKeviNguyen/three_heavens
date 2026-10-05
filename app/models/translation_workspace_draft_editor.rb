@@ -1,4 +1,5 @@
 class TranslationWorkspaceDraftEditor < ApplicationRecord
+  class Expired < StandardError; end
   belongs_to :user
   attr_readonly :user_id, :context_key, :editor_id
   validates :context_key, presence: true, length: { maximum: 80 }
@@ -12,8 +13,23 @@ class TranslationWorkspaceDraftEditor < ApplicationRecord
     return unless editor_id.present?
 
     new(user:, context_key:, editor_id:, sequence: 0).validate!
-    insert_all([ { user_id: user.id, context_key:, editor_id:, sequence: 0 } ],
+    existing = find_by(user_id: user.id, context_key:, editor_id:)
+    raise Expired unless ReplayIdentity.valid?(editor_id, existing:)
+
+    insert_all([ { user_id: user.id, context_key:, editor_id:, sequence: 0,
+      expires_at: ReplayIdentity.expires_at(editor_id) || existing.expires_at } ],
       unique_by: :index_workspace_draft_editors_on_identity)
-    lock.find_by!(user_id: user.id, context_key:, editor_id:)
+    editor = lock.find_by!(user_id: user.id, context_key:, editor_id:)
+    raise Expired unless ReplayIdentity.valid?(editor_id, existing: editor)
+
+    editor
+  end
+
+  def self.purge_expired(at: Time.current, batch_size: 100)
+    limit = Integer(batch_size).clamp(1, 100)
+    transaction do
+      ids = where(expires_at: ..at).order(:expires_at, :id).limit(limit).lock("FOR UPDATE SKIP LOCKED").pluck(:id)
+      where(id: ids).delete_all
+    end
   end
 end

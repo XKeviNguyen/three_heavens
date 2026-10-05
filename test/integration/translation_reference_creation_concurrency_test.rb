@@ -16,7 +16,7 @@ class TranslationReferenceCreationConcurrencyTest < ActionDispatch::IntegrationT
     9.times { UploadBudget.consume(user:) }
     sign_in_as user
     authenticated_cookies = cookies.to_hash
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     results = in_processes(12) do
       client = ActionDispatch::Integration::Session.new(Rails.application)
       authenticated_cookies.each { |name, value| client.cookies[name] = value }

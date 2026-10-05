@@ -6,7 +6,7 @@ module TranslationReferences
     class InProgress < AuthoringAttributes::Error; end
     class Interrupted < AuthoringAttributes::Error; end
 
-    def self.call(user:, attributes:, active: true, creation_key: SecureRandom.hex(16))
+    def self.call(user:, attributes:, active: true, creation_key: ReplayIdentity.issue)
       new(user:, attributes:, active:, creation_key:).call
     end
 
@@ -22,6 +22,9 @@ module TranslationReferences
       digest = payload_digest
       with_request_lock do
         existing = TranslationReferenceCreation.find_by(user:, creation_key:)
+        unless ReplayIdentity.valid?(creation_key, existing:)
+          raise Interrupted, "This reference action has expired. Start a new submission."
+        end
         next replay(existing, digest) if existing
 
         receipt = action = nil
@@ -31,7 +34,8 @@ module TranslationReferences
 
           # Commit the action together with its charge before any extraction.
           # Process loss leaves a pending tombstone, never another admission.
-          action = TranslationReferenceCreation.create!(user:, creation_key:, payload_digest: digest)
+          action = TranslationReferenceCreation.create!(user:, creation_key:, payload_digest: digest,
+            expires_at: [ ReplayIdentity.expires_at(creation_key), TranslationReferenceCreation::FAILURE_RETENTION.from_now ].max)
         end
         perform(action, receipt)
       end
@@ -102,7 +106,7 @@ module TranslationReferences
 
     def with_request_lock
       connection = TranslationReferenceCreation.connection
-      lock_key = Digest::SHA256.digest("reference_creation:#{user.id}:#{creation_key}").unpack1("q>")
+      lock_key = TranslationReferenceCreation.lock_key(user_id: user.id, creation_key:)
       TranslationReferenceCreation.transaction(requires_new: true) do
         connection.execute("SET LOCAL lock_timeout = '#{SourceImports::Limits::REQUEST_LOCK_WAIT_SECONDS}s'")
         connection.execute(TranslationReferenceCreation.sanitize_sql_array([ "SELECT pg_advisory_lock(?)", lock_key ]))

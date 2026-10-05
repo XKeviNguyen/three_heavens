@@ -136,6 +136,88 @@ class SourceImportReplayTest < ApplicationSystemTestCase
     source&.close!
   end
 
+  test "a delayed successful upload replay cannot restore a cancelled import" do
+    visit new_translation_workspace_path
+    source = Tempfile.new([ "cancelled-replay", ".txt" ])
+    source.write("Original imported text")
+    source.flush
+    click_button "Upload file"
+    attach_file "Source file", source.path
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "Original imported text"
+    source_id = find("#translation_workspace_source_import_id", visible: :all).value
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (options.method === "POST" && new URL(url, location.origin).pathname === "/source_imports.json") {
+          await new Promise(resolve => { window.__releaseUploadReplay = resolve })
+        }
+        return response
+      }
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector("[data-controller~='workspace-upload']"), "workspace-upload")
+      controller.upload().then(() => { window.__uploadReplayFinished = true })
+    JS
+    assert_until { page.evaluate_script("!!window.__releaseUploadReplay") }
+    click_button "Remove import"
+    assert_field "Source text", with: "Original imported text"
+    assert_equal "", find("#translation_workspace_source_import_id", visible: :all).value
+    fill_in "Source text", with: "Keep these reviewed edits"
+    page.execute_script("window.__releaseUploadReplay()")
+    assert_until { page.evaluate_script("window.__uploadReplayFinished") }
+    assert_equal "", find("#translation_workspace_source_import_id", visible: :all).value
+    assert_field "Source text", with: "Keep these reviewed edits"
+    assert_no_selector "#workspace-source-import", visible: true
+    assert_not SourceImport.exists?(source_id)
+  ensure
+    source&.close!
+  end
+
+  test "an older successful cancellation clears its import when the newer upload fails" do
+    visit new_translation_workspace_path
+    first = Tempfile.new([ "cancelled-first", ".txt" ])
+    second = Tempfile.new([ "invalid-second", ".txt" ])
+    first.write("First reviewed text")
+    second.write("Second chosen file")
+    [ first, second ].each(&:flush)
+    click_button "Upload file"
+    attach_file "Source file", first.path
+    click_button "Upload and review"
+    assert_field "Reviewed source text", with: "First reviewed text"
+    first_id = find("#translation_workspace_source_import_id", visible: :all).value
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        if (options.method === "POST" && new URL(url, location.origin).pathname === "/source_imports.json") {
+          return new Response(JSON.stringify({ error: "synthetic newer upload failure", code: "invalid_format" }), { status: 422, headers: { "Content-Type": "application/json" } })
+        }
+        const response = await deliver(url, options)
+        if (options.method === "DELETE" && new URL(url, location.origin).pathname.startsWith("/source_imports/")) {
+          await new Promise(resolve => { window.__releaseOldCancellation = resolve })
+        }
+        return response
+      }
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector("[data-controller~='workspace-upload']"), "workspace-upload")
+      const remove = controller.remove.bind(controller)
+      controller.remove = async () => { await remove(); window.__oldCancellationFinished = true }
+    JS
+    click_button "Remove import"
+    assert_until { page.evaluate_script("!!window.__releaseOldCancellation") }
+    click_button "Upload file"
+    attach_file "Source file", second.path
+    click_button "Upload and review"
+    assert_text "synthetic newer upload failure"
+    page.execute_script("window.__releaseOldCancellation()")
+    assert_until { page.evaluate_script("window.__oldCancellationFinished") }
+    assert_equal "", find("#translation_workspace_source_import_id", visible: :all).value
+    assert_text "synthetic newer upload failure"
+    assert_equal File.basename(second.path), page.evaluate_script("document.querySelector('#workspace-upload-file').files[0].name")
+    assert_not SourceImport.exists?(first_id)
+  ensure
+    first&.close!
+    second&.close!
+  end
+
   private
 
   def assert_until

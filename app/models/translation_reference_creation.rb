@@ -15,11 +15,34 @@ class TranslationReferenceCreation < ApplicationRecord
   encrypts :failure
 
   def self.expire_failures(cutoff: FAILURE_RETENTION.ago)
-    ids = where(status: :failed).where(created_at: ..cutoff).order(:created_at, :id).limit(100).pluck(:id)
-    where(id: ids, status: :failed).update_all(status: "expired", failure: nil, updated_at: Time.current)
+    transaction do
+      ids = where(status: :failed).where(created_at: ..cutoff).order(:created_at, :id).limit(100)
+        .lock("FOR UPDATE SKIP LOCKED").pluck(:id)
+      where(id: ids, status: :failed).update_all(status: "expired", failure: nil, updated_at: Time.current)
+    end
   end
 
   def recovery_expired?
     failed? && created_at <= FAILURE_RETENTION.ago
+  end
+
+  def self.lock_key(user_id:, creation_key:)
+    Digest::SHA256.digest("reference_creation:#{user_id}:#{creation_key}").unpack1("q>")
+  end
+
+  # Every outcome is ephemeral coordination state. The referenced business
+  # record survives deletion. Skip even expired pending rows while a live
+  # creator owns the session lock; abandoned pending rows can be purged.
+  def self.purge_expired(at: Time.current, batch_size: 100)
+    limit = Integer(batch_size).clamp(1, 100)
+    transaction do
+      candidates = where(expires_at: ..at).order(:expires_at, :id).limit(limit)
+        .lock("FOR UPDATE SKIP LOCKED").pluck(:id, :user_id, :creation_key)
+      ids = candidates.filter_map do |id, user_id, creation_key|
+        key = lock_key(user_id:, creation_key:)
+        id if connection.select_value(sanitize_sql_array([ "SELECT pg_try_advisory_xact_lock(?)", key ]))
+      end
+      where(id: ids).delete_all
+    end
   end
 end

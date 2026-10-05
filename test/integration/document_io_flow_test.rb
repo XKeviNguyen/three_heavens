@@ -16,7 +16,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: TranslationRunJob do
       post source_imports_path, params: {
         source_import: {
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           source_file: uploaded_file("\xEF\xBB\xBFOriginal\r\ntext".b, filename: "sermon.txt", content_type: "text/plain")
         }
       }
@@ -78,7 +78,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: AI_JOBS do
       post source_imports_path, params: {
         source_import: {
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           source_file: uploaded_file(pdf_with_text("Readable PDF source"), filename: "source.pdf", content_type: "application/pdf")
         }
       }
@@ -133,7 +133,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
     uploads.each do |upload, message|
       assert_no_enqueued_jobs only: TranslationRunJob do
-        post source_imports_path, params: { source_import: { source_file: upload, request_key: SecureRandom.hex(16) } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: ReplayIdentity.issue } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -155,7 +155,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
     cases.each do |upload, message|
       assert_no_enqueued_jobs only: AI_JOBS do
-        post source_imports_path, params: { source_import: { source_file: upload, request_key: SecureRandom.hex(16) } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: ReplayIdentity.issue } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -170,8 +170,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       {},
       { source_import: "malformed" },
       { source_import: [ "malformed" ] },
-      { source_import: { source_file: { nested: "malformed" }, request_key: SecureRandom.hex(16) } },
-      { source_import: { source_file: [ "malformed" ], request_key: SecureRandom.hex(16) } }
+      { source_import: { source_file: { nested: "malformed" }, request_key: ReplayIdentity.issue } },
+      { source_import: { source_file: [ "malformed" ], request_key: ReplayIdentity.issue } }
     ]
 
     payloads.each do |payload|
@@ -194,7 +194,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
-            request_key: SecureRandom.hex(16),
+            request_key: ReplayIdentity.issue,
             source_file: uploaded_file(
               malformed_docx,
               filename: "broken.docx",
@@ -216,7 +216,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
-            request_key: SecureRandom.hex(16),
+            request_key: ReplayIdentity.issue,
             source_file: uploaded_file("Retry source", filename: "retry.txt", content_type: "text/plain")
           }
         }
@@ -236,7 +236,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     source = "# Heading\n<script>alert('source only')</script>"
     post source_imports_path, params: {
       source_import: {
-        request_key: SecureRandom.hex(16),
+        request_key: ReplayIdentity.issue,
         source_file: uploaded_file(source, filename: "source.md", content_type: "text/markdown")
       }
     }
@@ -479,7 +479,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "every upload must carry one well-formed request key" do
-    [ nil, "", "short", "A" * 32, [ SecureRandom.hex(16) ], { nested: SecureRandom.hex(16) } ].each do |key|
+    [ nil, "", "short", "A" * 32, [ ReplayIdentity.issue ], { nested: ReplayIdentity.issue } ].each do |key|
       assert_no_difference -> { SourceImport.count } do
         post source_imports_path(format: :json), params: {
           source_import: { source_file: uploaded_file("Keyed", filename: "keyed.txt", content_type: "text/plain"), request_key: key }
@@ -490,7 +490,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "a replayed upload returns the original import and a reused key with another file is refused" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver = lambda do |content, filename: "replay.txt"|
       post source_imports_path(format: :json), params: {
         source_import: { source_file: uploaded_file(content, filename:, content_type: "text/plain"), request_key: key }
@@ -539,7 +539,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "a PDF upload while every PDF worker is busy stores nothing, says so, and the same upload succeeds on retry" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver = lambda do |format: :json|
       post source_imports_path(format:), params: {
         source_import: { source_file: uploaded_file(pdf_with_text("Retry later"), filename: "busy.pdf", content_type: "application/pdf"), request_key: key }
@@ -575,7 +575,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
   test "a storage failure is reported and every replay of that upload converges on it" do
     ActiveStorage::Blob.service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     2.times do
       post source_imports_path(format: :json), params: {
         source_import: { source_file: uploaded_file("Unstored", filename: "unstored.txt", content_type: "text/plain"), request_key: key }

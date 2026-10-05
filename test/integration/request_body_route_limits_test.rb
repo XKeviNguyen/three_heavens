@@ -29,7 +29,7 @@ class RequestBodyRouteLimitsTest < ActionDispatch::IntegrationTest
     sign_in_as users(:normal)
     file = Rack::Test::UploadedFile.new(StringIO.new("a" * (9 * 1024 * 1024)), "text/plain", original_filename: "large.txt")
 
-    post source_imports_path, params: { source_import: { source_file: file, request_key: SecureRandom.hex(16) } }
+    post source_imports_path, params: { source_import: { source_file: file, request_key: ReplayIdentity.issue } }
 
     assert_not_equal 413, response.status
   end

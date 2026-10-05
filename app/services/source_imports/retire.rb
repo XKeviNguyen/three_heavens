@@ -11,7 +11,10 @@ module SourceImports
           next false unless current.status.in?(%w[pending ready failed])
           next false if cutoff && current.expires_at > cutoff
 
-          SourceImportRetirement.create!(user_id: current.user_id, request_key: current.request_key) if current.request_key
+          if current.request_key
+            SourceImportRetirement.create!(user_id: current.user_id, request_key: current.request_key,
+              expires_at: ReplayIdentity.expires_at(current.request_key) || ReplayIdentity::LIFETIME.from_now)
+          end
           current.destroy!
           true
         end

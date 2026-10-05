@@ -22,7 +22,7 @@ module SourceImports
 
     test "twelve simultaneous processes share the tenth admission and its durable import" do
       9.times { UploadBudget.consume(user: @user) }
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       results = in_processes(12) do
         result = Create.call(user: @user, request_key: key, upload: uploaded_file("Concurrent tenth", filename: "ten.txt"))
         [ result.id, result.source_file.blob_id ]
@@ -38,7 +38,7 @@ module SourceImports
 
     test "process loss at the tenth admission replays the interrupted action without another charge or extraction" do
       9.times { UploadBudget.consume(user: @user) }
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       upload = -> { uploaded_file("Interrupted tenth", filename: "ten.txt") }
       crash_at_extraction { Create.call(user: @user, request_key: key, upload: upload.call) }
       assert @user.source_imports.sole.pending?
@@ -52,7 +52,7 @@ module SourceImports
 
     test "twelve different actions admit ten across processes" do
       results = in_processes(12) do
-        Create.call(user: @user, request_key: SecureRandom.hex(16), upload: uploaded_file("Different action", filename: "same.txt"))
+        Create.call(user: @user, request_key: ReplayIdentity.issue, upload: uploaded_file("Different action", filename: "same.txt"))
         :created
       rescue Create::RateLimited
         :limited

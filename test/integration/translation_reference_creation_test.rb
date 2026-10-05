@@ -22,7 +22,7 @@ class TranslationReferenceCreationTest < ActionDispatch::IntegrationTest
   end
 
   test "lost redirect and double submit replay the initial action even after a later revision" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver(key)
     reference = TranslationReference.order(:id).last
     assert_redirected_to translation_reference_path(reference)
@@ -37,10 +37,10 @@ class TranslationReferenceCreationTest < ActionDispatch::IntegrationTest
   end
 
   test "same content distinct actions and cross-user key reuse stay independent" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver(key)
     mine = TranslationReference.order(:id).last
-    deliver(SecureRandom.hex(16))
+    deliver(ReplayIdentity.issue)
     second = TranslationReference.order(:id).last
     assert_not_equal mine.id, second.id
     sign_out
@@ -55,7 +55,7 @@ class TranslationReferenceCreationTest < ActionDispatch::IntegrationTest
   test "key reuse with changed content fails and file replay at the cap spends nothing" do
     user = users(:normal)
     9.times { UploadBudget.consume(user:) }
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     attributes = -> { translation_reference_attributes(source_text: "").merge(source_file: uploaded_file("Uploaded source", filename: "source.txt")) }
     deliver(key, attributes: attributes.call)
     reference = TranslationReference.order(:id).last
@@ -67,7 +67,7 @@ class TranslationReferenceCreationTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
     assert_includes response.body, "different content"
     assert_equal 10, UploadBudget.find_by!(user:).count
-    deliver(SecureRandom.hex(16), attributes: attributes.call)
+    deliver(ReplayIdentity.issue, attributes: attributes.call)
     assert_response :too_many_requests
     assert_equal 10, UploadBudget.find_by!(user:).count
   end

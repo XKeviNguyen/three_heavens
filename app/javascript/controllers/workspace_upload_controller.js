@@ -3,7 +3,7 @@ import { randomHex } from "controllers/random_identifier"
 
 export default class extends Controller {
   static targets = ["file", "button", "message", "import", "filename", "metadata"]
-  static values = { projectId: String, createUrl: String, messages: Object }
+  static values = { replayLease: String, projectId: String, createUrl: String, messages: Object }
 
   async upload() {
     const file = this.fileTarget.files[0]
@@ -16,8 +16,9 @@ export default class extends Controller {
     // same action, so the server returns its import instead of a second copy.
     if (this.uploadedFile !== file) {
       this.uploadedFile = file
-      this.requestKey = randomHex(16)
+      this.requestKey = `${this.replayLeaseValue}.${randomHex(16)}`
     }
+    const requestKey = this.requestKey
     this.buttonTarget.disabled = true
     this.messageTarget.textContent = this.messagesValue.extracting
     const body = new FormData()
@@ -31,6 +32,7 @@ export default class extends Controller {
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
       const result = await response.json().catch(() => ({}))
+      if (this.requestKey !== requestKey) return
       if (!response.ok) {
         // Admission and an in-progress delivery leave the action unresolved.
         // A terminal validation/extraction failure lets an explicit retry
@@ -54,9 +56,9 @@ export default class extends Controller {
       this.field("source_text").focus()
       this.element.dispatchEvent(new Event("input", { bubbles: true }))
     } catch (error) {
-      this.messageTarget.textContent = error.message || this.messagesValue.importFailed
+      if (this.requestKey === requestKey) this.messageTarget.textContent = error.message || this.messagesValue.importFailed
     } finally {
-      this.buttonTarget.disabled = false
+      if (this.requestKey === requestKey) this.buttonTarget.disabled = false
     }
   }
 
@@ -72,13 +74,19 @@ export default class extends Controller {
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
       if (!response.ok) throw new Error()
-      if (this.field("source_import_id").value !== id || this.requestKey !== requestKey) return
+      if (this.field("source_import_id").value !== id) return
+      const currentAction = this.requestKey === requestKey
+      if (currentAction) {
+        this.requestKey = null
+        this.uploadedFile = null
+        this.buttonTarget.disabled = false
+      }
       this.field("source_import_id").value = ""
       this.field("source_import_project_token").value = ""
       this.importTarget.classList.add("hidden")
       document.querySelector("label[for='translation_workspace_source_text']").textContent = this.messagesValue.sourceText
-      if (this.fileTarget.files[0] === selectedFile) this.fileTarget.value = ""
-      this.messageTarget.textContent = this.messagesValue.removed
+      if (currentAction && this.fileTarget.files[0] === selectedFile) this.fileTarget.value = ""
+      if (currentAction) this.messageTarget.textContent = this.messagesValue.removed
       this.element.dispatchEvent(new Event("input", { bubbles: true }))
     } catch {
       if (this.field("source_import_id").value !== id || this.requestKey !== requestKey) return

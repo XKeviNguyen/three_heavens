@@ -530,6 +530,6 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
   end
 
   def new_editor_id
-    SecureRandom.hex(16)
+    ReplayIdentity.issue
   end
 end

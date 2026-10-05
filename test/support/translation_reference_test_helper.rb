@@ -20,7 +20,7 @@ module TranslationReferenceTestHelper
   def post_new_reference(path, params:, **options)
     submitted = params[:translation_reference]
     if submitted.is_a?(Hash)
-      params = params.merge(translation_reference: { creation_key: SecureRandom.hex(16) }.merge(submitted))
+      params = params.merge(translation_reference: { creation_key: ReplayIdentity.issue }.merge(submitted))
     end
     post path, params: params, **options
   end

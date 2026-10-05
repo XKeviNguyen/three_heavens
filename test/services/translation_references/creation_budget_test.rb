@@ -10,7 +10,7 @@ module TranslationReferences
     include UploadBudgetClock
 
     test "same action Busy after first work replays without a second extraction or admission" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       calls = 0
       original = SourceImports::PdfExtractor.method(:call)
       SourceImports::PdfExtractor.define_singleton_method(:call) do |*|
@@ -37,7 +37,7 @@ module TranslationReferences
     end
 
     test "Busy before work refunds each same-key retry then a normal retry consumes once" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       original = SourceImports::PdfExtractor.method(:call)
       SourceImports::PdfExtractor.define_singleton_method(:call) { |*| raise SourceImports::Busy.new("pdf_busy", "PDF work is busy") }
       begin

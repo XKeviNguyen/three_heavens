@@ -145,7 +145,7 @@ module DocumentIoTestHelper
     SourceImports::Create.call(
       user:,
       upload: uploaded_file(text, filename:, content_type: "text/plain"),
-      request_key: SecureRandom.hex(16)
+      request_key: ReplayIdentity.issue
     )
   end
 

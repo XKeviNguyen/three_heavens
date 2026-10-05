@@ -161,7 +161,7 @@ class UploadRateLimitTest < ActionDispatch::IntegrationTest
   end
 
   def import_params
-    { source_import: { request_key: SecureRandom.hex(16), source_file: uploaded_file(pdf_with_text("Source"), filename: "source.pdf", content_type: "application/pdf") } }
+    { source_import: { request_key: ReplayIdentity.issue, source_file: uploaded_file(pdf_with_text("Source"), filename: "source.pdf", content_type: "application/pdf") } }
   end
 
   def text_reference_params(title, source_text)

@@ -2954,9 +2954,10 @@ ALTER SEQUENCE public.sessions_id_seq OWNED BY public.sessions.id;
 CREATE TABLE public.source_import_retirements (
     id bigint NOT NULL,
     user_id bigint NOT NULL,
-    request_key character varying(32) NOT NULL,
+    request_key character varying(512) NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$'::text))
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
+    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))
 );
 
 
@@ -3001,13 +3002,13 @@ CREATE TABLE public.source_imports (
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    request_key character varying,
+    request_key character varying(512),
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
     CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text, ('pdf'::character varying)::text])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
-    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$'::text))),
+    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
     CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text, ('consumed'::character varying)::text])))
 );
@@ -3040,14 +3041,15 @@ CREATE TABLE public.translation_reference_creations (
     id bigint NOT NULL,
     user_id bigint NOT NULL,
     translation_reference_id bigint,
-    creation_key character varying(32) NOT NULL,
+    creation_key character varying(512) NOT NULL,
     payload_digest character varying(64) NOT NULL,
     status character varying DEFAULT 'pending'::character varying NOT NULL,
     failure text,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
     CONSTRAINT reference_creations_failure_size_check CHECK (((failure IS NULL) OR (octet_length(failure) <= 2097152))),
-    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
     CONSTRAINT reference_creations_outcome_check CHECK (((((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('expired'::character varying)::text])) AND (translation_reference_id IS NULL) AND (failure IS NULL)) OR (((status)::text = 'completed'::text) AND (translation_reference_id IS NOT NULL) AND (failure IS NULL)) OR (((status)::text = 'failed'::text) AND (translation_reference_id IS NULL) AND (failure IS NOT NULL))))
 );
 
@@ -3296,9 +3298,10 @@ CREATE TABLE public.translation_workspace_draft_editors (
     id bigint NOT NULL,
     user_id bigint NOT NULL,
     context_key character varying(80) NOT NULL,
-    editor_id character varying(32) NOT NULL,
+    editor_id character varying(512) NOT NULL,
     sequence bigint DEFAULT 0 NOT NULL,
-    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$'::text)),
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
+    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text)),
     CONSTRAINT workspace_draft_editors_sequence_check CHECK (((sequence >= 0) AND (sequence <= '9007199254740991'::bigint)))
 );
 
@@ -3336,10 +3339,10 @@ CREATE TABLE public.translation_workspace_drafts (
     expires_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    editor_id character varying,
+    editor_id character varying(512),
     editor_sequence bigint,
     CONSTRAINT workspace_drafts_context_key_check CHECK ((char_length((context_key)::text) <= 80)),
-    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$'::text))),
+    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,200}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
     CONSTRAINT workspace_drafts_editor_pair_check CHECK (((editor_id IS NULL) = (editor_sequence IS NULL))),
     CONSTRAINT workspace_drafts_editor_sequence_check CHECK (((editor_sequence IS NULL) OR (editor_sequence > 0))),
     CONSTRAINT workspace_drafts_lock_version_check CHECK ((lock_version >= 0))
@@ -5064,7 +5067,7 @@ CREATE INDEX index_projects_on_user_id ON public.projects USING btree (user_id);
 -- Name: index_reference_creations_on_expiring_failure; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_reference_creations_on_expiring_failure ON public.translation_reference_creations USING btree (created_at) WHERE ((status)::text = 'failed'::text);
+CREATE INDEX index_reference_creations_on_expiring_failure ON public.translation_reference_creations USING btree (created_at, id) WHERE ((status)::text = 'failed'::text);
 
 
 --
@@ -5201,6 +5204,13 @@ CREATE INDEX index_sessions_on_user_id ON public.sessions USING btree (user_id);
 
 
 --
+-- Name: index_source_import_retirements_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_source_import_retirements_on_expiry ON public.source_import_retirements USING btree (expires_at, id);
+
+
+--
 -- Name: index_source_import_retirements_on_owner_and_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5240,6 +5250,13 @@ CREATE INDEX index_source_imports_on_user_id ON public.source_imports USING btre
 --
 
 CREATE INDEX index_source_imports_on_user_id_and_status ON public.source_imports USING btree (user_id, status);
+
+
+--
+-- Name: index_translation_reference_creations_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_reference_creations_on_expiry ON public.translation_reference_creations USING btree (expires_at, id);
 
 
 --
@@ -5369,17 +5386,17 @@ CREATE INDEX index_translation_segment_runs_on_running_last_claimed_at ON public
 
 
 --
+-- Name: index_translation_workspace_draft_editors_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_draft_editors_on_expiry ON public.translation_workspace_draft_editors USING btree (expires_at, id);
+
+
+--
 -- Name: index_translation_workspace_draft_editors_on_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_translation_workspace_draft_editors_on_user_id ON public.translation_workspace_draft_editors USING btree (user_id);
-
-
---
--- Name: index_workspace_draft_editors_on_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX index_workspace_draft_editors_on_identity ON public.translation_workspace_draft_editors USING btree (user_id, context_key, editor_id);
 
 
 --
@@ -5499,6 +5516,13 @@ CREATE INDEX index_workflow_profiles_on_owner_and_recent ON public.workflow_prof
 --
 
 CREATE INDEX index_workflow_profiles_on_user_id ON public.workflow_profiles USING btree (user_id);
+
+
+--
+-- Name: index_workspace_draft_editors_on_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_workspace_draft_editors_on_identity ON public.translation_workspace_draft_editors USING btree (user_id, context_key, editor_id);
 
 
 --
@@ -6360,14 +6384,6 @@ ALTER TABLE ONLY public.judge_evaluations
 
 
 --
--- Name: translation_workspace_draft_editors fk_rails_c47ab55a2b; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.translation_workspace_draft_editors
-    ADD CONSTRAINT fk_rails_c47ab55a2b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
 -- Name: translation_workspace_drafts fk_rails_72cbb19784; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6600,6 +6616,14 @@ ALTER TABLE ONLY public.finalization_runs
 
 
 --
+-- Name: translation_workspace_draft_editors fk_rails_c47ab55a2b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors
+    ADD CONSTRAINT fk_rails_c47ab55a2b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: translation_segment_runs fk_rails_c71cadafbc; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6686,6 +6710,7 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261005120000'),
 ('20261005110000'),
 ('20261005100000'),
 ('20261004170000'),

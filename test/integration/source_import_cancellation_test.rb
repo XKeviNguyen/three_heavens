@@ -15,7 +15,7 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
     post session_path, params: { session: { email: @user.email, password: "synthetic cancellation password" } }
     assert_response :redirect
     @cookies = cookies.to_hash
-    @key = SecureRandom.hex(16)
+    @key = ReplayIdentity.issue
     @blobs_before = ActiveStorage::Blob.count
     @storage_keys = Queue.new
     keys = @storage_keys
@@ -55,7 +55,7 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
       assert_equal 204, finish(cancellation).first
       assert_retired(pending.id, budget: 10)
       assert_equal [ 422, "import_unavailable" ], upload.then { |status, body| [ status, body.fetch("code") ] }
-      assert_equal 429, upload(key: SecureRandom.hex(16)).first
+      assert_equal 429, upload(key: ReplayIdentity.issue).first
       assert_budget(10)
     end
   end
@@ -73,7 +73,7 @@ class SourceImportCancellationTest < ActionDispatch::IntegrationTest
     assert_not blob.service.exist?(blob.key)
     3.times { assert_equal 422, upload.first }
     assert_budget(1)
-    assert_equal 201, upload(key: SecureRandom.hex(16)).first
+    assert_equal 201, upload(key: ReplayIdentity.issue).first
     assert_equal 1, @user.source_imports.count
     assert_budget(2)
   end

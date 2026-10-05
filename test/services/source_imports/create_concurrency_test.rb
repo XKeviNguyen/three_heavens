@@ -23,7 +23,7 @@ module SourceImports
     end
 
     test "simultaneous deliveries of one upload action store one import and one blob" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       unattached_blobs = -> { ActiveStorage::Blob.where.missing(:attachments).count }
       unattached_before = unattached_blobs.call
       results = concurrently(3) do
@@ -41,7 +41,7 @@ module SourceImports
     # Advisory locks are re-entrant within one database session, so whether a
     # busy delivery released its request lock is checked from other sessions.
     test "busy deliveries of one upload action store nothing and release the request lock" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       upload = -> { uploaded_file(pdf_with_text("Busy then stored"), filename: "busy.pdf", content_type: "application/pdf") }
       holding, finish = Queue.new, Queue.new
       holder = Thread.new { PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }

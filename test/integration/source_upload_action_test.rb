@@ -11,7 +11,7 @@ class SourceUploadActionTest < ActionDispatch::IntegrationTest
   test "lost response at slot ten replays without work or charge and a new key is refused" do
     user = users(:normal)
     9.times { UploadBudget.consume(user:) }
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver(key)
     assert_response :created
     original = response.parsed_body
@@ -25,7 +25,7 @@ class SourceUploadActionTest < ActionDispatch::IntegrationTest
         assert_equal original, response.parsed_body
         assert_equal 10, UploadBudget.find_by!(user:).count
       end
-      deliver(SecureRandom.hex(16))
+      deliver(ReplayIdentity.issue)
       assert_response :too_many_requests
       deliver(key, text: "Changed bytes")
       assert_response :unprocessable_content
@@ -39,7 +39,7 @@ class SourceUploadActionTest < ActionDispatch::IntegrationTest
   test "a failed extraction replays at the cap and unavailable imports never do new work" do
     user = users(:normal)
     9.times { UploadBudget.consume(user:) }
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     bytes = "PK\x03\x04invalid".b
     2.times do
       post source_imports_path, params: { source_import: { request_key: key, source_file: uploaded_file(bytes, filename: "broken.docx") } }, headers: { "Accept" => "application/json" }
@@ -52,7 +52,7 @@ class SourceUploadActionTest < ActionDispatch::IntegrationTest
 
   test "pending and expired same-key actions at a full budget remain unavailable" do
     user = users(:normal)
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     deliver(key)
     imported = user.source_imports.sole
     9.times { UploadBudget.consume(user:) }

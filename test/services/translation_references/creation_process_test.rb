@@ -13,7 +13,7 @@ module TranslationReferences
     test "crash during first extraction leaves a tenth-slot action that never recharges or repeats work" do
       user = User.create!(email: "reference-crash-#{SecureRandom.hex(8)}@example.test", password: "synthetic crash password", role: :user, status: :active)
       9.times { UploadBudget.consume(user:) }
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       attributes = -> { { title: "Interrupted", source_language: "English", target_language: "Japanese", source_file: uploaded_file("Interrupted", filename: "source.txt"), approved_translation: "Approved" } }
       crash_at_extraction { Create.call(user:, creation_key: key, attributes: attributes.call) }
       assert TranslationReferenceCreation.find_by!(user:, creation_key: key).pending?

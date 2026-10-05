@@ -40,10 +40,14 @@ module SourceImports
 
       payload = UploadPayload.call(upload:)
       RequestLock.with(user_id: user.id, request_key:) do
-        if SourceImportRetirement.exists?(user_id: user.id, request_key:)
+        retirement = SourceImportRetirement.find_by(user_id: user.id, request_key:)
+        existing = user.source_imports.find_by(request_key:)
+        unless ReplayIdentity.valid?(request_key, existing: retirement || existing)
+          raise Error.new("import_unavailable", "This upload has expired. Upload the file again.")
+        end
+        if retirement
           raise Error.new("import_unavailable", "This upload is no longer available. Upload the file again.")
         end
-        existing = user.source_imports.find_by(request_key:)
         next replay(existing, payload) if existing
 
         receipt = source_import = nil

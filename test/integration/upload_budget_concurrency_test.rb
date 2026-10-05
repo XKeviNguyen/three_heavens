@@ -21,11 +21,11 @@ class UploadBudgetConcurrencyTest < ActionDispatch::IntegrationTest
       authenticated_cookies.each { |name, value| client.cookies[name] = value }
       upload = uploaded_file("Source #{index}", filename: "source.txt", content_type: "text/plain")
       if index.even?
-        client.post source_imports_path, params: { source_import: { request_key: SecureRandom.hex(16), source_file: upload } },
+        client.post source_imports_path, params: { source_import: { request_key: ReplayIdentity.issue, source_file: upload } },
                     headers: { "Accept" => "application/json" }
       else
         client.post translation_references_path, params: { translation_reference: {
-          creation_key: SecureRandom.hex(16), title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
+          creation_key: ReplayIdentity.issue, title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
           source_file: upload, approved_translation: "Approved"
         } }
       end

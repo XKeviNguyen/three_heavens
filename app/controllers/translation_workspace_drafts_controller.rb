@@ -22,7 +22,7 @@ class TranslationWorkspaceDraftsController < ApplicationController
     draft = result.draft
     render json: { id: draft.public_id, version: draft.lock_version, sequence: draft.editor_sequence,
                    saved_at: draft.updated_at.iso8601 }
-  rescue ActiveRecord::RecordNotUnique, ActiveRecord::StaleObjectError
+  rescue TranslationWorkspaceDraftEditor::Expired, ActiveRecord::RecordNotUnique, ActiveRecord::StaleObjectError
     render_conflict
   rescue ArgumentError, ActionController::ParameterMissing, ActionController::BadRequest
     head :bad_request
@@ -38,7 +38,7 @@ class TranslationWorkspaceDraftsController < ApplicationController
       draft_id: params[:draft_id], version: params[:version].nil? ? nil : supplied_version, **identity
     )
     conflict ? render_conflict(conflict) : head(:no_content)
-  rescue ActiveRecord::StaleObjectError
+  rescue TranslationWorkspaceDraftEditor::Expired, ActiveRecord::StaleObjectError
     render_conflict
   rescue ArgumentError, ActionController::BadRequest
     head :bad_request

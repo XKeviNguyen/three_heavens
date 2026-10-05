@@ -7,12 +7,12 @@ const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
 export default class extends Controller {
   static targets = ["form", "dialog", "status"]
   // The server's draft field lists, so only fields it stores count as edits.
-  static values = { saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object, scalarFields: Array, arrayFields: Array }
+  static values = { replayLease: String, saveUrl: String, resetUrl: String, draftId: String, version: Number, needsSave: Boolean, messages: Object, scalarFields: Array, arrayFields: Array }
 
   connect() {
     // One editor per page load. Only this random identifier and save counter
     // live in memory; the draft itself is stored encrypted on the server.
-    this.editorId = randomHex(16)
+    this.editorId = `${this.replayLeaseValue}.${randomHex(16)}`
     this.sequence = 0
     this.unacknowledged = null
     this.retryCount = 0

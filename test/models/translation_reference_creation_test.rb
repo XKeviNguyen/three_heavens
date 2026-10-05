@@ -5,7 +5,7 @@ class TranslationReferenceCreationIntegrityTest < ActiveSupport::TestCase
   include TranslationReferenceTestHelper
 
   test "failed recovery retains only bounded valid fields and encrypts them" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     attributes = translation_reference_attributes(source_text: "x" * 100_001)
     2.times do
       assert_raises(TranslationReferences::AuthoringAttributes::Error) do
@@ -22,7 +22,7 @@ class TranslationReferenceCreationIntegrityTest < ActiveSupport::TestCase
   end
 
   test "failure expiry removes recovery data but preserves replay identity" do
-    key = SecureRandom.hex(16)
+    key = ReplayIdentity.issue
     attributes = translation_reference_attributes(title: "")
     assert_raises(TranslationReferences::AuthoringAttributes::Error) do
       TranslationReferences::Create.call(user: users(:normal), attributes:, creation_key: key)
@@ -40,7 +40,7 @@ class TranslationReferenceCreationIntegrityTest < ActiveSupport::TestCase
 
   test "an interrupted or failed action retains its owner through normal model deletion" do
     owner = User.create!(email: "reference-action-owner@example.test", password: "a sufficiently secure password")
-    TranslationReferenceCreation.create!(user: owner, creation_key: SecureRandom.hex(16), payload_digest: "a" * 64)
+    TranslationReferenceCreation.create!(user: owner, creation_key: ReplayIdentity.issue, payload_digest: "a" * 64)
 
     assert_not owner.destroy
     assert User.exists?(owner.id)
@@ -59,7 +59,7 @@ class TranslationReferenceCreationIntegrityTest < ActiveSupport::TestCase
     unlinked = create_translation_reference
     TranslationReferenceCreation.where(translation_reference: unlinked).delete_all
     ownership_error = assert_db_rejection do
-      TranslationReferenceCreation.create!(user: users(:other), creation_key: SecureRandom.hex(16), payload_digest: "a" * 64, status: :completed, translation_reference: unlinked)
+      TranslationReferenceCreation.create!(user: users(:other), creation_key: ReplayIdentity.issue, payload_digest: "a" * 64, status: :completed, translation_reference: unlinked)
     end
     assert_instance_of PG::ForeignKeyViolation, ownership_error.cause
     assert_db_rejection do

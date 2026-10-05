@@ -8,7 +8,7 @@ module SourceImports
     test "creates ready TXT provenance with actual byte size SHA and private attachment" do
       source_import = Create.call(
         user: users(:normal),
-        request_key: SecureRandom.hex(16),
+        request_key: ReplayIdentity.issue,
         upload: uploaded_file("\xEF\xBB\xBFText\r\n日本語".b, filename: "..\\sermon.txt", content_type: "text/plain")
       )
 
@@ -27,7 +27,7 @@ module SourceImports
       upload = uploaded_file("short source", filename: "source.txt", content_type: "text/plain")
       upload.define_singleton_method(:size) { Limits::MAX_UPLOAD_BYTES }
 
-      assert Create.call(user: users(:normal), upload:, request_key: SecureRandom.hex(16)).ready?
+      assert Create.call(user: users(:normal), upload:, request_key: ReplayIdentity.issue).ready?
     end
 
     test "rejects advertised oversize before reading content" do
@@ -36,7 +36,7 @@ module SourceImports
       upload.define_singleton_method(:read) { raise "must not read" }
       upload.define_singleton_method(:rewind) { }
 
-      error = assert_raises(Error) { Create.call(user: users(:normal), upload:, request_key: SecureRandom.hex(16)) }
+      error = assert_raises(Error) { Create.call(user: users(:normal), upload:, request_key: ReplayIdentity.issue) }
       assert_equal "file_too_large", error.code
     end
 
@@ -45,7 +45,7 @@ module SourceImports
       error = assert_raises(Error) do
         Create.call(
           user: users(:normal),
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           upload: uploaded_file(malformed, filename: "broken.docx", content_type: Detector::DOCX_MIME)
         )
       end
@@ -63,7 +63,7 @@ module SourceImports
     test "imports DOCX through the same normalizer" do
       source_import = Create.call(
         user: users(:normal),
-        request_key: SecureRandom.hex(16),
+        request_key: ReplayIdentity.issue,
         upload: uploaded_file(build_docx, filename: "source.docx", content_type: Detector::DOCX_MIME)
       )
 
@@ -76,7 +76,7 @@ module SourceImports
     test "accepts generic x-zip-compressed DOCX uploads only after package validation" do
       source_import = Create.call(
         user: users(:normal),
-        request_key: SecureRandom.hex(16),
+        request_key: ReplayIdentity.issue,
         upload: uploaded_file(build_docx, filename: "source.docx", content_type: "application/x-zip-compressed")
       )
 
@@ -87,7 +87,7 @@ module SourceImports
       error = assert_raises(Error) do
         Create.call(
           user: users(:normal),
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           upload: uploaded_file(malformed, filename: "broken.docx", content_type: "application/x-zip-compressed")
         )
       end
@@ -105,7 +105,7 @@ module SourceImports
       cases.each do |filename, content, content_type, extension|
         source_import = Create.call(
           user: users(:normal),
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           upload: uploaded_file(content, filename:, content_type:)
         )
 
@@ -121,7 +121,7 @@ module SourceImports
     end
 
     test "a replayed upload action returns its import without storing another record or blob" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       first = nil
       assert_difference stored_counts, 1 do
         first = Create.call(user: users(:normal), upload: uploaded_file("Replayed source", filename: "replay.txt"), request_key: key)
@@ -135,7 +135,7 @@ module SourceImports
 
     test "a new upload action of the same file is a separate import" do
       imports = 2.times.map do
-        Create.call(user: users(:normal), upload: uploaded_file("Same bytes", filename: "same.txt"), request_key: SecureRandom.hex(16))
+        Create.call(user: users(:normal), upload: uploaded_file("Same bytes", filename: "same.txt"), request_key: ReplayIdentity.issue)
       end
 
       assert_equal 2, imports.map(&:id).uniq.size
@@ -143,7 +143,7 @@ module SourceImports
     end
 
     test "a replay carrying a different file is refused without storing it" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       Create.call(user: users(:normal), upload: uploaded_file("Original", filename: "original.txt"), request_key: key)
 
       [ [ "Different bytes", "original.txt" ], [ "Original", "renamed.txt" ] ].each do |content, filename|
@@ -157,7 +157,7 @@ module SourceImports
     end
 
     test "a replayed failed extraction reports the original failure without another record" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       upload = -> { uploaded_file(build_docx(document_xml: "not valid XML"), filename: "broken.docx", content_type: Detector::DOCX_MIME) }
       first = assert_raises(Error) { Create.call(user: users(:normal), upload: upload.call, request_key: key) }
       # The replay is rebuilt after the clock crosses a ZIP timestamp step, so
@@ -171,7 +171,7 @@ module SourceImports
     end
 
     test "a busy PDF extractor records no outcome, so the same upload action is processed when retried" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       upload = -> { uploaded_file(pdf_with_text("Retried"), filename: "retried.pdf", content_type: "application/pdf") }
       holding, finish = Queue.new, Queue.new
       holder = Thread.new { PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }
@@ -191,7 +191,7 @@ module SourceImports
     end
 
     test "a replay after the import expired is refused rather than reused" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       source_import = Create.call(user: users(:normal), upload: uploaded_file("Expiring", filename: "expiring.txt"), request_key: key)
       source_import.update!(expires_at: 1.minute.ago)
 
@@ -202,7 +202,7 @@ module SourceImports
     end
 
     test "request keys are scoped to their owner" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       mine = Create.call(user: users(:normal), upload: uploaded_file("Shared key", filename: "shared.txt"), request_key: key)
       theirs = Create.call(user: users(:other), upload: uploaded_file("Shared key", filename: "shared.txt"), request_key: key)
 
@@ -212,7 +212,7 @@ module SourceImports
 
     test "attachment transaction failure leaves a charged terminal action without any stored object" do
       uploads = count_storage_uploads
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       ActiveRecord::Base.connection.execute(<<~SQL)
         ALTER TABLE active_storage_attachments
         ADD CONSTRAINT reject_source_import_attachment CHECK (record_type <> 'SourceImport')
@@ -240,7 +240,7 @@ module SourceImports
     test "a storage write failure after commit leaves a failed import without a blob that replays converge on" do
       service = ActiveStorage::Blob.service
       service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
 
       assert_difference [ -> { SourceImport.count } ], 1 do
         assert_no_difference [ -> { ActiveStorage::Blob.count }, -> { ActiveStorage::Attachment.count } ] do
@@ -259,7 +259,7 @@ module SourceImports
         Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: key)
       end
       assert_equal "storage_unavailable", replay.code
-      retried = Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: SecureRandom.hex(16))
+      retried = Create.call(user: users(:normal), upload: uploaded_file("Unstored", filename: "unstored.txt"), request_key: ReplayIdentity.issue)
       assert retried.available?
       assert retried.source_file.blob.service.exist?(retried.source_file.blob.key)
     ensure
@@ -274,7 +274,7 @@ module SourceImports
         super(*arguments, **options)
       end
 
-      source_import = Create.call(user: users(:normal), upload: uploaded_file("Stored first", filename: "stored.txt"), request_key: SecureRandom.hex(16))
+      source_import = Create.call(user: users(:normal), upload: uploaded_file("Stored first", filename: "stored.txt"), request_key: ReplayIdentity.issue)
       assert_equal [ "pending" ], statuses
       assert source_import.reload.ready?
     ensure

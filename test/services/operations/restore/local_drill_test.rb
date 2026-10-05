@@ -145,6 +145,7 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
 
   test "editor ledger migration preserves existing draft replay ordering through cleanup" do
     require Rails.root.join("db/migrate/20261005110000_create_translation_workspace_draft_editors")
+    require Rails.root.join("db/migrate/20261005120000_bound_replay_coordination_lifetimes")
     drill = Operations::Restore::LocalDrill.new(environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" })
     original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
     original_storage_service = ActiveStorage::Blob.service
@@ -155,6 +156,8 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
       drill.send(:configure_source!, original_configuration, database, storage_root)
       migration = CreateTranslationWorkspaceDraftEditors.new
       # Only this explicitly disposable database is changed to the old schema.
+      lifecycle = BoundReplayCoordinationLifetimes.new
+      lifecycle.migrate(:down)
       migration.migrate(:down)
       ActiveRecord::Base.connection.schema_cache.clear!
       TranslationWorkspaceDraftEditor.reset_column_information
@@ -163,6 +166,7 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
       user.translation_workspace_drafts.create!(context_key: "new", editor_id: editor, editor_sequence: 1,
         workspace_payload: JSON.generate("source_text" => "Previously saved private work"), expires_at: 1.minute.ago)
       migration.migrate(:up)
+      lifecycle.migrate(:up)
       ActiveRecord::Base.connection.schema_cache.clear!
       TranslationWorkspaceDraftEditor.reset_column_information
       assert_equal 1, user.translation_workspace_draft_editors.sole.sequence

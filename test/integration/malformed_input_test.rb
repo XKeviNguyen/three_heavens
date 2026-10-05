@@ -79,7 +79,7 @@ class MalformedInputTest < ActionDispatch::IntegrationTest
   test "a NUL byte in an uploaded file's name is not a server error" do
     sign_in_as users(:normal)
     boundary = "NulFilenameBoundary"
-    body = "--#{boundary}\r\nContent-Disposition: form-data; name=\"source_import[request_key]\"\r\n\r\n#{SecureRandom.hex(16)}\r\n" \
+    body = "--#{boundary}\r\nContent-Disposition: form-data; name=\"source_import[request_key]\"\r\n\r\n#{ReplayIdentity.issue}\r\n" \
       "--#{boundary}\r\nContent-Disposition: form-data; name=\"source_import[source_file]\"; filename=\"a%00b.txt\"\r\n" \
       "Content-Type: text/plain\r\n\r\nSource text\r\n--#{boundary}--\r\n"
 

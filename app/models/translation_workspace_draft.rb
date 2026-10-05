@@ -2,7 +2,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
   # Rolling seven-day expiry; the hourly production job deletes expired rows.
   RETENTION = 7.days
   MAX_PAYLOAD_BYTES = 500_000
-  EDITOR_ID_FORMAT = /\A[0-9a-f]{32}\z/
+  EDITOR_ID_FORMAT = ReplayIdentity::PUBLIC_FORMAT
   MAX_EDITOR_SEQUENCE = 2**53 - 1
   SCALAR_FIELDS = %w[
     project_name source_language target_language document_title source_text
