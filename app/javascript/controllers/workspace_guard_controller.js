@@ -80,11 +80,7 @@ export default class extends Controller {
   trackPending(event) {
     const work = event.detail.work
     this.pending.add(work)
-    work.finally(() => {
-      this.pending.delete(work)
-      // A wait that timed out showed a failure; the page may be settled now.
-      if (!this.busy()) this.setStatus(this.settledStatus)
-    })
+    work.finally(() => this.pending.delete(work))
   }
 
   busy() {
@@ -240,6 +236,11 @@ export default class extends Controller {
       window.clearTimeout(timer)
       if (!settled) {
         this.setStatus(this.messagesValue.saveFailed)
+        // The work may still finish without changing anything to save; then
+        // this failure, unless another message replaced it, no longer applies.
+        this.settlePending().then(() => {
+          if (!this.busy() && this.statusTarget.textContent === this.messagesValue.saveFailed) this.setStatus(this.settledStatus)
+        })
         return false
       }
     }

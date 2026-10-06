@@ -506,6 +506,37 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_imported_draft "Imported while launching"
   end
 
+  test "a pending import that ends without a change never hides a failed discard" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Discard fails during import"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script("window.__harness.discardMode = 'fail'")
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/source_imports.json") {
+          await new Promise(resolve => { window.__releaseImport = resolve })
+          return new Response(JSON.stringify({ error: "Rejected import" }), { status: 422, headers: { "Content-Type": "application/json" } })
+        }
+        return deliver(url, options)
+      }
+    JS
+    click_button "Upload file"
+    @import_file = Tempfile.new([ "rejected-import", ".txt" ])
+    @import_file.write("Never imported")
+    @import_file.flush
+    attach_file "Source file", @import_file.path
+    click_button "Upload and review"
+    assert_until { page.evaluate_script("!!window.__releaseImport") }
+
+    accept_confirm { click_button "Discard draft" }
+    assert_status I18n.t("workspace.discard_failed")
+    page.execute_script("window.__releaseImport()")
+    assert_text "Rejected import"
+    assert_status I18n.t("workspace.discard_failed")
+  end
+
   private
 
   # Uploads a source file whose import response is held until

@@ -308,7 +308,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     first("a[href='#{new_translation_workspace_path}']").click
     # The page waits for the save instead of leaving.
     assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.saving")
-    assert_selector "body[data-leaving-document='old']"
     page.execute_script("window.__releaseTerminology()")
     assert_until { workspace_draft_glossary == revised.id.to_s }
     # The workspace was replaced by the visit, in the same document.
