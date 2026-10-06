@@ -263,7 +263,75 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "Guarded after restoration", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
+  test "a change made by a script while a clean visit loads is still saved" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Saved before leaving"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    clear_turbo_cache
+    page.execute_script("window.__harness.holdPages.add('/projects')")
+    click_link "Projects"
+    assert_until { page.evaluate_script("window.__harness.heldPages.length === 1") }
+    finish_import_while_leaving
+
+    page.execute_script("window.__harness.heldPages[0].release()")
+    assert_selector "h1", text: "Projects"
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text") == "Arrived while leaving" }
+    assert page.evaluate_script("!!window.__harness")
+  end
+
+  test "Back while a clean visit loads is Turbo's even after a script changed the page" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Saved before leaving"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    clear_turbo_cache
+    page.execute_script("window.__harness.holdPages.add('/projects')")
+    click_link "Projects"
+    assert_until { page.evaluate_script("window.__harness.heldPages.length === 1") }
+    finish_import_while_leaving
+
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__harness.heldPages.length === 2 && window.__harness.heldPages[0].aborted === true") }
+    page.execute_script("window.__harness.heldPages.forEach(held => held.release())")
+    assert_selector "h1", text: "Projects"
+    assert_equal 1, page.evaluate_script("window.__harness.events['turbo:render']")
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text") == "Arrived while leaving" }
+  end
+
+  test "Leave to the same page with a fragment loads a fresh page" do
+    open_workspace_from_projects
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:load", () => { window.__fragmentLoaded = true }, { once: true })
+      document.querySelector("a[href='#main-content']").click()
+    JS
+    assert_until { page.evaluate_script("location.hash === '#main-content' && window.__fragmentLoaded === true") }
+    page.go_back
+    assert_until { page.evaluate_script("location.hash === '' && !!document.querySelector(\"[data-controller='workspace-guard']\")") }
+    assert_field "Project name"
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned by Leave"
+    assert_status I18n.t("workspace.save_failed")
+
+    page.execute_script("history.forward()")
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_field "Project name", with: ""
+    assert_empty users(:normal).translation_workspace_drafts
+  end
+
   private
+
+  # What a source import that completes late does to the form.
+  def finish_import_while_leaving
+    page.execute_script(<<~JS)
+      const field = document.querySelector("[name='translation_workspace[source_text]']")
+      field.value = "Arrived while leaving"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+    JS
+  end
 
   def open_workspace_from_projects
     visit projects_path

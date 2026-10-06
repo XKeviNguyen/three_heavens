@@ -273,6 +273,22 @@ class TranslationWorkspaceDraftTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[document_title]'][value='fresh']"
   end
 
+  test "revisiting an import link keeps the reviewed draft that already holds that import" do
+    source_import = create_ready_import(user: users(:normal), text: "Original imported text", filename: "original.txt")
+    post_draft params: {
+      workspace: payload("source_import_id" => source_import.id.to_s, "source_text" => "Reviewed imported text",
+                         "document_title" => "Reviewed title")
+    }, as: :json
+    get new_translation_workspace_path(
+      source_import_id: source_import.id,
+      source_import_project_token: source_import_binding(source_import)
+    )
+    assert_response :success
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "Reviewed imported text"
+    assert_select "input[name='translation_workspace[document_title]'][value='Reviewed title']"
+    assert_select "[data-workspace-guard-needs-save-value='false']"
+  end
+
   test "a failed launch from a stale tab does not adopt a newer draft version" do
     post_draft params: { workspace: payload }, as: :json
     draft = users(:normal).translation_workspace_drafts.sole

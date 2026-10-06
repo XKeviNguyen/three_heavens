@@ -406,7 +406,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     end
   end
 
-  test "failed discard during Back save recovers navigation without a suspended render" do
+  test "failed discard during a claimed Back save keeps the page usable for the next visit" do
     visit projects_path
     click_link "New translation"
     assert_field "Project name"

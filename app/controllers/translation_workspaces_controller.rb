@@ -31,8 +31,11 @@ class TranslationWorkspacesController < ApplicationController
     load_draft(project)
     @draft_id = params[:translation_workspace_draft_id].to_s if request.post?
     @draft_version = params[:translation_workspace_draft_version].to_s if request.post?
-    @draft_needs_save = source_import.present? || attributes.present?
     restored_attributes = restored_draft_attributes(project) unless attributes
+    # Revisiting the import link (Back, reload) must not replace the reviewed
+    # text of a draft that already holds this import.
+    source_import = nil if source_import && restored_attributes&.dig(:source_import_id).to_s == source_import.id.to_s
+    @draft_needs_save = source_import.present? || attributes.present?
     workspace_attributes = attributes || restored_attributes || {}
     if source_import
       workspace_attributes = workspace_attributes.merge(

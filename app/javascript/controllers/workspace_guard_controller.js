@@ -47,7 +47,13 @@ export default class extends Controller {
     window.removeEventListener("pageshow", this.onPageShow)
     window.removeEventListener("online", this.onOnline)
     this.element.inert = false
+    this.leaving = false
     if (this.hasDialogTarget) this.dialogTarget.close?.()
+    // A detached page must not navigate, but an import or terminology save
+    // that finished while a visit loaded still reaches the draft: a Turbo
+    // render keeps the document, so this request and its retries complete.
+    this.navigation = null
+    if (!this.discarding && !this.launching && !this.allowVisit && this.dirty()) this.save()
   }
 
   payload() {
@@ -215,7 +221,7 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    if (this.launching || this.discarding) {
+    if (this.launching || this.discarding || this.navigation?.phase === "allowed") {
       event.preventDefault()
       return
     }
@@ -228,7 +234,7 @@ export default class extends Controller {
   // before the save can change this page, its head, or Turbo's history and
   // snapshot state, whatever the user decides afterwards.
   onTraverse(event) {
-    if (this.allowVisit || this.launching) return
+    if (this.allowVisit || this.launching || this.leaving) return
     if (this.discarding) {
       // A discard ends in a fresh workspace or keeps this page, so the
       // traversal is never followed.
@@ -242,7 +248,7 @@ export default class extends Controller {
   }
 
   onBeforeVisit(event) {
-    if (this.allowVisit || this.launching) return
+    if (this.allowVisit || this.launching || this.leaving) return
     if (!this.discarding && !this.navigation && !this.dirty()) return
     event.preventDefault()
     if (!this.discarding) this.navigateAfterSave(event.detail.url, "visit")
@@ -251,13 +257,16 @@ export default class extends Controller {
   // Turbo only starts a visit from a clean page (or a launch), and the visit
   // replaces this page when it renders. Freezing the page meanwhile keeps an
   // edit typed while the response is in flight from being replaced unsaved.
-  // A visit that renders nothing, such as following a redirect, still ends
-  // with turbo:load.
+  // While it loads, Turbo owns navigation, so a newer Back or link cancels it
+  // as usual. A visit that renders nothing, such as following a redirect,
+  // still ends with turbo:load.
   onVisit() {
+    this.leaving = true
     this.element.inert = true
   }
 
   onLoad() {
+    this.leaving = false
     this.element.inert = false
   }
 
@@ -352,7 +361,9 @@ export default class extends Controller {
     const destination = this.destination
     this.allowVisit = true
     this.dialogTarget.close()
-    window.location.assign(destination)
+    // Assigning a URL that differs only by its fragment would keep this page.
+    if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
+    else window.location.assign(destination)
   }
 
   async discard() {
