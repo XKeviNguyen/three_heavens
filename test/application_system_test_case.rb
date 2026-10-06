@@ -45,6 +45,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     OpenRouter::Catalog.transport = @original_catalog_transport
   end
 
+  # Waits until the document carrying the marker has been replaced. A selector
+  # query can race a full page load inside Chrome ("Node with given id does not
+  # belong to the document"), so this asks the current document directly.
+  def assert_document_replaced(marker_selector)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
+    until page.evaluate_script("!document.querySelector(arguments[0]) && document.readyState === 'complete'", marker_selector)
+      flunk "#{marker_selector} was not replaced" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.05
+    end
+  end
+
   def choose_known_language(label, value)
     field = find_field(label)
     field.fill_in with: value

@@ -26,6 +26,7 @@ export default class extends Controller {
     body.append("source_import[request_key]", this.requestKey)
     if (this.projectIdValue) body.append("source_import[project_id]", this.projectIdValue)
 
+    const settle = this.announcePending()
     try {
       const response = await fetch(this.createUrlValue, {
         method: "POST", body, credentials: "same-origin",
@@ -59,6 +60,7 @@ export default class extends Controller {
       if (this.requestKey === requestKey) this.messageTarget.textContent = error.message || this.messagesValue.importFailed
     } finally {
       if (this.requestKey === requestKey) this.buttonTarget.disabled = false
+      settle()
     }
   }
 
@@ -68,6 +70,7 @@ export default class extends Controller {
     const requestKey = this.requestKey
     const selectedFile = this.fileTarget.files[0]
 
+    const settle = this.announcePending()
     try {
       const response = await fetch(`/source_imports/${encodeURIComponent(id)}.json`, {
         method: "DELETE", credentials: "same-origin",
@@ -91,7 +94,18 @@ export default class extends Controller {
     } catch {
       if (this.field("source_import_id").value !== id || this.requestKey !== requestKey) return
       this.messageTarget.textContent = this.messagesValue.removeFailed
+    } finally {
+      settle()
     }
+  }
+
+  // The workspace waits for this request before it saves and navigates, so
+  // the import or its removal reaches the draft.
+  announcePending() {
+    let settle
+    const work = new Promise(resolve => { settle = resolve })
+    this.element.dispatchEvent(new CustomEvent("workspace:pending", { bubbles: true, detail: { work } }))
+    return settle
   }
 
   field(name) {

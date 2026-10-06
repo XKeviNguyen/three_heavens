@@ -1,3 +1,4 @@
+require "tempfile"
 require "application_system_test_case"
 
 # Back and Forward against held responses. A traversal the workspace claims
@@ -13,6 +14,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     click_button "Sign in"
     assert_text "Signed in successfully."
   end
+
+  teardown { @import_file&.close! }
 
   [ true, false ].each do |cache_cleared|
     test "a Back claimed after a failed save leaves no stale navigation state with cache cleared #{cache_cleared}" do
@@ -266,42 +269,6 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "Guarded after restoration", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
-  test "a change made by a script while a clean visit loads is still saved" do
-    open_workspace_from_projects
-    fill_in "Project name", with: "Saved before leaving"
-    assert_status I18n.t("workspace.saved")
-    install_history_harness
-    clear_turbo_cache
-    page.execute_script("window.__harness.holdPages.add('/projects')")
-    click_link "Projects"
-    assert_until { page.evaluate_script("window.__harness.heldPages.length === 1") }
-    finish_import_while_leaving
-
-    page.execute_script("window.__harness.heldPages[0].release()")
-    assert_selector "h1", text: "Projects"
-    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text") == "Arrived while leaving" }
-    assert page.evaluate_script("!!window.__harness")
-  end
-
-  test "Back while a clean visit loads is Turbo's even after a script changed the page" do
-    open_workspace_from_projects
-    fill_in "Project name", with: "Saved before leaving"
-    assert_status I18n.t("workspace.saved")
-    install_history_harness
-    clear_turbo_cache
-    page.execute_script("window.__harness.holdPages.add('/projects')")
-    click_link "Projects"
-    assert_until { page.evaluate_script("window.__harness.heldPages.length === 1") }
-    finish_import_while_leaving
-
-    page.execute_script("history.back()")
-    assert_until { page.evaluate_script("window.__harness.heldPages.length === 2 && window.__harness.heldPages[0].aborted === true") }
-    page.execute_script("window.__harness.heldPages.forEach(held => held.release())")
-    assert_selector "h1", text: "Projects"
-    assert_equal 1, page.evaluate_script("window.__harness.events['turbo:render']")
-    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text") == "Arrived while leaving" }
-  end
-
   test "Leave to the same page with a fragment loads a fresh page" do
     open_workspace_from_projects
     page.execute_script(<<~JS)
@@ -325,7 +292,58 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_empty users(:normal).translation_workspace_drafts
   end
 
-  test "a launch rejected after more typing renders a page that can still save" do
+  test "an import that finishes after a link is clicked reaches the draft before the page leaves" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Import before leaving"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    start_held_import("Imported before Projects")
+    click_link "Projects"
+    # The import is still pending, so the page waits instead of leaving.
+    assert_no_page_requests
+    assert_selector "h1", text: "New translation"
+
+    page.execute_script("window.__releaseImport()")
+    assert_selector "h1", text: "Projects"
+    assert_imported_draft "Imported before Projects"
+  end
+
+  test "Back during a pending import waits for it, saves, then follows Back" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Import before Back"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    start_held_import("Imported before Back")
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("location.pathname === '/projects'") }
+    assert_no_page_requests
+    assert_selector "h1", text: "New translation"
+
+    page.execute_script("window.__releaseImport()")
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
+    assert_imported_draft "Imported before Back"
+  end
+
+  test "an import that finishes while leaving for the same workspace reaches the draft and the new page" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Same draft import"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    start_held_import("Imported for the same draft")
+    first("a[href='#{new_translation_workspace_path}']").click
+    assert_no_page_requests
+
+    page.execute_script("window.__releaseImport()")
+    assert_until { page.evaluate_script("window.__harness.events['turbo:load'] === 1") }
+    assert_field "Reviewed source text", with: "Imported for the same draft"
+    assert_imported_draft "Imported for the same draft"
+    fill_in "Project name", with: "Edited on the new page"
+    assert_status I18n.t("workspace.saved")
+    assert_equal "Edited on the new page", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "a launch freezes the page so nothing typed is lost when it is rejected" do
     open_workspace_from_projects
     fill_in "Project name", with: "Rejected launch project"
     choose_known_language("Source language", "Vietnamese")
@@ -347,27 +365,146 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     JS
     click_button "Start translation"
     assert_until { page.evaluate_script("!!window.__releaseLaunch") }
-    page.execute_script(<<~JS)
-      const field = document.querySelector("[name='translation_workspace[source_text]']")
-      field.value = "Typed while the launch was checked"
-      field.dispatchEvent(new Event("input", { bubbles: true }))
-      window.__releaseLaunch()
-    JS
+    assert page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+    begin
+      find_field("Document title").send_keys(" typed during launch")
+    rescue Selenium::WebDriver::Error::ElementNotInteractableError
+      # An inert field refuses keyboard input outright in some drivers.
+    end
+    assert_equal "Rejected launch document", find_field("Document title").value
+
+    page.execute_script("window.__releaseLaunch()")
     assert_selector "#form-errors-heading"
+    assert_field "Document title", with: "Rejected launch document"
     fill_in "Document title", with: "Fixed after rejection"
     assert_status I18n.t("workspace.saved")
     assert_equal "Fixed after rejection", users(:normal).translation_workspace_drafts.sole.payload.fetch("document_title")
   end
 
+  test "Back during a launch keeps the page frozen until the newer visit replaces it" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Launch abandoned by Back"
+    choose_known_language("Source language", "Vietnamese")
+    choose_known_language("Target language", "Japanese")
+    fill_in "Document title", with: "Abandoned launch document"
+    fill_in "Source text", with: "Abandoned launch source"
+    fill_in "Instructions for the translation", with: "Translate carefully."
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    clear_turbo_cache
+    page.execute_script(<<~JS)
+      window.__harness.holdPages.add("/projects")
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/translation_workspace" && (options.method || "").toUpperCase() === "POST") {
+          window.__launchHeld = true
+          return new Promise((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true })
+          })
+        }
+        return deliver(url, options)
+      }
+      document.addEventListener("turbo:submit-end", () => { window.__submitEnded = true })
+    JS
+    click_button "Start translation"
+    assert_until { page.evaluate_script("window.__launchHeld === true") }
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__submitEnded === true && window.__harness.heldPages.length === 1") }
+    assert page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+
+    page.execute_script("window.__harness.heldPages[0].release()")
+    assert_selector "h1", text: "Projects"
+    assert_equal "Launch abandoned by Back", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "the page is frozen while an interface-language switch is in flight" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Kept across the language switch"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (new URL(url, location.origin).pathname === "/locale") await new Promise(resolve => { window.__releaseLocale = resolve })
+        return response
+      }
+    JS
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("!!window.__releaseLocale") }
+    assert page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+
+    page.execute_script("window.__releaseLocale()")
+    assert_selector "html[lang='ja']"
+    assert_field "プロジェクト名", with: "Kept across the language switch"
+  end
+
+  test "signing out from a page that cannot save leaves a usable Stay or Leave choice" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Unsaved at sign out"
+    assert_status I18n.t("workspace.save_failed")
+
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+    click_button "Leave"
+    assert_current_path login_path
+  end
+
+  test "a language switch that cancels a loading visit and fails leaves the page usable" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Usable after failed switch"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    clear_turbo_cache
+    page.execute_script(<<~JS)
+      window.__harness.holdPages.add("/projects")
+      const deliver = window.fetch
+      window.fetch = (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/locale") return Promise.reject(new TypeError("Failed to fetch"))
+        return deliver(url, options)
+      }
+      document.addEventListener("turbo:submit-end", () => { window.__localeEnded = true })
+    JS
+    click_link "Projects"
+    assert_until { page.evaluate_script("window.__harness.heldPages.length === 1") }
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("window.__localeEnded === true && window.__harness.heldPages[0].aborted === true") }
+
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+    fill_in "Project name", with: "Edited after failed switch"
+    assert_status I18n.t("workspace.saved")
+  end
+
   private
 
-  # What a source import that completes late does to the form.
-  def finish_import_while_leaving
+  # Uploads a source file whose import response is held until
+  # window.__releaseImport() is called.
+  def start_held_import(text)
     page.execute_script(<<~JS)
-      const field = document.querySelector("[name='translation_workspace[source_text]']")
-      field.value = "Arrived while leaving"
-      field.dispatchEvent(new Event("input", { bubbles: true }))
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (new URL(url, location.origin).pathname === "/source_imports.json") {
+          await new Promise(resolve => { window.__releaseImport = resolve })
+        }
+        return response
+      }
     JS
+    click_button "Upload file"
+    @import_file = Tempfile.new([ "held-import", ".txt" ])
+    @import_file.write(text)
+    @import_file.flush
+    attach_file "Source file", @import_file.path
+    click_button "Upload and review"
+    assert_until { page.evaluate_script("!!window.__releaseImport") }
+  end
+
+  def assert_imported_draft(text)
+    source_import = users(:normal).source_imports.sole
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.values_at("source_import_id", "source_text") == [ source_import.id.to_s, text ] }
   end
 
   def open_workspace_from_projects

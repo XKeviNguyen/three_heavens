@@ -161,7 +161,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     accept_confirm do
       click_button "Discard draft"
     end
-    assert_no_selector "body[data-discard-document='old']"
+    assert_document_replaced "body[data-discard-document='old']"
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: ""
     assert_equal 0, users(:normal).translation_workspace_drafts.count
@@ -382,7 +382,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
         page.execute_script("window.dispatchEvent(new Event('online'))")
         assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
       else
-        assert_no_selector "body[data-history-document='old']"
+        assert_document_replaced "body[data-history-document='old']"
       end
       assert_current_path new_translation_workspace_path
       assert_field "Project name", with: "Back save still unresolved"
@@ -502,7 +502,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
 
     page.execute_script("document.body.dataset.discardDocument = 'old'")
     accept_confirm { click_button "Discard draft" }
-    assert_no_selector "body[data-discard-document='old']"
+    assert_document_replaced "body[data-discard-document='old']"
     # The reset page is the same URL; wait until it has replaced this one.
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: ""

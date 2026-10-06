@@ -121,13 +121,13 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
 
     page.execute_script("document.body.dataset.historyDocument = 'workspace'")
     page.go_back
-    assert_no_selector "body[data-history-document='workspace']"
+    assert_document_replaced "body[data-history-document='workspace']"
     assert_selector "h1", text: "Projects"
     assert_current_path projects_path
     assert_no_selector "dialog[open]", text: "Leave this translation?"
     page.execute_script("document.body.dataset.historyDocument = 'projects'")
     page.go_forward
-    assert_no_selector "body[data-history-document='projects']"
+    assert_document_replaced "body[data-history-document='projects']"
     assert_selector "h1", text: "New translation"
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: "Back protected"
@@ -286,6 +286,60 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     click_link "Edit terminology"
     assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
     assert_equal [ 1, 1 ], page.evaluate_script("[document.querySelectorAll('dialog[data-controller=\"terminology-sheet\"]').length, document.querySelectorAll('#workspace-terminology-editor form').length]")
+  end
+
+  test "leaving while a closed terminology sheet still saves waits for that save to reach the draft" do
+    visit new_translation_workspace_path
+    select_workspace_glossary
+    hold_terminology_submissions
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+    find("dialog[open]").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    revised = @glossary.reload.current_revision
+
+    # Leaving for another workspace page of the same draft waits for the save.
+    page.execute_script("window.__samePage = true")
+    first("a[href='#{new_translation_workspace_path}']").click
+    page.execute_script("window.__releaseTerminology()")
+    assert_until { workspace_draft_glossary == revised.id.to_s }
+    assert_until { page.evaluate_script("window.__samePage === true && !document.querySelector('dialog[open]') && document.documentElement.getAttribute('aria-busy') === null") }
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{revised.id}']:checked", visible: :all
+  end
+
+  test "another editor opened while a closed sheet still saves loads after that save" do
+    visit new_translation_workspace_path
+    select_workspace_glossary
+    hold_terminology_submissions
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+    find("dialog[open]").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    revised = @glossary.reload.current_revision
+
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:before-fetch-request", event => {
+        if (event.target.id === "workspace-terminology-editor") window.__editorDeferred = event.defaultPrevented
+      }, { once: true })
+    JS
+    click_link "+ Add terminology"
+    assert_until { !page.evaluate_script("window.__editorDeferred").nil? }
+    assert page.evaluate_script("window.__editorDeferred"), "the new editor must wait for the save in flight"
+    assert_no_selector "dialog[open]"
+    assert_equal 0, page.evaluate_script("window.__sheetChanged")
+    page.execute_script("window.__releaseTerminology()")
+    assert_until { workspace_draft_glossary == revised.id.to_s }
+    assert_selector "dialog[open] form[action='#{workspace_terminology_path}']"
   end
 
   # The response to a save can arrive after the user has already closed the

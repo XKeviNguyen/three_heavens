@@ -2,6 +2,9 @@ import { Controller } from "@hotwired/stimulus"
 
 const SAVE_DELAY_MS = 1000
 const RETRY_DELAYS_MS = [2000, 5000, 15000, 30000]
+// How long navigation waits for an import or terminology save before it asks
+// the user to stay or leave instead.
+const PENDING_WAIT_MS = 30000
 
 export default class extends Controller {
   static targets = ["form", "dialog", "status"]
@@ -15,6 +18,7 @@ export default class extends Controller {
     this.editorId = this.editorIdValue
     this.sequence = this.sequenceValue
     this.unacknowledged = null
+    this.pending = new Set()
     this.retryCount = 0
     this.lastSavedState = this.needsSaveValue ? null : this.state()
     this.settledStatus = this.hasStatusTarget ? this.statusTarget.textContent : ""
@@ -47,21 +51,9 @@ export default class extends Controller {
     window.removeEventListener("pageshow", this.onPageShow)
     window.removeEventListener("online", this.onOnline)
     this.element.inert = false
-    this.leaving = false
     if (this.hasDialogTarget) this.dialogTarget.close?.()
-    // A detached page must not navigate, but an import or terminology save
-    // that finished while a visit loaded still reaches the draft: a Turbo
-    // render keeps the document, so this request and its retries complete.
-    // A workspace for the same draft rendered in its place was built from the
-    // server's draft, so saving now would only make that page conflict.
+    // A detached page never navigates.
     this.navigation = null
-    if (!this.discarding && !this.launching && !this.allowVisit && this.dirty() && !this.replacedBySameDraft()) this.save()
-  }
-
-  replacedBySameDraft() {
-    const form = document.getElementById(this.formTarget.id)
-    const project = form => form.elements["translation_workspace[project_id]"]?.value || ""
-    return !!form && form !== this.formTarget && project(form) === project(this.formTarget)
   }
 
   payload() {
@@ -81,6 +73,23 @@ export default class extends Controller {
   // shows, so it keeps the page dirty even if the fields are reverted.
   dirty() {
     return this.unacknowledged !== null || this.state() !== this.lastSavedState
+  }
+
+  // An import, its removal, or a terminology save changes the form when its
+  // request finishes, without typing. Until then the page is not settled.
+  trackPending(event) {
+    const work = event.detail.work
+    this.pending.add(work)
+    work.finally(() => this.pending.delete(work))
+  }
+
+  busy() {
+    return this.pending.size > 0 || this.dirty()
+  }
+
+  async settlePending() {
+    while (this.pending.size > 0) await Promise.allSettled(this.pending)
+    return true
   }
 
   // Typing only restarts the debounce. The form is serialized once, when the
@@ -216,14 +225,23 @@ export default class extends Controller {
     return response.json()
   }
 
-  // Saves until the persisted draft matches the form; false means edits are not safe.
+  // Waits for pending changes, then saves until the persisted draft matches
+  // the form; false means edits are not safe.
   async flush() {
+    if (this.pending.size > 0) {
+      this.setStatus(this.messagesValue.saving)
+      let timer
+      const timeout = new Promise(resolve => { timer = window.setTimeout(() => resolve(false), PENDING_WAIT_MS) })
+      const settled = await Promise.race([this.settlePending(), timeout])
+      window.clearTimeout(timer)
+      if (!settled) return false
+    }
     let saved = false
     for (let attempt = 0; attempt < 3; attempt++) {
       saved = await this.save()
       if (!saved || !this.dirty()) break
     }
-    return saved && !this.dirty()
+    return saved && !this.busy()
   }
 
   // The interface-language switch waits for this before navigating, and is
@@ -242,7 +260,7 @@ export default class extends Controller {
   // before the save can change this page, its head, or Turbo's history and
   // snapshot state, whatever the user decides afterwards.
   onTraverse(event) {
-    if (this.allowVisit || this.launching || this.leaving) return
+    if (this.allowVisit || this.launching) return
     if (this.discarding) {
       // A discard ends in a fresh workspace or keeps this page, so the
       // traversal is never followed.
@@ -250,31 +268,33 @@ export default class extends Controller {
       window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
       return
     }
-    if (!this.navigation && !this.dirty()) return
+    if (!this.navigation && !this.busy()) return
     event.preventDefault()
     this.navigateAfterSave(window.location.href, "history")
   }
 
   onBeforeVisit(event) {
-    if (this.allowVisit || this.launching || this.leaving) return
-    if (!this.discarding && !this.navigation && !this.dirty()) return
+    if (this.allowVisit || this.launching) return
+    if (!this.discarding && !this.navigation && !this.busy()) return
     event.preventDefault()
+    // A cancelled visit replaces nothing, so a submission that froze the page
+    // for it (such as signing out) leaves the page usable.
+    this.element.inert = false
     if (!this.discarding) this.navigateAfterSave(event.detail.url, "visit")
   }
 
-  // Turbo only starts a visit from a clean page (or a launch), and the visit
-  // replaces this page when it renders. Freezing the page meanwhile keeps an
-  // edit typed while the response is in flight from being replaced unsaved.
-  // While it loads, Turbo owns navigation, so a newer Back or link cancels it
-  // as usual. A visit that renders nothing, such as following a redirect,
-  // still ends with turbo:load.
+  // Turbo only starts a visit from a settled page (or a launch), and the
+  // visit replaces this page when it renders. Freezing the page meanwhile
+  // keeps an edit, an import, or a terminology save from starting on a page
+  // that is about to be replaced. A visit that renders nothing, such as
+  // following a redirect, still ends with turbo:load.
   onVisit() {
-    this.leaving = true
+    this.visiting = true
     this.element.inert = true
   }
 
   onLoad() {
-    this.leaving = false
+    this.visiting = false
     this.element.inert = false
   }
 
@@ -308,6 +328,7 @@ export default class extends Controller {
     } else {
       this.cancelNavigation()
       this.destination = navigation.destination
+      this.element.inert = false
       this.dialogTarget.showModal()
     }
   }
@@ -325,11 +346,11 @@ export default class extends Controller {
   // so their saves either succeed or report the conflict. After Leave or a
   // discard the page no longer guards anything, so it always reloads.
   onPageShow(event) {
-    if (event.persisted && (this.allowVisit || this.discarding || !this.dirty())) window.location.reload()
+    if (event.persisted && (this.allowVisit || this.discarding || !this.busy())) window.location.reload()
   }
 
   onBeforeUnload(event) {
-    if (this.allowVisit || this.launching || !this.dirty()) return
+    if (this.allowVisit || this.launching || !this.busy()) return
     event.preventDefault()
     event.returnValue = ""
   }
@@ -340,7 +361,7 @@ export default class extends Controller {
       return
     }
     this.cancelNavigation()
-    if (this.allowSubmit || !this.dirty()) return
+    if (this.allowSubmit || !this.busy()) return
     event.preventDefault()
     const submitter = event.submitter
     if (await this.flush()) {
@@ -350,14 +371,40 @@ export default class extends Controller {
     }
   }
 
+  // A Turbo form submission that is not for a frame, such as a launch or the
+  // interface-language switch, replaces this page with its response; a
+  // rejected launch renders the submitted values. The page is frozen
+  // meanwhile so nothing is typed that the response would discard.
   submitStart(event) {
-    if (event.target !== this.formTarget) return
-    const action = event.detail.formSubmission?.submitter?.formAction || this.formTarget.action
-    if (new URL(action).pathname === new URL(this.formTarget.action).pathname) this.launching = true
+    const submission = event.detail.formSubmission
+    if (!this.replacesPage(submission)) return
+    this.submission = submission
+    // Submitting cancels any visit still loading.
+    this.visiting = false
+    this.element.inert = true
+    if (submission.formElement === this.formTarget && new URL(submission.action).pathname === new URL(this.formTarget.action).pathname) this.launching = true
   }
 
-  submitEnd(event) {
-    if (event.target === this.formTarget && !event.detail.success) this.launching = false
+  // The page stays frozen while something may still replace it: a newer
+  // visit that cancelled the submission is loading, or the response is a
+  // page that Turbo renders or follows (its redirect visit starts after this
+  // event). Otherwise, including a Turbo Stream response, the page stays and
+  // is editable again. A visit this guard cancels unfreezes the page in
+  // onBeforeVisit.
+  async submitEnd(event) {
+    if (event.detail.formSubmission !== this.submission) return
+    this.submission = null
+    const response = event.detail.fetchResponse
+    if (this.visiting) return
+    if (response && !response.contentType?.startsWith("text/vnd.turbo-stream.html") && await response.responseHTML) return
+    this.launching = false
+    this.element.inert = false
+  }
+
+  // Turbo sends a form inside a frame, or one that names a frame, to that frame.
+  replacesPage({ formElement, submitter }) {
+    const frame = submitter?.getAttribute("data-turbo-frame") || formElement.getAttribute("data-turbo-frame")
+    return frame ? frame === "_top" : !formElement.closest("turbo-frame")
   }
 
   stay() {

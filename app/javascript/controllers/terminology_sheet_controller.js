@@ -14,6 +14,46 @@ export default class extends Controller {
     this.element.close?.()
     this.invoker = null
     this.hadEditor = false
+    this.settleSave()
+  }
+
+  // The sheet can be closed while a save is in flight; the workspace waits
+  // for its response, which selects the saved revision, before it saves and
+  // navigates. Any render of the editor frame ends the save; a request
+  // without an HTML response renders nothing.
+  saving(event) {
+    this.settleSave()
+    this.saveSubmission = event.detail.formSubmission
+    this.savingEditor = this.editorFrame?.firstElementChild
+    const work = new Promise(resolve => { this.finishSave = resolve })
+    this.element.dispatchEvent(new CustomEvent("workspace:pending", { bubbles: true, detail: { work } }))
+  }
+
+  async submitted(event) {
+    const submission = event.detail.formSubmission
+    if (submission !== this.saveSubmission || await event.detail.fetchResponse?.responseHTML) return
+    // A newer save may have started while the response was read.
+    if (submission === this.saveSubmission) this.settleSave()
+  }
+
+  // Opening another editor while a save is in flight would render over the
+  // save's own response, so that editor loads once the save has settled.
+  deferEditor(event) {
+    if (!this.finishSave || event.detail.fetchOptions.method !== "GET") return
+    event.preventDefault()
+    this.resumeEditor = event.detail.resume
+  }
+
+  settleSave() {
+    this.finishSave?.()
+    this.finishSave = null
+    const resume = this.resumeEditor
+    this.resumeEditor = null
+    resume?.()
+  }
+
+  get editorFrame() {
+    return this.element.querySelector("#workspace-terminology-editor")
   }
 
   sync() {
@@ -32,6 +72,7 @@ export default class extends Controller {
       this.dispatch("changed")
     }
     this.hadEditor = hasEditor
+    if (this.finishSave && this.editorFrame?.firstElementChild !== this.savingEditor) this.settleSave()
   }
 
   close() {
