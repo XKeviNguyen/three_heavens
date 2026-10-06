@@ -135,7 +135,8 @@ export default class extends Controller {
   }
 
   async save() {
-    if (this.discarding) return false
+    // After Leave nothing is saved again; signing out may already have ended the session.
+    if (this.discarding || this.allowVisit) return false
     window.clearTimeout(this.saveTimer)
     // One save at a time, so sequence numbers reach the server in order.
     while (this.saving) {
@@ -190,7 +191,7 @@ export default class extends Controller {
   // back online or editing again starts a new round. Conflicts and rejected
   // content are final.
   scheduleRetry() {
-    if (this.discarding || this.retryCount >= RETRY_DELAYS_MS.length) return
+    if (this.discarding || this.allowVisit || this.retryCount >= RETRY_DELAYS_MS.length) return
     const delay = RETRY_DELAYS_MS[this.retryCount]
     this.retryCount += 1
     window.clearTimeout(this.saveTimer)
@@ -316,7 +317,7 @@ export default class extends Controller {
     // One flush owns navigation. Later Back/Forward events replace its
     // destination, including a return to this very URL. No pre-save response
     // may render a workspace with an obsolete draft identity.
-    this.pendingLaunch = null
+    this.pendingSubmission = null
     if (this.navigation?.phase === "saving") {
       Object.assign(this.navigation, { destination, kind, historyMoved: this.navigation.historyMoved || kind === "history" })
       return
@@ -353,7 +354,7 @@ export default class extends Controller {
   cancelNavigation() {
     if (this.navigation?.historyMoved) window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
     this.navigation = null
-    this.pendingLaunch = null
+    this.pendingSubmission = null
   }
 
   // The back/forward cache can restore this page long after other pages saved
@@ -371,23 +372,51 @@ export default class extends Controller {
     event.returnValue = ""
   }
 
+  // Any form that replaces this page — a launch, a configuration page change,
+  // signing out — is sent only once the draft is saved, so nothing is lost and
+  // an action that ends the session cannot run before the save it needs. This
+  // listens on the document, which Turbo leaves to run before its own handler.
   async beforeSubmit(event) {
-    if (this.discarding) {
+    const form = event.target
+    const submitter = event.submitter
+    // A form whose own handler took over (such as the appearance switch)
+    // leaves nothing to save for; Turbo skips it as well.
+    if (event.defaultPrevented || !this.replacesPage({ formElement: form, submitter }) || this.allowVisit) return
+    // The saved page is already reloading to a claimed history entry.
+    if (this.discarding || this.navigation?.phase === "allowed") {
       event.preventDefault()
       return
     }
     this.cancelNavigation()
     if (this.allowSubmit || !this.busy()) return
     event.preventDefault()
-    const submitter = event.submitter
     // The latest action wins: Back, a link, a language switch or a discard
     // made while this flush runs takes over, and this submission is never sent.
-    const launch = this.pendingLaunch = {}
+    const claim = this.pendingSubmission = {}
     const saved = await this.flush()
-    if (this.pendingLaunch !== launch) return
+    if (this.pendingSubmission !== claim) return
     if (saved) {
-      this.allowSubmit = true
-      this.formTarget.requestSubmit(submitter)
+      this.send(form, submitter)
+    } else if (form !== this.formTarget) {
+      this.destination = { form, submitter }
+      this.element.inert = false
+      this.dialogTarget.showModal()
+    }
+  }
+
+  // The clicked control may have been replaced while the save ran (a panel
+  // re-render); the same control is found again, or the action lapses.
+  send(form, submitter) {
+    if (submitter && submitter.form !== form) {
+      submitter = Array.from(form.elements).find(element => element.type === "submit" &&
+        element.name === submitter.name && element.value === submitter.value &&
+        element.getAttribute("formaction") === submitter.getAttribute("formaction"))
+      if (!submitter) return
+    }
+    this.allowSubmit = true
+    try {
+      form.requestSubmit(submitter)
+    } finally {
       this.allowSubmit = false
     }
   }
@@ -438,7 +467,12 @@ export default class extends Controller {
   leave() {
     const destination = this.destination
     this.allowVisit = true
+    window.clearTimeout(this.saveTimer)
     this.dialogTarget.close()
+    if (destination.form) {
+      this.send(destination.form, destination.submitter)
+      return
+    }
     // Assigning a URL that differs only by its fragment would keep this page.
     if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
     else window.location.assign(destination)

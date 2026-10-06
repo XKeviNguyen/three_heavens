@@ -315,6 +315,150 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{revised.id}']:checked", visible: :all
   end
 
+  test "a glossary chosen while a terminology save is in flight stays chosen" do
+    other = Glossaries::Create.call(
+      user: users(:normal),
+      attributes: { name: "Other terms", source_language: "Vietnamese", target_language: "Japanese",
+                    entries: [ { source_term: "Peace", preferred_target_term: "平和" } ] }
+    )
+    visit new_translation_workspace_path
+    choose_language("Source language", "Vietnamese")
+    choose_language("Target language", "Japanese")
+    choose_glossary(@glossary)
+    assert_until { workspace_draft_glossary == @glossary.current_revision_id.to_s }
+    hold_terminology_submissions
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+    find("dialog[open]").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+
+    # The newer, explicit choice is made while the save is still in flight.
+    choose_glossary(other)
+    assert_selector "#workspace-glossary", text: "Other terms"
+    page.execute_script("window.__releaseTerminology()")
+
+    assert_until { page.evaluate_script("window.__sheetChanged") == 1 }
+    assert_equal 2, @glossary.reload.current_revision.version, "the library save itself still lands"
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{other.current_revision_id}']:checked", visible: :all
+    assert_until { workspace_draft_glossary == other.current_revision_id.to_s }
+    assert_selector "[data-workspace-summary-target='terminology']", text: "Other terms"
+    refresh
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{other.current_revision_id}']:checked", visible: :all
+  end
+
+  test "re-choosing the glossary being saved selects its saved revision" do
+    other = Glossaries::Create.call(
+      user: users(:normal),
+      attributes: { name: "Other terms", source_language: "Vietnamese", target_language: "Japanese",
+                    entries: [ { source_term: "Peace", preferred_target_term: "平和" } ] }
+    )
+    visit new_translation_workspace_path
+    choose_language("Source language", "Vietnamese")
+    choose_language("Target language", "Japanese")
+    choose_glossary(@glossary)
+    assert_until { workspace_draft_glossary == @glossary.current_revision_id.to_s }
+    # Hold the save before it reaches the server, so the panel keeps listing
+    # the glossary's old revision until the save commits.
+    page.execute_script(<<~JS)
+      window.__sheetChanged = 0
+      document.addEventListener("terminology-sheet:changed", () => { window.__sheetChanged += 1 })
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const target = new URL(url, location.origin)
+        if (target.pathname.startsWith("/workspace_terminology") && (options.method || "GET").toUpperCase() !== "GET" && !window.__releaseTerminology) {
+          await new Promise(resolve => { window.__releaseTerminology = resolve })
+        }
+        return deliver(url, options)
+      }
+    JS
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("!!window.__releaseTerminology") }
+    find("dialog[open]").send_keys(:escape)
+    choose_glossary(other)
+    # Back to the glossary whose save has not committed, at its old revision.
+    choose_glossary(@glossary)
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']:checked", visible: :all
+    page.execute_script("window.__releaseTerminology()")
+
+    assert_until { page.evaluate_script("window.__sheetChanged") == 1 }
+    saved = @glossary.reload.current_revision
+    assert_equal 2, saved.version
+    assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{saved.id}']:checked", visible: :all
+    assert_until { workspace_draft_glossary == saved.id.to_s }
+    assert_selector "[data-workspace-summary-target='terminology']", text: "Workspace terms"
+  end
+
+  test "a page control replaced while its save ran lapses and later saves still come first" do
+    TranslationWorkspacesController::CONFIGURATION_OPTION_LIMIT.times do |index|
+      Glossaries::Create.call(user: users(:normal), attributes: { name: "Paged terms #{index}", source_language: "Vietnamese",
+                                                                  target_language: "Japanese", entries: [ { source_term: "Term", preferred_target_term: "語" } ] })
+    end
+    @glossary.touch
+    visit new_translation_workspace_path
+    choose_language("Source language", "Vietnamese")
+    choose_language("Target language", "Japanese")
+    choose_glossary(@glossary)
+    assert_until { workspace_draft_glossary == @glossary.current_revision_id.to_s }
+    visit new_translation_workspace_path
+    assert_selector "nav[aria-label='Glossaries pagination']", visible: :all
+    hold_terminology_submissions
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      first("input[name='glossary[entries][][preferred_target_term]']").fill_in with: "慈悲"
+      click_button "Save terminology"
+    end
+    assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+    find("dialog[open]").send_keys(:escape)
+    # The page change waits for the save; the save's panel has no such control.
+    find("nav[aria-label='Glossaries pagination'] button[name='glossary_page'][value='2']", visible: :all).execute_script("this.click()")
+    page.execute_script("window.__releaseTerminology()")
+    assert_until { page.evaluate_script("window.__sheetChanged") == 1 }
+    assert_no_selector "nav[aria-label='Glossaries pagination']", visible: :all
+    assert_current_path new_translation_workspace_path
+
+    # Signing out afterwards still saves first.
+    fill_in "Project name", with: "Saved before signing out"
+    click_button "Log out"
+    assert_current_path login_path
+    assert_equal "Saved before signing out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "a second terminology save cannot start while one is in flight" do
+    visit new_translation_workspace_path
+    select_workspace_glossary
+    hold_terminology_submissions
+    page.execute_script(<<~JS)
+      window.__terminologyPosts = 0
+      document.addEventListener("turbo:submit-start", event => { if (event.target.closest("#workspace-terminology-editor")) window.__terminologyPosts += 1 })
+    JS
+
+    click_link "Edit terminology"
+    within "dialog[open]" do
+      field = first("input[name='glossary[entries][][preferred_target_term]']")
+      field.fill_in with: "慈悲"
+      click_button "Save terminology"
+      assert_until { page.evaluate_script("window.__terminologyHeld") == 200 }
+      field.send_keys(:enter)
+    end
+    # The submit event of an Enter is handled synchronously, so a second save
+    # would already have started; release the first and wait for it to land.
+    page.execute_script("window.__releaseTerminology()")
+    assert_until { page.evaluate_script("window.__sheetChanged") == 1 }
+    assert_equal 1, page.evaluate_script("window.__terminologyPosts")
+    assert_until { workspace_draft_glossary == @glossary.reload.current_revision_id.to_s }
+  end
+
   test "another editor opened while a closed sheet still saves loads after that save" do
     visit new_translation_workspace_path
     select_workspace_glossary
@@ -643,6 +787,15 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
     assert_until { workspace_draft_glossary == @glossary.current_revision_id.to_s }
+  end
+
+  # With several saved glossaries the open list reaches under the sticky
+  # launch bar, so the choice is made with the keyboard.
+  def choose_glossary(glossary)
+    find("#workspace-glossary summary", text: "Choose saved glossary").click
+    radio = find("input[name='translation_workspace[glossary_revision_id]'][data-glossary-id='#{glossary.id}']", visible: :all)
+    radio.send_keys(:space)
+    assert_selector "#workspace-glossary", text: glossary.current_revision.name
   end
 
   def workspace_draft_glossary

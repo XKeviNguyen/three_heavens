@@ -537,7 +537,228 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_status I18n.t("workspace.discard_failed")
   end
 
+  test "a pending import that outlasts the wait offers Stay or Leave and clears the failure once it ends" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Waiting for a slow import"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    # Test-side clock: every 30-second timer (the guard's wait for pending work,
+    # and its last save retry, which this test never reaches) elapses at once.
+    page.execute_script(<<~JS)
+      const schedule = window.setTimeout
+      window.setTimeout = (callback, delay, ...rest) => schedule(callback, delay === 30000 ? 20 : delay, ...rest)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/source_imports.json") {
+          await new Promise(resolve => { window.__releaseImport = resolve })
+          return new Response(JSON.stringify({ error: "Rejected import" }), { status: 422, headers: { "Content-Type": "application/json" } })
+        }
+        return deliver(url, options)
+      }
+    JS
+    click_button "Upload file"
+    @import_file = Tempfile.new([ "slow-import", ".txt" ])
+    @import_file.write("Never imported")
+    @import_file.flush
+    attach_file "Source file", @import_file.path
+    click_button "Upload and review"
+    assert_until { page.evaluate_script("!!window.__releaseImport") }
+
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    assert_status I18n.t("workspace.save_failed")
+    click_button "Stay"
+    assert_no_page_requests
+
+    page.execute_script("window.__releaseImport()")
+    assert_text "Rejected import"
+    assert_status I18n.t("workspace.saved")
+  end
+
+  test "an appearance switch on an unsaved page is not treated as leaving" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    page.execute_script(<<~JS)
+      window.__appearanceRequests = 0
+      const deliver = window.fetch
+      window.fetch = (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/appearance") window.__appearanceRequests += 1
+        return deliver(url, options)
+      }
+    JS
+    fill_in "Project name", with: "Unsaved while switching appearance"
+    assert_status I18n.t("workspace.save_failed")
+
+    find("details.appearance-menu summary").click
+    within("details.appearance-menu") { click_button "Dark" }
+    assert_selector "html[data-appearance='dark'], html.dark", wait: 10
+    assert_no_selector "dialog[open]"
+    assert_equal 1, page.evaluate_script("window.__appearanceRequests")
+
+    # The guard still owns navigation afterwards.
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Stay"
+    assert_field "Project name", with: "Unsaved while switching appearance"
+  end
+
+  test "unsaved text is saved before signing out and restored after signing in again" do
+    open_workspace_from_projects
+    install_history_harness
+    record_requests
+    fill_in "Project name", with: "Saved before sign out"
+    click_button "Log out"
+    assert_current_path login_path
+    assert_equal "Saved before sign out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    assert_save_then_single_sign_out
+
+    sign_in_again
+    assert_field "Project name", with: "Saved before sign out"
+  end
+
+  test "signing out waits for a save in flight" do
+    open_workspace_from_projects
+    install_history_harness
+    record_requests
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Held at sign out"
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    click_button "Log out"
+    assert_status I18n.t("workspace.saving")
+    assert_equal 0, page.evaluate_script("window.__requests.filter(request => request === 'session').length")
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_current_path login_path
+    assert_equal "Held at sign out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    assert_save_then_single_sign_out
+  end
+
+  test "a sign-out answered with an error page keeps the latest edit" do
+    open_workspace_from_projects
+    install_history_harness
+    record_requests(session_status: 500)
+    fill_in "Project name", with: "Kept despite failed sign out"
+    click_button "Log out"
+    assert_until { page.evaluate_script("window.__requests.includes('session')") }
+    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("project_name", nil) == "Kept despite failed sign out" }
+    assert_save_then_single_sign_out
+  end
+
+  test "a save that fails keeps sign-out waiting for the user's choice" do
+    open_workspace_from_projects
+    install_history_harness
+    record_requests
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Not saved yet"
+    assert_status I18n.t("workspace.save_failed")
+
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Stay"
+    assert_field "Project name", with: "Not saved yet"
+    assert_equal 0, page.evaluate_script("window.__requests.filter(request => request === 'session').length")
+
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_current_path login_path
+  end
+
+  test "no save is retried after Leave has started signing out" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    # Test-side clock: save retries wait until the test runs them.
+    page.execute_script(<<~JS)
+      const schedule = window.setTimeout
+      window.__retries = []
+      window.setTimeout = (callback, delay, ...rest) => {
+        if ([2000, 5000, 15000, 30000].includes(delay)) return window.__retries.push(callback)
+        return schedule(callback, delay, ...rest)
+      }
+      window.__requests = []
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const path = new URL(url, location.origin).pathname
+        if (path === "/translation_workspace_draft") window.__requests.push("draft")
+        if (path !== "/session") return deliver(url, options)
+        window.__requests.push("session")
+        const response = await deliver(url, options)
+        await new Promise(resolve => { window.__releaseSession = resolve })
+        return response
+      }
+    JS
+    fill_in "Project name", with: "Abandoned at sign out"
+    assert_status I18n.t("workspace.save_failed")
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("!!window.__releaseSession") }
+
+    # Every retry still scheduled now runs while the ended session's response is held.
+    assert_operator page.evaluate_script("window.__retries.length"), :>, 0
+    page.execute_script("window.__retries.splice(0).forEach(retry => retry())")
+    page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done()))")
+    requests = page.evaluate_script("window.__requests")
+    assert_equal "session", requests.last
+    page.execute_script("window.__releaseSession()")
+    assert_current_path login_path
+  end
+
+  test "signing out from a saved workspace or another page stays immediate" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Saved earlier"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    record_requests
+    click_button "Log out"
+    assert_current_path login_path
+    assert_equal [ "session" ], page.evaluate_script("window.__requests")
+
+    sign_in_again
+    visit projects_path
+    click_button "Log out"
+    assert_current_path login_path
+  end
+
   private
+
+  # Records draft saves and the sign-out request in the order they are sent;
+  # session_status: answers the sign-out with that status instead.
+  def record_requests(session_status: nil)
+    page.execute_script(<<~JS, session_status)
+      const sessionStatus = arguments[0]
+      window.__requests = []
+      const deliver = window.fetch
+      window.fetch = (url, options = {}) => {
+        const path = new URL(url, location.origin).pathname
+        if (path === "/translation_workspace_draft") window.__requests.push("draft")
+        if (path === "/session") {
+          window.__requests.push("session")
+          if (sessionStatus) return Promise.resolve(new Response("<html><body><h1>Server error</h1></body></html>", { status: sessionStatus, headers: { "Content-Type": "text/html" } }))
+        }
+        return deliver(url, options)
+      }
+    JS
+  end
+
+  # The draft is saved first, then the session ends exactly once and nothing
+  # tries to save afterwards.
+  def assert_save_then_single_sign_out
+    requests = page.evaluate_script("window.__requests")
+    assert_equal 1, requests.count("session")
+    assert_equal "session", requests.last
+    assert_includes requests, "draft"
+  end
+
+  def sign_in_again
+    visit login_path
+    fill_in "Email", with: users(:normal).email
+    fill_in "Password", with: "correct horse battery staple"
+    click_button "Sign in"
+    assert_text "Signed in successfully."
+  end
 
   # Uploads a source file whose import response is held until
   # window.__releaseImport() is called.
@@ -601,7 +822,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
           if (method === "DELETE" && harness.discardMode === "fail") return new Response("", { status: 503 })
           return deliver(url, options)
         }
-        if (method === "GET") harness.pageRequests.push(target.pathname)
+        // A hover prefetch is not a navigation; the visit still decides.
+        if (method === "GET" && options.headers?.["X-Sec-Purpose"] !== "prefetch") harness.pageRequests.push(target.pathname)
         const response = await deliver(url, options)
         if (method === "GET" && harness.holdPages.has(target.pathname)) await hold(harness.heldPages, { path: target.pathname }, options.signal)
         return response

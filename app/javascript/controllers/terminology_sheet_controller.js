@@ -46,9 +46,40 @@ export default class extends Controller {
     this.resumeEditor = event.detail.resume
   }
 
+  // A glossary chosen while a save is in flight is newer than the save's
+  // response, which would select the saved revision again.
+  selectionChanged(event) {
+    if (this.finishSave && event.target.name === "translation_workspace[glossary_revision_id]") this.chosenDuringSave = true
+  }
+
+  // The save's response replaces the panel with the current library and the
+  // saved revision selected (replacing the panel also cancels any older panel
+  // load). After a newer choice, that choice is selected again; a choice of
+  // the saved glossary's previous revision means its saved revision.
+  beforeStreamRender(event) {
+    if (!this.chosenDuringSave || event.target.target !== "workspace-terminology") return
+    const chosen = this.glossaryRadio(":checked")
+    if (!chosen) return
+    const { value } = chosen
+    const { glossaryId } = chosen.dataset
+    const render = event.detail.render
+    event.detail.render = async stream => {
+      await render(stream)
+      const radio = this.glossaryRadio(`[value='${CSS.escape(value)}']`) || (glossaryId && this.glossaryRadio(`[data-glossary-id='${CSS.escape(glossaryId)}']`))
+      if (!radio || radio.checked) return
+      radio.checked = true
+      radio.dispatchEvent(new Event("input", { bubbles: true }))
+    }
+  }
+
+  glossaryRadio(filter) {
+    return document.querySelector(`input[name='translation_workspace[glossary_revision_id]']${filter}`)
+  }
+
   settleSave() {
     this.finishSave?.()
     this.finishSave = null
+    this.chosenDuringSave = false
     const resume = this.resumeEditor
     this.resumeEditor = null
     resume?.()
