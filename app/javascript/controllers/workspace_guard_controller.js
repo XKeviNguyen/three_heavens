@@ -52,8 +52,16 @@ export default class extends Controller {
     // A detached page must not navigate, but an import or terminology save
     // that finished while a visit loaded still reaches the draft: a Turbo
     // render keeps the document, so this request and its retries complete.
+    // A workspace for the same draft rendered in its place was built from the
+    // server's draft, so saving now would only make that page conflict.
     this.navigation = null
-    if (!this.discarding && !this.launching && !this.allowVisit && this.dirty()) this.save()
+    if (!this.discarding && !this.launching && !this.allowVisit && this.dirty() && !this.replacedBySameDraft()) this.save()
+  }
+
+  replacedBySameDraft() {
+    const form = document.getElementById(this.formTarget.id)
+    const project = form => form.elements["translation_workspace[project_id]"]?.value || ""
+    return !!form && form !== this.formTarget && project(form) === project(this.formTarget)
   }
 
   payload() {

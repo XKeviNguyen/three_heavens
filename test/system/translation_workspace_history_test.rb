@@ -151,6 +151,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
   test "of two history visits the older response arriving last never renders" do
     visit settings_account_path
     click_link "Projects"
+    # The sidebar on every page links to New translation; wait for Projects so
+    # history holds settings, Projects, then the workspace.
+    assert_selector "h1", text: "Projects"
     click_link "New translation"
     assert_field "Project name"
     install_history_harness
@@ -320,6 +323,40 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
     assert_field "Project name", with: ""
     assert_empty users(:normal).translation_workspace_drafts
+  end
+
+  test "a launch rejected after more typing renders a page that can still save" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Rejected launch project"
+    choose_known_language("Source language", "Vietnamese")
+    choose_known_language("Target language", "Japanese")
+    fill_in "Document title", with: "Rejected launch document"
+    fill_in "Source text", with: "Rejected launch source"
+    fill_in "Instructions for the translation", with: "Translate carefully."
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (new URL(url, location.origin).pathname === "/translation_workspace" && (options.method || "").toUpperCase() === "POST") {
+          await new Promise(resolve => { window.__releaseLaunch = resolve })
+        }
+        return response
+      }
+    JS
+    click_button "Start translation"
+    assert_until { page.evaluate_script("!!window.__releaseLaunch") }
+    page.execute_script(<<~JS)
+      const field = document.querySelector("[name='translation_workspace[source_text]']")
+      field.value = "Typed while the launch was checked"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      window.__releaseLaunch()
+    JS
+    assert_selector "#form-errors-heading"
+    fill_in "Document title", with: "Fixed after rejection"
+    assert_status I18n.t("workspace.saved")
+    assert_equal "Fixed after rejection", users(:normal).translation_workspace_drafts.sole.payload.fetch("document_title")
   end
 
   private
