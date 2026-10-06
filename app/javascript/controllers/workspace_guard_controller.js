@@ -80,7 +80,11 @@ export default class extends Controller {
   trackPending(event) {
     const work = event.detail.work
     this.pending.add(work)
-    work.finally(() => this.pending.delete(work))
+    work.finally(() => {
+      this.pending.delete(work)
+      // A wait that timed out showed a failure; the page may be settled now.
+      if (!this.busy()) this.setStatus(this.settledStatus)
+    })
   }
 
   busy() {
@@ -234,7 +238,10 @@ export default class extends Controller {
       const timeout = new Promise(resolve => { timer = window.setTimeout(() => resolve(false), PENDING_WAIT_MS) })
       const settled = await Promise.race([this.settlePending(), timeout])
       window.clearTimeout(timer)
-      if (!settled) return false
+      if (!settled) {
+        this.setStatus(this.messagesValue.saveFailed)
+        return false
+      }
     }
     let saved = false
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -277,6 +284,12 @@ export default class extends Controller {
     if (this.allowVisit || this.launching) return
     if (!this.discarding && !this.navigation && !this.busy()) return
     event.preventDefault()
+    // The saved page is already reloading to the claimed history entry; a
+    // newer link replaces that load, even if the reload was stopped.
+    if (this.navigation?.phase === "allowed") {
+      window.location.assign(event.detail.url)
+      return
+    }
     // A cancelled visit replaces nothing, so a submission that froze the page
     // for it (such as signing out) leaves the page usable.
     this.element.inert = false
@@ -302,6 +315,7 @@ export default class extends Controller {
     // One flush owns navigation. Later Back/Forward events replace its
     // destination, including a return to this very URL. No pre-save response
     // may render a workspace with an obsolete draft identity.
+    this.pendingLaunch = null
     if (this.navigation?.phase === "saving") {
       Object.assign(this.navigation, { destination, kind, historyMoved: this.navigation.historyMoved || kind === "history" })
       return
@@ -338,6 +352,7 @@ export default class extends Controller {
   cancelNavigation() {
     if (this.navigation?.historyMoved) window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
     this.navigation = null
+    this.pendingLaunch = null
   }
 
   // The back/forward cache can restore this page long after other pages saved
@@ -364,7 +379,12 @@ export default class extends Controller {
     if (this.allowSubmit || !this.busy()) return
     event.preventDefault()
     const submitter = event.submitter
-    if (await this.flush()) {
+    // The latest action wins: Back, a link, a language switch or a discard
+    // made while this flush runs takes over, and this submission is never sent.
+    const launch = this.pendingLaunch = {}
+    const saved = await this.flush()
+    if (this.pendingLaunch !== launch) return
+    if (saved) {
       this.allowSubmit = true
       this.formTarget.requestSubmit(submitter)
       this.allowSubmit = false
@@ -397,6 +417,8 @@ export default class extends Controller {
     const response = event.detail.fetchResponse
     if (this.visiting) return
     if (response && !response.contentType?.startsWith("text/vnd.turbo-stream.html") && await response.responseHTML) return
+    // A visit or another submission may have started while the body was read.
+    if (this.visiting || this.submission) return
     this.launching = false
     this.element.inert = false
   }

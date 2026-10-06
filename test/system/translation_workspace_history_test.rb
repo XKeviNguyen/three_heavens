@@ -478,6 +478,34 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_status I18n.t("workspace.saved")
   end
 
+  test "Back pressed while a launch waits for a pending import wins and the launch is never sent" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Back wins over launch"
+    choose_known_language("Source language", "Vietnamese")
+    choose_known_language("Target language", "Japanese")
+    fill_in "Document title", with: "Launch waiting document"
+    fill_in "Source text", with: "Typed before the import"
+    fill_in "Instructions for the translation", with: "Translate carefully."
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    start_held_import("Imported while launching")
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:before-fetch-request", event => {
+        if (event.detail.fetchOptions.method === "POST" && new URL(event.detail.url).pathname === "/translation_workspace") sessionStorage.setItem("launchSent", "true")
+      })
+    JS
+    click_button "Start translation"
+    assert_status I18n.t("workspace.saving")
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("location.pathname === '/projects' && window.__harness.events['history:traverse'] === 1") }
+
+    page.execute_script("window.__releaseImport()")
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
+    assert_nil page.evaluate_script("sessionStorage.getItem('launchSent')")
+    assert_imported_draft "Imported while launching"
+  end
+
   private
 
   # Uploads a source file whose import response is held until

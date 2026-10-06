@@ -19,8 +19,10 @@ export default class extends Controller {
 
   // The sheet can be closed while a save is in flight; the workspace waits
   // for its response, which selects the saved revision, before it saves and
-  // navigates. Any render of the editor frame ends the save; a request
-  // without an HTML response renders nothing.
+  // navigates. A saved revision arrives as a Turbo Stream that empties the
+  // editor frame and a rejected save re-renders it; either render ends the
+  // save, and no other editor loads meanwhile (deferEditor). A response with
+  // no body renders nothing, so it ends the save when the request does.
   saving(event) {
     this.settleSave()
     this.saveSubmission = event.detail.formSubmission

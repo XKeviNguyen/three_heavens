@@ -304,11 +304,15 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     revised = @glossary.reload.current_revision
 
     # Leaving for another workspace page of the same draft waits for the save.
-    page.execute_script("window.__samePage = true")
+    page.execute_script("window.__samePage = true; document.body.dataset.leavingDocument = 'old'")
     first("a[href='#{new_translation_workspace_path}']").click
+    # The page waits for the save instead of leaving.
+    assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.saving")
+    assert_selector "body[data-leaving-document='old']"
     page.execute_script("window.__releaseTerminology()")
     assert_until { workspace_draft_glossary == revised.id.to_s }
-    assert_until { page.evaluate_script("window.__samePage === true && !document.querySelector('dialog[open]') && document.documentElement.getAttribute('aria-busy') === null") }
+    # The workspace was replaced by the visit, in the same document.
+    assert_until { page.evaluate_script("window.__samePage === true && !document.body.dataset.leavingDocument && document.documentElement.getAttribute('aria-busy') === null") }
     assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{revised.id}']:checked", visible: :all
   end
 
@@ -330,7 +334,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       document.addEventListener("turbo:before-fetch-request", event => {
         if (event.target.id === "workspace-terminology-editor") window.__editorDeferred = event.defaultPrevented
-      }, { once: true })
+      })
     JS
     click_link "+ Add terminology"
     assert_until { !page.evaluate_script("window.__editorDeferred").nil? }
