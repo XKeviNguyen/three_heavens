@@ -365,14 +365,16 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
           }
           return response
         }
-        window.addEventListener("popstate", () => { window.__historyPops = (window.__historyPops || 0) + 1 })
+        window.addEventListener("history:traverse", () => { window.__historyPops = (window.__historyPops || 0) + 1 })
         document.addEventListener("turbo:before-render", () => { window.__historyRenders = (window.__historyRenders || 0) + 1 })
       JS
       fill_in "Project name", with: "Back save still unresolved"
       page.execute_script("history.back()")
-      assert_until { page.evaluate_script("window.__releaseDraftResponse !== null && window.__historyRenders >= 1") }
+      assert_until { page.evaluate_script("window.__releaseDraftResponse !== null && location.pathname === '/projects'") }
       page.execute_script("history.forward()")
       assert_until { page.evaluate_script("window.__historyPops >= 2 && location.pathname === '/translation_workspace/new'") }
+      # Both traversals were claimed before Turbo saw them: nothing rendered.
+      assert_nil page.evaluate_script("window.__historyRenders")
       page.execute_script("window.__releaseDraftResponse()")
       if lose_response
         assert_selector "dialog[open]", text: "Leave this translation?"
@@ -461,46 +463,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_field "Project name", with: "History save failed"
   end
 
-  test "a late Back response after failed discard cannot replace the current editor" do
-    visit projects_path
-    click_link "New translation"
-    assert_field "Project name"
-    page.execute_script(<<~JS)
-      window.Turbo.cache.clear()
-      const deliver = window.fetch.bind(window)
-      window.fetch = async (url, options = {}) => {
-        const path = new URL(url, location.origin).pathname
-        if (path === "/translation_workspace_draft" && options.method === "DELETE") return new Response("", { status: 503 })
-        if (path === "/translation_workspace_draft" && options.method === "POST" && !window.__heldLateSave) {
-          window.__heldLateSave = true
-          await new Promise(resolve => { window.__releaseLateSave = resolve })
-        }
-        const response = await deliver(url, options)
-        if (path === "/projects" && !window.__heldLateHistory) {
-          window.__heldLateHistory = true
-          await new Promise(resolve => { window.__releaseLateHistory = resolve })
-        }
-        return response
-      }
-      document.addEventListener("turbo:before-render", () => { window.__lateRenderSeen = true })
-    JS
-    fill_in "Project name", with: "Before failed discard"
-    page.execute_script("history.back()")
-    assert_until { page.evaluate_script("!!window.__releaseLateSave && !!window.__releaseLateHistory") }
-    accept_confirm { click_button "Discard draft" }
-    page.execute_script("window.__releaseLateSave()")
-    assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.discard_failed")
-    fill_in "Project name", with: "Keep latest after failed discard"
-    page.execute_script("window.__releaseLateHistory()")
-    assert_until { page.evaluate_script("window.__lateRenderSeen === true") }
-    assert_selector "h1", text: "New translation"
-    assert_field "Project name", with: "Keep latest after failed discard"
-    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
-    refresh
-    assert_field "Project name", with: "Keep latest after failed discard"
-  end
-
-  test "locale submission takes ownership from a cancelled pending Back visit" do
+  test "locale submission takes ownership from a claimed pending Back" do
     visit projects_path
     click_link "New translation"
     assert_field "Project name"
@@ -513,20 +476,12 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
           window.__heldLocaleSave = true
           await new Promise(resolve => { window.__releaseLocaleSave = resolve })
         }
-        const response = await deliver(url, options)
-        if (path === "/projects" && !window.__heldLocaleHistory) {
-          window.__heldLocaleHistory = true
-          await new Promise((resolve, reject) => {
-            window.__releaseLocaleHistory = resolve
-            options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true })
-          })
-        }
-        return response
+        return deliver(url, options)
       }
     JS
     fill_in "Project name", with: "Keep across cancelled Back and locale"
     page.execute_script("history.back()")
-    assert_until { page.evaluate_script("!!window.__releaseLocaleSave && !!window.__releaseLocaleHistory") }
+    assert_until { page.evaluate_script("!!window.__releaseLocaleSave && location.pathname === '/projects'") }
     within("aside#app-sidebar") { select "日本語", from: "Interface language" }
     page.execute_script("window.__releaseLocaleSave()")
     assert_selector "html[lang='ja']"

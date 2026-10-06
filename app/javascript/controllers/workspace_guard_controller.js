@@ -20,26 +20,33 @@ export default class extends Controller {
     this.settledStatus = this.hasStatusTarget ? this.statusTarget.textContent : ""
     this.currentUrl = window.location.href
     this.currentHistoryState = window.history.state
-    this.onBeforeRender = this.onBeforeRender.bind(this)
     this.onBeforeVisit = this.onBeforeVisit.bind(this)
+    this.onVisit = this.onVisit.bind(this)
+    this.onLoad = this.onLoad.bind(this)
     this.onBeforeUnload = this.onBeforeUnload.bind(this)
-    this.onPopState = this.onPopState.bind(this)
+    this.onTraverse = this.onTraverse.bind(this)
+    this.onPageShow = this.onPageShow.bind(this)
     this.onOnline = this.onOnline.bind(this)
-    document.addEventListener("turbo:before-render", this.onBeforeRender)
     document.addEventListener("turbo:before-visit", this.onBeforeVisit)
+    document.addEventListener("turbo:visit", this.onVisit)
+    document.addEventListener("turbo:load", this.onLoad)
     window.addEventListener("beforeunload", this.onBeforeUnload)
-    window.addEventListener("popstate", this.onPopState, true)
+    window.addEventListener("history:traverse", this.onTraverse)
+    window.addEventListener("pageshow", this.onPageShow)
     window.addEventListener("online", this.onOnline)
     if (this.needsSaveValue) this.scheduleSave()
   }
 
   disconnect() {
     window.clearTimeout(this.saveTimer)
-    document.removeEventListener("turbo:before-render", this.onBeforeRender)
     document.removeEventListener("turbo:before-visit", this.onBeforeVisit)
+    document.removeEventListener("turbo:visit", this.onVisit)
+    document.removeEventListener("turbo:load", this.onLoad)
     window.removeEventListener("beforeunload", this.onBeforeUnload)
-    window.removeEventListener("popstate", this.onPopState, true)
+    window.removeEventListener("history:traverse", this.onTraverse)
+    window.removeEventListener("pageshow", this.onPageShow)
     window.removeEventListener("online", this.onOnline)
+    this.element.inert = false
     if (this.hasDialogTarget) this.dialogTarget.close?.()
   }
 
@@ -216,9 +223,22 @@ export default class extends Controller {
     event.detail.pending.push(this.flush())
   }
 
-  onPopState() {
-    if (this.allowVisit || this.launching || this.discarding) return
-    if (this.navigation || this.dirty()) this.navigateAfterSave(window.location.href, "history")
+  // Runs before Turbo sees Back or Forward (see history_traversal.js). A
+  // traversal claimed here never becomes a Turbo visit, so nothing fetched
+  // before the save can change this page, its head, or Turbo's history and
+  // snapshot state, whatever the user decides afterwards.
+  onTraverse(event) {
+    if (this.allowVisit || this.launching) return
+    if (this.discarding) {
+      // A discard ends in a fresh workspace or keeps this page, so the
+      // traversal is never followed.
+      event.preventDefault()
+      window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+      return
+    }
+    if (!this.navigation && !this.dirty()) return
+    event.preventDefault()
+    this.navigateAfterSave(window.location.href, "history")
   }
 
   onBeforeVisit(event) {
@@ -228,18 +248,17 @@ export default class extends Controller {
     if (!this.discarding) this.navigateAfterSave(event.detail.url, "visit")
   }
 
-  onBeforeRender(event) {
-    if (this.allowVisit || this.launching) return
-    if (!this.discarding && !this.navigation && (!this.dirty() || window.location.href === this.currentUrl)) return
-    // Finish Turbo's render lifecycle without inserting a response fetched
-    // before the save. Leaving its render promise suspended would block a
-    // later visit after Stay, a failed discard, or a failed save.
-    event.detail.render = () => {}
-    if (["failed", "cancelled"].includes(this.navigation?.phase)) {
-      this.navigation = null
-      return
-    }
-    if (!this.discarding && !this.navigation) this.navigateAfterSave(window.location.href, "history")
+  // Turbo only starts a visit from a clean page (or a launch), and the visit
+  // replaces this page when it renders. Freezing the page meanwhile keeps an
+  // edit typed while the response is in flight from being replaced unsaved.
+  // A visit that renders nothing, such as following a redirect, still ends
+  // with turbo:load.
+  onVisit() {
+    this.element.inert = true
+  }
+
+  onLoad() {
+    this.element.inert = false
   }
 
   async navigateAfterSave(destination, kind) {
@@ -247,43 +266,49 @@ export default class extends Controller {
     // destination, including a return to this very URL. No pre-save response
     // may render a workspace with an obsolete draft identity.
     if (this.navigation?.phase === "saving") {
-      Object.assign(this.navigation, { destination, kind })
+      Object.assign(this.navigation, { destination, kind, historyMoved: this.navigation.historyMoved || kind === "history" })
       return
     }
-    const navigation = { destination, kind, phase: "saving" }
+    const navigation = { destination, kind, phase: "saving", historyMoved: kind === "history" }
     this.navigation = navigation
     const saved = await this.flush()
-    if (this.discarding || this.navigation !== navigation || navigation.phase !== "saving") return
+    if (this.discarding || this.navigation !== navigation) return
     if (saved) {
       if (navigation.kind === "history") {
         navigation.phase = "allowed"
-        // History already moved. Replace that entry with a fresh document
-        // fetched after acknowledgement, preserving the user's latest
-        // history position without retaining sensitive draft data in history.
-        window.location.replace(navigation.destination)
+        // History already moved to the destination. Load that entry as a
+        // fresh document fetched after acknowledgement, preserving the user's
+        // latest history position without retaining sensitive draft data in
+        // history. Replacing it with its own URL would only scroll to a
+        // fragment and claim the traversal again. Edits typed while it loads
+        // would be lost, so the page is frozen first.
+        this.element.inert = true
+        window.location.reload()
       } else {
         this.navigation = null
         window.Turbo.visit(navigation.destination)
       }
     } else {
-      // Keep ownership until the outstanding history response is ignored,
-      // even though the visible URL is restored before it arrives.
-      this.navigation = navigation.kind === "history" ? Object.assign(navigation, { phase: "failed" }) : null
-      if (navigation.kind === "history") window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+      this.cancelNavigation()
       this.destination = navigation.destination
       this.dialogTarget.showModal()
     }
   }
 
+  // Turbo never saw a claimed traversal, so restoring this entry's URL and
+  // state is all it takes to keep history consistent with this page.
   cancelNavigation() {
-    if (this.navigation?.kind === "history") {
-      window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
-      // The old history GET can arrive after Discard fails or a locale flush
-      // finishes. Retain its provenance until its render is ignored.
-      this.navigation.phase = "cancelled"
-    } else {
-      this.navigation = null
-    }
+    if (this.navigation?.historyMoved) window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+    this.navigation = null
+  }
+
+  // The back/forward cache can restore this page long after other pages saved
+  // newer drafts, which the Turbo cache exemption cannot prevent. Reload the
+  // current draft unless the page still guards unsaved edits; those are kept
+  // so their saves either succeed or report the conflict. After Leave or a
+  // discard the page no longer guards anything, so it always reloads.
+  onPageShow(event) {
+    if (event.persisted && (this.allowVisit || this.discarding || !this.dirty())) window.location.reload()
   }
 
   onBeforeUnload(event) {
