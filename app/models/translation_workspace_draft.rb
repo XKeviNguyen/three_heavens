@@ -60,7 +60,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
     ARRAY_FIELDS.each do |field|
       next unless value.key?(field)
       items = value[field]
-      maximum = field == "translation_reference_revision_ids" ? 5 : Ai::UsageLimits::MAX_TRANSLATION_MODELS
+      maximum = field == "translation_reference_revision_ids" ? ExperimentReferenceRevision::MAXIMUM_REFERENCES : Ai::UsageLimits::MAX_TRANSLATION_MODELS
       unless items.is_a?(Array) && items.length <= maximum && items.all? { |item| item.is_a?(String) && item.length <= 200 }
         raise ArgumentError, "Invalid workspace draft selection"
       end

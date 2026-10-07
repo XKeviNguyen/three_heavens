@@ -57,10 +57,11 @@ export default class extends Controller {
   // load). After a newer choice, that choice is selected again; a choice of
   // the saved glossary's previous revision means its saved revision.
   beforeStreamRender(event) {
-    if (!this.chosenDuringSave || event.target.target !== "workspace-terminology") return
+    if (!this.finishSave || event.target.target !== "workspace-terminology") return
     const render = event.detail.render
     event.detail.render = async stream => {
-      // Read when the render runs, so a choice made just before it counts.
+      // Decided when the render runs, so a choice made just before it counts.
+      if (!this.chosenDuringSave) return render(stream)
       const chosen = this.glossaryRadio(":checked")
       await render(stream)
       if (!chosen) return

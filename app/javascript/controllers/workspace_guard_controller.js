@@ -389,12 +389,12 @@ export default class extends Controller {
       return
     }
     // The saved page is already reloading to a claimed history entry. A newer
-    // form replaces that load with a full page submission, as a newer link does.
+    // form replaces that load with a full page submission, as a newer link
+    // does: Turbo, whose handler runs after this one, leaves the form to the
+    // browser. (A form cannot be submitted again while its submit event runs.)
     if (this.navigation?.phase === "allowed") {
-      event.preventDefault()
       this.allowVisit = true
       form.dataset.turbo = "false"
-      this.send(form, submitter)
       return
     }
     this.cancelNavigation()
@@ -417,6 +417,7 @@ export default class extends Controller {
   // The clicked control may have been replaced while the save ran (a panel
   // re-render); the same control is found again, or the action lapses.
   send(form, submitter) {
+    if (!form.isConnected) return false
     if (submitter && submitter.form !== form) {
       submitter = Array.from(form.elements).find(element => element.type === "submit" &&
         element.name === submitter.name && element.value === submitter.value &&

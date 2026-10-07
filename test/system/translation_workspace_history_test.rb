@@ -702,8 +702,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
 
     # Every retry still scheduled now runs while the ended session's response is held.
     assert_operator page.evaluate_script("window.__retries.length"), :>, 0
+    # A retry that saves records its request synchronously, as the fetch starts.
     page.execute_script("window.__retries.splice(0).forEach(retry => retry())")
-    page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done()))")
     requests = page.evaluate_script("window.__requests")
     assert_equal "session", requests.last
     page.execute_script("window.__releaseSession()")
@@ -763,12 +763,37 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     click_button "Leave"
     assert_until { page.evaluate_script("!!window.__releaseSignOut") }
     page.execute_script("window.__sameDocument = true; window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
-    # The claimed Back's save lands; it must not reload the page to that Back.
-    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("project_name", nil) == "Abandoned for sign-out" }
-    page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done()))")
+    # The claimed Back's save is acknowledged on the page; it must not reload the page to that Back.
+    assert_status I18n.t("workspace.saved")
     page.execute_script("window.__releaseSignOut()")
     assert_current_path login_path
     assert page.evaluate_script("window.__sameDocument === true"), "the sign-out was replaced by a reload"
+  end
+
+  test "signing out while the saved page reloads to a claimed Back replaces that reload" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Saved before the reload"
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+
+    # The guard freezes the page and starts the reload in the same task; Log out
+    # is clicked right after, while that reload is still pending. (WebDriver
+    # itself waits for a pending navigation, so the click comes from the page.)
+    page.execute_script(<<~JS)
+      const guard = document.querySelector("[data-controller='workspace-guard']")
+      const observer = new MutationObserver(() => {
+        if (!guard.inert) return
+        observer.disconnect()
+        document.querySelector("form[action='/session'] [type='submit']").click()
+      })
+      observer.observe(guard, { attributes: true, attributeFilter: ["inert"] })
+    JS
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+
+    assert_current_path login_path
+    assert_equal "Saved before the reload", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
   test "signing out from a saved workspace or another page stays immediate" do
