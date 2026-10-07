@@ -158,7 +158,7 @@ module BlindReviews
       score_properties.merge(
         "candidate_label" => {
           type: "string",
-          enum: review_run.review_evaluations.map(&:anonymous_label)
+          enum: review_run.review_evaluations.order(:anonymous_label).pluck(:anonymous_label)
         },
         "strengths" => { type: "string", maxLength: 5_000 },
         "issues" => { type: "string", maxLength: 5_000 },

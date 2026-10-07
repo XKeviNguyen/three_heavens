@@ -230,6 +230,10 @@ export default class extends Controller {
   // the form; false means edits are not safe.
   async flush() {
     if (this.pending.size > 0) {
+      // Edits already typed are saved first, so no queued save can report
+      // "saved" over a wait that fails; the pending work may change the form
+      // again, which the loop below saves.
+      if (!await this.save()) return false
       this.setStatus(this.messagesValue.saving)
       let timer
       const timeout = new Promise(resolve => { timer = window.setTimeout(() => resolve(false), PENDING_WAIT_MS) })
@@ -256,12 +260,14 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    if (this.launching || this.discarding) {
+    if (this.discarding) {
       event.preventDefault()
       return
     }
-    // The page is saved and reloading; the switch replaces that load (beforeSubmit).
-    if (this.navigation?.phase === "allowed") return
+    // Nothing here is kept any more: a launch or a Leave is replacing the
+    // page, or the saved page is reloading. Like a link (onBeforeVisit), the
+    // switch replaces that load (beforeSubmit).
+    if (this.allowVisit || this.launching || this.navigation?.phase === "allowed") return
     this.cancelNavigation()
     // Like a form, the switch holds the claim while it saves; a newer action
     // (a link, Back, another form, a discard) takes it, and the switch lapses.
@@ -467,11 +473,12 @@ export default class extends Controller {
     if (this.visiting) return
     if (response && !response.contentType?.startsWith("text/vnd.turbo-stream.html") && await response.responseHTML) return
     // A visit or another submission may have started while the body was read.
-    if (this.visiting || this.submission) return
+    // The saved page is reloading (navigateAfterSave) and stays frozen.
+    if (this.visiting || this.submission || this.navigation?.phase === "allowed") return
     this.launching = false
     this.element.inert = false
     // A Leave whose form did not replace the page leaves nothing abandoned.
-    if (this.allowVisit && !this.discarding && this.navigation?.phase !== "allowed") this.resumeGuarding()
+    if (this.allowVisit && !this.discarding) this.resumeGuarding()
   }
 
   // The page stayed after all, so its edits are guarded and saved again.
@@ -502,6 +509,9 @@ export default class extends Controller {
       if (!this.send(destination.form, destination.submitter)) this.resumeGuarding()
       return
     }
+    // Edits typed while it loads would be lost unguarded, as would any made
+    // if the load is stopped, so the page is frozen first.
+    this.element.inert = true
     // Assigning a URL that differs only by its fragment would keep this page.
     if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
     else window.location.assign(destination)

@@ -11,15 +11,17 @@ export default class extends Controller {
     this.committed = this.selectTarget.value
   }
 
+  // The newest choice wins: a switch still waiting lapses when another choice
+  // is made, including a return to the committed language, which needs none.
   async switch() {
     const locale = this.selectTarget.value
-    if (locale === this.committed || this.switching) return
+    const attempt = this.attempt = {}
+    if (locale === this.committed) return
 
-    this.switching = true
     const pending = []
     const event = this.dispatch("before-switch", { detail: { locale, pending }, cancelable: true })
     const results = await Promise.all(pending)
-    this.switching = false
+    if (this.attempt !== attempt) return
 
     if (event.defaultPrevented || results.includes(false)) {
       this.selectTarget.value = this.committed

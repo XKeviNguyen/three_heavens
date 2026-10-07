@@ -292,6 +292,33 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_empty users(:normal).translation_workspace_drafts
   end
 
+  test "Leave freezes the page, so nothing is typed unguarded if the page stays" do
+    project = users(:normal).projects.create!(name: "Download project", source_language: "Vietnamese", target_language: "Japanese")
+    document = project.documents.create!(title: "Downloadable", source_text: "Original text", source_format: "txt", original_filename: "original.txt")
+    document.source_file.attach(io: StringIO.new("Original text"), filename: "original.txt", content_type: "text/plain")
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned by Leave"
+    assert_status I18n.t("workspace.save_failed")
+
+    # A download leaves this document in place, as a stopped load would.
+    page.execute_script(<<~JS, download_original_document_path(document))
+      const link = document.createElement("a")
+      link.href = arguments[0]
+      link.textContent = "Download the original"
+      document.querySelector("main").append(link)
+    JS
+    click_link "Download the original"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert") }
+    assert page.evaluate_script("!!window.__harness")
+
+    click_link "Projects"
+    assert_selector "h1", text: "Projects"
+  end
+
   test "an import that finishes after a link is clicked reaches the draft before the page leaves" do
     open_workspace_from_projects
     fill_in "Project name", with: "Import before leaving"
@@ -546,10 +573,22 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_status I18n.t("workspace.saved")
     install_history_harness
     # Test-side clock: every 30-second timer (the guard's wait for pending work,
-    # and its last save retry, which this test never reaches) elapses at once.
+    # and its last save retry, which this test never reaches) elapses at once,
+    # and autosave debounces wait until the test runs them.
     page.execute_script(<<~JS)
       const schedule = window.setTimeout
-      window.setTimeout = (callback, delay, ...rest) => schedule(callback, delay === 30000 ? 20 : delay, ...rest)
+      const cancel = window.clearTimeout
+      const debounces = window.__debounces = new Map()
+      window.setTimeout = (callback, delay, ...rest) => {
+        if (delay === 1000 && window.__holdDebounces) {
+          const id = -(debounces.size + 1)
+          debounces.set(id, callback)
+          return id
+        }
+        return schedule(callback, delay === 30000 ? 20 : delay, ...rest)
+      }
+      window.clearTimeout = id => id < 0 ? debounces.delete(id) : cancel(id)
+      window.__holdDebounces = true
       const deliver = window.fetch
       window.fetch = async (url, options = {}) => {
         if (new URL(url, location.origin).pathname === "/source_imports.json") {
@@ -569,6 +608,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
 
     click_link "Projects"
     assert_selector "dialog[open]", text: "Leave this translation?"
+    # Leaving the name field queued a save; none may report "saved" now.
+    page.execute_script("window.__holdDebounces = false; window.__debounces.forEach(callback => callback()); window.__debounces.clear()")
     assert_status I18n.t("workspace.save_failed")
     click_button "Stay"
     assert_no_page_requests
@@ -834,6 +875,75 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_selector "html[lang='en']"
     assert_equal "en", users(:normal).reload.locale
     assert_equal "Saved before signing out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "a newer language choice made after a link took the earlier switch's claim is honored" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Saved before the second choice"
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    click_link "Projects"
+    within("aside#app-sidebar") { select "Tiếng Việt", from: "Interface language" }
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_selector "html[lang='vi']"
+    assert_equal "vi", users(:normal).reload.locale
+    assert_equal "Saved before the second choice", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "choosing the current language again while a switch waits cancels the switch" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script(<<~JS)
+      window.__harness.saveMode = "hold"
+      window.__localeSubmits = 0
+      document.addEventListener("submit", event => {
+        if (new URL(event.target.action).pathname === "/locale") window.__localeSubmits += 1
+      }, true)
+    JS
+    fill_in "Project name", with: "Saved without a switch"
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    within("aside#app-sidebar") { select "English", from: "Interface language" }
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_status I18n.t("workspace.saved")
+    assert_equal 0, page.evaluate_script("window.__localeSubmits")
+    assert_equal "en", users(:normal).reload.locale
+    assert_equal "Saved without a switch", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "a language switch during a launch replaces the launch like a link would" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Launch replaced by a switch"
+    choose_known_language("Source language", "Vietnamese")
+    choose_known_language("Target language", "Japanese")
+    fill_in "Document title", with: "Switched launch document"
+    fill_in "Source text", with: "Switched launch source"
+    fill_in "Instructions for the translation", with: "Translate carefully."
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/translation_workspace" && (options.method || "").toUpperCase() === "POST") {
+          window.__launchHeld = true
+          return new Promise((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true })
+          })
+        }
+        return deliver(url, options)
+      }
+    JS
+    click_button "Start translation"
+    assert_until { page.evaluate_script("window.__launchHeld === true") }
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+
+    assert_selector "html[lang='ja']"
+    assert_equal "ja", users(:normal).reload.locale
+    assert_equal "Launch replaced by a switch", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
   test "signing out from a saved workspace or another page stays immediate" do
