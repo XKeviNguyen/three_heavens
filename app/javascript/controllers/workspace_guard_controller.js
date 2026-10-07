@@ -263,7 +263,10 @@ export default class extends Controller {
     // The page is saved and reloading; the switch replaces that load (beforeSubmit).
     if (this.navigation?.phase === "allowed") return
     this.cancelNavigation()
-    event.detail.pending.push(this.flush())
+    // Like a form, the switch holds the claim while it saves; a newer action
+    // (a link, Back, another form, a discard) takes it, and the switch lapses.
+    const claim = this.pendingSubmission = {}
+    event.detail.pending.push(this.flush().then(saved => saved && this.pendingSubmission === claim))
   }
 
   // Runs before Turbo sees Back or Forward (see history_traversal.js). A
@@ -285,15 +288,17 @@ export default class extends Controller {
   }
 
   onBeforeVisit(event) {
-    if (this.allowVisit || this.launching) return
-    if (!this.discarding && !this.navigation && !this.busy()) return
-    event.preventDefault()
-    // The saved page is already reloading to the claimed history entry; a
-    // newer link replaces that load, even if the reload was stopped.
+    // The saved page is already reloading to the claimed history entry (or a
+    // form is replacing that load); a newer link replaces that navigation,
+    // even if it was stopped.
     if (this.navigation?.phase === "allowed") {
+      event.preventDefault()
       window.location.assign(event.detail.url)
       return
     }
+    if (this.allowVisit || this.launching) return
+    if (!this.discarding && !this.navigation && !this.busy()) return
+    event.preventDefault()
     // A cancelled visit replaces nothing, so a submission that froze the page
     // for it (such as signing out) leaves the page usable.
     this.element.inert = false
@@ -383,18 +388,20 @@ export default class extends Controller {
     const submitter = event.submitter
     // A form whose own handler took over (such as the appearance switch)
     // leaves nothing to save for; Turbo skips it as well.
-    if (event.defaultPrevented || !this.replacesPage({ formElement: form, submitter }) || this.allowVisit) return
-    if (this.discarding) {
-      event.preventDefault()
-      return
-    }
-    // The saved page is already reloading to a claimed history entry. A newer
-    // form replaces that load with a full page submission, as a newer link
-    // does: Turbo, whose handler runs after this one, leaves the form to the
-    // browser. (A form cannot be submitted again while its submit event runs.)
+    if (event.defaultPrevented || !this.replacesPage({ formElement: form, submitter })) return
+    // The saved page is already reloading to a claimed history entry (or an
+    // earlier form is replacing that load). A newer form replaces that
+    // navigation with a full page submission, as a newer link does: Turbo,
+    // whose handler runs after this one, leaves the form to the browser.
+    // Turbo's own fetch could not cancel a browser navigation already under way.
     if (this.navigation?.phase === "allowed") {
       this.allowVisit = true
       form.dataset.turbo = "false"
+      return
+    }
+    if (this.allowVisit) return
+    if (this.discarding) {
+      event.preventDefault()
       return
     }
     this.cancelNavigation()
@@ -464,7 +471,7 @@ export default class extends Controller {
     this.launching = false
     this.element.inert = false
     // A Leave whose form did not replace the page leaves nothing abandoned.
-    if (this.allowVisit && !this.discarding) this.resumeGuarding()
+    if (this.allowVisit && !this.discarding && this.navigation?.phase !== "allowed") this.resumeGuarding()
   }
 
   // The page stayed after all, so its edits are guarded and saved again.

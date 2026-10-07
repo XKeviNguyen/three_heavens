@@ -796,6 +796,46 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "Saved before the reload", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
+  test "Leave for a form no longer on the page keeps guarding and saving" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Kept when the form is gone"
+    assert_status I18n.t("workspace.save_failed")
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    page.execute_script("document.querySelector(\"form[action='/session']\").remove()")
+    click_button "Leave"
+
+    assert_no_selector "dialog[open]"
+    assert_current_path new_translation_workspace_path
+    page.execute_script("window.__harness.saveMode = 'ok'")
+    fill_in "Project name", with: "Saved after the lapsed Leave"
+    assert_status I18n.t("workspace.saved")
+    assert_equal "Saved after the lapsed Leave", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Guarded after the lapsed Leave"
+    assert_status I18n.t("workspace.save_failed")
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+  end
+
+  test "signing out while a language switch waits for its save wins over the switch" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Saved before signing out"
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    click_button "Log out"
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_current_path login_path
+    assert_selector "html[lang='en']"
+    assert_equal "en", users(:normal).reload.locale
+    assert_equal "Saved before signing out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
   test "signing out from a saved workspace or another page stays immediate" do
     open_workspace_from_projects
     fill_in "Project name", with: "Saved earlier"
