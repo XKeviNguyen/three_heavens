@@ -97,6 +97,7 @@ export default class extends Controller {
   changed(event) {
     if (this.launching || this.discarding) return
     if (!this.draftChange(event)) return
+    this.refusedDiscard = null
     this.retryCount = 0
     this.needsSaveValue = true
     window.clearTimeout(this.saveTimer)
@@ -227,9 +228,12 @@ export default class extends Controller {
   }
 
   // Until work that outlasted a wait ends (flush), the draft lacks its result,
-  // so a save meanwhile keeps reporting the failure rather than "saved".
+  // so a save meanwhile keeps reporting the failure rather than "saved". A
+  // refused discard stays reported until the next edit, even as the edits
+  // typed during it are saved.
   get savedStatus() {
-    return this.pendingWaitFailed ? this.messagesValue.saveFailed : this.settledStatus
+    if (this.pendingWaitFailed) return this.messagesValue.saveFailed
+    return this.refusedDiscard || this.settledStatus
   }
 
   // Waits for pending changes, then saves until the persisted draft matches
@@ -242,10 +246,13 @@ export default class extends Controller {
       if (!await this.save()) return false
       this.setStatus(this.messagesValue.saving)
       let timer
+      const wait = this.pendingWait = {}
       const timeout = new Promise(resolve => { timer = window.setTimeout(() => resolve(false), PENDING_WAIT_MS) })
       const settled = await Promise.race([this.settlePending(), timeout])
       window.clearTimeout(timer)
       if (!settled) {
+        // A newer flush still waiting for the same work reports the outcome.
+        if (this.pendingWait !== wait) return false
         this.pendingWaitFailed = true
         this.setStatus(this.messagesValue.saveFailed)
         // The work may still finish without changing anything to save; then
@@ -268,16 +275,17 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
+    // Nothing here is kept any more: a browser load (see onBeforeVisit), or a
+    // form after Leave, is replacing it. Like a link, the switch replaces
+    // that load (beforeSubmit).
+    if (this.navigation?.phase === "allowed") return
     // A launch's response shows what became of paid work, so the switch
-    // waits for neither it nor a discard and is refused.
+    // waits for neither it nor a discard still deciding, and is refused.
     if (this.launching || this.discarding) {
       event.preventDefault()
       return
     }
-    // Nothing here is kept any more: a Leave or the saved page is replacing
-    // it. Like a link (onBeforeVisit), the switch replaces that load
-    // (beforeSubmit).
-    if (this.allowVisit || this.navigation?.phase === "allowed") return
+    if (this.allowVisit) return
     this.cancelNavigation()
     // Like a form, the switch holds the claim while it saves; a newer action
     // (a link, Back, another form, a discard) takes it, and the switch lapses.
@@ -311,9 +319,11 @@ export default class extends Controller {
   }
 
   onBeforeVisit(event) {
-    // The saved page is already reloading to the claimed history entry (or a
-    // form is replacing that load); a newer link replaces that navigation,
-    // even if it was stopped.
+    // In the "allowed" phase a browser load is already replacing this page:
+    // the post-save reload of a claimed history entry, a Leave's destination,
+    // or a discard's fresh workspace (or a form that replaced one of those).
+    // A newer link replaces that navigation, even if it was stopped; Turbo's
+    // own fetch could not.
     if (this.navigation?.phase === "allowed") {
       event.preventDefault()
       window.location.assign(event.detail.url)
@@ -412,11 +422,11 @@ export default class extends Controller {
     // A form whose own handler took over (such as the appearance switch)
     // leaves nothing to save for; Turbo skips it as well.
     if (event.defaultPrevented || !this.replacesPage({ formElement: form, submitter })) return
-    // The saved page is already reloading to a claimed history entry (or an
-    // earlier form is replacing that load). A newer form replaces that
-    // navigation with a full page submission, as a newer link does: Turbo,
-    // whose handler runs after this one, leaves the form to the browser.
-    // Turbo's own fetch could not cancel a browser navigation already under way.
+    // A browser load is already replacing this page (see onBeforeVisit). A
+    // newer form replaces that navigation with a full page submission, as a
+    // newer link does: Turbo, whose handler runs after this one, leaves the
+    // form to the browser. Turbo's own fetch could not cancel a browser
+    // navigation already under way.
     if (this.navigation?.phase === "allowed") {
       this.allowVisit = true
       form.dataset.turbo = "false"
@@ -490,7 +500,7 @@ export default class extends Controller {
     if (this.visiting) return
     if (response && !response.contentType?.startsWith("text/vnd.turbo-stream.html") && await response.responseHTML) return
     // A visit or another submission may have started while the body was read.
-    // The saved page is reloading (navigateAfterSave) and stays frozen.
+    // A browser load is replacing the page (see onBeforeVisit); it stays frozen.
     if (this.visiting || this.submission || this.navigation?.phase === "allowed") return
     this.launching = false
     this.element.inert = false
@@ -510,9 +520,11 @@ export default class extends Controller {
     return frame ? frame === "_top" : !formElement.closest("turbo-frame")
   }
 
+  // Stay is the latest action: a traversal claimed meanwhile gives way too.
   stay() {
     this.destination = null
     this.dialogTarget.close()
+    this.cancelNavigation()
   }
 
   leave() {
@@ -527,9 +539,8 @@ export default class extends Controller {
       return
     }
     // Edits typed while it loads would be lost unguarded, as would any made
-    // if the load is stopped, so the page is frozen first. A newer action
-    // must replace this browser load the way it replaces the post-save
-    // reload, which Turbo's own fetches cannot.
+    // if the load is stopped, so the page is frozen first, and a newer
+    // action replaces this browser load (see onBeforeVisit).
     this.element.inert = true
     this.navigation = { phase: "allowed" }
     // Assigning a URL that differs only by its fragment would keep this page.
@@ -542,6 +553,9 @@ export default class extends Controller {
     // Discarding is terminal for this page: no timer, retry, or reconnect may
     // save again, or a late save could recreate the discarded draft.
     this.discarding = true
+    // changed() ignores edits from here on; if the discard is refused, only
+    // those are saved, not a save the server already settled.
+    const discardedState = JSON.stringify(this.payload())
     this.cancelNavigation()
     window.clearTimeout(this.saveTimer)
     while (this.saving) {
@@ -564,16 +578,17 @@ export default class extends Controller {
       }).catch(() => null)
       if (!response || (!response.ok && response.status !== 404)) {
         this.discarding = false
-        this.setStatus(response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
-        // Edits typed meanwhile were not scheduled (changed); they are kept.
-        if (this.dirty()) this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
+        this.refusedDiscard = response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed
+        this.setStatus(this.refusedDiscard)
+        if (JSON.stringify(this.payload()) !== discardedState) this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
         return
       }
     }
     this.allowVisit = true
     // As with Leave, nothing typed while the fresh workspace loads, or after
-    // that load is stopped, would be guarded.
+    // that load is stopped, would be guarded, and a newer action replaces it.
     this.element.inert = true
+    this.navigation = { phase: "allowed" }
     window.location.assign(this.resetUrlValue)
   }
 

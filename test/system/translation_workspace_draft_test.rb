@@ -41,8 +41,10 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     accept_confirm { click_button "Discard draft" }
     assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.discard_failed"), wait: 10
     assert_empty users(:normal).translation_workspace_drafts.reload
+    page.execute_script("document.body.dataset.discardDocument = 'old'")
     accept_confirm { click_button "Discard draft" }
-    assert_field "Source text", with: "", wait: 10
+    assert_document_replaced "body[data-discard-document='old']"
+    assert_field "Source text", with: ""
     assert_until do
       page.evaluate_script(<<~JS, original_editor)
         (() => {
@@ -324,7 +326,7 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     page.execute_script("window.__releasePendingDiscardSave()")
 
     # The reset page is the same URL; wait until the old page has been replaced.
-    assert_until(timeout: 15) { page.evaluate_script("window.__firstSaveSent !== true") }
+    assert_until(timeout: 15) { page.evaluate_script("window.__firstSaveSent !== true && document.readyState === 'complete'") }
     assert_field "Project name", with: ""
     assert_equal 0, users(:normal).translation_workspace_drafts.count
   end

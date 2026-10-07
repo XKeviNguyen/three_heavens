@@ -295,24 +295,24 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
   test "Leave freezes the page, and a newer link replaces its browser load" do
     leave_to_a_download
     click_link "Projects"
-    assert_selector "h1", text: "Projects"
     # A browser load, not a Turbo visit that the pending load could override.
-    assert page.evaluate_script("!window.__harness")
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
   end
 
   test "a language switch after Leave replaces its browser load" do
     leave_to_a_download
     within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
     assert_selector "html[lang='ja']"
-    assert page.evaluate_script("!window.__harness")
     assert_equal "ja", users(:normal).reload.locale
   end
 
   test "Back after Leave replaces its browser load" do
     leave_to_a_download
     page.execute_script("history.back()")
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
     assert_selector "h1", text: "Projects"
-    assert page.evaluate_script("!window.__harness")
   end
 
   test "an import that finishes after a link is clicked reaches the draft before the page leaves" do
@@ -550,6 +550,54 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_empty users(:normal).translation_workspace_drafts
   end
 
+  test "a link after a discard replaces the fresh workspace's browser load" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Discarded before a link"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    # The fresh workspace's load is stopped as soon as it starts, so the page
+    # stays. Whether that load is stopped or still pending, a link must
+    # replace it with a browser load, never a Turbo visit.
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if ((options.method || "").toUpperCase() === "DELETE") setTimeout(() => { window.stop(); window.__stopped = true }, 0)
+        return response
+      }
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_until { page.evaluate_script("window.__stopped === true") }
+    assert page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+
+    click_link "Projects"
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
+    assert_empty users(:normal).translation_workspace_drafts
+  end
+
+  test "a refused discard does not resend a save that already failed" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Never saved, then discarded"
+    # Leaving the field now keeps its change event out of the recording below.
+    page.execute_script("document.activeElement.blur()")
+    assert_status I18n.t("workspace.save_failed")
+    page.execute_script(<<~JS)
+      window.__harness.discardMode = "fail"
+      const schedule = window.setTimeout
+      window.__delays = []
+      window.setTimeout = (callback, delay, ...rest) => {
+        window.__delays.push(delay)
+        return schedule(callback, delay, ...rest)
+      }
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_status I18n.t("workspace.discard_failed")
+    assert_not_includes page.evaluate_script("window.__delays"), 1000
+  end
+
   test "edits typed while a discard is refused are saved afterwards" do
     open_workspace_from_projects
     fill_in "Project name", with: "Before the refused discard"
@@ -562,6 +610,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
 
     page.execute_script("window.__harness.heldDiscards.shift().release()")
     assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name") == "Typed during the refused discard" }
+    # Saving them does not hide that the discard was refused; the next edit does.
+    assert_status I18n.t("workspace.discard_failed")
+    fill_in "Project name", with: "Edited after the refused discard"
     assert_status I18n.t("workspace.saved")
   end
 
@@ -652,6 +703,63 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     page.execute_script("window.__releaseImport()")
     assert_text "Rejected import"
     assert_status I18n.t("workspace.saved")
+  end
+
+  test "Stay cancels a Back pressed while the dialog was open" do
+    open_workspace_from_projects
+    workspace_path = page.evaluate_script("location.pathname")
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Kept by Stay"
+    assert_status I18n.t("workspace.save_failed")
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    page.execute_script("window.__harness.saveMode = 'hold'; history.back()")
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length > 0") }
+
+    click_button "Stay"
+    assert_equal workspace_path, page.evaluate_script("location.pathname")
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.splice(0).forEach(held => held.release())")
+    assert_status I18n.t("workspace.saved")
+    assert page.evaluate_script("!!window.__harness && location.pathname === arguments[0]", workspace_path)
+    assert_no_page_requests
+  end
+
+  test "an abandoned wait for pending work leaves the newer wait's status alone" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Two waits for one import"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    # Test-side clock: the guard's 30-second waits run when the test says.
+    page.execute_script(<<~JS)
+      const schedule = window.setTimeout
+      const cancel = window.clearTimeout
+      const waits = window.__waits = []
+      window.setTimeout = (callback, delay, ...rest) => {
+        if (delay !== 30000) return schedule(callback, delay, ...rest)
+        waits.push(callback)
+        return -waits.length
+      }
+      window.clearTimeout = id => id < 0 ? (waits[-id - 1] = () => {}) : cancel(id)
+    JS
+    start_held_import("Imported after two waits")
+
+    click_link "Projects"
+    assert_until { page.evaluate_script("window.__waits.length === 1") }
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_until { page.evaluate_script("window.__waits.length === 2") }
+
+    # The link's wait lapsed when the switch took over; its timeout says nothing.
+    page.execute_script("window.__waits[0]()")
+    assert_status I18n.t("workspace.saving")
+    page.execute_script("window.__waits[1]()")
+    assert_status I18n.t("workspace.save_failed")
+    within("aside#app-sidebar") { assert_field "Interface language", with: "en" }
+
+    page.execute_script("window.__releaseImport()")
+    assert_imported_draft("Imported after two waits")
+    assert_status I18n.t("workspace.saved")
+    assert_no_page_requests
   end
 
   test "an appearance switch on an unsaved page is not treated as leaving" do
