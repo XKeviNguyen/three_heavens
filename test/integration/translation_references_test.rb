@@ -11,7 +11,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
   test "owner creates a pasted pair revises archives and reactivates it" do
     assert_difference -> { TranslationReference.count }, 1 do
       assert_difference -> { TranslationReferenceRevision.count }, 1 do
-        post translation_references_path, params: {
+        post_new_reference translation_references_path, params: {
           translation_reference: translation_reference_attributes
         }
       end
@@ -48,7 +48,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     ]
 
     cases.each_with_index do |(source_name, source_bytes, approved_name, approved_bytes), index|
-      post translation_references_path, params: {
+      post_new_reference translation_references_path, params: {
         translation_reference: {
           title: "Uploaded #{index}",
           source_language: "Vietnamese",
@@ -71,7 +71,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
 
   test "text PDF uploads extract both reference sides without provider work" do
     assert_no_difference "AiProviderAttempt.count" do
-      post translation_references_path, params: {
+      post_new_reference translation_references_path, params: {
         translation_reference: {
           title: "PDF reference",
           source_language: "Vietnamese",
@@ -91,7 +91,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     oversized = "a" * (SourceImports::Limits::MAX_UPLOAD_BYTES + 1)
 
     assert_no_difference -> { TranslationReference.count } do
-      post translation_references_path, params: {
+      post_new_reference translation_references_path, params: {
         translation_reference: {
           title: "Oversized source",
           source_language: "Vietnamese",
@@ -114,7 +114,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       -> { TranslationRun.count },
       -> { ActiveJob::Base.queue_adapter.enqueued_jobs.size }
     ] do
-      post translation_references_path, params: {
+      post_new_reference translation_references_path, params: {
         translation_reference: translation_reference_attributes.merge(
           source_file: uploaded_file("uploaded source", filename: "source.txt", content_type: "text/plain")
         )
@@ -124,7 +124,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "not both"
 
     assert_no_difference [ -> { TranslationReference.count }, -> { TranslationRun.count } ] do
-      post translation_references_path, params: {
+      post_new_reference translation_references_path, params: {
         translation_reference: {
           title: "Unsafe",
           source_language: "Vietnamese",
@@ -188,7 +188,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
       { translation_reference: translation_reference_attributes.merge(source_text: [ "bad" ]) }
     ].each do |payload|
       assert_no_difference -> { TranslationReference.count } do
-        post translation_references_path, params: payload
+        post_new_reference translation_references_path, params: payload
       end
       assert_response :bad_request
     end
@@ -302,7 +302,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
         file_key => uploaded_file("Desired new content", filename: "new.txt")
       )
       assert_no_difference -> { TranslationReference.count } do
-        post translation_references_path, params: { translation_reference: submitted }
+        post_new_reference translation_references_path, params: { translation_reference: submitted }
       end
       assert_response :unprocessable_content
       assert_select "textarea[name='translation_reference[#{side}]']", text: "Desired new content"

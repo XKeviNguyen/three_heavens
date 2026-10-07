@@ -9,6 +9,15 @@ class CiGateTest < ActiveSupport::TestCase
   # pending migration, so these database checks are only useful locally.
   LOCAL_ONLY = [ "bin/rails db:migrate:status", "bin/rails runner 'ActiveRecord::Migration.check_all_pending!'" ].freeze
 
+  test "local and hosted gates have explicit matching test concurrency" do
+    source = Rails.root.join("config/ci.rb").read
+    workflow = YAML.safe_load(Rails.root.join(".github/workflows/ci.yml").read)
+    assert_includes source, 'ENV["PARALLEL_WORKERS"] ||= "4"'
+    %w[test system-test].each do |job|
+      assert_equal 4, workflow.fetch("jobs").fetch(job).fetch("env").fetch("PARALLEL_WORKERS")
+    end
+  end
+
   test "every local gate check runs in GitHub Actions" do
     source = Rails.root.join("config/ci.rb").read
     local = source.scan(/^\s*step "[^"]+", "([^"]+)"/).flatten

@@ -2,7 +2,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
   # Rolling seven-day expiry; the hourly production job deletes expired rows.
   RETENTION = 7.days
   MAX_PAYLOAD_BYTES = 500_000
-  EDITOR_ID_FORMAT = /\A[0-9a-f]{32}\z/
+  EDITOR_ID_FORMAT = ReplayIdentity::PUBLIC_FORMAT
   MAX_EDITOR_SEQUENCE = 2**53 - 1
   SCALAR_FIELDS = %w[
     project_name source_language target_language document_title source_text
@@ -42,7 +42,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
   scope :current, -> { where("expires_at > ?", Time.current) }
 
   def self.context_key(project)
-    project ? "project:#{project.id}" : "new"
+    project&.id ? "project:#{project.id}" : "new"
   end
 
   def self.validate_payload!(value)
@@ -60,7 +60,7 @@ class TranslationWorkspaceDraft < ApplicationRecord
     ARRAY_FIELDS.each do |field|
       next unless value.key?(field)
       items = value[field]
-      maximum = field == "translation_reference_revision_ids" ? 5 : Ai::UsageLimits::MAX_TRANSLATION_MODELS
+      maximum = field == "translation_reference_revision_ids" ? ExperimentReferenceRevision::MAXIMUM_REFERENCES : Ai::UsageLimits::MAX_TRANSLATION_MODELS
       unless items.is_a?(Array) && items.length <= maximum && items.all? { |item| item.is_a?(String) && item.length <= 200 }
         raise ArgumentError, "Invalid workspace draft selection"
       end

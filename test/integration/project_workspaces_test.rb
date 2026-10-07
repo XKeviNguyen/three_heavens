@@ -272,7 +272,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: TranslationRunJob do
       post source_imports_path, params: {
         source_import: {
-          request_key: SecureRandom.hex(16),
+          request_key: ReplayIdentity.issue,
           project_id: @project.id.to_s,
           source_file: uploaded_file("Imported source", filename: "project.txt", content_type: "text/plain")
         }
@@ -318,7 +318,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: TranslationRunJob do
         post source_imports_path, params: {
           source_import: {
-            request_key: SecureRandom.hex(16),
+            request_key: ReplayIdentity.issue,
             project_id: projects(:two).id.to_s,
             source_file: uploaded_file("Private", filename: "private.txt", content_type: "text/plain")
           }
@@ -343,7 +343,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     )
     post source_imports_path, params: {
       source_import: {
-        request_key: SecureRandom.hex(16),
+        request_key: ReplayIdentity.issue,
         project_id: @project.id.to_s,
         source_file: uploaded_file("Bound source", filename: "bound.txt", content_type: "text/plain")
       }

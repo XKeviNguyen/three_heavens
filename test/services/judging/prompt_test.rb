@@ -110,6 +110,17 @@ class Judging::PromptTest < ActiveSupport::TestCase
                  parsed_untrusted_data(prompt).fetch("source_text")
   end
 
+  test "lists the schema's candidate labels in label order whatever the row order" do
+    labels = @judge_run.judge_evaluations.order(:anonymous_label).pluck(:anonymous_label)
+    # An update moves the first label's row after the others, so a sequential scan,
+    # the plan for so few rows, reads it last; without ORDER BY this test fails.
+    @judge_run.judge_evaluations.find_by!(anonymous_label: labels.first).update_columns(updated_at: 1.minute.from_now)
+
+    schema = Judging::Prompt.build(@judge_run.reload).fetch(:response_schema)
+    assert_equal labels, schema.dig(:properties, :rankings, :items, :properties, :candidate_label, :enum)
+    assert_equal labels, schema.dig(:properties, :winner_label, :enum)
+  end
+
   test "requests a complete strict ranking without hidden reasoning" do
     schema = @prompt.fetch(:response_schema)
     rankings = schema.dig(:properties, :rankings)

@@ -5,6 +5,11 @@ require "test_helper"
 ENV["SE_AVOID_STATS"] = "true"
 require_relative "support/open_router_catalog_fixture"
 
+# Assert observable browser state instead of treating Capybara's two-second
+# default as an application deadline. Concurrent Chrome processes can take
+# longer to finish a request or replace the document even after Rails responds.
+Capybara.default_max_wait_time = 10
+
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   driven_by :selenium,
             using: :headless_chrome,
@@ -38,6 +43,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
   teardown do
     OpenRouter::Catalog.transport = @original_catalog_transport
+  end
+
+  # Waits until the document carrying the marker has been replaced. A selector
+  # query can race a full page load inside Chrome ("Node with given id does not
+  # belong to the document"), so this asks the current document directly.
+  def assert_document_replaced(marker_selector)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
+    until page.evaluate_script("!document.querySelector(arguments[0]) && document.readyState === 'complete'", marker_selector)
+      flunk "#{marker_selector} was not replaced" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.05
+    end
   end
 
   def choose_known_language(label, value)

@@ -6,6 +6,59 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     sign_in_in_browser
   end
 
+  test "reconnecting the same page preserves autosave ordering" do
+    visit new_translation_workspace_path
+    fill_in "Source text", with: "Before reconnect"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    page.execute_script(<<~JS)
+      const element = document.querySelector("[data-controller='workspace-guard']")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+      controller.disconnect()
+      controller.connect()
+    JS
+    fill_in "Source text", with: "After reconnect"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "After reconnect", users(:normal).translation_workspace_drafts.sole.payload.fetch("source_text")
+  end
+
+  test "retrying a committed discard after response loss reaches a fresh workspace" do
+    visit new_translation_workspace_path
+    fill_in "Source text", with: "Discard once"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    original_editor = page.evaluate_script("document.querySelector('[data-controller=workspace-guard]').dataset.workspaceGuardEditorIdValue")
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        const response = await deliver(url, options)
+        if (!window.__discardDropped && new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "DELETE") {
+          window.__discardDropped = true
+          await response.arrayBuffer()
+          throw new TypeError("synthetic response loss")
+        }
+        return response
+      }
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.discard_failed"), wait: 10
+    assert_empty users(:normal).translation_workspace_drafts.reload
+    page.execute_script("document.body.dataset.discardDocument = 'old'")
+    accept_confirm { click_button "Discard draft" }
+    assert_document_replaced "body[data-discard-document='old']"
+    assert_field "Source text", with: ""
+    assert_until do
+      page.evaluate_script(<<~JS, original_editor)
+        (() => {
+          const element = document.querySelector("[data-controller='workspace-guard']")
+          const controller = element && window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+          return !!controller?.editorId && controller.editorId !== arguments[0]
+        })()
+      JS
+    end
+    fill_in "Source text", with: "Fresh page after retry"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    assert_equal "Fresh page after retry", users(:normal).translation_workspace_drafts.reload.sole.payload.fetch("source_text")
+  end
+
   test "language search requires selection and Escape restores the committed value" do
     visit new_translation_workspace_path
     choose_language("Source language", "Vietnamese")
@@ -106,9 +159,11 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     fill_in "Project name", with: "Discard me"
     assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
 
+    page.execute_script("document.body.dataset.discardDocument = 'old'")
     accept_confirm do
       click_button "Discard draft"
     end
+    assert_document_replaced "body[data-discard-document='old']"
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: ""
     assert_equal 0, users(:normal).translation_workspace_drafts.count
@@ -251,27 +306,27 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     visit new_translation_workspace_path
     page.execute_script(<<~JS)
       const deliver = window.fetch.bind(window)
-      const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+      window.__releasePendingDiscardSave = null
       window.fetch = async (url, options = {}) => {
         const draft = new URL(url, location.origin).pathname === "/translation_workspace_draft"
         if (draft && options.method === "POST" && !window.__firstSaveSent) {
           window.__firstSaveSent = true
           const response = await deliver(url, options)
-          await pause(1500)
+          await new Promise(resolve => { window.__releasePendingDiscardSave = resolve })
           await response.arrayBuffer()
           throw new TypeError("Failed to fetch")
         }
         const response = await deliver(url, options)
-        if (draft && options.method === "DELETE") await pause(3000)
         return response
       }
     JS
     fill_in "Project name", with: "Discard while unresolved"
-    assert_until { page.evaluate_script("window.__firstSaveSent === true") }
+    assert_until { page.evaluate_script("window.__releasePendingDiscardSave !== null") }
     accept_confirm { click_button "Discard draft" }
+    page.execute_script("window.__releasePendingDiscardSave()")
 
     # The reset page is the same URL; wait until the old page has been replaced.
-    assert_until(timeout: 15) { page.evaluate_script("window.__firstSaveSent !== true") }
+    assert_until(timeout: 15) { page.evaluate_script("window.__firstSaveSent !== true && document.readyState === 'complete'") }
     assert_field "Project name", with: ""
     assert_equal 0, users(:normal).translation_workspace_drafts.count
   end
@@ -290,6 +345,152 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal "Edited after Forward", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
+  [ false, true ].each do |lose_response|
+    test "Forward during an unacknowledged Back save preserves lineage with response loss #{lose_response}" do
+      visit projects_path
+      click_link "New translation"
+      assert_field "Project name"
+      page.execute_script(<<~JS)
+        document.body.dataset.historyDocument = "old"
+        const deliver = window.fetch.bind(window)
+        window.__releaseDraftResponse = null
+        window.fetch = async (url, options = {}) => {
+          if (new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST" && !window.__heldDraftResponse) {
+            window.__heldDraftResponse = true
+            await new Promise(resolve => { window.__releaseDraftResponse = resolve })
+          }
+          const response = await deliver(url, options)
+          if (#{lose_response} && new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST" && !window.__lostHistorySave) {
+            window.__lostHistorySave = true
+            await response.arrayBuffer()
+            throw new TypeError("Failed to fetch")
+          }
+          return response
+        }
+        window.addEventListener("history:traverse", () => { window.__historyPops = (window.__historyPops || 0) + 1 })
+        document.addEventListener("turbo:before-render", () => { window.__historyRenders = (window.__historyRenders || 0) + 1 })
+      JS
+      fill_in "Project name", with: "Back save still unresolved"
+      page.execute_script("history.back()")
+      assert_until { page.evaluate_script("window.__releaseDraftResponse !== null && location.pathname === '/projects'") }
+      page.execute_script("history.forward()")
+      assert_until { page.evaluate_script("window.__historyPops >= 2 && location.pathname === '/translation_workspace/new'") }
+      # Both traversals were claimed before Turbo saw them: nothing rendered.
+      assert_nil page.evaluate_script("window.__historyRenders")
+      page.execute_script("window.__releaseDraftResponse()")
+      if lose_response
+        assert_selector "dialog[open]", text: "Leave this translation?"
+        click_button "Stay"
+        page.execute_script("window.dispatchEvent(new Event('online'))")
+        assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+      else
+        assert_document_replaced "body[data-history-document='old']"
+      end
+      assert_current_path new_translation_workspace_path
+      assert_field "Project name", with: "Back save still unresolved"
+      fill_in "Project name", with: "Latest edit after raced Forward"
+      assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+      refresh
+      assert_field "Project name", with: "Latest edit after raced Forward"
+      assert_equal 1, users(:normal).translation_workspace_drafts.count
+      choose_language("Source language", "Vietnamese")
+      choose_language("Target language", "Japanese")
+      fill_in "Document title", with: "Recovered launch"
+      fill_in "Source text", with: "Latest visible recovered source"
+      fill_in "Instructions for the translation", with: "Translate carefully."
+      within "#workspace-manual-models" do
+        find("input[placeholder='Search OpenRouter models…']").click
+        first("button", text: "Add").click
+      end
+      click_button "Start translation"
+      assert_current_path(/\A\/experiments\/\d+\z/)
+      assert_equal 0, users(:normal).translation_workspace_drafts.count
+    end
+  end
+
+  test "failed discard during a claimed Back save keeps the page usable for the next visit" do
+    visit projects_path
+    click_link "New translation"
+    assert_field "Project name"
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.__releaseNavigationSave = null
+      window.fetch = async (url, options = {}) => {
+        const draft = new URL(url, location.origin).pathname === "/translation_workspace_draft"
+        if (draft && options.method === "DELETE") return new Response("", { status: 503 })
+        if (draft && options.method === "POST" && !window.__heldNavigationSave) {
+          window.__heldNavigationSave = true
+          await new Promise(resolve => { window.__releaseNavigationSave = resolve })
+        }
+        return deliver(url, options)
+      }
+    JS
+    fill_in "Project name", with: "Keep after failed discard"
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__releaseNavigationSave !== null && location.pathname === '/projects'") }
+    accept_confirm { click_button "Discard draft" }
+    page.execute_script("window.__releaseNavigationSave()")
+    assert_selector "[data-workspace-guard-target='status']", text: I18n.t("workspace.discard_failed"), wait: 10
+    assert_current_path new_translation_workspace_path
+    fill_in "Project name", with: "Latest after failed discard"
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    click_link "Projects"
+    assert_selector "h1", text: "Projects"
+    click_link "New translation"
+    assert_field "Project name", with: "Latest after failed discard"
+  end
+
+  test "failed history save then Stay can recover and render the next ordinary visit" do
+    visit projects_path
+    click_link "New translation"
+    assert_field "Project name"
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.__rejectHistorySave = true
+      window.fetch = (url, options = {}) => {
+        if (window.__rejectHistorySave && new URL(url, location.origin).pathname === "/translation_workspace_draft" && options.method === "POST") return Promise.resolve(new Response("", { status: 503 }))
+        return deliver(url, options)
+      }
+    JS
+    fill_in "Project name", with: "History save failed"
+    assert_selector "[data-workspace-guard-target='status']", text: /Saving|Could not save/, wait: 10
+    page.execute_script("history.back()")
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Stay"
+    page.execute_script("window.__rejectHistorySave = false; window.dispatchEvent(new Event('online'))")
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+    click_link "Projects"
+    assert_selector "h1", text: "Projects"
+    click_link "New translation"
+    assert_field "Project name", with: "History save failed"
+  end
+
+  test "locale submission takes ownership from a claimed pending Back" do
+    visit projects_path
+    click_link "New translation"
+    assert_field "Project name"
+    page.execute_script(<<~JS)
+      window.Turbo.cache.clear()
+      const deliver = window.fetch.bind(window)
+      window.fetch = async (url, options = {}) => {
+        const path = new URL(url, location.origin).pathname
+        if (path === "/translation_workspace_draft" && options.method === "POST" && !window.__heldLocaleSave) {
+          window.__heldLocaleSave = true
+          await new Promise(resolve => { window.__releaseLocaleSave = resolve })
+        }
+        return deliver(url, options)
+      }
+    JS
+    fill_in "Project name", with: "Keep across cancelled Back and locale"
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("!!window.__releaseLocaleSave && location.pathname === '/projects'") }
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    page.execute_script("window.__releaseLocaleSave()")
+    assert_selector "html[lang='ja']"
+    assert_selector "h1", text: "新しい翻訳"
+    assert_field "プロジェクト名", with: "Keep across cancelled Back and locale"
+  end
+
   test "a retry after a lost response resolves the save without another edit" do
     visit new_translation_workspace_path
     drop_next_draft_save_responses(1)
@@ -301,7 +502,9 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_equal draft.lock_version.to_s, find("#translation_workspace_draft_version", visible: :all).value
     assert_equal 0, draft.lock_version
 
+    page.execute_script("document.body.dataset.discardDocument = 'old'")
     accept_confirm { click_button "Discard draft" }
+    assert_document_replaced "body[data-discard-document='old']"
     # The reset page is the same URL; wait until it has replaced this one.
     assert_current_path new_translation_workspace_path
     assert_field "Project name", with: ""

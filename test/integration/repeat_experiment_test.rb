@@ -127,29 +127,45 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     get new_translation_workspace_path
     assert_select "button[formaction='#{translation_workspace_options_path}'][formmethod='post'][name='workflow_profile_page'][value='2'][formnovalidate]", count: 1
 
-    preserved_token = css_select("input[name='translation_workspace[submission_token]']").first["value"]
-    assert_no_difference [ -> { Experiment.count }, -> { enqueued_jobs.size } ] do
+    # The browser saves its draft before posting a page change, so the page
+    # restored after the redirect shows that draft.
+    paged_workspace = {
+      "document_title" => "Preserved while paging",
+      "source_text" => "Preserved source",
+      "experiment_name" => "Preserved experiment",
+      "instruction_prompt" => "Preserved instruction",
+      "glossary_revision_id" => selected_glossary.current_revision_id.to_s,
+      "methodology_profile_revision_id" => selected_methodology.current_revision_id.to_s,
+      "translation_reference_revision_ids" => [ selected_reference.current_revision_id.to_s ],
+      "guidance_preference" => "reference_examples",
+      "workflow_mode" => "automatic",
+      "workflow_profile_revision_id" => selected_profile.current_revision_id.to_s
+    }
+    context_key = TranslationWorkspaceDraft.context_key(@project)
+    TranslationWorkspaceDrafts::Save.call(
+      user: users(:normal), context_key:, payload: paged_workspace, draft_id: nil, version: nil,
+      editor_id: ReplayIdentity.issue(user: users(:normal), context_key:), sequence: 1
+    )
+    page_change = lambda do |confirmation:, digest:|
       post translation_workspace_options_path, params: {
         workflow_profile_page: "2",
-        translation_workspace: {
-          submission_token: preserved_token,
-          project_id: @project.id.to_s,
-          document_title: "Preserved while paging",
-          source_text: "Preserved source",
-          experiment_name: "Preserved experiment",
-          instruction_prompt: "Preserved instruction",
-          glossary_revision_id: selected_glossary.current_revision_id.to_s,
-          methodology_profile_revision_id: selected_methodology.current_revision_id.to_s,
-          translation_reference_revision_ids: [ selected_reference.current_revision_id.to_s ],
-          guidance_preference: "reference_examples",
-          workflow_mode: "automatic",
-          workflow_profile_revision_id: selected_profile.current_revision_id.to_s,
-          automatic_confirmation: "1",
-          automatic_plan_digest: "0" * 64
-        }
+        translation_workspace: paged_workspace.merge(
+          "submission_token" => css_select("input[name='translation_workspace[submission_token]']").first["value"],
+          "project_id" => @project.id.to_s,
+          "automatic_confirmation" => confirmation,
+          "automatic_plan_digest" => digest
+        )
       }
     end
+
+    assert_no_difference [ -> { Experiment.count }, -> { enqueued_jobs.size }, -> { TranslationWorkspaceSubmission.count } ] do
+      page_change.call(confirmation: "1", digest: "0" * 64)
+    end
+    assert_redirected_to new_translation_workspace_path(project_id: @project.id, workflow_profile_page: 2)
+    assert_no_match(/Preserved/, response.location)
+    follow_redirect!
     assert_response :success
+    assert_select "nav[aria-label='Workflow profiles pagination']", text: /Page 2 of 2/
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Preserved source"
     assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][value='#{selected_profile.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{selected_glossary.current_revision_id}'][checked]", count: 1
@@ -160,6 +176,16 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     rebuilt_digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, rebuilt_digest)
     assert_not_equal "0" * 64, rebuilt_digest
+
+    # Confirming the plan shown survives a page change while the plan holds.
+    page_change.call(confirmation: "1", digest: rebuilt_digest)
+    follow_redirect!
+    assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox'][checked]", count: 1
+    assert_equal rebuilt_digest, css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
+
+    # A plain visit never carries an earlier authorization.
+    get new_translation_workspace_path(project_id: @project.id)
+    assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])", count: 1
 
     get repeat_experiment_path(historical)
 

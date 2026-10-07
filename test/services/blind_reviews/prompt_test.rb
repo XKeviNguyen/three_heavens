@@ -80,6 +80,17 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     end
   end
 
+  test "lists the schema's candidate labels in label order whatever the row order" do
+    review_run = @round.review_runs.first
+    labels = review_run.review_evaluations.order(:anonymous_label).pluck(:anonymous_label)
+    # An update moves the first label's row after the others, so a sequential scan,
+    # the plan for so few rows, reads it last; without ORDER BY this test fails.
+    review_run.review_evaluations.find_by!(anonymous_label: labels.first).update_columns(updated_at: 1.minute.from_now)
+
+    schema = BlindReviews::Prompt.build(review_run.reload).fetch(:response_schema)
+    assert_equal labels, schema.dig(:properties, :evaluations, :items, :properties, "candidate_label", :enum)
+  end
+
   test "delimits prompt injection text as untrusted JSON data" do
     user_prompt = @prompt.fetch(:user_prompt)
     system_prompt = @prompt.fetch(:system_prompt)

@@ -21,6 +21,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     ).filter(
       "password" => "password-value",
       "submission_token" => "opaque-launch-value",
+      "request_key" => "opaque-upload-value",
+      "creation_key" => "opaque-reference-value",
+      "editor_id" => "opaque-editor-value",
       "source_text" => "source-value",
       "extracted_text" => "extracted-value",
       "preview_text" => "preview-value",
@@ -37,6 +40,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
 
     assert_equal "[FILTERED]", filtered["password"]
     assert_equal "[FILTERED]", filtered["submission_token"]
+    assert_equal "[FILTERED]", filtered["request_key"]
+    assert_equal "[FILTERED]", filtered["creation_key"]
+    assert_equal "[FILTERED]", filtered["editor_id"]
     assert_equal "[FILTERED]", filtered["source_text"]
     assert_equal "[FILTERED]", filtered["extracted_text"]
     assert_equal "[FILTERED]", filtered["preview_text"]

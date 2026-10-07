@@ -18,11 +18,12 @@ module SourceImports
 
     teardown do
       @user.source_imports.find_each(&:destroy!)
+      UploadBudget.where(user: @user).delete_all
       @user.delete
     end
 
     test "simultaneous deliveries of one upload action store one import and one blob" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       unattached_blobs = -> { ActiveStorage::Blob.where.missing(:attachments).count }
       unattached_before = unattached_blobs.call
       results = concurrently(3) do
@@ -40,7 +41,7 @@ module SourceImports
     # Advisory locks are re-entrant within one database session, so whether a
     # busy delivery released its request lock is checked from other sessions.
     test "busy deliveries of one upload action store nothing and release the request lock" do
-      key = SecureRandom.hex(16)
+      key = ReplayIdentity.issue
       upload = -> { uploaded_file(pdf_with_text("Busy then stored"), filename: "busy.pdf", content_type: "application/pdf") }
       holding, finish = Queue.new, Queue.new
       holder = Thread.new { PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }
@@ -51,7 +52,7 @@ module SourceImports
       holder.join
 
       assert_equal [ "pdf_busy", "pdf_busy" ], results.map { it.is_a?(Busy) ? it.code : it }
-      assert_empty @user.source_imports
+      assert_empty @user.source_imports.reload
       assert concurrently(1) { request_lock_free?(key) }.sole, "a busy delivery kept its request lock"
       assert concurrently(1) { Create.call(user: @user, upload: upload.call, request_key: key) }.sole.ready?
     ensure
@@ -63,7 +64,7 @@ module SourceImports
 
     def request_lock_free?(key)
       connection = ActiveRecord::Base.connection
-      lock_key = Digest::SHA256.digest("source_import_request:#{@user.id}:#{key}").unpack1("q>")
+      lock_key = RequestLock.key(user_id: @user.id, request_key: key)
       locked = connection.select_value(ActiveRecord::Base.sanitize_sql_array([ "SELECT pg_try_advisory_lock(?)", lock_key ]))
       connection.select_value(ActiveRecord::Base.sanitize_sql_array([ "SELECT pg_advisory_unlock(?)", lock_key ])) if locked
       locked

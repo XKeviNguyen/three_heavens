@@ -6,7 +6,7 @@
     <% if selected_revision %>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <label class="flex min-w-0 items-start gap-3">
-          <%= radio_button_tag "translation_workspace[glossary_revision_id]", selected_revision.id, true, id: "translation_workspace_glossary_revision_id_#{selected_revision.id}", class: "mt-1 size-4 shrink-0 text-blue-600", data: { workspace_summary_name: selected_revision.name } %>
+          <%= radio_button_tag "translation_workspace[glossary_revision_id]", selected_revision.id, true, id: "translation_workspace_glossary_revision_id_#{selected_revision.id}", class: "mt-1 size-4 shrink-0 text-blue-600", data: { workspace_summary_name: selected_revision.name, glossary_id: selected_glossary.id } %>
           <span class="min-w-0">
             <span class="block truncate text-sm font-semibold text-slate-950"><%= selected_revision.name %></span>
             <span class="mt-0.5 block text-xs text-slate-500"><%= t("terminology_sheet.revision", version: selected_revision.version) %> · <%= t("terminology_sheet.terms_count", count: selected_revision.entries.size) %> · <%= selected_revision.source_language %> → <%= selected_revision.target_language %></span>
@@ -48,7 +48,7 @@
               <% next if selected_revision&.id == revision.id %>
               <div class="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-blue-50">
                 <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
-                  <%= radio_button_tag "translation_workspace[glossary_revision_id]", revision.id, false, id: "translation_workspace_glossary_revision_id_#{revision.id}", class: "mt-0.5 size-4 text-blue-600", data: { workspace_summary_name: revision.name } %>
+                  <%= radio_button_tag "translation_workspace[glossary_revision_id]", revision.id, false, id: "translation_workspace_glossary_revision_id_#{revision.id}", class: "mt-0.5 size-4 text-blue-600", data: { workspace_summary_name: revision.name, glossary_id: revision.glossary_id } %>
                   <span><span class="block text-xs font-semibold text-slate-900"><%= revision.name %></span><span class="mt-0.5 block text-[11px] font-normal text-slate-500"><%= t("terminology_sheet.revision", version: revision.version) %> · <%= t("terminology_sheet.terms_count", count: revision.entries.size) %></span></span>
                 </label>
                 <%= link_to t("terminology_sheet.edit"), edit_workspace_terminology_path(glossary_id: glossary.id), data: { turbo_frame: "workspace-terminology-editor" }, class: "shrink-0 text-[11px] font-semibold text-blue-700 hover:text-blue-900" %>

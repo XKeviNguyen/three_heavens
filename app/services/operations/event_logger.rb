@@ -15,6 +15,8 @@ module Operations
       pipeline_blocked pipeline_ready_for_editor stale_reconciliation_completed
       pipeline_reconciliation_completed source_import_cleanup_completed
       workspace_submission_cleanup_completed active_storage_cleanup_completed
+      source_import_retirement_cleanup_completed workspace_draft_cleanup_completed
+      workspace_editor_cleanup_completed reference_recovery_cleanup_completed reference_identity_cleanup_completed
       managed_ai_access_changed backup_started backup_completed
       backup_failed restore_verification_started restore_verification_completed
       restore_verification_failed operations_preflight_completed

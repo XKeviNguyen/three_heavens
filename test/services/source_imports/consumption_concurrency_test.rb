@@ -41,6 +41,7 @@ module SourceImports
       ActiveStorage::Attachment.where(record_type: "Document", record_id: document_ids).delete_all
       Document.where(id: document_ids).delete_all
       Project.where(id: project_ids).delete_all
+      UploadBudget.where(user: @user).delete_all
       @user.delete if @user&.persisted?
       @model.delete if @model&.persisted?
       ActiveStorage::Blob.where.missing(:attachments).delete_all

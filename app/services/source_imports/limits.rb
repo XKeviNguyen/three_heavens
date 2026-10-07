@@ -28,7 +28,7 @@ module SourceImports
     IMPORT_EXPIRATION = 24.hours
     CLEANUP_BATCH_SIZE = 100
     EXTRACTION_VERSION = "document-io-v3"
-    REQUEST_KEY_FORMAT = /\A[0-9a-f]{32}\z/
+    REQUEST_KEY_FORMAT = ReplayIdentity::PUBLIC_FORMAT
     # How long a duplicate delivery waits for the first delivery of the same
     # upload action to reach its final outcome.
     REQUEST_LOCK_WAIT_SECONDS = 30

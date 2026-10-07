@@ -49,6 +49,8 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
       post translation_workspace_options_path, params: {
         translation_workspace: manual_attributes(submission_token: issue_translation_workspace_token)
       }
+      follow_redirect!
+      assert_response :success
       %w[vi ja en].each do |locale|
         patch locale_path, params: { locale_code: locale }, headers: { "Referer" => new_translation_workspace_url }
         follow_redirect!

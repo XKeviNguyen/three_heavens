@@ -13,7 +13,7 @@
 
     <%= form_with model: @source_import || SourceImport.new, url: source_imports_path, method: :post, class: "contents", data: { file_drop_target: "form", turbo_frame: "_top" } do |form| %>
       <% if @project %><%= hidden_field_tag "source_import[project_id]", @project.id %><% end %>
-      <%= hidden_field_tag "source_import[request_key]", SecureRandom.hex(16), id: nil %>
+      <%= hidden_field_tag "source_import[request_key]", ReplayIdentity.issue, id: nil %>
       <%= form.label :source_file, t("workspace_ui.source_file"), class: "sr-only" %>
       <%= form.file_field :source_file,
             class: "sr-only",

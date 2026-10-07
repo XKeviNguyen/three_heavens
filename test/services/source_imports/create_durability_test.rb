@@ -18,7 +18,7 @@ module SourceImports
         role: :user,
         status: :active
       )
-      @key = SecureRandom.hex(16)
+      @key = ReplayIdentity.issue
       @reached = Queue.new
       @decision = Queue.new
       reached = @reached
@@ -36,6 +36,7 @@ module SourceImports
       singleton.remove_method(:upload) if singleton.method_defined?(:upload, false)
       @threads&.each { |thread| thread.kill.join(5) }
       @user.source_imports.find_each(&:destroy!)
+      UploadBudget.where(user: @user).delete_all
       @user.delete
     end
 
@@ -83,7 +84,7 @@ module SourceImports
       assert_equal [ "storage_unavailable", source_import.id ], [ later.code, later.source_import.id ]
       @reached.clear
       Thread.new { @reached.pop(timeout: 10) && @decision << :succeed }
-      assert create(request_key: SecureRandom.hex(16)).available?, "a new upload action must be able to succeed"
+      assert create(request_key: ReplayIdentity.issue).available?, "a new upload action must be able to succeed"
     end
 
     private

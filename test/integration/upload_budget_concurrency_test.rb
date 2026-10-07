@@ -21,11 +21,11 @@ class UploadBudgetConcurrencyTest < ActionDispatch::IntegrationTest
       authenticated_cookies.each { |name, value| client.cookies[name] = value }
       upload = uploaded_file("Source #{index}", filename: "source.txt", content_type: "text/plain")
       if index.even?
-        client.post source_imports_path, params: { source_import: { request_key: SecureRandom.hex(16), source_file: upload } },
+        client.post source_imports_path, params: { source_import: { request_key: ReplayIdentity.issue, source_file: upload } },
                     headers: { "Accept" => "application/json" }
       else
         client.post translation_references_path, params: { translation_reference: {
-          title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
+          creation_key: ReplayIdentity.issue, title: "Concurrent #{index}", source_language: "Vietnamese", target_language: "Japanese",
           source_file: upload, approved_translation: "Approved"
         } }
       end
@@ -41,6 +41,7 @@ class UploadBudgetConcurrencyTest < ActionDispatch::IntegrationTest
       # These rows were committed by child processes, outside Rails' test
       # transaction. Remove only this test's history using the established
       # fixture-cleanup boundary; production history remains sealed.
+      TranslationReferenceCreation.where(translation_reference_id: TranslationReference.where.not(id: original_reference_ids).select(:id)).delete_all
       mutate_historical_fixture do
         references = TranslationReference.where.not(id: original_reference_ids)
         TranslationReferenceRevision.where(translation_reference_id: references.select(:id)).delete_all

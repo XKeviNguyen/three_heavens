@@ -69,6 +69,6 @@ class SourceImport < ApplicationRecord
   end
 
   def purge_destroyed_source_file_blob
-    @destroyed_source_file_blob&.purge
+    ActiveStorageMaintenance::Purge.call(blob: @destroyed_source_file_blob) if @destroyed_source_file_blob
   end
 end

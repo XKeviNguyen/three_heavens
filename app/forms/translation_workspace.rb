@@ -91,6 +91,9 @@ class TranslationWorkspace
       )
       true
     end
+  rescue ReplayIdentity::AdmissionExceeded
+    errors.add(:base, "Too many recent workspace submissions. Try again later.")
+    false
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
          Pipelines::Start::Error,

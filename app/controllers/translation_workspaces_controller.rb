@@ -1,6 +1,7 @@
 class TranslationWorkspacesController < ApplicationController
   before_action :require_managed_ai_access, only: :create
   CONFIGURATION_OPTION_LIMIT = 100
+  CONFIGURATION_PAGE_PARAMS = %i[workflow_profile_page glossary_page methodology_profile_page translation_reference_page].freeze
   SCALAR_ATTRIBUTES = %w[
     project_id
     project_name
@@ -23,17 +24,17 @@ class TranslationWorkspacesController < ApplicationController
   ].freeze
 
   def new
-    attributes = pagination_workspace_params
-    project = find_owned_project(attributes ? attributes[:project_id] : project_id_param)
-    source_import = load_source_import(attributes ? attributes[:source_import_id] : source_import_id_param)
-    project_binding = attributes ? attributes[:source_import_project_token] : source_import_project_token_param
+    project = find_owned_project(project_id_param)
+    source_import = load_source_import(source_import_id_param)
+    project_binding = source_import_project_token_param
     validate_source_import_project_binding!(source_import:, project:, token: project_binding)
     load_draft(project)
-    @draft_id = params[:translation_workspace_draft_id].to_s if request.post?
-    @draft_version = params[:translation_workspace_draft_version].to_s if request.post?
-    @draft_needs_save = source_import.present? || attributes.present?
-    restored_attributes = restored_draft_attributes(project) unless attributes
-    workspace_attributes = attributes || restored_attributes || {}
+    restored_attributes = restored_draft_attributes(project)
+    # Revisiting the import link (Back, reload) must not replace the reviewed
+    # text of a draft that already holds this import.
+    source_import = nil if source_import && restored_attributes&.dig(:source_import_id).to_s == source_import.id.to_s
+    @draft_needs_save = source_import.present?
+    workspace_attributes = restored_attributes || {}
     if source_import
       workspace_attributes = workspace_attributes.merge(
         source_import_id: source_import.id,
@@ -48,6 +49,7 @@ class TranslationWorkspacesController < ApplicationController
       existing_project: project
     )
     load_available_models(project:, workspace: @translation_workspace)
+    restore_paged_provider_authorization
     if source_import && !source_import.available?
       @translation_workspace.errors.add(:source_import_id, source_import.availability_message)
     end
@@ -55,10 +57,25 @@ class TranslationWorkspacesController < ApplicationController
     head :bad_request
   end
 
+  # Changing a configuration page posts the workspace form, which the page has
+  # saved to its draft before sending, and shows the requested page restored
+  # from that draft. Only the project and page numbers travel in the URL. The
+  # paid-work authorization, which a draft never holds, crosses the redirect
+  # in the session and is checked again against the restored workspace.
   def options
-    new
-    rebuild_paged_provider_work_plan unless performed?
-    render :new unless performed?
+    attributes = translation_workspace_params
+    project = find_owned_project(attributes[:project_id])
+    if attributes[:workflow_mode] == "automatic"
+      digest = attributes[:automatic_plan_digest].to_s
+      flash[:workspace_authorization] = {
+        "automatic_plan_digest" => digest.match?(/\A\h{64}\z/) ? digest : "",
+        "automatic_confirmation" => attributes[:automatic_confirmation] == "1" ? "1" : "0"
+      }
+    end
+    pages = params.slice(*CONFIGURATION_PAGE_PARAMS).permit(*CONFIGURATION_PAGE_PARAMS).to_h.select { |_name, value| value.to_s.match?(/\A[1-9]\d{0,5}\z/) }
+    redirect_to new_translation_workspace_path(project_id: project&.id, **pages.symbolize_keys), status: :see_other
+  rescue ActionController::ParameterMissing, ActionController::BadRequest
+    head :bad_request
   end
 
   def repeat
@@ -157,9 +174,8 @@ class TranslationWorkspacesController < ApplicationController
     version = params[:translation_workspace_draft_version]
     return if public_id.blank? || !version.to_s.match?(/\A\d+\z/)
 
-    current_user.translation_workspace_drafts
-      .where(public_id:, context_key: TranslationWorkspaceDraft.context_key(project), lock_version: version.to_i)
-      .delete_all
+    TranslationWorkspaceDrafts::Discard.after_launch(user: current_user,
+      public_id:, context_key: TranslationWorkspaceDraft.context_key(project), version: version.to_i)
   end
 
   def prepare_repeat_preview(revision, historical)
@@ -194,6 +210,17 @@ class TranslationWorkspacesController < ApplicationController
   rescue Ai::ContextBudget::Error => error
     reset_paged_provider_authorization
     @translation_workspace.errors.add(:workflow_profile_revision_id, error.message)
+  end
+
+  # A page change keeps the paid-work authorization only while the restored
+  # workspace is still automatic and still produces the confirmed plan.
+  def restore_paged_provider_authorization
+    authorization = flash[:workspace_authorization]
+    return unless authorization.is_a?(Hash) && @translation_workspace.workflow_mode == "automatic"
+
+    @translation_workspace.automatic_plan_digest = authorization["automatic_plan_digest"].to_s
+    @translation_workspace.automatic_confirmation = authorization["automatic_confirmation"].to_s
+    rebuild_paged_provider_work_plan
   end
 
   def reset_paged_provider_authorization
@@ -355,12 +382,6 @@ class TranslationWorkspacesController < ApplicationController
     requested.clamp(1, total_pages)
   rescue ArgumentError, TypeError
     1
-  end
-
-  def pagination_workspace_params
-    return unless params[:translation_workspace].present?
-
-    translation_workspace_params
   end
 
   def translation_workspace_params
