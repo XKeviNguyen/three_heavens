@@ -336,7 +336,7 @@ export default class extends Controller {
     // own fetch could not.
     if (this.navigation?.phase === "allowed") {
       event.preventDefault()
-      window.location.assign(event.detail.url)
+      this.load(event.detail.url)
       return
     }
     if (this.allowVisit || this.launching) return
@@ -390,11 +390,12 @@ export default class extends Controller {
       } else if (navigation.historyMoved) {
         // A link followed a claimed Back or Forward: the browser alone moved
         // to another entry, so Turbo's history position is stale and a Turbo
-        // visit would push from the wrong place. A browser load replaces the
-        // entry reached instead, frozen and replaceable like the reload above.
+        // visit would push from the wrong place. A browser load from the entry
+        // reached adds the destination after it instead, frozen and
+        // replaceable like the reload above.
         navigation.phase = "allowed"
         this.element.inert = true
-        window.location.assign(navigation.destination)
+        this.load(navigation.destination)
       } else {
         this.navigation = null
         window.Turbo.visit(navigation.destination)
@@ -575,10 +576,10 @@ export default class extends Controller {
     const destination = this.destination
     this.dialogTarget.close()
     // Leave is the latest action: a traversal claimed meanwhile gives way. A
-    // browser load replaces whatever entry that traversal reached, so only a
-    // form or a repeated traversal needs this page's own entry back first.
+    // browser load can start from whatever entry that traversal reached, so
+    // only a form or a repeated traversal needs this page's own entry back.
     if (destination.form || destination.traversal) this.cancelNavigation()
-    else this.navigation = this.pendingSubmission = null
+    else this.pendingSubmission = null
     this.allowVisit = true
     window.clearTimeout(this.saveTimer)
     if (destination.form) {
@@ -596,9 +597,14 @@ export default class extends Controller {
       window.history.go(destination.traversal)
       return
     }
-    // Assigning a URL that differs only by its fragment would keep this page.
-    if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
-    else window.location.assign(destination)
+    this.load(destination)
+  }
+
+  // A browser load of url. Assigning a URL that differs only by its fragment
+  // would keep this page, so that reloads it instead.
+  load(url) {
+    if (new URL(url, window.location.href).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
+    else window.location.assign(url)
   }
 
   async discard() {
@@ -606,7 +612,11 @@ export default class extends Controller {
     // Discarding is terminal for this page: no timer, retry, or reconnect may
     // save again, or a late save could recreate the discarded draft.
     this.discarding = true
-    this.cancelNavigation()
+    // The fresh workspace can load from whatever entry a claimed traversal
+    // reached, as Leave's link does; only a refused discard, which keeps
+    // this page, brings history back to this page's own entry.
+    const historyMoved = this.navigation?.historyMoved
+    this.navigation = this.pendingSubmission = null
     window.clearTimeout(this.saveTimer)
     while (this.saving) {
       try { await this.saving } catch {}
@@ -628,6 +638,7 @@ export default class extends Controller {
       }).catch(() => null)
       if (!response || (!response.ok && response.status !== 404)) {
         this.discarding = false
+        if (historyMoved) this.restoreHistory()
         this.refusedDiscard = response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed
         this.setStatus(this.refusedDiscard)
         // Saving resumes for anything unsaved, including edits typed during

@@ -69,15 +69,15 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     page.execute_script("window.__harness.saveMode = 'fail'")
     fill_in "Project name", with: "Abandoned for the link"
     assert_status I18n.t("workspace.save_failed")
-    click_link "Projects"
+    # History, not Projects, which the claimed Back below reaches.
+    within("aside#app-sidebar") { click_link "History" }
     assert_selector "dialog[open]", text: "Leave this translation?"
     page.execute_script("window.__harness.saveMode = 'hold'; history.back()")
     assert_until { page.evaluate_script("window.__harness.heldSaves.length > 0") }
 
     click_button "Leave"
     assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
-    assert_selector "h1", text: "Projects"
-    assert_current_path projects_path
+    assert_current_path history_path
   end
 
   test "a link clicked while a claimed Back saves loads natively from the entry Back reached" do
@@ -97,6 +97,30 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "Saved before the History link", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
     page.go_back
     assert_selector "h1", text: "Projects"
+  end
+
+  # Chrome loads a fragment-only assign here anyway; the guard reloads instead
+  # (load), so no browser that would only scroll leaves the page frozen.
+  test "a skip link that follows a claimed Back to the same URL loads the saved workspace" do
+    visit new_translation_workspace_path
+    assert_field "Project name"
+    within("aside#app-sidebar") { click_link "History" }
+    assert_current_path history_path
+    within("aside#app-sidebar") { click_link "New translation" }
+    assert_field "Project name"
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Saved before the skip link"
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    # Two claimed Backs reach the first workspace entry, the same URL as this page.
+    page.execute_script("history.go(-2)")
+    assert_until { page.evaluate_script("window.__harness.events['history:traverse'] === 1") }
+    page.execute_script("document.querySelector(\"a[href='#main-content']\").click()")
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_field "Project name", with: "Saved before the skip link"
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
   end
 
   test "Back and Forward churn during a delayed acknowledgement follows only the latest traversal" do
@@ -583,6 +607,22 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Projects"
     assert_nil page.evaluate_script("sessionStorage.getItem('launchSent')")
     assert_imported_draft "Imported while launching"
+  end
+
+  test "a discard with no draft after a claimed Back still loads the fresh workspace" do
+    open_workspace_from_projects
+    install_history_harness
+    # Nothing typed, so no draft exists and the discard sends no request; a
+    # pending import keeps the page busy, so Back is claimed and waits.
+    start_held_import("Never reaches the draft")
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__harness.events['history:traverse'] === 1 && location.pathname === '/projects'") }
+
+    accept_confirm { click_button "Discard draft" }
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_current_path new_translation_workspace_path
+    assert_field "Project name", with: ""
+    assert_empty users(:normal).translation_workspace_drafts
   end
 
   test "a discard freezes the page before the fresh workspace loads" do
