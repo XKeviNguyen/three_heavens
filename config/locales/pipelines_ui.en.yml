@@ -18,14 +18,14 @@ en:
     execution_status: AI request status
     logical_runs: AI tasks
     physical_slots: AI requests
-    attempts_started: Requests sent, including retries
+    attempts_started: "AI attempts started, including retries"
     pending_running_failed: Waiting · running · failed
     known_tokens: Tokens used (known)
     known_attempt_cost: Cost so far (known)
     average_latency: Average response time
     logical_progress: '%{completed} done of %{total}'
     physical_progress: '%{completed} done of %{total} created'
-    token_coverage: Partial total; %{known} of %{total} requests reported tokens.
+    token_coverage: "Partial total; %{known} of %{total} attempts reported tokens."
     cost_coverage: Partial total; unknown costs are not counted as zero.
     recent_failures: Recent failed AI requests
     failure_intro: Only safe error codes are shown. Prompts, your text, and raw responses from the AI service are never displayed.

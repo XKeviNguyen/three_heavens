@@ -66,7 +66,7 @@ The page refreshes every 5 seconds while models are working. Each card shows the
 
 ## 6. Blind review
 
-Choose one or more reviewer models and click **Start blind review**. Reviewers see the candidates as *Candidate A, B, C…* and never learn which model wrote which. Each review scores faithfulness, naturalness, terminology, and how well the instructions were followed, and lists strengths, issues, and suggested corrections. Only you see "Written by (hidden from AI)".
+Choose one or more reviewer models and click **Start blind review**. Reviewers see the candidates as *Candidate A, B, C…*; the app never tells them which model wrote which. Each review scores faithfulness, naturalness, terminology, and how well the instructions were followed, and lists strengths, issues, and suggested corrections. Only you see "Written by (hidden from AI)".
 
 ![Blind review scores for two anonymous candidates](images/readme/03-blind-review.png)
 
@@ -82,7 +82,7 @@ Click **Edit the winning translation**. The winner becomes **version 1** of your
 
 ![Final translation workspace with the editable draft](images/readme/05-final-editor.png)
 
-- **Save version** creates a new version; earlier versions are kept and can be viewed or **restored as a new version**.
+- **Save version** creates a new version when the text has changed (saving unchanged text keeps the current version); earlier versions are kept and can be viewed or **restored as a new version**.
 - **Get AI suggestions** asks one or more models to improve the current version. Each suggestion shows the proposed text, a change summary, and terminology notes. **Apply suggestion** turns it into a new version; nothing is ever applied automatically. A suggestion made for an older version is marked *Out of date*.
 - If another tab saved a newer version, you are told before anything is overwritten, and your text stays in the editor so you can combine the changes.
 

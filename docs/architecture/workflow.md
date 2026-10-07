@@ -29,7 +29,7 @@ stateDiagram-v2
 
 ## Blindness
 
-`BlindReviews::Prompt` and `Judging::Prompt` send candidates under labels (`Candidate A`, `B`, …) assigned per run. Model names, providers, and identifiers are never included. The label-to-candidate mapping is stored in the evaluations and is shown only to the owner ("Written by (hidden from AI)").
+`BlindReviews::Prompt` and `Judging::Prompt` send candidates under labels (`Candidate A`, `B`, …) assigned per run. The application never adds the candidate's model name, provider, or identifier to these prompts. The prompts do include the source, your guidance, and the candidate texts, so identifying cues written inside that text could still reach a reviewer; anonymity is designed to reduce bias, not proven to remove it. The label-to-candidate mapping is stored in the evaluations and is shown only to the owner ("Written by (hidden from AI)").
 
 ## Choosing the winner
 
@@ -62,7 +62,7 @@ Before an automatic launch the workspace shows, and the owner approves, a plan o
 
 ## Long documents
 
-A document holds up to 100,000 characters. When a source exceeds the single-request target, Three Heavens derives an immutable, versioned list of lossless parts (`DocumentExecutionPlan` → `ExperimentSegment`), splitting at paragraph, line, sentence-like punctuation, and finally Unicode-safe hard boundaries. Rejoining the parts reproduces the source exactly.
+A document holds up to 100,000 characters. Only a source longer than the 4,000-character single-request target (`LongDocuments::Segmenter::TARGET_CHARACTERS`) is planned into parts; for it, Three Heavens derives an immutable, versioned list of lossless parts (`DocumentExecutionPlan` → `ExperimentSegment`), splitting at paragraph, line, sentence-like punctuation, and finally Unicode-safe hard boundaries. Rejoining the parts reproduces the source exactly.
 
 - Each stage runs one request per model and part (`TranslationSegmentRun`, `ReviewSegmentRun`, `JudgeSegmentRun`, `FinalizationSegmentRun`). Only failed parts are retried.
 - The parent runs remain the logical candidate/reviewer/judge records used by history, benchmarks, winner selection, and workflow advancement.

@@ -48,7 +48,7 @@ Each step can be started by hand, or a saved **workflow setup** runs translation
 <td><img src="docs/images/readme/13-japanese-judging.png" alt="Judging page in the Japanese interface showing the winning translation and ranking points"></td>
 </tr>
 <tr>
-<td><b>3. Blind review.</b> Model names are removed from review prompts, which reduces brand and self-preference bias. Only you see which model wrote each candidate.</td>
+<td><b>3. Blind review.</b> Review prompts carry anonymous labels instead of model names, which is designed to reduce brand and self-preference bias. Only you see which model wrote each candidate.</td>
 <td><b>4. Judging</b> (shown in the Japanese interface). Each judge ranks every candidate; ranking points are summed across judges. No winner is declared until every judge finishes.</td>
 </tr>
 <tr>
@@ -56,7 +56,7 @@ Each step can be started by hand, or a saved **workflow setup** runs translation
 <td><img src="docs/images/readme/06-ai-suggestion.png" alt="An AI suggestion for version 1, marked Ready to apply, with a suggested translation, change summary, and terminology notes"></td>
 </tr>
 <tr>
-<td><b>5. You edit the winner.</b> Source, instructions, glossary, and review evidence stay beside the editor. Every save creates a new version.</td>
+<td><b>5. You edit the winner.</b> Source, instructions, glossary, and review evidence stay beside the editor. Saving changed text creates a new version.</td>
 <td><b>6. AI suggests, you decide.</b> A suggestion is tied to the exact version it was made for and is applied only when you click <i>Apply suggestion</i>.</td>
 </tr>
 <tr>
@@ -94,11 +94,11 @@ Most of the engineering is in making paid, slow, failure-prone AI calls behave l
 
 - **The human checkpoint is a domain invariant.** Only the explicit finalize action finalizes a translation, and AI suggestions become versions only when a person applies them. Automatic workflows always end at "Ready for you to edit". — [`Finalizations::ApplyProposal`](app/services/finalizations/apply_proposal.rb), [`Pipelines::Advance`](app/services/pipelines/advance.rb); [automatic pipeline tests](test/system/automatic_pipelines_test.rb)
 - **Paid AI work needs explicit, bounded approval.** An automatic launch stores the approved plan (models × document parts × retry limit) on the workflow run; for multi-part documents the plan's digest is rechecked at submit and the launch is refused if it changed. Actual spend is recorded per request and shown as known or partial; a later retry is a separate action with its own cost warning. — [`Pipelines::Start`](app/services/pipelines/start.rb); [submission tests](test/integration/translation_workspace_submission_test.rb)
-- **Every launch is idempotent.** Each form carries a signed, single-use submission identity consumed under a row lock, so a double click or a replayed POST returns the existing translation instead of paying twice. — [`TranslationWorkspace`](app/forms/translation_workspace.rb), [`ReplayIdentity`](app/services/replay_identity.rb); [replay tests](test/integration/replay_adversarial_test.rb)
+- **Every launch is idempotent.** Each form carries a signed, single-use submission identity consumed under a row lock, so a double click or a replayed POST returns the existing translation instead of starting a second paid run. — [`TranslationWorkspace`](app/forms/translation_workspace.rb), [`ReplayIdentity`](app/services/replay_identity.rb); [replay tests](test/integration/replay_adversarial_test.rb)
 - **AI jobs tolerate duplicates, late arrivals, and crashes.** Runs are committed before their jobs are enqueued; a job claims its run under a row lock by job ID and execution number, and a late result can only update the attempt that claimed it. A watchdog fails stuck work without calling a provider. — [`Ai::ExecutionClaim`](app/services/ai/execution_claim.rb), [`Ai::StaleExecutionReconciler`](app/services/ai/stale_execution_reconciler.rb); [job lineage tests](test/jobs/ai_job_lineage_test.rb)
 - **Drafts live on the server, not in localStorage.** An encrypted server draft, a per-tab editor identity, and a monotonically increasing sequence number resolve lost responses and late duplicates deterministically, report another tab's newer draft as a conflict, and work across devices. — [`TranslationWorkspaceDrafts::Save`](app/services/translation_workspace_drafts/save.rb); [draft tests](test/integration/translation_workspace_draft_test.rb), [browser history tests](test/system/translation_workspace_history_test.rb)
 - **Configuration is versioned, not edited in place.** Glossaries, methodologies, references, and workflow setups append revisions; a translation stores the exact revisions it used, and PostgreSQL triggers stop terminal history from being rewritten. — [database design](docs/architecture/database.md)
-- **PostgreSQL is the only coordination layer.** Row and advisory locks, unique indexes, and `SKIP LOCKED` give idempotency and batched cleanup; Solid Queue keeps jobs in PostgreSQL too, so there is one stateful dependency to back up and reason about. — [reliability](docs/architecture/reliability.md); [multi-process concurrency tests](test/support/process_barrier.rb)
+- **PostgreSQL coordinates all persistent workflow state.** Row and advisory locks, unique indexes, and `SKIP LOCKED` give idempotency and batched cleanup; Solid Queue keeps jobs in PostgreSQL too, so there is one stateful dependency to back up and reason about. — [reliability](docs/architecture/reliability.md); [multi-process concurrency tests](test/support/process_barrier.rb)
 - **Untrusted input is contained.** DOCX goes through a bounded ZIP reader and DTD-free XML; PDFs are extracted in a resource-limited child process; model output is validated against JSON schemas before it is stored. — [`SourceImports::PdfExtractor`](app/services/source_imports/pdf_extractor.rb); [security](docs/security.md)
 
 ## Architecture
@@ -113,7 +113,7 @@ flowchart LR
   J --> PG
   J -->|HTTPS| OR["OpenRouter"]
   PU --> FS[("Private file storage")]
-  PU --> PDF["Sandboxed PDF extractor"]
+  PU --> PDF["Resource-limited PDF worker"]
 ```
 
 A single Rails monolith. Controllers handle HTTP and ownership checks; a form object and namespaced services (`TranslationExperiments::`, `BlindReviews::`, `Judging::`, `Finalizations::`, `Pipelines::`, `SourceImports::`) own the workflows; jobs make every AI call through one provider client (`Ai::OpenRouterClient`). There is no Redis: in production Solid Queue, Solid Cache, and Solid Cable each use their own PostgreSQL database. Full topology, request path, and recurring jobs: [architecture overview](docs/architecture/overview.md).
@@ -135,7 +135,7 @@ flowchart TD
   class E,F human
 ```
 
-Judges receive the anonymous candidates and the anonymous review feedback. The winner is chosen by a Borda count: a candidate ranked *r* of *N* earns *N − r + 1* points from each judge; ties go to the higher average score. Documents up to 100,000 characters are split losslessly into parts at paragraph and sentence boundaries, and each model processes every part. Details: [workflow and long documents](docs/architecture/workflow.md).
+Judges receive the anonymous candidates and the anonymous review feedback. The winner is chosen by a Borda count: a candidate ranked *r* of *N* earns *N − r + 1* points from each judge; ties go to the higher average score. Sources longer than 4,000 characters (up to 100,000) are split losslessly into parts at paragraph and sentence boundaries, and each model processes every part. Details: [workflow and long documents](docs/architecture/workflow.md).
 
 ## Data model
 
@@ -153,7 +153,7 @@ erDiagram
   EXPERIMENT ||--o| PIPELINE_RUN : "automatic workflow"
 ```
 
-Full diagrams (reviews, judgments, suggestions, versioned guidance, request-coordination tables) and the constraints that protect history: [database design](docs/architecture/database.md).
+This is a simplified domain view. Diagrams of all 47 application tables with their keys, and the constraints that protect history, are in [database design](docs/architecture/database.md); per-table purpose and lifecycle are in the [data dictionary](docs/architecture/data-dictionary.md).
 
 ## Reliability
 
@@ -186,7 +186,7 @@ Autosave, idempotency, recovery, and cleanup fairness in detail: [reliability de
 - Every owned record is loaded through the signed-in user's associations; other users' records look exactly like missing ones.
 - Database-backed sessions that sign-out revokes, bcrypt passwords with email confirmation, and Google ID-token verification with single-use nonces.
 - A strict nonce-based Content Security Policy, CSRF protection, per-route request-size limits, and rate limits on sign-in and uploads.
-- Hostile-file handling (bounded DOCX parsing, sandboxed PDF extraction), encrypted drafts, and log filtering of text and identities.
+- Hostile-file handling (bounded DOCX parsing, a resource-limited PDF worker), encrypted drafts, and log filtering of text and identities.
 
 Controls, limits, and residual risks: [security](docs/security.md).
 
@@ -206,7 +206,7 @@ Every change is reviewed along the same dimensions:
 
 | Dimension | Examples here |
 | --- | --- |
-| Security | ownership scoping, signed identities, input bounds, sandboxed parsing |
+| Security | ownership scoping, signed identities, input bounds, bounded file parsing |
 | Data | PostgreSQL constraints and triggers, versioned history, restore drills |
 | Flow | idempotent launches, replay-safe autosave, explicit retries |
 | Environment | browser system tests, production-boot contract, preflight checks |
@@ -299,9 +299,10 @@ Runbooks: [configuration](docs/operations/configuration.md) · [production deplo
 
 - **V1.1, release candidate.** The `develop` branch passes the CI gate above. Production deployment is a separate, human-controlled step; this README does not claim a live deployment, traffic, or uptime.
 - **One AI provider:** all AI calls go through OpenRouter.
+- **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
 - **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
 - **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
 - **License:** no open-source license has been chosen yet. You are welcome to read and evaluate the code; all other rights are reserved.
 
-Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)
+Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)

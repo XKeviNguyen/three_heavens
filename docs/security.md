@@ -37,7 +37,7 @@ See [Google sign-in](identity/google-sign-in.md) for the identity flow.
 Uploads accept `.txt`, `.md`, `.docx`, and text `.pdf` up to 10 MiB. Details are in [documents](architecture/documents.md); in short:
 
 - **DOCX:** macro-free WordprocessingML only. Package structure, content types, relationships, and extension/MIME/magic bytes must agree. A bounded in-memory ZIP reader caps entries (500), declared expansion (50 MiB), and XML sizes, and rejects encrypted entries, macros, embedded objects, path traversal, ambiguous names, and suspicious compression. XML parsing is strict, DTD-free, and network-disabled.
-- **PDF:** text is extracted by `pdf-reader` in a separate child process with no environment or inherited files, its own process group, 256 MiB address space, a 5-second CPU and wall-clock limit, at most 100 pages, no file writes or core dumps, and the highest OOM score. One PDF worker runs per container.
+- **PDF:** text is extracted by `pdf-reader` in a separate, resource-limited child process that inherits no application environment, credentials, or open files (only `MALLOC_ARENA_MAX=2` is passed), with its own process group, 256 MiB address space, a 5-second CPU and wall-clock limit, at most 100 pages, and no file writes or core dumps. Where Linux allows it, the worker sets `oom_score_adj=1000` on a best-effort basis. One PDF worker runs per container, coordinated by an in-process slot limit.
 
 ## AI provider boundary
 

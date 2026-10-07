@@ -18,14 +18,14 @@ ja:
     execution_status: "AIリクエストの状況"
     logical_runs: "AI処理"
     physical_slots: "AIリクエスト"
-    attempts_started: "送信したリクエスト（再試行を含む）"
+    attempts_started: "開始したAI試行（再試行を含む）"
     pending_running_failed: 待機 · 実行中 · 失敗
     known_tokens: "使用したトークン（判明分）"
     known_attempt_cost: "これまでの費用（判明分）"
     average_latency: "平均応答時間"
     logical_progress: 完了%{completed}件 / 全%{total}件
     physical_progress: 完了%{completed}件 / 作成%{total}件
-    token_coverage: "一部のみの合計です。%{known}/%{total}件のリクエストでトークン数が報告されました。"
+    token_coverage: "一部のみの合計です。%{known}/%{total}件の試行でトークン数が報告されました。"
     cost_coverage: "一部のみの合計です。不明な費用は0として扱いません。"
     recent_failures: "最近失敗したAIリクエスト"
     failure_intro: "安全なエラーコードだけを表示します。プロンプト、あなたの文章、AIサービスからの生の応答は表示しません。"

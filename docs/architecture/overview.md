@@ -1,6 +1,6 @@
 # Architecture overview
 
-Three Heavens is one Rails 8.1 application. PostgreSQL 17 is the source of truth for application data and also backs the job queue, cache, and Action Cable. There is no Redis and no separate frontend build.
+Three Heavens is one Rails 8.1 application. PostgreSQL 17 is the source of truth for application data and also backs the job queue, cache, and Action Cable. There is no Redis, no JavaScript bundler, and no separate single-page app; JavaScript loads through importmap, and Tailwind CSS is built by Rails tooling (`tailwindcss:watch` in development, asset precompilation in the Docker build).
 
 ## Runtime topology
 
@@ -73,7 +73,7 @@ Queue, cache, and cable health appear on the admin-only Operations page as aggre
 ## Related documents
 
 - [Translation workflow and long documents](workflow.md)
-- [Database design](database.md)
+- [Database design](database.md) and [data dictionary](data-dictionary.md)
 - [Reliability and concurrency](reliability.md)
 - [Documents: import and export](documents.md)
 - [Security](../security.md)

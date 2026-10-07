@@ -44,7 +44,7 @@ Visible text is converted deterministically: paragraphs become LF-separated line
 
 ## PDF
 
-`SourceImports::PdfExtractor` runs `pdf-reader` in a separate, resource-limited child process: no environment or inherited files, its own process group, 256 MiB address space, 5-second CPU and wall-clock limits, at most 100 pages, no file writes or core dumps, and the highest OOM score so the kernel stops it before the web process. See [security](../security.md) for the residual risk.
+`SourceImports::PdfExtractor` runs `pdf-reader` in a separate, resource-limited child process: it inherits no application environment, credentials, or open files (only a minimal allocator setting, `MALLOC_ARENA_MAX=2`, is passed), runs in its own process group with 256 MiB of address space, 5-second CPU and wall-clock limits, at most 100 pages, and no file writes or core dumps. On Linux hosts that allow it, the worker sets `oom_score_adj=1000` so the kernel stops it before the web process; if that setting cannot be written, extraction still runs under the other limits. It runs as the same user as the application, so it is resource-limited, not a kernel sandbox. See [security](../security.md) for the residual risk.
 
 ## Export
 

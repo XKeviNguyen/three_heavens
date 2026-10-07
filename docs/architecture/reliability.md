@@ -2,7 +2,7 @@
 
 Three Heavens assumes that networks drop responses, users double-click and open several tabs, processes crash between steps, and jobs run twice. Each section below names the failure, the mechanism, and where the code lives.
 
-PostgreSQL is the coordination point throughout: row locks (`SELECT … FOR UPDATE`), advisory locks, unique indexes, and `SKIP LOCKED`. There is no second coordination store to keep consistent.
+PostgreSQL coordinates all persistent workflow state: row locks (`SELECT … FOR UPDATE`), advisory locks, unique indexes, and `SKIP LOCKED`. There is no second coordination store such as Redis. (One in-memory exception: the per-container PDF worker slot is a `Mutex` and `ConditionVariable`, because it limits a local process, not shared state.)
 
 ## 1. Autosaved drafts
 
@@ -67,6 +67,11 @@ flowchart TD
 - Only the first execution and strictly newer built-in retries of the recorded job may claim a run. Duplicate executions, other jobs, and retries from an earlier manual recovery cycle exit harmlessly. A late result can update only the attempt that claimed the run.
 - `StaleAiWorkReconciliationJob` (every 15 minutes) marks work that has not started, or is running without a fresh claim, for `AI_STALE_EXECUTION_THRESHOLD_MINUTES` (default 120, range 15–1440) as failed with `stale_pending` or `stale_execution`. It never sends a provider request. A job that arrives after recovery is obsolete. Operators can run `bin/rails ai:reconcile_stale`.
 - Retrying failed work is always an explicit owner action with a cost warning. Completed sibling runs, anonymous labels, and the base versions of AI suggestions are preserved.
+- Each claim writes an `ai_provider_attempts` row **before** the context-budget check and before any request is sent, so the ledger counts execution attempts, not HTTP requests.
+
+### Exactly-once applies to application state, not to the provider
+
+Launch identities, job claims, and attempt fencing make the application's own state change once per operation. They cannot make an external call exactly-once: the client sends no provider-side idempotency key, and a read or network timeout is treated as retryable (up to 5 attempts per authorization under `Ai::ProviderRetryPolicy`). If OpenRouter received a request but the response was lost, a retry can be processed and billed again. Cost totals show only what the provider reported.
 
 Tests: `test/jobs/ai_job_lineage_test.rb`, `test/services/ai/run_scheduler_test.rb`, `test/services/ai/stale_execution_reconciler_test.rb`.
 
@@ -79,7 +84,7 @@ Tests: `test/jobs/ai_job_lineage_test.rb`, `test/services/ai/run_scheduler_test.
 
 ## 5. Bounded cleanup and fairness
 
-Temporary state is deleted on a schedule, never by a request:
+Bulk expiry cleanup runs in bounded scheduled jobs. A request removes only the specific record it acts on: an explicit draft discard, the draft retired by a successful launch, or an expired or unreadable draft replaced during autosave. Scheduled lifetimes:
 
 | State | Lifetime | Cleanup |
 | --- | --- | --- |
