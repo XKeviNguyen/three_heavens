@@ -347,6 +347,8 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{other.current_revision_id}']:checked", visible: :all
     assert_until { workspace_draft_glossary == other.current_revision_id.to_s }
     assert_selector "[data-workspace-summary-target='terminology']", text: "Other terms"
+    # The panel's own card follows the choice too, so its links edit that glossary.
+    assert_selector "#workspace-terminology a[href*='glossary_id=#{other.id}']", text: "Edit terminology"
     refresh
     assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{other.current_revision_id}']:checked", visible: :all
   end
@@ -396,6 +398,7 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_selector "input[name='translation_workspace[glossary_revision_id]'][value='#{saved.id}']:checked", visible: :all
     assert_until { workspace_draft_glossary == saved.id.to_s }
     assert_selector "[data-workspace-summary-target='terminology']", text: "Workspace terms"
+    assert_selector "#workspace-terminology a[href*='glossary_id=#{@glossary.id}']", text: "Edit terminology"
   end
 
   test "a page control replaced while its save ran lapses and later saves still come first" do
@@ -432,6 +435,22 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     click_button "Log out"
     assert_current_path login_path
     assert_equal "Saved before signing out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+  end
+
+  test "no more references can be ticked than a draft and a launch accept" do
+    5.times { |index| create_translation_reference(title: "Extra reference #{index}") }
+    visit new_translation_workspace_path
+    find("details > summary", text: /References, methodology/).click
+    boxes = all("input[name='translation_workspace[translation_reference_revision_ids][]']")
+    assert_equal 6, boxes.size
+    boxes.first(5).each(&:check)
+    assert boxes.last.disabled?
+    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("translation_reference_revision_ids", [])&.size == 5 }
+
+    boxes.first.uncheck
+    assert_not boxes.last.disabled?
+    boxes.last.check
+    assert boxes.first.disabled?
   end
 
   test "a second terminology save cannot start while one is in flight" do

@@ -494,7 +494,10 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
         if (event.detail.fetchOptions.method === "POST" && new URL(event.detail.url).pathname === "/translation_workspace") sessionStorage.setItem("launchSent", "true")
       })
     JS
-    click_button "Start translation"
+    page.execute_script("document.addEventListener('submit', () => { window.__launchSubmitted = true }, { capture: true, once: true })")
+    # Activate the button itself, independent of where the sticky bar is drawn.
+    find_button("Start translation").execute_script("this.click()")
+    assert_until { page.evaluate_script("window.__launchSubmitted === true") }
     assert_status I18n.t("workspace.saving")
     page.execute_script("history.back()")
     assert_until { page.evaluate_script("location.pathname === '/projects' && window.__harness.events['history:traverse'] === 1") }
@@ -674,7 +677,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
       const schedule = window.setTimeout
       window.__retries = []
       window.setTimeout = (callback, delay, ...rest) => {
-        if ([2000, 5000, 15000, 30000].includes(delay)) return window.__retries.push(callback)
+        // A negative id never matches a real timer the guard might clear.
+        if ([2000, 5000, 15000, 30000].includes(delay)) return -window.__retries.push(callback)
         return schedule(callback, delay, ...rest)
       }
       window.__requests = []
@@ -704,6 +708,67 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "session", requests.last
     page.execute_script("window.__releaseSession()")
     assert_current_path login_path
+  end
+
+  test "a sign-out that fails after Leave keeps guarding and saving the page" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/session") return Promise.reject(new TypeError("Failed to fetch"))
+        return deliver(url, options)
+      }
+      document.addEventListener("turbo:submit-end", () => { window.__signOutEnded = true })
+    JS
+    fill_in "Project name", with: "Kept after a failed sign-out"
+    assert_status I18n.t("workspace.save_failed")
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("window.__signOutEnded === true") }
+
+    # Still here: the edit is saved again once saving works, and leaving is guarded.
+    page.execute_script("window.__harness.saveMode = 'ok'")
+    fill_in "Project name", with: "Saved after the failed sign-out"
+    assert_status I18n.t("workspace.saved")
+    assert_equal "Saved after the failed sign-out", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Guarded again"
+    assert_status I18n.t("workspace.save_failed")
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+  end
+
+  test "Leave after a Back was claimed signs out instead of following that Back" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    page.execute_script(<<~JS)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/session") await new Promise(resolve => { window.__releaseSignOut = resolve })
+        return deliver(url, options)
+      }
+    JS
+    fill_in "Project name", with: "Abandoned for sign-out"
+    assert_status I18n.t("workspace.save_failed")
+    click_button "Log out"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    click_button "Leave"
+    assert_until { page.evaluate_script("!!window.__releaseSignOut") }
+    page.execute_script("window.__sameDocument = true; window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    # The claimed Back's save lands; it must not reload the page to that Back.
+    assert_until { users(:normal).translation_workspace_drafts.first&.payload&.fetch("project_name", nil) == "Abandoned for sign-out" }
+    page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => done()))")
+    page.execute_script("window.__releaseSignOut()")
+    assert_current_path login_path
+    assert page.evaluate_script("window.__sameDocument === true"), "the sign-out was replaced by a reload"
   end
 
   test "signing out from a saved workspace or another page stays immediate" do
@@ -802,6 +867,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
   def install_history_harness
     page.execute_script(<<~JS, TURBO_EVENTS)
       const turboEvents = arguments[0]
+      // Hover prefetches would be held too and then reused by a later visit;
+      // only the visits a test drives are held. <html> survives Turbo visits.
+      document.documentElement.dataset.turboPrefetch = "false"
       const deliver = window.fetch.bind(window)
       const harness = window.__harness = { saveMode: "ok", discardMode: "ok", heldSaves: [], holdPages: new Set(), heldPages: [], pageRequests: [], events: {} }
       const hold = (list, entry, signal) => new Promise((resolve, reject) => {

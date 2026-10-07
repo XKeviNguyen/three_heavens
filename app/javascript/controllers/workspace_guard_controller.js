@@ -256,10 +256,12 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    if (this.launching || this.discarding || this.navigation?.phase === "allowed") {
+    if (this.launching || this.discarding) {
       event.preventDefault()
       return
     }
+    // The page is saved and reloading; the switch replaces that load (beforeSubmit).
+    if (this.navigation?.phase === "allowed") return
     this.cancelNavigation()
     event.detail.pending.push(this.flush())
   }
@@ -382,9 +384,17 @@ export default class extends Controller {
     // A form whose own handler took over (such as the appearance switch)
     // leaves nothing to save for; Turbo skips it as well.
     if (event.defaultPrevented || !this.replacesPage({ formElement: form, submitter }) || this.allowVisit) return
-    // The saved page is already reloading to a claimed history entry.
-    if (this.discarding || this.navigation?.phase === "allowed") {
+    if (this.discarding) {
       event.preventDefault()
+      return
+    }
+    // The saved page is already reloading to a claimed history entry. A newer
+    // form replaces that load with a full page submission, as a newer link does.
+    if (this.navigation?.phase === "allowed") {
+      event.preventDefault()
+      this.allowVisit = true
+      form.dataset.turbo = "false"
+      this.send(form, submitter)
       return
     }
     this.cancelNavigation()
@@ -411,7 +421,7 @@ export default class extends Controller {
       submitter = Array.from(form.elements).find(element => element.type === "submit" &&
         element.name === submitter.name && element.value === submitter.value &&
         element.getAttribute("formaction") === submitter.getAttribute("formaction"))
-      if (!submitter) return
+      if (!submitter) return false
     }
     this.allowSubmit = true
     try {
@@ -419,6 +429,7 @@ export default class extends Controller {
     } finally {
       this.allowSubmit = false
     }
+    return true
   }
 
   // A Turbo form submission that is not for a frame, such as a launch or the
@@ -451,6 +462,14 @@ export default class extends Controller {
     if (this.visiting || this.submission) return
     this.launching = false
     this.element.inert = false
+    // A Leave whose form did not replace the page leaves nothing abandoned.
+    if (this.allowVisit && !this.discarding) this.resumeGuarding()
+  }
+
+  // The page stayed after all, so its edits are guarded and saved again.
+  resumeGuarding() {
+    this.allowVisit = false
+    this.scheduleSave()
   }
 
   // Turbo sends a form inside a frame, or one that names a frame, to that frame.
@@ -466,11 +485,13 @@ export default class extends Controller {
 
   leave() {
     const destination = this.destination
+    this.dialogTarget.close()
+    // Leave is the latest action: a traversal claimed meanwhile gives way.
+    this.cancelNavigation()
     this.allowVisit = true
     window.clearTimeout(this.saveTimer)
-    this.dialogTarget.close()
     if (destination.form) {
-      this.send(destination.form, destination.submitter)
+      if (!this.send(destination.form, destination.submitter)) this.resumeGuarding()
       return
     }
     // Assigning a URL that differs only by its fragment would keep this page.

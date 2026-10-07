@@ -58,17 +58,19 @@ export default class extends Controller {
   // the saved glossary's previous revision means its saved revision.
   beforeStreamRender(event) {
     if (!this.chosenDuringSave || event.target.target !== "workspace-terminology") return
-    const chosen = this.glossaryRadio(":checked")
-    if (!chosen) return
-    const { value } = chosen
-    const { glossaryId } = chosen.dataset
     const render = event.detail.render
     event.detail.render = async stream => {
+      // Read when the render runs, so a choice made just before it counts.
+      const chosen = this.glossaryRadio(":checked")
       await render(stream)
+      if (!chosen) return
+      const { value } = chosen
+      const { glossaryId } = chosen.dataset
       const radio = this.glossaryRadio(`[value='${CSS.escape(value)}']`) || (glossaryId && this.glossaryRadio(`[data-glossary-id='${CSS.escape(glossaryId)}']`))
       if (!radio || radio.checked) return
+      // A change, as a user's choice would be: the panel reloads for it and the draft saves it.
       radio.checked = true
-      radio.dispatchEvent(new Event("input", { bubbles: true }))
+      radio.dispatchEvent(new Event("change", { bubbles: true }))
     }
   }
 
