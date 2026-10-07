@@ -15,6 +15,9 @@ vi:
       newer: ← Mới hơn
       older: Cũ hơn →
       page: Trang %{current}/%{total} · %{entries}
+      entries:
+        one: '%{count} mục'
+        other: '%{count} mục'
     steps:
       label: Quy trình dịch
       translation: Dịch
@@ -27,6 +30,7 @@ vi:
       failed: Thất bại
       waiting: Đang chờ
     home: Trang chủ Three Heavens
+    technical_details: Chi tiết kỹ thuật
     upload:
       title: Tải tệp nguồn lên · Three Heavens
       extracting: Đang trích xuất văn bản…
@@ -34,4 +38,4 @@ vi:
       or: hoặc
       choose: Chọn tệp
       formats: TXT · Markdown · DOCX · PDF
-      limit: Dung lượng tối đa %{maximum} MiB. Tải lên và xem trước không liên hệ nhà cung cấp AI.
+      limit: "Tối đa %{maximum} MiB. Tải lên và xem trước không gửi gì cho AI."

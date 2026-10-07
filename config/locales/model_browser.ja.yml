@@ -6,8 +6,8 @@ ja:
     selected_many: "モデルを%{count}件選択"
     empty_selected: モデルが選択されていません。下の一覧から追加してください。
     search_placeholder: OpenRouterのモデルを検索…
-    provider: プロバイダー
-    all_providers: すべてのプロバイダー
+    provider: "提供元"
+    all_providers: "すべての提供元"
     free_only: 無料のみ
     sort: 並び替え
     name: 名前

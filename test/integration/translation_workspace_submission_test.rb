@@ -157,11 +157,11 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
       end
     end
     assert_response :unprocessable_content
-    assert_select "h3", text: "Paid-work authorization"
+    assert_select "h3", text: "Approve AI cost"
     segment_count = LongDocuments::Segmenter.call(source).size
     request_slots = profile.current_revision.model_selections.count * segment_count
-    authorization = css_select("section").find { |section| section.at_css("h3")&.text == "Paid-work authorization" }
-    assert_match(/#{segment_count} source segment\(s\) require #{request_slots} initial request slots and authorize at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} requests/, authorization.text.squish)
+    authorization = css_select("section").find { |section| section.at_css("h3")&.text == "Approve AI cost" }
+    assert_match(/processed in #{segment_count} part\(s\): #{request_slots} AI requests to start, and at most #{request_slots * Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} in total/, authorization.text.squish)
     digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, digest)
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])"
@@ -219,7 +219,7 @@ class TranslationWorkspaceSubmissionTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /Submission token.*expired/i
+    assert_select "li", text: /This form has expired/
 
     malformed_values = [ nil, "short", "x" * 101, [ issue_translation_workspace_token ], { nested: "token" } ]
     malformed_values.each do |value|

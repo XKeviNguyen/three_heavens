@@ -87,7 +87,7 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_select "[role='status']", text: /no longer has the model capability data/
+    assert_select "[role='status']", text: /missing model details this document needs/
     assert_select "input[name='translation_workspace[workflow_mode]'][value='manual'][checked]"
     assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][checked]", count: 0
     assert_select "#workspace-manual-models [data-model-card] input[type='hidden'][name='translation_workspace[model_ids][]']", count: 2
@@ -113,9 +113,9 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     end
 
     {
-      workflow_profile_page: [ "Workflow profiles", "translation_workspace[workflow_profile_revision_id]", selected_profile.current_revision_id ],
+      workflow_profile_page: [ "Workflow setups", "translation_workspace[workflow_profile_revision_id]", selected_profile.current_revision_id ],
       glossary_page: [ "Glossaries", "translation_workspace[glossary_revision_id]", selected_glossary.current_revision_id ],
-      methodology_profile_page: [ "Methodology profiles", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
+      methodology_profile_page: [ "Methodologies", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
       translation_reference_page: [ "Translation references", "translation_workspace[translation_reference_revision_ids][]", selected_reference.current_revision_id ]
     }.each do |page_param, (label, input_name, revision_id)|
       get new_translation_workspace_path(page_param => 2)
@@ -165,13 +165,13 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     assert_no_match(/Preserved/, response.location)
     follow_redirect!
     assert_response :success
-    assert_select "nav[aria-label='Workflow profiles pagination']", text: /Page 2 of 2/
+    assert_select "nav[aria-label='Workflow setups pagination']", text: /Page 2 of 2/
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Preserved source"
     assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][value='#{selected_profile.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{selected_glossary.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{selected_methodology.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[translation_reference_revision_ids][]'][value='#{selected_reference.current_revision_id}'][checked]", count: 1
-    assert_select "h3", text: "Paid-work authorization"
+    assert_select "h3", text: "Approve AI cost"
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])", count: 1
     rebuilt_digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, rebuilt_digest)

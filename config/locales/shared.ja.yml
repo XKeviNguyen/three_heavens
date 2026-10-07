@@ -15,6 +15,9 @@ ja:
       newer: ← 新しい項目
       older: 古い項目 →
       page: '%{current}/%{total}ページ · %{entries}'
+      entries:
+        one: '%{count}件'
+        other: '%{count}件'
     steps:
       label: 翻訳ワークフロー
       translation: 翻訳
@@ -27,6 +30,7 @@ ja:
       failed: 失敗
       waiting: 待機中
     home: Three Heavensのホーム
+    technical_details: 技術情報
     upload:
       title: 原文ファイルをアップロード · Three Heavens
       extracting: 原文を抽出中…
@@ -34,4 +38,4 @@ ja:
       or: または
       choose: ファイルを選択
       formats: TXT · Markdown · DOCX · PDF
-      limit: 最大%{maximum} MiB。アップロードとプレビューではAIプロバイダーに送信しません。
+      limit: "最大%{maximum} MiB。アップロードとプレビューではAIに何も送信しません。"

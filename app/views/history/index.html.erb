@@ -58,7 +58,7 @@
             <p class="mt-4 text-sm text-slate-500"><span class="font-semibold"><%= t("projects_ui.manual_workflow") %></span></p>
           <% end %>
           <% if experiment.methodology_profile_revision %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.methodology") %></span> <%= experiment.methodology_profile_revision.name %> · <%= t("projects_ui.revision", version: experiment.methodology_profile_revision.version) %></p><% end %>
-          <p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.guidance_preference") %></span> <%= localized_guidance_label(experiment.guidance_preference) %></p>
+          <p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.guidance_preference") %>:</span> <%= localized_guidance_label(experiment.guidance_preference) %></p>
           <% if experiment.experiment_reference_revisions.any? %><p class="mt-2 text-sm text-slate-600"><span class="font-semibold"><%= t("projects_ui.references") %></span> <%= experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · #{t("projects_ui.revision", version: snapshot.translation_reference_revision.version)}" }.to_sentence %></p><% end %>
 
           <div class="mt-5 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4 text-sm font-semibold">

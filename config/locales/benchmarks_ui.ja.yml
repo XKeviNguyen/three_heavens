@@ -2,20 +2,20 @@ ja:
   benchmarks_ui:
     title: モデル統計 · Three Heavens
     show_title: '%{name}の統計 · Three Heavens'
-    heading: モデル別の統計
-    intro: 指定したカタログモデル別に集計します。履歴があれば無効なモデルも含まれます。平均値と比率には標本数を示し、欠けているデータは明示します。
+    heading: "モデル評価"
+    intro: "選んだモデルごとに集計します。履歴があれば無効なモデルも含まれます。平均値と比率には件数を示し、欠けているデータは明示します。"
     sort_by: 並べ替え
     sort_button: 並べ替え
     sort:
       judge_samples: 判定スコアの標本数（多い順）
-      wins: 正式採用数（多い順）
-      win_rate: 正式採用率（高い順）
+      wins: "採用数（多い順）"
+      win_rate: "採用率（高い順）"
       review_score: ブラインドレビューの点数（高い順）
       judge_score: 判定スコア（高い順）
       translation_cost: 平均翻訳費用（低い順）
-      latency: 平均所要時間（短い順）
+      latency: "平均応答時間（短い順）"
     empty: 統計データはまだありません
-    empty_intro: モデルは翻訳実験に参加すると表示されます。
+    empty_intro: "モデルは翻訳に参加すると、ここに表示されます。"
     diagnostics: レビュー・判定モデルの分析
     diagnostics_intro: 自己採点差は、レビューモデルが同じカタログモデルの候補に付けた平均点から、他のモデルの候補への平均点を引いた値です。原因を示すものではありません。判定の一致率は集計結果との一致であり、客観的な正しさではありません。
     model_role: モデルの役割
@@ -24,13 +24,13 @@ ja:
     self_difference: 自己採点差
     agreement: 集計結果との一致
     metric_notes: 指標の説明
-    metric_notes_intro: 正式採用率は、完了した判定ラウンドで勝った回数を、評価対象となった完了ラウンド数で割った値です。失敗・未完了は除きます。参加数と失敗率は分割リクエストではなく論理的な翻訳処理で数えます。品質平均は完了したレビュー・判定の有効な点数を使います。費用、トークン、所要時間は完了した翻訳のみから算出します。
-    cost_note: 判定点あたりの費用は、費用が正の完了した翻訳ごとに、費用を完了した判定の平均点で割り、対象分を平均します。費用0や未判定の処理は除きます。
+    metric_notes_intro: "採用率は、そのモデルの翻訳を含む完了した判定のうち、採用された回数の割合です。失敗・未完了は除きます。参加数と失敗率は、文書を分割して処理した場合でも文書全体の翻訳を1件として数えます。品質平均は完了したレビューと判定の点数を使います。費用、トークン、応答時間は完了した翻訳だけから算出します。"
+    cost_note: "判定点あたりの費用は、有料の完了した翻訳ごとに費用を平均判定点で割り、その結果を平均します。無料や未判定の翻訳は除きます。"
     all: ← モデル統計一覧
     summary: 概要
     role_diagnostics: 役割別の分析
-    role_intro: レビューモデルの比較には指定したカタログモデルを使い、提供元が実際に返した識別子は使いません。差は記述的なもので因果関係を示しません。一致率は集計結果との一致であり、客観的な正しさではありません。
-    self_difference_heading: 自己レビューの採点差
+    role_intro: "レビューモデルの比較には、AIサービスが報告したIDではなく、あなたが選んだモデルを使います。差は結果を示すもので、原因を示すものではありません。一致率は採用された翻訳との一致であり、客観的な正しさではありません。"
+    self_difference_heading: "このレビューモデルは自分の翻訳をひいきしていないか"
     self: 自身
     other: 他モデル
     difference: 差
@@ -40,8 +40,8 @@ ja:
     no_judge_runs: 該当なし · 対象となる完了した判定がありません。
     resolved_history: 実際に使用されたモデルの履歴
     resolved_intro: OpenRouterが指定したモデルとは異なる実際の識別子を返す場合があります。不明な値は明示します。以下の費用合計には、費用が報告された完了済み翻訳のみを含めます。
-    resolved_identifier: 実際の識別子
-    runs: 処理件数
+    resolved_identifier: "実際に使われたモデルID"
+    runs: "翻訳件数"
     wins: 採用数
     judge_score: 判定スコア
     known_cost: 判明している費用
@@ -49,19 +49,19 @@ ja:
     recent_history: 最近の翻訳履歴
     recent_intro: このモデルを指定した直近25件です。
     sample: 翻訳の統計対象
-    official_winner: 正式採用
-    latency: 所要時間
+    official_winner: "採用"
+    latency: "応答時間"
     review_score: ブラインドレビューの点数
     completed_translations: 完了した翻訳
     participation: 参加%{count}件 · 失敗%{failed}件 · 失敗率%{rate}
-    official_wins: 正式採用数
+    official_wins: "採用数"
     win_rate_detail: 対象の完了ラウンド%{count}件で%{rate}
     score_samples: 点数の標本%{count}件 · 候補%{candidates}件
     known_translation_cost: 判明している翻訳費用
     total: 合計%{value}
-    average_samples: 平均%{value} · 完了した処理%{count}件
-    average_latency: 平均所要時間
-    completed_samples: 完了した処理%{count}件
+    average_samples: "平均%{value} · 完了した翻訳%{count}件"
+    average_latency: "平均応答時間"
+    completed_samples: "完了した翻訳%{count}件"
     average_total_tokens: 平均合計トークン数
     cost_per_point: 判定点あたりの平均費用
-    cost_quality_samples: 費用が正で判定済みの処理%{count}件 · 低いほど良い
+    cost_quality_samples: "有料で判定済みの翻訳%{count}件 · 低いほど良い"

@@ -42,12 +42,12 @@ class HistoryOwnershipTest < ActionDispatch::IntegrationTest
 
     sign_in_as users(:normal)
     get benchmarks_path
-    assert_select "article[data-model-id='#{model.id}']", text: /Completed translations\s*1/m
+    assert_select "article[data-model-id='#{model.id}']", text: /Finished translations\s*1/m
 
     sign_out
     sign_in_as users(:admin)
     get benchmarks_path
-    assert_select "article[data-model-id='#{model.id}']", text: /Completed translations\s*2/m
+    assert_select "article[data-model-id='#{model.id}']", text: /Finished translations\s*2/m
 
     get benchmark_model_path(model)
     assert_not_includes response.body, "Normal user's benchmark identity"

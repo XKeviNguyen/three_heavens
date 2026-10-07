@@ -33,10 +33,10 @@ class TranslationWorkspaceMethodologyTest < ActionDispatch::IntegrationTest
     assert_equal selected, experiment.methodology_profile_revision
     get experiment_path(experiment)
     assert_response :success
-    assert_includes response.body, "#{selected.name} · revision #{selected.version}"
+    assert_includes response.body, "#{selected.name} · version #{selected.version}"
     get history_path
     assert_response :success
-    assert_includes response.body, "#{selected.name} · revision #{selected.version}"
+    assert_includes response.body, "#{selected.name} · version #{selected.version}"
 
     MethodologyProfiles::Revise.call(
       methodology_profile: methodology,
@@ -78,7 +78,7 @@ class TranslationWorkspaceMethodologyTest < ActionDispatch::IntegrationTest
     assert_equal methodology.current_revision, experiment.methodology_profile_revision
     get pipeline_run_path(experiment.pipeline_run)
     assert_response :success
-    assert_includes response.body, "#{methodology.current_revision.name} · revision #{methodology.current_revision.version}"
+    assert_includes response.body, "#{methodology.current_revision.name} · version #{methodology.current_revision.version}"
   end
 
   test "malformed foreign archived stale and mismatched methodology selections are rejected" do
@@ -144,7 +144,7 @@ class TranslationWorkspaceMethodologyTest < ActionDispatch::IntegrationTest
     MethodologyProfiles::ChangeStatus.deactivate(methodology_profile: methodology)
     assert_not workspace.send(:lock_methodology_selection)
     assert_includes workspace.errors[:methodology_profile_revision_id],
-                    "is no longer the active current methodology revision"
+                    "changed after this page was opened. Choose the latest version and try again."
   end
 
   private

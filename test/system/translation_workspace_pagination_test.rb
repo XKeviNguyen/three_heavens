@@ -113,8 +113,8 @@ class TranslationWorkspacePaginationTest < ApplicationSystemTestCase
   # Clicks the methodology list's page button and waits for the requested page.
   def change_methodology_page(number)
     open_methodology
-    find("nav[aria-label='Methodology profiles pagination'] button[name='methodology_profile_page'][value='#{number}']").click
-    assert_selector "nav[aria-label='Methodology profiles pagination']", text: /Page #{number} of 2/, visible: :all
+    find("nav[aria-label='Methodologies pagination'] button[name='methodology_profile_page'][value='#{number}']").click
+    assert_selector "nav[aria-label='Methodologies pagination']", text: /Page #{number} of 2/, visible: :all
   end
 
   def draft_payload(project = nil)

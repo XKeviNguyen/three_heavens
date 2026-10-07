@@ -6,7 +6,7 @@
         <%= link_to t("shared_ui.pagination.newer"), url_for(request.query_parameters.merge(page_param => pagination[:current_page] - 1)), rel: "prev", class: "font-semibold text-blue-700 hover:text-blue-900" %>
       <% end %>
     </div>
-    <p class="text-center text-slate-600"><%= t("shared_ui.pagination.page", current: pagination[:current_page], total: pagination[:total_pages], entries: pluralize(pagination[:total_count], label.downcase.singularize)) %></p>
+    <p class="text-center text-slate-600"><%= t("shared_ui.pagination.page", current: pagination[:current_page], total: pagination[:total_pages], entries: t("shared_ui.pagination.entries", count: pagination[:total_count])) %></p>
     <div class="min-w-20 text-right">
       <% if pagination[:current_page] < pagination[:total_pages] %>
         <%= link_to t("shared_ui.pagination.older"), url_for(request.query_parameters.merge(page_param => pagination[:current_page] + 1)), rel: "next", class: "font-semibold text-blue-700 hover:text-blue-900" %>

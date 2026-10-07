@@ -1,4 +1,53 @@
 vi:
+  activemodel:
+    attributes:
+      translation_workspace:
+        project_name: Tên dự án
+        project_id: Dự án
+        source_language: Ngôn ngữ nguồn
+        target_language: Ngôn ngữ đích
+        document_title: Tiêu đề tài liệu
+        source_text: Văn bản nguồn
+        source_import_id: Tệp đã tải lên
+        source_import_project_token: Tệp đã tải lên
+        experiment_name: Tên bản dịch
+        instruction_prompt: Hướng dẫn dịch
+        model_ids: Mô hình AI
+        model_identifiers: Mô hình AI
+        workflow_mode: Quy trình AI
+        workflow_profile_revision_id: Quy trình đã lưu
+        glossary_revision_id: Bảng thuật ngữ
+        methodology_profile_revision_id: Phương pháp dịch
+        translation_reference_revision_ids: Bản dịch tham khảo
+        guidance_preference: Thứ tự ưu tiên hướng dẫn
+        automatic_confirmation: Xác nhận chi phí AI
+        submission_token: Biểu mẫu này
+    errors:
+      models:
+        translation_workspace:
+          too_many_submissions: Bạn đã bắt đầu quá nhiều lượt dịch trong thời gian ngắn. Vui lòng đợi một lát rồi thử lại.
+          start_failed: Không thể bắt đầu lượt dịch. Hãy kiểm tra biểu mẫu rồi thử lại.
+          references_too_long: Các bản dịch tham khảo đã chọn quá dài so với giới hạn văn bản của mô hình. Hãy bỏ bớt bản tham khảo hoặc chọn mô hình nhận được văn bản dài hơn.
+          unavailable: không còn khả dụng
+          mixed_settings: không thể kết hợp mô hình chọn thủ công với cấu hình quy trình tự động
+          models_required: cần có ít nhất một mô hình khả dụng
+          too_many_models: chỉ được chọn tối đa %{count}
+          duplicate_models: không được chọn trùng một mô hình
+          model_unavailable: có mô hình không còn khả dụng
+          stale_selection: đã thay đổi sau khi bạn mở trang. Hãy chọn phiên bản mới nhất rồi thử lại.
+          inactive_workflow: không còn hoạt động
+          confirmation_required: cần được đánh dấu mỗi lần bắt đầu dịch
+          workflow_models_unavailable: dùng một mô hình không còn khả dụng
+          language_mismatch: phải dùng đúng ngôn ngữ nguồn và ngôn ngữ đích của dự án này
+          too_many_references: chỉ được chọn tối đa %{count} bản
+          duplicate_references: "không được chọn trùng một bản dịch tham khảo"
+          reference_unavailable: "có bản dịch tham khảo không còn dùng được"
+          expired: Biểu mẫu này đã hết hạn. Hãy tải lại trang rồi thử lại.
+          attributes:
+            source_import_id:
+              format: "%{message}"
+            submission_token:
+              format: "%{message}"
   activerecord:
     attributes:
       user:

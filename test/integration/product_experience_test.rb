@@ -56,13 +56,22 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
 
     get methodology_profiles_path
     assert_response :success
-    assert_select "section[aria-label='Methodology profiles'] article", count: 25
-    assert_select "nav[aria-label='Methodology profiles pagination']", text: /Page 1 of 2.*27 methodology profiles/m
+    assert_select "section[aria-label='Methodologies'] article", count: 25
+    assert_select "nav[aria-label='Methodologies pagination']", text: /Page 1 of 2.*27 items/m
 
     get methodology_profiles_path(page: 999)
     assert_response :success
-    assert_select "section[aria-label='Methodology profiles'] article", count: 2
-    assert_select "nav[aria-label='Methodology profiles pagination']", text: /Page 2 of 2/
+    assert_select "section[aria-label='Methodologies'] article", count: 2
+    assert_select "nav[aria-label='Methodologies pagination']", text: /Page 2 of 2/
+
+    # Counts come from the locale, not from English pluralization of the label.
+    { "vi" => "27 mục", "ja" => "27件" }.each do |locale, count|
+      users(:normal).update!(locale: locale)
+      get methodology_profiles_path
+      assert_select "nav p", text: /#{count}\z/
+      assert_no_match(/27 \S+s\b/, css_select("nav p").map(&:text).join(" "))
+    end
+    users(:normal).update!(locale: "en")
 
     profile = MethodologyProfile.order(:id).last
     26.times do |index|
@@ -74,8 +83,8 @@ class ProductExperienceTest < ActionDispatch::IntegrationTest
     end
     get methodology_profile_path(profile)
     assert_response :success
-    assert_select "section", text: /Revision 27 · Current/, minimum: 1
-    assert_select "nav[aria-label='Revisions pagination']", text: /Page 1 of 2.*27 revisions/m
+    assert_select "section", text: /Version 27 · Current/, minimum: 1
+    assert_select "nav[aria-label='Versions pagination']", text: /Page 1 of 2.*27 items/m
   end
 
   test "non-owned records render a generic private-safe not-found page" do

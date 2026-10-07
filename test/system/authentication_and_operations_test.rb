@@ -38,13 +38,13 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     visit experiment_path(experiment)
 
-    assert_text "Recover failed translations"
-    assert_text "incur additional cost"
+    assert_text "Retry failed translations"
+    assert_text "may add cost"
     assert_enqueued_with(job: TranslationRunJob, args: [ failed_run.id ]) do
-      accept_confirm(/up to 5 new provider attempts/) do
+      accept_confirm(/tried up to 5 more times/) do
         click_button "Retry failed translations"
       end
-      assert_text "Queued 1 failed translation run(s) for retry."
+      assert_text "Retrying 1 failed translation(s)."
     end
     assert failed_run.reload.pending?
     assert_equal 1, experiment.translation_runs.count
@@ -82,7 +82,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
       click_button "Start translation"
-      assert_text "Translation experiment"
+      assert_text "Translation started."
       assert_text "Reviewed browser source"
       assert_link "Original source file"
     end
@@ -151,7 +151,7 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
 
     assert_enqueued_jobs 1, only: TranslationRunJob do
       click_button "Start translation"
-      assert_text "Translation experiment"
+      assert_text "Translation started."
       assert_text "Pasted text remains supported"
     end
 
@@ -232,9 +232,9 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_link "Download DOCX", href: download_final_translation_path(final_translation, format: :docx)
     fill_in "Final translation draft", with: "Human-edited browser revision"
     fill_in "Change note (optional)", with: "Final human pass"
-    click_button "Save revision"
+    click_button "Save version"
 
-    assert_text "Revision saved."
+    assert_text "Version saved."
     assert_field "Final translation draft", with: "Human-edited browser revision"
     assert_text "Version 2"
 

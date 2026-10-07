@@ -133,22 +133,7 @@
           </div>
         <% end %>
 
-        <% telemetry = {
-             t("results_ui.telemetry.prompt_tokens") => review_run.prompt_tokens,
-             t("results_ui.telemetry.completion_tokens") => review_run.completion_tokens,
-             t("results_ui.telemetry.total_tokens") => review_run.total_tokens,
-             t("results_ui.telemetry.cost") => (number_to_currency(review_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless review_run.cost.nil?)
-           }.compact %>
-        <% if telemetry.any? %>
-          <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
-            <% telemetry.each do |label, value| %>
-              <div>
-                <dt class="text-slate-500"><%= label %></dt>
-                <dd class="font-medium text-slate-900"><%= value %></dd>
-              </div>
-            <% end %>
-          </dl>
-        <% end %>
+        <%= render "shared/ai_usage", run: review_run %>
       </article>
     <% end %>
   </section>

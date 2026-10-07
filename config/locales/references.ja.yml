@@ -16,23 +16,23 @@ ja:
     languages: 言語
     status: 状態
     updated: 更新日
-    archive_confirm: この参考訳をアーカイブしますか？過去の翻訳では選択した版が保持されます。
+    archive_confirm: "この参考訳をアーカイブしますか？使用済みの翻訳には影響しません。"
     using: '参考訳の使い方：'
     using_intro: 一致する参考訳を最大5件、
-    using_preserved: 実験では選択した版がそのまま保持されます。
+    using_preserved: "各翻訳では、使用した版がそのまま保持されます。"
     exact_source: 原文の全文
     exact_translation: 承認済み訳文の全文
     history: 版の履歴
-    current_digest: '現在のSHA-256：'
+    current_digest: "現在のSHA-256フィンガープリント："
     used_by:
-      one: 1件の実験で使用
-      other: '%{count}件の実験で使用'
+      one: "1件の翻訳で使用"
+      other: "%{count}件の翻訳で使用"
     all: ← 参考訳一覧
     create_heading: 参考訳を作成
-    edit_heading: 新しい版を作成
-    edit_intro: 保存すると変更できない新しい版が作られます。未編集の欄で差し替えファイルを選ぶと、入力済みの文が置き換わります。
+    edit_heading: "この参考訳の新しい版を保存"
+    edit_intro: "保存すると新しい版が作られます。編集していない側で新しいファイルを選ぶと、表示中の文章がファイルの内容に置き換わります。"
     save_revision: 新しい版を保存
-    conflict: 新しい版が公開されています
+    conflict: "新しい版が保存されています"
     conflict_intro: 下の最新版と送信した内容を比較し、変更を確認してから保存してください。
     current_title: 現在のタイトル
     current_source_language: 現在の原語

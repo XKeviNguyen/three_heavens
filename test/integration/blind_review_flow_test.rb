@@ -52,7 +52,7 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     get experiment_path(@experiment)
 
     assert_response :success
-    assert_select "h2", "Start blind cross-review"
+    assert_select "h2", "Start blind review"
     assert_select "form[action='#{experiment_review_rounds_path(@experiment)}']"
     assert_select "input[type='checkbox'][value='#{@first_model.id}']", count: 1
     assert_select "input[type='checkbox'][value='#{@second_model.id}']", count: 1
@@ -120,7 +120,7 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     assert_select "meta[http-equiv='refresh'][content='5']", count: 1
     assert_select "[role='status']", text: /refreshes automatically every 5 seconds/
     assert_select "article", text: /#{Regexp.escape(@first_model.display_name)}/
-    assert_select "article", text: /queued and waiting to start/
+    assert_select "article", text: /Waiting to start/
   end
 
   test "completed result page shows scores feedback candidate translation and human mapping" do
@@ -169,9 +169,9 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     assert_select "article", text: /Minor style issue/
     assert_select "article", text: /Improve the phrase/
     assert_select "article", text: /#{Regexp.escape(evaluation.translation_run.translated_text)}/
-    assert_select "article", text: /Human-only mapping:.*#{Regexp.escape(evaluation.translation_run.llm_model.display_name)}/m
+    assert_select "article", text: /Written by \(hidden from AI\):.*#{Regexp.escape(evaluation.translation_run.llm_model.display_name)}/m
     assert_select "article", text: /Suggested revision/
-    assert_select "article", text: /Prompt tokens.*200/m
+    assert_select "article", text: /Input tokens.*200/m
     assert_select "article", text: /Cost.*\$0\.0023456789/m
   end
 
@@ -189,9 +189,9 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     get review_round_path(round)
 
     assert_response :success
-    assert_select "article", text: /Reviewer failed/
+    assert_select "article", text: /Review failed/
     assert_select "article", text: /provider_failure/
-    assert_includes response.body, "AI work failed."
+    assert_includes response.body, "The AI request failed."
     assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
     assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"
@@ -234,14 +234,14 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
   test "ineligible experiments do not show the start form" do
     @experiment.update!(status: :running)
     get experiment_path(@experiment)
-    assert_select "h2", text: "Start blind cross-review", count: 0
+    assert_select "h2", text: "Start blind review", count: 0
 
     @experiment.update!(status: :completed)
     mutate_historical_fixture do
       @experiment.translation_runs.second.update!(translated_text: "")
     end
     get experiment_path(@experiment)
-    assert_select "h2", text: "Start blind cross-review", count: 0
+    assert_select "h2", text: "Start blind review", count: 0
   end
 
   private

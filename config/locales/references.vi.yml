@@ -1,39 +1,39 @@
 vi:
   references_ui:
-    title: Bản dịch tham chiếu · Three Heavens
-    show_title: '%{title} · Bản dịch tham chiếu · Three Heavens'
-    new_title: Bản dịch tham chiếu mới · Three Heavens
-    edit_title: Chỉnh sửa bản dịch tham chiếu · Three Heavens
-    library: Thư viện bản dịch tham chiếu
-    heading: Bản tham chiếu
-    singular: Bản dịch tham chiếu
-    intro: Bản tham chiếu là ví dụ dịch bạn đã duyệt. Chúng giúp AI theo cách dùng từ và văn phong bạn chọn.
-    new: Thêm bản tham chiếu
-    empty: Chưa có bản dịch tham chiếu
+    title: "Bản dịch tham khảo · Three Heavens"
+    show_title: "%{title} · Bản dịch tham khảo · Three Heavens"
+    new_title: "Bản dịch tham khảo mới · Three Heavens"
+    edit_title: "Chỉnh sửa bản dịch tham khảo · Three Heavens"
+    library: "Thư viện bản dịch tham khảo"
+    heading: "Bản dịch tham khảo"
+    singular: "Bản dịch tham khảo"
+    intro: "Bản dịch tham khảo là các bản dịch bạn đã duyệt. Chúng giúp AI theo cách dùng từ và văn phong bạn đã chọn."
+    new: "Thêm bản dịch tham khảo"
+    empty: "Chưa có bản dịch tham khảo"
     empty_intro: Thêm một ví dụ song ngữ đã duyệt rồi chọn trong không gian dịch.
-    create: Tạo bản tham chiếu
+    create: "Tạo bản dịch tham khảo"
     field_title: Tiêu đề
     languages: Ngôn ngữ
     status: Trạng thái
     updated: Cập nhật
-    archive_confirm: Lưu trữ bản tham chiếu này? Các lần dịch cũ vẫn giữ đúng bản đã chọn.
-    using: 'Sử dụng bản tham chiếu:'
+    archive_confirm: "Lưu trữ bản dịch tham khảo này? Các lượt dịch đã dùng vẫn giữ bản sao của chúng."
+    using: "Sử dụng bản dịch tham khảo:"
     using_intro: Chọn tối đa năm bản phù hợp trong
-    using_preserved: Mỗi lần dịch giữ nguyên các phiên bản đã chọn.
+    using_preserved: "Mỗi lượt dịch giữ đúng phiên bản đã dùng."
     exact_source: Nguyên văn ví dụ nguồn
     exact_translation: Nguyên văn bản dịch đã duyệt
     history: Lịch sử phiên bản
-    current_digest: 'SHA-256 hiện tại:'
+    current_digest: "Dấu vân tay SHA-256 hiện tại:"
     used_by:
-      one: được dùng trong 1 lần dịch
-      other: được dùng trong %{count} lần dịch
-    all: ← Tất cả bản tham chiếu
-    create_heading: Tạo bản dịch tham chiếu
-    edit_heading: Tạo phiên bản mới
-    edit_intro: Khi lưu, hệ thống tạo phiên bản cố định mới. Nếu bạn chọn tệp thay thế cho phần chưa sửa, nội dung tệp sẽ thay văn bản điền sẵn.
+      one: "được dùng trong 1 lượt dịch"
+      other: "được dùng trong %{count} lượt dịch"
+    all: "← Tất cả bản dịch tham khảo"
+    create_heading: "Tạo bản dịch tham khảo"
+    edit_heading: "Lưu phiên bản mới cho bản dịch tham khảo này"
+    edit_intro: "Khi lưu, hệ thống tạo phiên bản mới. Nếu bạn chọn tệp mới cho phần chưa sửa, nội dung tệp sẽ thay văn bản đang hiển thị."
     save_revision: Lưu phiên bản mới
-    conflict: Đã có phiên bản mới hơn
-    conflict_intro: So sánh phiên bản hiện tại bên dưới với nội dung bạn vừa gửi, chủ động gộp thay đổi rồi lưu.
+    conflict: "Đã có phiên bản mới hơn được lưu"
+    conflict_intro: "So sánh phiên bản mới nhất bên dưới với nội dung bạn đã nhập, gộp các thay đổi rồi lưu."
     current_title: Tiêu đề hiện tại
     current_source_language: Ngôn ngữ nguồn hiện tại
     current_target_language: Ngôn ngữ đích hiện tại
@@ -48,4 +48,4 @@ vi:
     translation_upload_help: Dán bản dịch đã duyệt hoặc tải lên một tệp TXT, MD, DOCX hay PDF. Không dùng cả hai.
     pasted_translation: Bản dịch đã duyệt đã dán
     upload_translation: Hoặc tải tệp bản dịch đã duyệt lên
-    saving: Đang lưu bản tham chiếu…
+    saving: "Đang lưu bản dịch tham khảo…"

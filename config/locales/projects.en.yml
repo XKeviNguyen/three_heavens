@@ -3,48 +3,48 @@ en:
     title: Projects · Three Heavens
     workspaces: Translation workspaces
     heading: Projects
-    intro: Keep related source documents and translation experiments together under
-      one fixed language pair.
+    intro: Keep related documents and their translations together. Each project uses
+      one language pair.
     start_new: Start a new project translation
     empty: No projects yet
-    empty_intro: Your first translation launch will create a private Project and its
-      first source document.
+    empty_intro: Your first translation creates a private project and its first
+      document.
     start_translation: Start a translation
     documents: Documents
-    experiments: Experiments
+    experiments: Translations
     newest_activity: Newest activity
     open_project: Open project
     workspace: Project workspace
     paste_start: Paste text / start translation
     upload_source: Upload source file
     no_documents: No source documents yet
-    no_documents_intro: Paste text or upload one source file to start this Project's
-      first translation experiment.
+    no_documents_intro: Paste text or upload a source file to start this project's
+      first translation.
     paste_source: Paste source text
     project_documents: Project documents
     uploaded_source: Uploaded source
     pasted_source: Pasted source
     download_original: Download original
-    translation_experiment: Translation experiment
+    translation_experiment: Translation
     automatic_workflow: Automatic workflow
     manual_workflow: Manual workflow
     glossary: Glossary
     methodology: Methodology
-    guidance_preference: Guidance preference
+    guidance_preference: "Guidance priority"
     references: References
     blind_review: Blind review
-    judge: Judge
+    judge: Judging
     final_translation: Final translation
     not_started: Not started
     not_created: Not created
-    experiment: Experiment
-    pipeline_progress: Pipeline progress
-    judge_results: Judge results
+    experiment: Translation candidates
+    pipeline_progress: Automatic workflow progress
+    judge_results: Judging results
     all_projects: ← All Projects
-    revision: revision %{version}
+    revision: version %{version}
     document_count:
       one: '%{count} document'
       other: '%{count} documents'
     experiment_count:
-      one: '%{count} experiment'
-      other: '%{count} experiments'
+      one: '%{count} translation'
+      other: '%{count} translations'

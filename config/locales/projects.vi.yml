@@ -3,8 +3,7 @@ vi:
     title: Dự án · Three Heavens
     workspaces: Không gian dịch thuật
     heading: Dự án
-    intro: Gom các tài liệu nguồn và lượt dịch liên quan vào một dự án với cặp ngôn
-      ngữ cố định.
+    intro: "Gom các tài liệu liên quan và bản dịch của chúng vào một nơi. Mỗi dự án dùng một cặp ngôn ngữ."
     start_new: Bắt đầu dịch trong dự án mới
     empty: Chưa có dự án
     empty_intro: Lượt dịch đầu tiên sẽ tạo một dự án riêng và tài liệu nguồn đầu tiên.
@@ -24,21 +23,21 @@ vi:
     uploaded_source: Tệp nguồn đã tải lên
     pasted_source: Văn bản đã dán
     download_original: Tải tệp gốc
-    translation_experiment: Lượt dịch
+    translation_experiment: "Lượt dịch"
     automatic_workflow: Quy trình tự động
     manual_workflow: Quy trình thủ công
     glossary: Bảng thuật ngữ
     methodology: Phương pháp
     guidance_preference: Ưu tiên hướng dẫn
-    references: Tài liệu tham khảo
-    blind_review: Đánh giá ẩn danh
-    judge: Chấm chọn
+    references: "Bản dịch tham khảo"
+    blind_review: "Nhận xét ẩn danh"
+    judge: "Chấm điểm"
     final_translation: Bản dịch cuối
     not_started: Chưa bắt đầu
     not_created: Chưa tạo
-    experiment: Lượt dịch
-    pipeline_progress: Tiến độ quy trình
-    judge_results: Kết quả chấm chọn
+    experiment: "Bản dịch ứng viên"
+    pipeline_progress: "Tiến độ quy trình tự động"
+    judge_results: "Kết quả chấm điểm"
     all_projects: ← Tất cả dự án
     revision: phiên bản %{version}
     document_count:

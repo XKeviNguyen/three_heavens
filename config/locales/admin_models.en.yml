@@ -5,9 +5,9 @@ en:
     new_title: Add model · Three Heavens
     provider_help: Catalog metadata only; do not enter a key or credential.
     identifier_locked: Locked because this model has historical translation, review, or judge usage.
-    identifier_help: Use the OpenRouter catalog identifier. It becomes immutable after first historical use.
-    context_help: Required for long-document planning. Leave blank only for conservative small-document compatibility.
-    output_help: This capability must satisfy the full stage-specific completion reserve or provider work fails before scheduling.
+    identifier_help: Use the OpenRouter catalog ID. It can't be changed after the model has been used.
+    context_help: Needed for long documents. Leave blank only if the model will be used for short documents.
+    output_help: This must be large enough for the longest answer each step needs; otherwise AI requests are refused before they are sent.
     context_window: Context window (tokens)
     maximum_output: Maximum output (tokens)
     add_active: Add active model
@@ -23,7 +23,7 @@ en:
     add: Add model
     deactivation_help: Models are never deleted from this area. Deactivation removes a model from future active selectors while preserving all translation, review, judge, finalization, and benchmark history.
     search: Search OpenRouter
-    search_intro: Find a compatible text model and add it with trusted catalog metadata. Discovery is read-only and makes no paid provider request.
+    search_intro: Find a compatible text model and add it with details from the catalog. Searching is free and sends no paid AI request.
     browse: Browse OpenRouter
     browse_help: Search the live OpenRouter catalog and add a model with canonical metadata.
     add_and_activate: Add and activate model

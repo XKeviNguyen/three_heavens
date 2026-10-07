@@ -161,7 +161,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     )
     assert_no_automatic_records { post translation_workspace_path, params: { translation_workspace: base } }
     assert_response :unprocessable_content
-    assert_select "li", text: /confirmation.*accepted/i
+    assert_select "li", text: /Cost approval must be checked/
 
     assert_no_automatic_records do
       post translation_workspace_path, params: {
@@ -172,7 +172,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /cannot mix/
+    assert_select "li", text: /can't combine/
 
     old_revision = profile.current_revision
     WorkflowProfiles::Revise.call(
@@ -189,7 +189,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /stale/
+    assert_select "li", text: /changed after this page was opened/
 
     other = create_workflow_profile(user: users(:other))
     assert_no_automatic_records do
@@ -201,7 +201,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /not available/
+    assert_select "li", text: /no longer available/
   end
 
   test "workspace and stop parameter shapes reject tampering without a 500" do
@@ -228,7 +228,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", pipeline.workflow_profile_revision.name
     assert_select "h2", text: /Progress/
-    assert_select "h2", text: /Logical-run cost coverage/
+    assert_select "h2", text: /Cost from earlier records/
     assert_select "form[action='#{stop_pipeline_run_path(pipeline)}']"
 
     patch stop_pipeline_run_path(pipeline)

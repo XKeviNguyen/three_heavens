@@ -94,7 +94,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     # A browser load, so Turbo starts over with positions that match history.
     assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
     assert_current_path history_path
-    assert_selector "h1", text: "Experiment history"
+    assert_selector "h1", text: "Translation history"
     assert_equal "", page.evaluate_script("location.hash")
     assert_equal "Saved before the History link", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
     page.go_back

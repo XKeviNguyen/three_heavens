@@ -10,7 +10,7 @@ class ManagedAiAccessTest < ActionDispatch::IntegrationTest
 
     get new_translation_workspace_path
     assert_response :success
-    assert_select "[role='status']", text: /AI translation access/
+    assert_select "[role='status']", text: /AI translation isn't turned on/
 
     %w[manual automatic].each do |mode|
       assert_no_difference "AiProviderAttempt.count" do

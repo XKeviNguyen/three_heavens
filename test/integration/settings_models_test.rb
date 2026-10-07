@@ -317,11 +317,11 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
 
     get experiment_path(reviewer_experiment)
-    assert_select "h2", "Start blind cross-review"
+    assert_select "h2", "Start blind review"
     assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 0
 
     get review_round_path(judge_selection_review_round)
-    assert_select "h2", "Start judge selection"
+    assert_select "h2", "Start judging"
     assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 0
 
     assert_equal historical_ids[:translations], model.translation_run_ids.sort
@@ -371,11 +371,11 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_select "#workspace-manual-models[data-available='true']", count: 1
 
     get experiment_path(reviewer_experiment)
-    assert_select "h2", "Start blind cross-review"
+    assert_select "h2", "Start blind review"
     assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 1
 
     get review_round_path(judge_review_round)
-    assert_select "h2", "Start judge selection"
+    assert_select "h2", "Start judging"
     assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 1
   end
 

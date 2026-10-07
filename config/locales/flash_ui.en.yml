@@ -2,41 +2,41 @@ en:
   flash_ui:
     glossary:
       created: Glossary created.
-      revision: Glossary revision %{version} created.
+      revision: Glossary saved as version %{version}.
       activated: Glossary activated.
-      archived: Glossary archived. Historical revisions remain available.
+      archived: Glossary archived. Its earlier versions are still available.
     methodology:
-      created: Methodology profile created.
-      revision: Methodology revision %{version} created.
-      activated: Methodology profile activated.
-      archived: Methodology profile archived. Historical revisions remain available.
+      created: Methodology created.
+      revision: Methodology saved as version %{version}.
+      activated: Methodology activated.
+      archived: Methodology archived. Its earlier versions are still available.
     workflow:
-      created: Workflow profile created.
-      revision: Workflow profile revision %{version} created.
-      duplicated: Workflow profile duplicated.
-      activated: Workflow profile activated.
-      deactivated: Workflow profile deactivated.
+      created: Workflow setup created.
+      revision: Workflow setup saved as version %{version}.
+      duplicated: Workflow setup duplicated.
+      activated: Workflow setup activated.
+      deactivated: Workflow setup deactivated.
     reference:
-      created: Translation reference created.
-      revision: Translation reference revision %{version} created.
-      activated: Translation reference activated.
-      archived: Translation reference archived. Historical experiment snapshots remain available.
+      created: Reference created.
+      revision: Reference saved as version %{version}.
+      activated: Reference activated.
+      archived: Reference archived. Translations that used it keep their copy.
     final:
-      workspace_ready: Final translation workspace is ready.
-      revision_saved: Revision saved.
-      revision_restored: Revision restored as a new version.
-      refinement_started: AI refinement started.
-      proposal_applied: AI proposal applied as a new revision.
+      workspace_ready: Your final translation draft is ready.
+      revision_saved: Version saved.
+      revision_restored: Earlier version restored as a new version.
+      refinement_started: AI suggestions requested.
+      proposal_applied: AI suggestion applied as a new version.
       finalized: Final translation finalized.
       reopened: Final translation reopened for editing.
     review:
       started: Blind review started.
     judge:
-      started: Judge selection started.
+      started: Judging started.
     pipeline:
-      stopped: Future automatic advancement stopped. Already queued or running provider work was not cancelled.
+      stopped: Automation stopped. AI requests that had already started will still finish.
     operations:
-      reconciled: Reconciled %{count} stale AI run(s). No provider work was started.
+      reconciled: Marked %{count} stuck AI task(s) as failed. No AI requests were sent.
     model:
       added: Model added and activated.
       catalog_action: '%{name} was %{action}.'
@@ -45,10 +45,10 @@ en:
         added_and_activated: added and activated
         already_active: already active
       catalog_failed: The selected model could not be added from the OpenRouter catalog.
-      updated: Model metadata updated.
+      updated: Model details updated.
       activated: '%{name} activated.'
-      deactivated: '%{name} deactivated. Its history was preserved.'
+      deactivated: '%{name} deactivated. Its history was kept.'
     workspace:
-      replayed: This translation launch was already completed; showing its existing result.
-      automatic_started: Automatic translation pipeline started.
-      experiment_started: Translation experiment started.
+      replayed: This translation was already started. Showing it now.
+      automatic_started: Automatic workflow started.
+      experiment_started: Translation started.

@@ -367,7 +367,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       )
     )
     assert_not second.submit
-    assert_includes second.errors[:source_import_id].join, "was already used"
+    assert_includes second.errors[:source_import_id].join, "This uploaded file was already used for a translation."
     assert_equal 1, SourceImport.find(source_import.id).resulting_document.experiments.count
   end
 
@@ -379,7 +379,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     get new_translation_workspace_path(source_import_id: source_import.id, source_import_project_token: binding)
     assert_response :success
     assert_select "h2", text: "Please correct the following:"
-    assert_select "li", text: /Source import.*has expired/i
+    assert_select "li", text: /This upload has expired/
 
     assert_no_workspace_records_created do
       assert_no_enqueued_jobs only: AI_JOBS do
@@ -423,7 +423,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_operator clock_calls, :>=, 2
-    assert_includes workspace.errors[:source_import_id], "This source import has expired; upload the source file again."
+    assert_includes workspace.errors[:source_import_id], "This upload has expired. Upload the file again."
     assert source_import.reload.ready?
     assert_nil source_import.resulting_document
   end
@@ -474,7 +474,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
     delete source_import_path(consumed, format: :json)
     assert_response :conflict
-    assert_equal "This source import can no longer be canceled.", response.parsed_body["error"]
+    assert_equal "This upload can no longer be removed.", response.parsed_body["error"]
     assert SourceImport.exists?(consumed.id)
   end
 

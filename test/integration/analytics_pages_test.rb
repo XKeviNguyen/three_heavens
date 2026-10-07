@@ -52,15 +52,15 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     get history_path(page: "1; DROP TABLE experiments")
 
     assert_response :success
-    assert_select "h1", "Experiment history"
-    assert_select "header", text: /each translation, review, judge, and finalization run once/
+    assert_select "h1", "Translation history"
+    assert_select "header", text: /counts each translation, review, judging, and\s+suggestion task once/
     assert_select "article", text: /Completed.*Completed.*Completed/m
-    assert_select "article", text: /Official winner.*Candidate model/m
+    assert_select "article", text: /Winning translation.*Candidate model/m
     assert_select "article",
-                  text: /Known total · incomplete cost telemetry \(3\/4 runs complete; 3 with known spend\)/
-    assert_select "a[href='#{experiment_path(@experiment)}']", "Experiment"
+                  text: /Known cost so far · some tasks did not report cost \(3 of 4\s+tasks finished; 3 with known cost\)/
+    assert_select "a[href='#{experiment_path(@experiment)}']", "Translation candidates"
     assert_select "a[href='#{review_round_path(@review_round)}']", "Blind review"
-    assert_select "a[href='#{judge_round_path(@judge_round)}']", "Judge results"
+    assert_select "a[href='#{judge_round_path(@judge_round)}']", "Judging results"
     assert_includes response.body, "&lt;img src=x onerror=history()&gt;"
     assert_includes response.body, "&lt;script&gt;Candidate model&lt;/script&gt;"
     assert_not_includes response.body, "<script>Candidate model</script>"
@@ -70,13 +70,13 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     get benchmarks_path(sort: "wins; DROP TABLE llm_models")
 
     assert_response :success
-    assert_select "h1", "Model benchmark leaderboard"
+    assert_select "h1", "Model benchmarks"
     assert_select "article[data-model-id='#{@candidate.id}']", text: /Inactive/
-    assert_select "article[data-model-id='#{@candidate.id}']", text: /Official wins.*1/m
+    assert_select "article[data-model-id='#{@candidate.id}']", text: /Wins.*1/m
     assert_select "article[data-model-id='#{@candidate.id}']", text: /Blind-review score.*9/m
     assert_select "article[data-model-id='#{@candidate.id}']", text: /Judge score.*90/m
     assert_select "section", text: /Reviewer and judge diagnostics/
-    assert_select "table", text: /Aggregate agreement/
+    assert_select "table", text: /Agrees with overall winner/
     assert_includes response.body, "&lt;script&gt;Candidate model&lt;/script&gt;"
     assert LlmModel.exists?(@candidate.id)
   end
@@ -88,17 +88,17 @@ class AnalyticsPagesTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: /Candidate model/
     assert_select "h2", "Summary"
     assert_select "h2", "Role diagnostics"
-    assert_select "h2", "Resolved-model history"
+    assert_select "h2", "Models actually used"
     assert_select "table", text: /served\/page-model/
-    assert_select "article", text: /Official winner/
+    assert_select "article", text: /Winner/
     assert_select "article", text: /Blind-review score.*9 \(n=1\)/m
     assert_select "article", text: /Judge score.*90 \(n=1\)/m
-    assert_select "article", text: /Latency.*3 s/m
+    assert_select "article", text: /Response time.*3 s/m
     assert_select "a[href='#{experiment_path(@experiment)}']", count: 0
     assert_select "a[href='#{review_round_path(@review_round)}']", count: 0
     assert_select "a[href='#{judge_round_path(@judge_round)}']", count: 0
     assert_select "article", text: /Difference.*3/m
-    assert_select "article", text: /100%.*1 agreements across 1 eligible/m
+    assert_select "article", text: /100%.*1 agreement\(s\) across 1 finished judgment/m
     assert_not_includes response.body, "&lt;img src=x onerror=history()&gt;"
   end
 

@@ -1,9 +1,9 @@
 ja:
   terminology_sheet:
     add_title: 用語を追加
-    add_intro: この翻訳画面のまま、再利用できる個人用の用語集を作成できます。AIへのリクエストは発生しません。
+    add_intro: "この翻訳画面のまま、再利用できる個人用の用語集を作成できます。AIには何も送信されません。"
     edit_title: 用語を編集
-    edit_intro: 保存すると変更できない新しい版が作成されます。以前の版と、それを使った翻訳は変わりません。用語の編集でAIへのリクエストは発生しません。
+    edit_intro: "保存すると新しい版が作られます。以前の版と、それを使った翻訳は変わりません。用語を編集してもAIには何も送信されません。"
     glossary_name: 用語集の名前
     glossary_placeholder: 日本語の説教用語
     description: 説明（任意）
@@ -35,7 +35,7 @@ ja:
     source: 原語
     preferred: 推奨訳語
     none_selected: 用語集を選択していません
-    panel_intro: 推奨する訳語をここに追加するか、保存済みの用語集を選んでください。用語の変更でAIへのリクエストは発生しません。
+    panel_intro: "推奨する訳語をここに追加するか、保存済みの用語集を選んでください。用語を変更してもAIには何も送信されません。"
     choose_saved: 保存済みの用語集を選択
     no_terminology: 用語集を使わない
     continue_without: 用語集を使わずに続けます。

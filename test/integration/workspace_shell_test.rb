@@ -16,10 +16,10 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
       assert_select "a", text: "New translation"
       assert_select "a", text: "Projects"
       assert_select "a", text: "History"
-      assert_select "a", text: "Terminology"
+      assert_select "a", text: "Glossaries"
       assert_select "a", text: "References"
       assert_select "a", text: "Methodology"
-      assert_select "a", text: "Workflows"
+      assert_select "a", text: "Workflow setups"
       assert_select "a", text: "Benchmarks"
     end
 

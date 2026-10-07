@@ -1,24 +1,24 @@
 en:
   history_ui:
-    title: Experiment history · Three Heavens
-    analytics: Analytics
-    heading: Experiment history
-    intro: Newest first. System cost adds each translation, review, judge, and finalization
-      run once. A partial total is labeled whenever any run lacks cost telemetry.
-    empty: No experiments yet
-    empty_intro: Run a translation experiment to begin building history.
-    new_experiment: New experiment
+    title: Translation history · Three Heavens
+    analytics: Insights
+    heading: Translation history
+    intro: Newest first. AI cost counts each translation, review, judging, and
+      suggestion task once. If any task did not report its cost, the total is marked as partial.
+    empty: No translations yet
+    empty_intro: Start a translation to build your history.
+    new_experiment: New translation
     translation_candidates: Translation candidates
-    execution: Execution
-    segmented: Segmented (%{count} segments)
-    single_request: Single request per run
-    judge_round: Judge round
-    official_winner: Official winner
-    system_cost: System cost
-    partial_cost: Known total · incomplete cost telemetry (%{complete}/%{total} runs
-      complete; %{known} with known spend)
-    reported_cost: '%{count} run(s) reported cost'
-    no_cost: No cost telemetry reported
-    automatic_pipeline: Automatic pipeline
-    repeat_configuration: Repeat configuration
+    execution: Processing
+    segmented: In %{count} parts
+    single_request: In one piece
+    judge_round: Judging
+    official_winner: Winning translation
+    system_cost: AI cost
+    partial_cost: Known cost so far · some tasks did not report cost (%{complete} of %{total}
+      tasks finished; %{known} with known cost)
+    reported_cost: '%{count} task(s) reported cost'
+    no_cost: No cost reported
+    automatic_pipeline: Automatic workflow
+    repeat_configuration: Reuse these settings
     final_translation_status: Final translation (%{status})

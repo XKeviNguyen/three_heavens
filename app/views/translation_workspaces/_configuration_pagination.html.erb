@@ -5,7 +5,7 @@
         <%= button_tag t("shared_ui.pagination.newer"), type: "submit", name: page_param, value: pagination[:current_page] - 1, formmethod: "post", formaction: translation_workspace_options_path, formnovalidate: true, data: { turbo_frame: "_top" }, class: "font-semibold text-blue-700 hover:text-blue-900" %>
       <% end %>
     </div>
-    <p class="text-center text-slate-600"><%= t("shared_ui.pagination.page", current: pagination[:current_page], total: pagination[:total_pages], entries: pluralize(pagination[:total_count], label.downcase.singularize)) %></p>
+    <p class="text-center text-slate-600"><%= t("shared_ui.pagination.page", current: pagination[:current_page], total: pagination[:total_pages], entries: t("shared_ui.pagination.entries", count: pagination[:total_count])) %></p>
     <div class="min-w-20 text-right">
       <% if pagination[:current_page] < pagination[:total_pages] %>
         <%= button_tag t("shared_ui.pagination.older"), type: "submit", name: page_param, value: pagination[:current_page] + 1, formmethod: "post", formaction: translation_workspace_options_path, formnovalidate: true, data: { turbo_frame: "_top" }, class: "font-semibold text-blue-700 hover:text-blue-900" %>

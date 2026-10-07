@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Regenerates the README product-tour screenshots in docs/images/readme/.
+#
+# Runs the real application in a headless browser against the *test*
+# database (the same one bin/rails test uses, wiped by the run), with the test
+# suite's network guard and a deterministic fake AI client. It never contacts
+# OpenRouter, Google, or email, and it needs no API key.
+set -euo pipefail
+
+if [[ "${RAILS_ENV:-test}" != "test" ]]; then
+  echo "capture-readme-screenshots only runs with RAILS_ENV=test" >&2
+  exit 1
+fi
+
+# A URL would override config/database.yml and point the run at a real database.
+for name in DATABASE_URL CACHE_DATABASE_URL QUEUE_DATABASE_URL CABLE_DATABASE_URL; do
+  if [[ -n "${!name:-}" ]]; then
+    echo "Unset $name first: screenshots must use the local test database" >&2
+    exit 1
+  fi
+done
+
+cd "$(dirname "$0")/.."
+export RAILS_ENV=test PARALLEL_WORKERS=1
+bin/rails test script/readme_screenshots/capture_test.rb "$@"
+echo "Screenshots written to ${README_SCREENSHOT_DIR:-docs/images/readme}/"

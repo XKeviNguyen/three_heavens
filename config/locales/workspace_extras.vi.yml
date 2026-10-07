@@ -2,17 +2,15 @@ vi:
   workspace_ui:
     adding_to: Thêm vào
     file_limits: TXT, Markdown, DOCX hoặc PDF · tối đa %{maximum} MiB
-    references_selected: Đã chọn %{count}/5 bản tham chiếu
-    references_empty_suffix: để thêm ví dụ đã duyệt.
+    references_selected: "Đã chọn %{count}/5 bản dịch tham khảo"
+    references_empty_suffix: "để thêm bản dịch đã duyệt."
     models: 'Mô hình:'
-    profile_summary: '%{mode} · %{translators} dịch · %{reviewers} nhận xét · %{judges} chấm điểm · %{finalizers} hoàn thiện'
-    paid_plan: '%{segments} đoạn nguồn cần %{slots} yêu cầu ban đầu và cho phép tối đa %{maximum} yêu cầu, gồm cả thử lại
-      tích hợp.'
-    paid_plan_role: '%{role}: %{runs} lượt × %{segments} đoạn = %{requests} yêu cầu'
+    profile_summary: "%{mode} · Dịch: %{translators} · Nhận xét: %{reviewers} · Chấm điểm: %{judges} · Đề xuất: %{finalizers}"
+    paid_plan: "Tài liệu được xử lý thành %{segments} đoạn: %{slots} yêu cầu AI ban đầu và tối đa %{maximum} yêu cầu, tính cả tự động thử lại."
+    paid_plan_role: "%{role}: %{runs} mô hình × %{segments} đoạn = %{requests} yêu cầu"
     draft_import_detached: Tệp đã tải lên ban đầu không còn được đính kèm. Văn bản nguồn bạn đã rà soát vẫn được giữ lại.
     draft_configuration_changed: Một số cấu hình đã lưu không còn khả dụng. Hãy kiểm tra các lựa chọn còn lại.
     draft_unreadable: "Không thể đọc bản nháp đã lưu nên bản nháp chưa được khôi phục. Thay đổi được lưu tiếp theo sẽ thay thế bản nháp này, hoặc chọn Xóa bản nháp để xóa ngay."
-    repeat_profile_unavailable: Hồ sơ tự động trước đây không còn dữ liệu năng lực mô hình cần thiết cho nguồn này. Lượt chạy
-      thủ công đã được điền sẵn các mô hình dịch còn hoạt động; hãy kiểm tra hoặc thay thế trước khi cho phép xử lý.
+    repeat_profile_unavailable: "Quy trình tự động dùng lần trước thiếu thông tin mô hình mà tài liệu này cần, nên hệ thống đã điền sẵn chế độ thủ công với các mô hình dịch còn dùng được. Hãy kiểm tra hoặc thay thế chúng trước khi bắt đầu."
     profile_unavailable: không còn khả dụng
     repeat_of: Lặp lại %{name}

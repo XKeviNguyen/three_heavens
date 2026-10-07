@@ -9,7 +9,7 @@ ja:
     empty_intro: 最初の翻訳を始めると、個人用のプロジェクトと原文が作成されます。
     start_translation: 翻訳を始める
     documents: 文書
-    experiments: 翻訳実行
+    experiments: "翻訳"
     newest_activity: 最新の更新
     open_project: プロジェクトを開く
     workspace: プロジェクトの作業画面
@@ -22,21 +22,21 @@ ja:
     uploaded_source: アップロードした原文
     pasted_source: 貼り付けた原文
     download_original: 元のファイルをダウンロード
-    translation_experiment: 翻訳実行
+    translation_experiment: "翻訳"
     automatic_workflow: 自動ワークフロー
     manual_workflow: 手動ワークフロー
     glossary: 用語集
     methodology: 翻訳方針
     guidance_preference: 指針の優先順位
-    references: 参考資料
-    blind_review: ブラインド評価
-    judge: 選考
+    references: "参考訳"
+    blind_review: "ブラインドレビュー"
+    judge: "判定"
     final_translation: 最終訳
     not_started: 未開始
     not_created: 未作成
-    experiment: 翻訳実行
-    pipeline_progress: ワークフローの進捗
-    judge_results: 選考結果
+    experiment: "翻訳候補"
+    pipeline_progress: "自動ワークフローの進行状況"
+    judge_results: "判定結果"
     all_projects: ← プロジェクト一覧
     revision: 第%{version}版
     document_count:

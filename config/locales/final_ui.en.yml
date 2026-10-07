@@ -3,20 +3,20 @@ en:
     title: Final translation workspace · Three Heavens
     return_project: ← Return to %{name}
     heading: Final translation workspace
-    seed_winner: official seed winner
+    seed_winner: started from the winning translation by
     finalized_at: Finalized %{at}
-    refinement_running: Refinement is still running.
+    refinement_running: AI suggestions are still being written.
     no_auto_reload: This page will not reload automatically, so text in the editor stays safe.
-    refresh: Refresh proposal status
-    refresh_confirm: Refresh proposal status? Any unsaved editor changes will be discarded.
-    related_pages: Related workflow pages
+    refresh: Check for new suggestions
+    refresh_confirm: Check for new suggestions? Any unsaved editor changes will be discarded.
+    related_pages: Earlier steps
     reference: Reference
-    glossary_snapshot: Glossary snapshot
-    reference_examples: Reference examples · %{count} snapshot(s)
-    no_references: No reference examples were selected for this Experiment.
-    evidence: Quality evidence for the official winner
-    evidence_intro: Blind-review and judge evidence is preserved as reference for the human editor.
-    original_winner: View original winning translation
+    glossary_snapshot: Glossary used
+    reference_examples: Reference examples · %{count} used
+    no_references: No reference examples were used for this translation.
+    evidence: Why this translation won
+    evidence_intro: Blind review and judging results are kept here to help you edit.
+    original_winner: View the original winning translation
     review_score: Review %{number} · score %{score}/10
     judge_score: Judgment %{number} · rank %{rank} · score %{score}/100
     editor: Final translation editor
@@ -25,79 +25,79 @@ en:
     version: Version %{number}
     origin_label: 'Origin: %{origin}'
     origins:
-      seed: Seed
-      manual: Manual
-      ai_applied: AI applied
+      seed: Winning translation
+      manual: Manual edit
+      ai_applied: AI suggestion applied
       restored: Restored
     finalized_read_only: Finalized · read only
     draft_editable: Draft · editable
-    persisted_for_reconciliation: Current persisted version for reconciliation
+    persisted_for_reconciliation: Saved version to compare against
     newer_version: 'A newer saved version exists: version %{number}'
-    conflict_intro: Your submitted text remains in the editor below. Compare it with this saved version, reconcile the differences, then save again.
-    persisted_version: Current persisted version %{number}
-    submitted_draft: Your submitted draft
+    conflict_intro: Your text is still in the editor below. Compare it with this saved version, combine the changes, then save again.
+    persisted_version: Saved version %{number}
+    submitted_draft: Your text
     draft_label: Final translation draft
-    save_help: A manual save creates a new immutable version. Any unapplied AI proposal based on the current version will become historical and can no longer be applied.
+    save_help: Saving creates a new version, and earlier versions are kept. AI suggestions made for the current version can no longer be applied after you save.
     change_note_optional: Change note (optional)
-    change_note_placeholder: Briefly describe this revision
-    save_revision: Save revision
-    save_immutable: Saving creates a new immutable version.
+    change_note_placeholder: Briefly describe what you changed
+    save_revision: Save version
+    save_immutable: Saving creates a new version. Earlier versions stay unchanged.
     download_txt: Download TXT
     download_docx: Download DOCX
-    proposals: AI refinement proposals
-    proposals_intro: Each model proposes against the exact current version. Proposals never alter the draft until you explicitly apply one.
-    segment_cost: This document has %{count} segments. Each selected finalizer authorizes %{count} initial segment provider requests; built-in retries may add calls.
-    alignment_unavailable: Segmented refinement is unavailable because the current draft lacks safe source-segment alignment. Manual editing and finalization remain available.
-    active_finalizers: Active OpenRouter finalizers (select up to %{maximum})
-    no_finalizers: No active OpenRouter finalizer models are available.
-    start_refinement: Start refinement
-    start_refinement_confirm: Start refinement with the selected models? This begins provider work and may incur additional cost. Proposals will not be applied automatically.
-    starting_refinement: Starting refinement…
-    no_proposals: No refinement proposals yet. The human editor can save and finalize the draft without using AI refinement.
-    round: Refinement round · exact base version %{version}
-    retry_intro: '%{count} failed refinement(s). Completed proposals remain immutable. Each failed physical work item selected by this action authorizes up to %{attempts} new provider attempts and may incur additional cost.'
-    retry: Retry failed refinements
-    retry_confirm: Retry only the failed refinement work? Each failed physical item may make up to %{attempts} new provider attempts and incur additional cost.
-    retry_old_version: This round targets an older draft version and cannot be retried.
-    retry_unavailable: Retry is unavailable while finalized or because a historical model is inactive or unsupported.
-    exact_base: Exact base version
+    proposals: AI suggestions
+    proposals_intro: Each model suggests improvements to the current version. Your draft does not change until you apply a suggestion yourself.
+    segment_cost: This document is processed in %{count} parts, so each model you choose makes %{count} AI requests. Automatic retries may add a few more.
+    alignment_unavailable: AI suggestions aren't available for this draft because it was edited by hand and no longer lines up with the parts of the source. You can still edit and finalize it yourself.
+    active_finalizers: Available models (choose up to %{maximum})
+    no_finalizers: No suggestion models are available.
+    start_refinement: Get AI suggestions
+    start_refinement_confirm: Ask the selected models for suggestions? This sends AI requests and may cost money. Suggestions are never applied automatically.
+    starting_refinement: Requesting suggestions…
+    no_proposals: No AI suggestions yet. You can save and finalize the draft without them.
+    round: Suggestions for version %{version}
+    retry_intro: '%{count} suggestion(s) failed. Finished suggestions stay as they are. Each failed request can be tried up to %{attempts} more times, which may add cost.'
+    retry: Retry failed suggestions
+    retry_confirm: Retry only the failed suggestions? Each failed request can be tried up to %{attempts} more times, which may add cost.
+    retry_old_version: These suggestions were made for an older version, so they can't be retried.
+    retry_unavailable: Retry isn't available because the translation is finalized, or a model used here is no longer active or supported.
+    exact_base: "Based on version"
     already_applied: Already applied
-    stale_proposal: Stale proposal
-    applicable_proposal: Applicable proposal
-    segmented_progress: Segmented progress
-    proposed_translation: Proposed translation
+    stale_proposal: Out of date
+    applicable_proposal: Ready to apply
+    segmented_progress: Progress by part
+    proposed_translation: Suggested translation
     change_summary: Change summary
     terminology_notes: Terminology notes
     warnings: Warnings
     none_reported: None reported.
-    apply_proposal: Apply proposal
-    apply_confirm: Apply this proposal as a new editable revision? Your current version remains in immutable history.
-    applying: Applying proposal…
+    apply_proposal: Apply suggestion
+    apply_confirm: Apply this suggestion as a new version? Your current version stays in the history.
+    applying: Applying suggestion…
     applied_as: Applied as %{versions}.
-    stale_help: This proposal is stale because the current draft no longer matches its base version. It cannot be applied.
-    reopen_before_apply: Reopen the translation before applying this proposal.
-    refinement_failed: Refinement failed
-    proposal_running: The model is preparing its proposal.
-    proposal_queued: This proposal is queued.
-    rounds: Refinement rounds
-    history_intro: Historical versions are immutable. Restoring one always creates a new revision.
+    stale_help: This suggestion was made for an earlier version of the draft, so it can't be applied.
+    reopen_before_apply: Reopen the translation before applying this suggestion.
+    refinement_failed: Suggestion failed
+    proposal_running: The model is writing its suggestion.
+    proposal_queued: Waiting to start.
+    rounds: Suggestion rounds
+    history_intro: Earlier versions never change. Restoring one creates a new version.
     version_origin: Version %{number} · %{origin}
     current_version: Current version
     change_note: Change note
     none: None
-    ai_source: AI source
+    ai_source: Suggested by
     restore: Restore as new version
-    restore_confirm: Restore version %{number} as a new current revision? No history will be deleted.
+    restore_confirm: Restore version %{number} as the new current version? Nothing will be deleted.
     restoring: Restoring…
-    view_history: View historical content
+    view_history: View this version
     versions: Versions
     approve_heading: Approve the final translation
-    approve_intro: Finalize marks the current version as the approved final translation and makes it read-only. You can explicitly reopen it later without losing history.
+    approve_intro: Finalizing marks the current version as the approved final translation and makes it read-only. You can reopen it later without losing history.
     finalize: Finalize current version
-    finalize_confirm: Finalize version %{number} as the approved final translation? Editing and refinement will be disabled until you explicitly reopen it.
+    finalize_confirm: Finalize version %{number} as the approved final translation? Editing and AI suggestions are turned off until you reopen it.
     finalizing: Finalizing…
     finalized_heading: Translation finalized
-    finalized_intro: Version %{number} is the approved final translation. Reopen only when further editing or refinement is required.
+    finalized_intro: Version %{number} is the approved final translation. Reopen it only if you need to edit it or ask for more suggestions.
     reopen: Reopen for editing
     reopen_confirm: Reopen this approved translation for editing? Downloads will be labeled as draft until you finalize again.
     reopening: Reopening…

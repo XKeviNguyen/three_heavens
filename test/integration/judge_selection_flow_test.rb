@@ -18,7 +18,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     get review_round_path(@review_round)
 
     assert_response :success
-    assert_select "h2", "Start judge selection"
+    assert_select "h2", "Start judging"
     assert_select "form[action='#{review_round_judge_rounds_path(@review_round)}']"
     assert_select "input[type='checkbox'][value='#{@judge.id}']", count: 1
     assert_select "input[type='checkbox'][value='#{inactive.id}']", count: 0
@@ -37,7 +37,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     get review_round_path(@review_round)
 
     assert_response :success
-    assert_select "h2", text: "Start judge selection", count: 0
+    assert_select "h2", text: "Start judging", count: 0
   end
 
   test "tampered and missing judge IDs reject the entire request" do
@@ -62,7 +62,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     assert_select "meta[http-equiv='refresh'][content='5']", count: 1
     assert_select "[role='status']", text: /refreshes automatically every 5 seconds/
     assert_select "article", text: /#{Regexp.escape(@judge.display_name)}/
-    assert_select "article", text: /queued and waiting to start/
+    assert_select "article", text: /Waiting to start/
   end
 
   test "completed page displays individual ranking mapping telemetry and aggregate winner" do
@@ -84,14 +84,22 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "meta[http-equiv='refresh']", count: 0
     assert_select "h2", text: /#{Regexp.escape(round.winner_translation_run.llm_model.display_name)}/
-    assert_select "article", text: /Judge winner:/
+    assert_select "article", text: /This judge's pick:/
     assert_select "article", text: /#1 · Candidate/
     assert_select "article", text: /90\/100/
-    assert_select "article", text: /Human-only mapping:/
+    assert_select "article", text: /Written by \(hidden from AI\):/
     assert_select "article", text: /Rationale for Candidate/
-    assert_select "article", text: /Prompt tokens.*200/m
+    assert_select "article", text: /Input tokens.*200/m
     assert_select "article", text: /Cost.*\$0\.003456789/m
-    assert_includes response.body, "Borda points"
+    assert_includes response.body, "ranking points"
+    # The stored audit explanation names internal records; the page explains the rule in plain language.
+    assert_includes round.reload.aggregation_explanation, "TranslationRun ID"
+    assert_includes response.body, "Each judge ranks every candidate."
+    assert_not_includes response.body, "TranslationRun ID"
+
+    users(:normal).update!(locale: "ja")
+    get judge_round_path(round)
+    assert_includes response.body, "各判定モデルがすべての候補を順位付けします。"
   end
 
   test "failed judge is sanitized escaped and yields no official winner" do
@@ -108,9 +116,9 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     get judge_round_path(round)
 
     assert_response :success
-    assert_select "h2", "No official aggregate winner"
-    assert_select "article", text: /Judge failed/
-    assert_includes response.body, "AI work failed."
+    assert_select "h2", "No winner"
+    assert_select "article", text: /Judgment failed/
+    assert_includes response.body, "The AI request failed."
     assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
     assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"
