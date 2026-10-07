@@ -601,10 +601,12 @@ export default class extends Controller {
   }
 
   // A browser load of url. Assigning a URL that differs only by its fragment
-  // would keep this page, so that reloads it instead.
+  // would keep this page, so set the requested URL on this entry and reload.
   load(url) {
-    if (new URL(url, window.location.href).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
-    else window.location.assign(url)
+    if (new URL(url, window.location.href).href.split("#")[0] === window.location.href.split("#")[0]) {
+      window.history.replaceState(window.history.state, "", url)
+      window.location.reload()
+    } else window.location.assign(url)
   }
 
   async discard() {
@@ -653,7 +655,7 @@ export default class extends Controller {
     // that load is stopped, would be guarded, and a newer action replaces it.
     this.element.inert = true
     this.navigation = { phase: "allowed" }
-    window.location.assign(this.resetUrlValue)
+    this.load(this.resetUrlValue)
   }
 
   setStatus(message) {

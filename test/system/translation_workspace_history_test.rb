@@ -94,13 +94,13 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     # A browser load, so Turbo starts over with positions that match history.
     assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
     assert_current_path history_path
+    assert_selector "h1", text: "Experiment history"
+    assert_equal "", page.evaluate_script("location.hash")
     assert_equal "Saved before the History link", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
     page.go_back
     assert_selector "h1", text: "Projects"
   end
 
-  # Chrome loads a fragment-only assign here anyway; the guard reloads instead
-  # (load), so no browser that would only scroll leaves the page frozen.
   test "a skip link that follows a claimed Back to the same URL loads the saved workspace" do
     visit new_translation_workspace_path
     assert_field "Project name"
@@ -119,7 +119,85 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
 
     page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
     assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_equal "#main-content", page.evaluate_script("location.hash")
+    assert_selector "#main-content:target"
     assert_field "Project name", with: "Saved before the skip link"
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+  end
+
+  test "Leave through the skip link loads a fresh workspace at the requested fragment" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned through the skip link"
+    assert_status I18n.t("workspace.save_failed")
+
+    page.execute_script("document.querySelector(\"a[href='#main-content']\").click()")
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_equal "#main-content", page.evaluate_script("location.hash")
+    assert_selector "#main-content:target"
+    assert_field "Project name", with: ""
+    assert_empty users(:normal).translation_workspace_drafts
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+  end
+
+  test "discard after a claimed Back to a workspace fragment loads a fresh empty document" do
+    visit "#{new_translation_workspace_path}#main-content"
+    assert_field "Project name"
+    within("aside#app-sidebar") { click_link "History" }
+    assert_current_path history_path
+    within("aside#app-sidebar") { click_link "New translation" }
+    assert_field "Project name"
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Discarded after fragment Back"
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    editor_id = navigation_state.fetch("editorId")
+    # Hold the forced-load boundary after DELETE so this also catches browsers
+    # that happen to fetch a document for a fragment-only location.assign.
+    page.execute_script(<<~JS)
+      const element = document.querySelector("[data-controller='workspace-guard']")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+      const load = controller.load.bind(controller)
+      controller.load = url => { window.__releaseDocumentLoad = () => load(url) }
+    JS
+
+    page.execute_script("history.go(-2)")
+    assert_until { page.evaluate_script("location.hash === '#main-content' && window.__harness.events['history:traverse'] === 1") }
+    accept_confirm { click_button "Discard draft" }
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    assert_until { page.evaluate_script("!!window.__releaseDocumentLoad") }
+    assert_empty users(:normal).translation_workspace_drafts
+    page.execute_script("window.__releaseDocumentLoad()")
+
+    # The held save must finish before DELETE; the new server-rendered editor
+    # and empty database prove the document was fetched after that DELETE.
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_current_path new_translation_workspace_path, ignore_query: false
+    assert_equal "", page.evaluate_script("location.hash")
+    assert_field "Project name", with: ""
+    assert_empty users(:normal).translation_workspace_drafts
+    assert_not_equal editor_id, navigation_state.fetch("editorId")
+    assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
+  end
+
+  test "discard at the same URL reloads a fresh empty workspace" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Discarded at the same URL"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    editor_id = navigation_state.fetch("editorId")
+    accept_confirm { click_button "Discard draft" }
+
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_current_path new_translation_workspace_path, ignore_query: false
+    assert_equal "", page.evaluate_script("location.hash")
+    assert_field "Project name", with: ""
+    assert_empty users(:normal).translation_workspace_drafts
+    assert_not_equal editor_id, navigation_state.fetch("editorId")
     assert_not page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert")
   end
 
