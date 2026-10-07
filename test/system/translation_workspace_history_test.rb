@@ -42,8 +42,25 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
       assert_equal before.slice("editorId", "sequence"), saved.slice("editorId", "sequence")
       assert_equal [ draft.public_id, draft.lock_version ], saved.values_at("draftId", "version")
 
-      assert_back_from_projects_restores "Synthetic B protected text", history_length: before["historyLength"]
+      assert_back_from_projects_restores "Synthetic B protected text"
     end
+  end
+
+  test "Leave after a refused Back loads the entry Back reached and keeps the workspace ahead of it" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned by Leave after Back"
+    assert_status I18n.t("workspace.save_failed")
+
+    page.execute_script("history.back()")
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
+    # Nothing was added after Projects, so Forward still reaches the workspace.
+    page.go_forward
+    assert_selector "h1", text: "New translation"
   end
 
   test "Back and Forward churn during a delayed acknowledgement follows only the latest traversal" do
@@ -94,7 +111,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     fill_in "Project name", with: "Latest after failed discard"
     assert_status I18n.t("workspace.saved")
     assert_equal "Latest after failed discard", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
-    assert_back_from_projects_restores "Latest after failed discard", history_length: before["historyLength"]
+    assert_back_from_projects_restores "Latest after failed discard"
   end
 
   test "a locale switch that cannot save cancels a claimed Back without stale navigation state" do
@@ -119,7 +136,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     page.execute_script("window.__harness.saveMode = 'ok'; window.dispatchEvent(new Event('online'))")
     assert_status I18n.t("workspace.saved")
     assert_equal "Kept after failed locale switch", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
-    assert_back_from_projects_restores "Kept after failed locale switch", history_length: before["historyLength"]
+    assert_back_from_projects_restores "Kept after failed locale switch"
   end
 
   test "a clean Back freezes the page until its visit replaces it and Forward then Back lets the latest visit win" do
@@ -576,14 +593,14 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_empty users(:normal).translation_workspace_drafts
   end
 
-  test "a refused discard does not resend a save that already failed" do
+  test "a refused discard does not resend content the server refused for good" do
     open_workspace_from_projects
     install_history_harness
-    page.execute_script("window.__harness.saveMode = 'fail'")
-    fill_in "Project name", with: "Never saved, then discarded"
+    page.execute_script("window.__harness.saveMode = 'conflict'")
+    fill_in "Project name", with: "Refused, then discarded"
     # Leaving the field now keeps its change event out of the recording below.
     page.execute_script("document.activeElement.blur()")
-    assert_status I18n.t("workspace.save_failed")
+    assert_status I18n.t("workspace.save_conflict")
     page.execute_script(<<~JS)
       window.__harness.discardMode = "fail"
       const schedule = window.setTimeout
@@ -596,6 +613,36 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     accept_confirm { click_button "Discard draft" }
     assert_status I18n.t("workspace.discard_failed")
     assert_not_includes page.evaluate_script("window.__delays"), 1000
+  end
+
+  test "an edit not yet sent when a discard is refused is saved afterwards" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Saved before the edit"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    # Autosave debounces wait until the test runs them, so the edit below is
+    # still unsent when the discard starts and cancels its debounce.
+    page.execute_script(<<~JS)
+      const schedule = window.setTimeout
+      const cancel = window.clearTimeout
+      const debounces = window.__debounces = new Map()
+      let next = 0
+      window.setTimeout = (callback, delay, ...rest) => {
+        if (delay !== 1000) return schedule(callback, delay, ...rest)
+        const id = -(++next)
+        debounces.set(id, callback)
+        return id
+      }
+      window.clearTimeout = id => id < 0 ? debounces.delete(id) : cancel(id)
+      window.__harness.discardMode = "fail"
+    JS
+    fill_in "Project name", with: "Unsent when the discard was refused"
+    accept_confirm { click_button "Discard draft" }
+    assert_status I18n.t("workspace.discard_failed")
+
+    page.execute_script("window.__debounces.forEach(callback => callback()); window.__debounces.clear()")
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name") == "Unsent when the discard was refused" }
+    assert_status I18n.t("workspace.discard_failed")
   end
 
   test "edits typed while a discard is refused are saved afterwards" do
@@ -705,6 +752,43 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_status I18n.t("workspace.saved")
   end
 
+  test "a refused discard stays reported after a wait for pending work settles" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Refused discard, then a slow import"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script("window.__harness.discardMode = 'fail'")
+    accept_confirm { click_button "Discard draft" }
+    assert_status I18n.t("workspace.discard_failed")
+    # Test-side clock: the guard's 30-second wait for pending work elapses at once.
+    page.execute_script(<<~JS)
+      const schedule = window.setTimeout
+      window.setTimeout = (callback, delay, ...rest) => schedule(callback, delay === 30000 ? 20 : delay, ...rest)
+      const deliver = window.fetch
+      window.fetch = async (url, options = {}) => {
+        if (new URL(url, location.origin).pathname === "/source_imports.json") {
+          await new Promise(resolve => { window.__releaseImport = resolve })
+          return new Response(JSON.stringify({ error: "Rejected import" }), { status: 422, headers: { "Content-Type": "application/json" } })
+        }
+        return deliver(url, options)
+      }
+    JS
+    click_button "Upload file"
+    @import_file = Tempfile.new([ "rejected-import", ".txt" ])
+    @import_file.write("Never imported")
+    @import_file.flush
+    attach_file "Source file", @import_file.path
+    click_button "Upload and review"
+    assert_until { page.evaluate_script("!!window.__releaseImport") }
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Stay"
+
+    page.execute_script("window.__releaseImport()")
+    assert_text "Rejected import"
+    assert_status I18n.t("workspace.discard_failed")
+  end
+
   test "Stay cancels a Back pressed while the dialog was open" do
     open_workspace_from_projects
     workspace_path = page.evaluate_script("location.pathname")
@@ -718,7 +802,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_until { page.evaluate_script("window.__harness.heldSaves.length > 0") }
 
     click_button "Stay"
-    assert_equal workspace_path, page.evaluate_script("location.pathname")
+    assert_until { page.evaluate_script("location.pathname === arguments[0]", workspace_path) }
     page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.splice(0).forEach(held => held.release())")
     assert_status I18n.t("workspace.saved")
     assert page.evaluate_script("!!window.__harness && location.pathname === arguments[0]", workspace_path)
@@ -1224,6 +1308,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
         const method = (options.method || "GET").toUpperCase()
         if (target.pathname === "/translation_workspace_draft") {
           if (method === "POST" && harness.saveMode === "fail") return new Response("", { status: 503 })
+          if (method === "POST" && harness.saveMode === "conflict") return new Response("", { status: 409 })
           if (method === "POST" && harness.saveMode === "hold") {
             const held = {}
             await hold(harness.heldSaves, held)
@@ -1284,6 +1369,8 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
   end
 
   def assert_unchanged_navigation_state(before, ignore: [])
+    # Returning to the workspace's own entry is a traversal, which settles asynchronously.
+    assert_until { page.evaluate_script("location.href === arguments[0] && history.state?.turbo?.restorationIdentifier === arguments[1]?.turbo?.restorationIdentifier", before["href"], before["historyState"]) }
     after = navigation_state
     assert_equal "New translation", after["h1"]
     assert_equal before.except(*ignore), after.except(*ignore)
@@ -1296,11 +1383,13 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
 
   # Projects is a new history entry after the workspace one, so Back returns to
   # the workspace in the same document and renders the acknowledged draft.
-  def assert_back_from_projects_restores(project_name, history_length:)
+  # The refused traversal left every history entry as it was, so Back from
+  # the workspace still reaches the Projects entry it came from. (A browser
+  # reused across tests caps history.length, so entries are not counted.)
+  def assert_back_from_projects_restores(project_name)
     page.execute_script("window.__harness.holdPages.clear(); window.__sameDocument = true")
     click_link "Projects"
     assert_selector "h1", text: "Projects"
-    assert_equal history_length, page.evaluate_script("history.length")
     page.go_back
     assert_selector "h1", text: "New translation"
     assert_field "Project name", with: project_name
@@ -1309,6 +1398,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal project_name, draft.payload.fetch("project_name")
     restored = navigation_state
     assert_equal [ draft.public_id, draft.lock_version, false ], restored.values_at("draftId", "version", "dirty")
+    page.go_back
+    assert_selector "h1", text: "Projects"
+    assert_current_path projects_path
   end
 
   def assert_status(text)

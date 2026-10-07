@@ -180,7 +180,8 @@ export default class extends Controller {
       return true
     } catch (error) {
       this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)
-      if (!error.final) this.scheduleRetry()
+      if (error.final) this.finallyRejected = snapshot
+      else this.scheduleRetry()
       return false
     } finally {
       if (this.saving === saving) this.saving = null
@@ -259,7 +260,7 @@ export default class extends Controller {
         // this failure, unless another message replaced it, no longer applies.
         this.settlePending().then(() => {
           this.pendingWaitFailed = false
-          if (!this.busy() && this.statusTarget.textContent === this.messagesValue.saveFailed) this.setStatus(this.settledStatus)
+          if (!this.busy() && this.statusTarget.textContent === this.messagesValue.saveFailed) this.setStatus(this.savedStatus)
         })
         return false
       }
@@ -275,9 +276,8 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    // Nothing here is kept any more: a browser load (see onBeforeVisit), or a
-    // form after Leave, is replacing it. Like a link, the switch replaces
-    // that load (beforeSubmit).
+    // Nothing here is kept any more: a browser load is replacing it. Like a
+    // link (onBeforeVisit), the switch replaces that load (beforeSubmit).
     if (this.navigation?.phase === "allowed") return
     // A launch's response shows what became of paid work, so the switch
     // waits for neither it nor a discard still deciding, and is refused.
@@ -285,6 +285,7 @@ export default class extends Controller {
       event.preventDefault()
       return
     }
+    // A Leave's form is replacing the page; the switch replaces it instead.
     if (this.allowVisit) return
     this.cancelNavigation()
     // Like a form, the switch holds the claim while it saves; a newer action
@@ -298,6 +299,12 @@ export default class extends Controller {
   // before the save can change this page, its head, or Turbo's history and
   // snapshot state, whatever the user decides afterwards.
   onTraverse(event) {
+    // The page returning to its own entry (restoreHistory) is no traversal.
+    if (this.returning && this.atHomeEntry()) {
+      this.returning = false
+      event.preventDefault()
+      return
+    }
     // A browser load is already replacing this page (see onBeforeVisit);
     // only another browser load of the new entry can replace it.
     if (this.navigation?.phase === "allowed") {
@@ -310,7 +317,7 @@ export default class extends Controller {
       // A discard ends in a fresh workspace or keeps this page, so the
       // traversal is never followed.
       event.preventDefault()
-      window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+      this.restoreHistory()
       return
     }
     if (!this.navigation && !this.busy()) return
@@ -382,19 +389,45 @@ export default class extends Controller {
         window.Turbo.visit(navigation.destination)
       }
     } else {
+      // Leave repeats a Back or Forward over the same distance.
+      const traversal = navigation.kind === "history" ? this.historyOffset() : 0
       this.cancelNavigation()
-      this.destination = navigation.destination
+      this.destination = traversal ? { traversal } : navigation.destination
       this.element.inert = false
       this.dialogTarget.showModal()
     }
   }
 
-  // Turbo never saw a claimed traversal, so restoring this entry's URL and
-  // state is all it takes to keep history consistent with this page.
   cancelNavigation() {
-    if (this.navigation?.historyMoved) window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+    if (this.navigation?.historyMoved) this.restoreHistory()
     this.navigation = null
     this.pendingSubmission = null
+  }
+
+  // Turbo never saw a claimed traversal, so the browser alone moved to
+  // another entry. Going back to this page's own entry keeps every entry as
+  // it was; one without Turbo's position instead takes this page's URL and
+  // state, so history still matches the page.
+  restoreHistory() {
+    const offset = this.historyOffset()
+    if (offset === null) {
+      window.history.replaceState(this.currentHistoryState, "", this.currentUrl)
+    } else if (offset !== 0) {
+      this.returning = true
+      window.history.go(-offset)
+    }
+  }
+
+  // How far the browser moved from this page's entry, by Turbo's positions.
+  historyOffset() {
+    const home = this.currentHistoryState?.turbo?.restorationIndex
+    const here = window.history.state?.turbo?.restorationIndex
+    return Number.isInteger(home) && Number.isInteger(here) ? here - home : null
+  }
+
+  atHomeEntry() {
+    const home = this.currentHistoryState?.turbo?.restorationIdentifier
+    return !!home && window.history.state?.turbo?.restorationIdentifier === home
   }
 
   // The back/forward cache can restore this page long after other pages saved
@@ -543,6 +576,11 @@ export default class extends Controller {
     // action replaces this browser load (see onBeforeVisit).
     this.element.inert = true
     this.navigation = { phase: "allowed" }
+    // The browser loads the entry a refused Back or Forward reached (onTraverse).
+    if (destination.traversal) {
+      window.history.go(destination.traversal)
+      return
+    }
     // Assigning a URL that differs only by its fragment would keep this page.
     if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
     else window.location.assign(destination)
@@ -553,9 +591,6 @@ export default class extends Controller {
     // Discarding is terminal for this page: no timer, retry, or reconnect may
     // save again, or a late save could recreate the discarded draft.
     this.discarding = true
-    // changed() ignores edits from here on; if the discard is refused, only
-    // those are saved, not a save the server already settled.
-    const discardedState = JSON.stringify(this.payload())
     this.cancelNavigation()
     window.clearTimeout(this.saveTimer)
     while (this.saving) {
@@ -580,7 +615,10 @@ export default class extends Controller {
         this.discarding = false
         this.refusedDiscard = response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed
         this.setStatus(this.refusedDiscard)
-        if (JSON.stringify(this.payload()) !== discardedState) this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
+        // Saving resumes for anything unsaved, including edits typed during
+        // the discard (changed() ignored them) and a debounce or retry it
+        // cancelled, but not content the server already refused for good.
+        if (this.dirty() && this.state() !== this.finallyRejected) this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
         return
       }
     }
