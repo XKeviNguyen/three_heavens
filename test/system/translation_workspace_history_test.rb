@@ -63,6 +63,42 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_selector "h1", text: "New translation"
   end
 
+  test "Leave for a link reaches it even after a Back was claimed while the dialog was open" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned for the link"
+    assert_status I18n.t("workspace.save_failed")
+    click_link "Projects"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    page.execute_script("window.__harness.saveMode = 'hold'; history.back()")
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length > 0") }
+
+    click_button "Leave"
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Projects"
+    assert_current_path projects_path
+  end
+
+  test "a link clicked while a claimed Back saves loads natively from the entry Back reached" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'hold'")
+    fill_in "Project name", with: "Saved before the History link"
+    assert_until { page.evaluate_script("window.__harness.heldSaves.length === 1") }
+    page.execute_script("history.back()")
+    assert_until { page.evaluate_script("location.pathname === '/projects'") }
+    within("aside#app-sidebar") { click_link "History" }
+
+    page.execute_script("window.__harness.saveMode = 'ok'; window.__harness.heldSaves.shift().release()")
+    # A browser load, so Turbo starts over with positions that match history.
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_current_path history_path
+    assert_equal "Saved before the History link", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    page.go_back
+    assert_selector "h1", text: "Projects"
+  end
+
   test "Back and Forward churn during a delayed acknowledgement follows only the latest traversal" do
     open_workspace_from_projects
     install_history_harness
@@ -613,6 +649,36 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     accept_confirm { click_button "Discard draft" }
     assert_status I18n.t("workspace.discard_failed")
     assert_not_includes page.evaluate_script("window.__delays"), 1000
+  end
+
+  test "a refused discard resends content refused earlier once a later save succeeded" do
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'conflict'")
+    fill_in "Project name", with: "Refused once"
+    page.execute_script("document.activeElement.blur()")
+    assert_status I18n.t("workspace.save_conflict")
+    page.execute_script("window.__harness.saveMode = 'ok'")
+    fill_in "Project name", with: "Saved in between"
+    page.execute_script("document.activeElement.blur()")
+    assert_status I18n.t("workspace.saved")
+    # The refused content again, now merely unsaved.
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Refused once"
+    page.execute_script("document.activeElement.blur()")
+    assert_status I18n.t("workspace.save_failed")
+    page.execute_script(<<~JS)
+      window.__harness.discardMode = "fail"
+      const schedule = window.setTimeout
+      window.__delays = []
+      window.setTimeout = (callback, delay, ...rest) => {
+        window.__delays.push(delay)
+        return schedule(callback, delay, ...rest)
+      }
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_status I18n.t("workspace.discard_failed")
+    assert_includes page.evaluate_script("window.__delays"), 1000
   end
 
   test "an edit not yet sent when a discard is refused is saved afterwards" do

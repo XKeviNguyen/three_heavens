@@ -167,6 +167,7 @@ export default class extends Controller {
       if (result.sequence !== sequence) throw new Error("draft save was not acknowledged")
 
       this.unacknowledged = null
+      this.finallyRejected = null
       this.retryCount = 0
       this.draftIdValue = result.id
       this.versionValue = result.version
@@ -300,8 +301,10 @@ export default class extends Controller {
   // snapshot state, whatever the user decides afterwards.
   onTraverse(event) {
     // The page returning to its own entry (restoreHistory) is no traversal.
-    if (this.returning && this.atHomeEntry()) {
-      this.returning = false
+    // Any traversal ends the wait for that return.
+    const returned = this.returning && this.atHomeEntry()
+    this.returning = false
+    if (returned) {
       event.preventDefault()
       return
     }
@@ -384,6 +387,14 @@ export default class extends Controller {
         // would be lost, so the page is frozen first.
         this.element.inert = true
         window.location.reload()
+      } else if (navigation.historyMoved) {
+        // A link followed a claimed Back or Forward: the browser alone moved
+        // to another entry, so Turbo's history position is stale and a Turbo
+        // visit would push from the wrong place. A browser load replaces the
+        // entry reached instead, frozen and replaceable like the reload above.
+        navigation.phase = "allowed"
+        this.element.inert = true
+        window.location.assign(navigation.destination)
       } else {
         this.navigation = null
         window.Turbo.visit(navigation.destination)
@@ -563,8 +574,11 @@ export default class extends Controller {
   leave() {
     const destination = this.destination
     this.dialogTarget.close()
-    // Leave is the latest action: a traversal claimed meanwhile gives way.
-    this.cancelNavigation()
+    // Leave is the latest action: a traversal claimed meanwhile gives way. A
+    // browser load replaces whatever entry that traversal reached, so only a
+    // form or a repeated traversal needs this page's own entry back first.
+    if (destination.form || destination.traversal) this.cancelNavigation()
+    else this.navigation = this.pendingSubmission = null
     this.allowVisit = true
     window.clearTimeout(this.saveTimer)
     if (destination.form) {
@@ -576,7 +590,8 @@ export default class extends Controller {
     // action replaces this browser load (see onBeforeVisit).
     this.element.inert = true
     this.navigation = { phase: "allowed" }
-    // The browser loads the entry a refused Back or Forward reached (onTraverse).
+    // Back or Forward again, to the entry whose save failed (navigateAfterSave);
+    // that browser load replaces this page (onTraverse).
     if (destination.traversal) {
       window.history.go(destination.traversal)
       return
