@@ -8,18 +8,18 @@ vi:
     guidance: Hướng dẫn phương pháp dịch
     guidance_help: Mô tả quan điểm dịch, mức độ bám sát bản gốc, giọng văn, cách xử lý thần học, trích dẫn, cách viết và định dạng. Dấu xuống dòng và khoảng cách bên trong được giữ nguyên.
     revise: Chỉnh sửa %{name}
-    edit_intro: Khi lưu, hệ thống tạo một phiên bản cố định mới. Các lần dịch cũ vẫn dùng bản hướng dẫn ban đầu.
+    edit_intro: "Khi lưu, hệ thống tạo phiên bản mới. Các lượt dịch đã dùng phương pháp này vẫn giữ phiên bản đã dùng."
     heading: Phương pháp dịch
     singular: Phương pháp dịch
-    index_intro: Hướng dẫn cách dịch riêng của bạn, có thể dùng lại. Phương pháp dịch tách biệt với bảng thuật ngữ và cấu hình quy trình.
+    index_intro: "Hướng dẫn riêng của bạn về cách viết bản dịch, có thể dùng lại. Phương pháp dịch tách biệt với bảng thuật ngữ (thuật ngữ ưu tiên) và cấu hình quy trình (chọn mô hình AI)."
     new: Phương pháp mới
     empty: Chưa có phương pháp dịch
     empty_intro: Tạo hướng dẫn về văn phong và cách dịch để chọn trong không gian dịch.
     create: Tạo phương pháp dịch
-    archive_confirm: Lưu trữ phương pháp này? Các lần dịch cũ vẫn giữ đúng phiên bản đã dùng.
+    archive_confirm: "Lưu trữ phương pháp này? Các lượt dịch đã dùng vẫn giữ phiên bản đã dùng."
     new_heading: Phương pháp dịch mới
-    new_intro: Phương pháp quy định cách dịch. Dùng bảng thuật ngữ cho các cặp từ cố định và cấu hình quy trình để chọn mô hình, giai đoạn.
-    show_intro: Các phiên bản cũ không thể thay đổi và vẫn xem được sau khi lưu trữ.
+    new_intro: "Phương pháp dịch mô tả cách viết bản dịch. Dùng bảng thuật ngữ cho các cặp từ cố định và cấu hình quy trình để chọn mô hình AI và các bước."
+    show_intro: "Các phiên bản cũ không bao giờ thay đổi và vẫn xem được sau khi lưu trữ."
     all: Tất cả phương pháp
     using: 'Sử dụng phương pháp:'
     using_intro: Chọn phương pháp này cho cặp ngôn ngữ phù hợp trong

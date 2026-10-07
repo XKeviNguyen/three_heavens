@@ -49,7 +49,7 @@
       <h2 class="mt-2 text-2xl font-bold text-slate-950"><%= winner.llm_model.display_name %></h2>
       <p class="mt-1 break-all font-mono text-xs text-slate-600"><%= winner.llm_model.model_identifier %></p>
       <div class="mt-4 whitespace-pre-wrap break-words rounded-lg bg-white/70 p-4 text-sm leading-6 text-slate-900"><%= winner.translated_text %></div>
-      <p class="mt-4 text-sm text-slate-700"><%= @judge_round.aggregation_explanation %></p>
+      <% if @judge_round.aggregation_explanation.present? %><p class="mt-4 text-sm text-slate-700"><%= t("results_ui.judge.aggregation_explanation") %></p><% end %>
 
       <div class="mt-5">
         <% if @judge_round.final_translation %>
@@ -139,19 +139,7 @@
           </div>
         <% end %>
 
-        <% telemetry = {
-             t("results_ui.telemetry.prompt_tokens") => judge_run.prompt_tokens,
-             t("results_ui.telemetry.completion_tokens") => judge_run.completion_tokens,
-             t("results_ui.telemetry.total_tokens") => judge_run.total_tokens,
-             t("results_ui.telemetry.cost") => (number_to_currency(judge_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless judge_run.cost.nil?)
-           }.compact %>
-        <% if telemetry.any? %>
-          <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
-            <% telemetry.each do |label, value| %>
-              <div><dt class="text-slate-500"><%= label %></dt><dd class="font-medium text-slate-900"><%= value %></dd></div>
-            <% end %>
-          </dl>
-        <% end %>
+        <%= render "shared/ai_usage", run: judge_run %>
       </article>
     <% end %>
   </section>

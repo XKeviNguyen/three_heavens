@@ -69,6 +69,6 @@ class OperationsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to settings_operations_path
     follow_redirect!
-    assert_select "[role='status']", text: /No provider work was started/
+    assert_select "[role='status']", text: /No AI requests were sent/
   end
 end

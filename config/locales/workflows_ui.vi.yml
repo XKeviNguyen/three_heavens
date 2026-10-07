@@ -4,34 +4,34 @@ vi:
     edit_title: Chỉnh sửa cấu hình quy trình · Three Heavens
     new_title: Cấu hình quy trình mới · Three Heavens
     show_title: '%{name} · Cấu hình quy trình · Three Heavens'
-    configuration: Thiết lập cấu hình
-    completion_mode: Chế độ hoàn tất
-    winner_help: Tạo bản nháp chính thức rồi dừng để người biên tập tiếp tục.
-    refinement_help: Tạo thêm đề xuất AI nhưng không tự áp dụng hay hoàn tất.
+    configuration: "Thiết lập"
+    completion_mode: "Điểm dừng"
+    winner_help: "Tạo bản nháp từ bản dịch thắng rồi dừng để bạn biên tập."
+    refinement_help: "Nhờ AI đề xuất thêm chỉnh sửa nhưng không bao giờ tự áp dụng hay hoàn tất."
     select_range: Chọn %{minimum}–%{maximum}
-    finalizer_range: Không chọn cho bản nháp thắng cuộc, hoặc chọn 1–%{maximum} cho đề xuất chỉnh sửa
-    role_order: '%{selection}. Thứ tự được giữ cố định.'
-    role_models: 'Mô hình %{role}'
+    finalizer_range: "Không chọn để dừng ở bản nháp từ bản thắng, hoặc chọn 1–%{maximum} để thêm đề xuất AI"
+    role_order: "%{selection}. Các mô hình được dùng theo thứ tự hiển thị."
+    role_models: "Chọn %{role}"
     role_hints:
-      translator: Mô hình tạo các bản dịch độc lập.
-      reviewer: Mô hình nhận xét bản dịch theo cấu trúc.
+      translator: "Mỗi mô hình viết một bản dịch riêng."
+      reviewer: "Mô hình nhận xét từng bản dịch theo tiêu chí rõ ràng."
       judge: Mô hình chấm điểm và xếp hạng độc lập các bản dịch đã nhận xét.
       finalizer: Mô hình đề xuất chỉnh sửa mà không tự áp dụng.
     roles:
-      translator: dịch
-      reviewer: nhận xét
-      judge: chấm điểm
-      finalizer: đề xuất chỉnh sửa
+      translator: "Mô hình dịch"
+      reviewer: "Mô hình nhận xét"
+      judge: "Mô hình chấm điểm"
+      finalizer: "Mô hình đề xuất chỉnh sửa"
     saving: Đang lưu cấu hình…
     automation: Tự động hóa
-    create_revision: Tạo phiên bản %{version}
-    edit_intro: Phiên bản %{version} được giữ nguyên để đối chiếu và xem lại quy trình cũ.
+    create_revision: "Lưu thành phiên bản %{version}"
+    edit_intro: "Phiên bản %{version} được giữ nguyên để có thể truy lại các quy trình đã dùng nó."
     heading: Cấu hình quy trình
     singular: Cấu hình quy trình
-    index_intro: Cấu hình riêng của bạn, có thể dùng lại. Mỗi lần sửa tạo một phiên bản cố định mới.
+    index_intro: "Các quy trình tự động riêng của bạn, có thể dùng lại. Mỗi lần sửa sẽ lưu một phiên bản mới."
     new: Cấu hình quy trình mới
     empty: Chưa có cấu hình quy trình
-    empty_intro: Tạo cấu hình để khởi chạy quy trình tự động khi bắt đầu lần dịch.
+    empty_intro: "Tạo một cấu hình để tự động chạy dịch, nhận xét và chấm điểm khi bắt đầu lượt dịch."
     updated: Cập nhật %{at}
     revision: Phiên bản
     mode: Chế độ
@@ -39,17 +39,17 @@ vi:
     edit: Sửa
     duplicate: Nhân bản
     deactivate: Tắt
-    deactivate_confirm: Tắt cấu hình này? Các quy trình cũ vẫn giữ nguyên.
-    new_intro: Lưu cấu hình không khởi chạy AI. Mỗi lần chạy quy trình cần được xác nhận riêng.
+    deactivate_confirm: "Tắt cấu hình quy trình này? Các quy trình đã chạy vẫn giữ nguyên."
+    new_intro: "Lưu cấu hình không gửi gì cho AI. Bạn duyệt chi phí mỗi lần bắt đầu dịch với cấu hình này."
     create: Tạo cấu hình quy trình
-    active_new: Đang hoạt động · dùng được cho quy trình mới
+    active_new: "Đang hoạt động · dùng được cho lượt dịch mới"
     inactive_history: Đã tắt · chỉ xem lịch sử
     all: Tất cả cấu hình
     using: 'Sử dụng cấu hình:'
     using_intro: Chọn cấu hình này trong
-    using_confirmation: Mỗi lần khởi chạy vẫn cần xác nhận công việc AI riêng.
+    using_confirmation: "Mỗi lần bắt đầu, bạn vẫn cần duyệt chi phí AI."
     eligible: Hiện có thể dùng
     ineligible: Không còn dùng được
     launched:
-      one: 1 quy trình cũ đã dùng phiên bản này.
-      other: '%{count} quy trình cũ đã dùng phiên bản này.'
+      one: "1 quy trình tự động đã dùng phiên bản này."
+      other: "%{count} quy trình tự động đã dùng phiên bản này."

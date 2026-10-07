@@ -3,11 +3,11 @@
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
 # docker build -t three_heavens .
-# Supply every production environment variable documented in README.md when running the image.
+# Supply every production environment variable documented in docs/operations/configuration.md when running the image.
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
-# Keep the tag aligned with .ruby-version; refresh the multi-architecture index per README.md.
+# Keep the tag aligned with .ruby-version; refresh the multi-architecture index per docs/operations/configuration.md.
 FROM docker.io/library/ruby:3.4.10-slim@sha256:9d50d98e61ccbe4f1ef436349911e09b53c42a00364bcd3bda6ac107abc29528 AS base
 
 # Rails app lives here

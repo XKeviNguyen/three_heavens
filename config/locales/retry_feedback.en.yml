@@ -1,22 +1,22 @@
 en:
   retry_feedback:
     translation:
-      none: No failed translation runs need retrying.
-      queue_failed: Retry could not be queued. The failed translation runs remain available for another explicit retry.
-      partial: Queued %{queued} failed translation run(s); %{failed} could not be queued and remain available for retry.
-      queued: Queued %{count} failed translation run(s) for retry.
+      none: No failed translations to retry.
+      queue_failed: The retry couldn't start. The failed translations are still there to retry later.
+      partial: Retrying %{queued} failed translation(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed translation(s).
     reviewer:
-      none: No failed reviewer runs need retrying.
-      queue_failed: Retry could not be queued. The failed reviewer runs remain available for another explicit retry.
-      partial: Queued %{queued} failed reviewer run(s); %{failed} could not be queued and remain available for retry.
-      queued: Queued %{count} failed reviewer run(s) for retry.
+      none: No failed reviews to retry.
+      queue_failed: The retry couldn't start. The failed reviews are still there to retry later.
+      partial: Retrying %{queued} failed review(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed review(s).
     judge:
-      none: No failed judge runs need retrying.
-      queue_failed: Retry could not be queued. The failed judge runs remain available for another explicit retry.
-      partial: Queued %{queued} failed judge run(s); %{failed} could not be queued and remain available for retry.
-      queued: Queued %{count} failed judge run(s) for retry.
+      none: No failed judgments to retry.
+      queue_failed: The retry couldn't start. The failed judgments are still there to retry later.
+      partial: Retrying %{queued} failed judgment(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed judgment(s).
     refinement:
-      none: No failed refinement runs need retrying.
-      queue_failed: Retry could not be queued. The failed refinement runs remain available for another explicit retry.
-      partial: Queued %{queued} failed refinement run(s); %{failed} could not be queued and remain available for retry.
-      queued: Queued %{count} failed refinement run(s) for retry.
+      none: No failed suggestions to retry.
+      queue_failed: The retry couldn't start. The failed suggestions are still there to retry later.
+      partial: Retrying %{queued} failed suggestion(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed suggestion(s).

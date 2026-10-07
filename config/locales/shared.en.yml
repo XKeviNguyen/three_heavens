@@ -15,11 +15,14 @@ en:
       newer: ← Newer
       older: Older →
       page: Page %{current} of %{total} · %{entries}
+      entries:
+        one: '%{count} item'
+        other: '%{count} items'
     steps:
       label: Translation workflow
       translation: Translation
       review: Blind review
-      judge: Judge
+      judge: Judging
       editor: Human editor
     step_states:
       complete: Complete
@@ -27,6 +30,7 @@ en:
       failed: Failed
       waiting: Waiting
     home: Three Heavens home
+    technical_details: Technical details
     upload:
       title: Upload source file · Three Heavens
       extracting: Extracting source…
@@ -34,4 +38,4 @@ en:
       or: or
       choose: Choose file
       formats: TXT · Markdown · DOCX · PDF
-      limit: Maximum supported size %{maximum} MiB. Uploading and previewing never contacts an AI provider.
+      limit: Up to %{maximum} MiB. Uploading and previewing never sends anything to AI.

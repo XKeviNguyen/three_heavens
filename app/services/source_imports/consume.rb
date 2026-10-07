@@ -22,13 +22,8 @@ module SourceImports
     end
 
     def apply!
-      if (failure = source_import.availability_failure(at:))
-        code = {
-          already_consumed: "already_consumed",
-          expired: "expired_import",
-          unavailable: "unavailable_import"
-        }.fetch(failure)
-        raise Error.new(code, "This source import #{source_import.availability_message(at:)}.")
+      if (code = source_import.availability_error_code(at:))
+        raise Error.new(code, source_import.availability_message(at:))
       end
 
       document.assign_attributes(

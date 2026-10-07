@@ -27,7 +27,7 @@
         <span class="text-sm"><%= revision.source_language %> → <%= revision.target_language %></span>
       </div>
       <p class="mt-2 text-sm text-slate-600"><%= revision.name %> · <%= revision.description.presence || t("glossaries_ui.no_description") %></p>
-      <details class="mt-3 text-xs text-slate-500"><summary class="cursor-pointer font-semibold"><%= t("glossaries_ui.technical_identity") %></summary><p class="mt-2 break-all font-mono">SHA-256 <%= revision.configuration_digest %></p></details>
+      <details class="mt-3 text-xs text-slate-500"><summary class="cursor-pointer font-semibold"><%= t("shared_ui.technical_details") %></summary><p class="mt-2 break-all font-mono">SHA-256 <%= revision.configuration_digest %></p></details>
       <dl class="mt-5 divide-y divide-slate-100 border-y border-slate-100">
         <% revision.entries.each do |entry| %>
           <div class="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">

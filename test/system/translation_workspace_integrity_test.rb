@@ -89,9 +89,9 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
       "References" => translation_references_path,
       "Projects" => projects_path,
       "History" => history_path,
-      "Terminology" => glossaries_path,
+      "Glossaries" => glossaries_path,
       "Methodology" => methodology_profiles_path,
-      "Workflows" => workflow_profiles_path,
+      "Workflow setups" => workflow_profiles_path,
       "Benchmarks" => benchmarks_path
     }.each do |label, path|
       click_link label

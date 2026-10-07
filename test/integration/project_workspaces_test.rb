@@ -28,7 +28,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "Projects"
     assert_select "a[href='#{project_path(@project)}']", text: "Open project"
-    assert_select "article", text: /Reusable sermons.*Vietnamese.*Japanese.*Documents.*1.*Experiments.*0/m
+    assert_select "article", text: /Reusable sermons.*Vietnamese.*Japanese.*Documents.*1.*Translations.*0/m
     assert_select "article", text: /Foreign private project/, count: 0
     assert_select "a[href='#{new_translation_workspace_path}']", text: /Start a new project translation/
   end
@@ -75,7 +75,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     assert_operator response.body.index("Newer source"), :<, response.body.index("Older source")
     assert_select "section", text: /Automatic draft.*Automatic workflow.*Running/m
     assert_select "section", text: /Manual draft.*Manual workflow.*Completed/m
-    assert_select "a[href='#{pipeline_run_path(pipeline)}']", text: "Pipeline progress"
+    assert_select "a[href='#{pipeline_run_path(pipeline)}']", text: "Automatic workflow progress"
     assert_select "a[href='#{new_translation_workspace_path(project_id: @project.id)}']", text: /Paste text/
     assert_select "a[href='#{new_source_import_path(project_id: @project.id)}']", text: "Upload source file"
   end
@@ -237,7 +237,7 @@ class ProjectWorkspacesTest < ActionDispatch::IntegrationTest
     ensure
       ActiveSupport::Notifications.unsubscribe(subscriber)
     end
-    assert_includes workspace.errors[:project_id], "is not available"
+    assert_includes workspace.errors[:project_id], "is no longer available"
     assert lock_queries.any? { |sql| sql.include?("FOR UPDATE") }
   end
 

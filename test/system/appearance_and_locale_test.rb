@@ -180,7 +180,7 @@ class AppearanceAndLocaleSystemTest < ApplicationSystemTestCase
     Timeout.timeout(5) { sleep 0.05 until user.reload.appearance == "dark" }
     assert_selector "html[data-appearance='system']"
     within("aside#app-sidebar") { click_link "History" }
-    assert_selector "h1", text: "Experiment history"
+    assert_selector "h1", text: "Translation history"
     assert_selector "html[data-appearance='dark']"
   end
 

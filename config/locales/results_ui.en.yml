@@ -3,106 +3,107 @@ en:
     back_project: Back to Project
     back_project_arrow: ← Back to Project
     back_review: Back to blind review
-    back_translation: Back to translation experiment
+    back_translation: Back to translation candidates
     candidate_translation: Candidate translation
     corrections: Recommended corrections
     error_code: Error code
     glossary: 'Glossary:'
-    human_mapping: Human-only mapping
+    human_mapping: Written by (hidden from AI)
     issues: Issues
     original_file: Original source file
     overall: overall
-    pasted_source: Pasted text · the source shown below is authoritative
-    provider_requests_complete: provider requests complete.
-    queueing_retries: Queueing retries…
+    pasted_source: Pasted text · the source shown below is what was translated
+    provider_requests_complete: parts done.
+    queueing_retries: Starting retries…
     rationale: Rationale
-    requested_model: Requested model
-    resolved_model: Resolved model
+    requested_model: Chosen model
+    resolved_model: Model actually used
     risks: Risks
-    segmented: Segmented execution
+    segmented: Processed in parts
     source_document: Source document
     strengths: Strengths
     suggested_translation: Suggested improved translation
-    translation_instruction: Translation instruction
+    translation_instruction: Translation instructions
     uploaded_file: Uploaded file
-    view_pipeline: View consolidated progress
+    view_pipeline: View automatic workflow progress
     telemetry:
-      prompt_tokens: Prompt tokens
-      completion_tokens: Completion tokens
+      prompt_tokens: Input tokens
+      completion_tokens: Output tokens
       total_tokens: Total tokens
       cost: Cost
     translation:
-      title: Translation experiment · Three Heavens
-      heading: Translation experiment
-      running: Translation runs are still in progress. This page refreshes automatically every 5 seconds.
-      recover: Recover failed translations
-      retry_intro: '%{count} failed run(s) can be retried without changing completed translations or model identities. Each failed physical work item selected by this action authorizes up to %{attempts} new provider attempts and may incur additional cost.'
+      title: Translation candidates · Three Heavens
+      heading: Translation candidates
+      running: Translations are still in progress. This page refreshes automatically every 5 seconds.
+      recover: "Retry failed translations"
+      retry_intro: '%{count} translation(s) failed. Retrying redoes only the failed work; finished translations and the chosen models stay the same. Each failed request can be tried up to %{attempts} more times, which may add cost.'
       retry: Retry failed translations
-      retry_confirm: Retry only the failed translation work? Each failed physical item may make up to %{attempts} new provider attempts and incur additional cost.
-      retry_unavailable: Retry is unavailable because a historical model is inactive or unsupported.
-      model_runs: Model runs
+      retry_confirm: Retry only the failed translations? Each failed request can be tried up to %{attempts} more times, which may add cost.
+      retry_unavailable: Retry isn't available because a model used here is no longer active or supported.
+      model_runs: Results by model
       failed: Translation failed
       run_running: The model is translating this document now.
-      run_pending: This run is queued and waiting to start.
-      review_exists: A blind review round already exists for this experiment.
+      run_pending: Waiting to start.
+      review_exists: This translation already has a blind review.
       view_review: View blind review
-      start_review: Start blind cross-review
-      review_intro: Select 1–%{maximum} reviewer models. Each reviewer receives the source, instruction, rubric, and anonymously labeled translations. Candidate model identities remain private from the reviewer.
-      segment_cost: This document has %{count} segments. Each selected reviewer authorizes %{count} initial segment provider requests; built-in retries may add calls.
-      active_reviewers: Active OpenRouter reviewers
-      no_reviewers: No active OpenRouter reviewer models are available.
+      start_review: Start blind review
+      review_intro: Choose 1–%{maximum} reviewer models. Each reviewer sees the source, your instructions, the scoring guide, and the candidates under anonymous labels. Reviewers never learn which model wrote which candidate.
+      segment_cost: This document is processed in %{count} parts, so each reviewer you choose makes %{count} AI requests. Automatic retries may add a few more.
+      active_reviewers: Available reviewer models
+      no_reviewers: No reviewer models are available.
       start_review_button: Start blind review
-      start_review_confirm: Start blind review with the selected models? This begins provider work and may incur cost.
+      start_review_confirm: Start blind review with the selected models? This sends AI requests and may cost money.
       starting_review: Starting review…
     review:
       title: Blind review · Three Heavens
-      heading: Blind cross-review
+      heading: Blind review
       running: Reviewers are still evaluating the translations. This page refreshes automatically every 5 seconds.
-      recover: Recover failed reviewers
-      retry_intro: '%{count} failed reviewer(s) can be retried in this round. Completed reviews and anonymous candidate mappings stay unchanged. Each failed physical work item selected by this action authorizes up to %{attempts} new provider attempts and may incur additional cost.'
-      retry: Retry failed reviewers
-      retry_confirm: Retry only the failed review work? Each failed physical item may make up to %{attempts} new provider attempts and incur additional cost.
-      retry_unavailable: Retry is unavailable because a historical reviewer model is inactive or unsupported.
-      runs: Reviewer runs
+      recover: "Retry failed reviews"
+      retry_intro: '%{count} review(s) failed. Retrying redoes only the failed reviews; finished reviews and the anonymous candidate labels stay the same. Each failed request can be tried up to %{attempts} more times, which may add cost.'
+      retry: Retry failed reviews
+      retry_confirm: Retry only the failed reviews? Each failed request can be tried up to %{attempts} more times, which may add cost.
+      retry_unavailable: Retry isn't available because a reviewer model used here is no longer active or supported.
+      runs: Reviews
       reviewer: Reviewer
-      failed: Reviewer failed
+      failed: Review failed
       run_running: This reviewer is evaluating the anonymous candidates now.
-      run_pending: This review is queued and waiting to start.
+      run_pending: Waiting to start.
       faithfulness: Faithfulness
       naturalness: Naturalness
       terminology: Terminology
-      instruction_adherence: Instruction adherence
-      judge_exists: A judge round already exists for this blind review.
-      view_judge: View judge results
-      start_judge: Start judge selection
-      judge_intro: Select 1–%{maximum} judge models. Judges receive anonymously labeled translations and anonymous blind-review feedback; candidate and reviewer model identities remain private from them.
-      segment_cost: This document has %{count} segments. Each selected judge authorizes %{count} initial segment provider requests; built-in retries may add calls.
-      active_judges: Active OpenRouter judges
-      no_judges: No active OpenRouter judge models are available.
-      start_judge_button: Start judge selection
-      start_judge_confirm: Start judging with the selected models? This begins provider work and may incur cost.
+      instruction_adherence: Follows instructions
+      judge_exists: This blind review has already been judged.
+      view_judge: View judging results
+      start_judge: Start judging
+      judge_intro: Choose 1–%{maximum} judge models. Judges see the anonymous candidates and the anonymous review feedback, never the names of the models that wrote or reviewed them.
+      segment_cost: This document is processed in %{count} parts, so each judge you choose makes %{count} AI requests. Automatic retries may add a few more.
+      active_judges: Available judge models
+      no_judges: No judge models are available.
+      start_judge_button: Start judging
+      start_judge_confirm: Start judging with the selected models? This sends AI requests and may cost money.
       starting_judge: Starting judging…
     judge:
-      title: Judge selection · Three Heavens
-      heading: Judge selection
+      title: Judging · Three Heavens
+      heading: Judging
       running: Judges are evaluating the translations. This page refreshes automatically every 5 seconds.
-      recover: Recover failed judges
-      retry_intro: '%{count} failed judge(s) can be retried in this round. Completed judgments and anonymous mappings stay unchanged. No official winner exists until every judge completes and aggregation succeeds. Each failed physical work item selected by this action authorizes up to %{attempts} new provider attempts and may incur additional cost.'
-      retry: Retry failed judges
-      retry_confirm: Retry only the failed judge work? Each failed physical item may make up to %{attempts} new provider attempts and incur additional cost.
-      retry_unavailable: Retry is unavailable because a historical judge model is inactive or unsupported.
-      winner: Official aggregate winner
-      open_editor: Open final translation workspace
-      create_editor: Create final translation workspace
+      recover: "Retry failed judgments"
+      retry_intro: '%{count} judgment(s) failed. Retrying redoes only the failed judgments; finished judgments and the anonymous labels stay the same. A winner is chosen only after every judge finishes. Each failed request can be tried up to %{attempts} more times, which may add cost.'
+      retry: Retry failed judgments
+      retry_confirm: Retry only the failed judgments? Each failed request can be tried up to %{attempts} more times, which may add cost.
+      retry_unavailable: Retry isn't available because a judge model used here is no longer active or supported.
+      winner: Winning translation
+      open_editor: Open final translation
+      create_editor: Edit the winning translation
       opening_editor: Opening editor…
-      ranking: '%{points} Borda points · %{score}/100 mean score · %{count} judge(s)'
-      no_winner: No official aggregate winner
-      no_winner_intro: At least one judge failed. Successful sibling judgments are preserved below, but the round does not declare an official winner.
-      runs: Judge runs
+      ranking: '%{points} ranking points · average score %{score}/100 · %{count} judge(s)'
+      aggregation_explanation: "Each judge ranks every candidate. Higher places earn more ranking points; the translation with the most points wins, and a tie goes to the higher average score."
+      no_winner: No winner
+      no_winner_intro: At least one judge failed, so no winner was chosen. Successful judgments are kept below.
+      runs: Judgments
       judge: Judge
-      failed: Judge failed
+      failed: Judgment failed
       run_running: This judge is ranking the anonymous candidates now.
-      run_pending: This judgment is queued and waiting to start.
-      judge_winner: Judge winner
+      run_pending: Waiting to start.
+      judge_winner: This judge's pick
       confidence: Confidence
-    provider_failure: AI work failed. Review the error code before retrying explicitly.
+    provider_failure: The AI request failed. Check the error code, then retry if you want to.

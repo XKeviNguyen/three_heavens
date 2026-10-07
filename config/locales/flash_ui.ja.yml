@@ -20,13 +20,13 @@ ja:
       created: 参考訳を作成しました。
       revision: 参考訳の第%{version}版を作成しました。
       activated: 参考訳を有効にしました。
-      archived: 参考訳をアーカイブしました。過去の実験で使った記録は残ります。
+      archived: "参考訳をアーカイブしました。使用済みの翻訳には影響しません。"
     final:
-      workspace_ready: 最終訳の編集画面を開けます。
+      workspace_ready: "最終訳の下書きができました。"
       revision_saved: 新しい版を保存しました。
       revision_restored: 新しい版として復元しました。
-      refinement_started: AIの修正案の作成を開始しました。
-      proposal_applied: AI提案を新しい版として適用しました。
+      refinement_started: "AIに修正案を依頼しました。"
+      proposal_applied: "AIの修正案を新しい版として適用しました。"
       finalized: 最終訳を確定しました。
       reopened: 最終訳を再編集可能にしました。
     review:
@@ -34,9 +34,9 @@ ja:
     judge:
       started: 判定を開始しました。
     pipeline:
-      stopped: 以降の自動処理を止めました。待機中・実行中のAI処理は取り消されません。
+      stopped: "自動処理を停止しました。すでに始まったAIリクエストは最後まで実行されます。"
     operations:
-      reconciled: 停滞したAI処理%{count}件を整理しました。新しいAI処理は開始していません。
+      reconciled: "止まっていたAI処理%{count}件を失敗として記録しました。AIリクエストは送信していません。"
     model:
       added: モデルを追加して有効にしました。
       catalog_action: '%{name}：%{action}。'
@@ -49,6 +49,6 @@ ja:
       activated: '%{name}を有効にしました。'
       deactivated: '%{name}を無効にしました。履歴は保持されます。'
     workspace:
-      replayed: この翻訳はすでに開始済みです。既存の結果を表示します。
-      automatic_started: 自動翻訳パイプラインを開始しました。
-      experiment_started: 翻訳実験を開始しました。
+      replayed: "この翻訳はすでに開始されています。その翻訳を表示します。"
+      automatic_started: "自動ワークフローを開始しました。"
+      experiment_started: "翻訳を開始しました。"

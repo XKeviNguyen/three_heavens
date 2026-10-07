@@ -5,7 +5,7 @@ en:
     completed: Completed
     failed: Failed
     blocked: Blocked
-    ready_for_editor: Ready for editor
+    ready_for_editor: "Ready for you to edit"
     stopped: Stopped
     draft: Draft
     finalized: Finalized
@@ -20,16 +20,16 @@ en:
   guidance_labels:
     reference_examples: Reference examples
     glossary: Glossary terminology
-    experiment_instruction: This translation instruction
+    experiment_instruction: This translation's instructions
   next_actions:
     final_translation: Final translation (%{status})
-    pipeline_progress: Pipeline progress
-    judge_results: Judge results
+    pipeline_progress: Automatic workflow progress
+    judge_results: Judging results
     view_judge_progress: View judge progress
     continue_judging: Continue to judging
     view_blind_review: View blind review
     continue_blind_review: Continue to blind review
     view_translation_progress: View translation progress
   workflow_modes:
-    winner_draft: Winner draft
-    refinement_proposals: Refinement proposals
+    winner_draft: Winner draft only
+    refinement_proposals: Winner draft + AI suggestions

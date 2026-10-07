@@ -92,7 +92,7 @@ class TranslationWorkspace
       true
     end
   rescue ReplayIdentity::AdmissionExceeded
-    errors.add(:base, "Too many recent workspace submissions. Try again later.")
+    errors.add(:base, :too_many_submissions)
     false
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
@@ -100,13 +100,13 @@ class TranslationWorkspace
          SourceImports::Error,
          OpenRouter::ModelResolver::Error => error
     if error.is_a?(SourceImports::Error)
-      errors.add(:source_import_id, error.message)
+      errors.add(:source_import_id, I18n.t("source_imports.errors.#{error.code}", default: :"source_imports.invalid_request"))
       return false
     end
     message = if error.message == TranslationReferences::ContextBudgetMessage::MESSAGE
-      error.message
+      :references_too_long
     else
-      "The translation experiment could not be started. Please review the form and try again."
+      :start_failed
     end
     errors.add(:base, message)
     false
@@ -205,13 +205,13 @@ class TranslationWorkspace
     return true unless existing_project?
 
     unless project_id.to_s.match?(/\A[1-9]\d*\z/)
-      errors.add(:project_id, "is not valid")
+      errors.add(:project_id, :invalid)
       return false
     end
 
     locked_project = user.projects.lock.find_by(id: project_id)
     unless locked_project
-      errors.add(:project_id, "is not available")
+      errors.add(:project_id, :unavailable)
       return false
     end
 
@@ -229,7 +229,7 @@ class TranslationWorkspace
 
   def validate_model_selection
     unless workflow_mode.in?(%w[manual automatic])
-      errors.add(:workflow_mode, "must be manual or automatic")
+      errors.add(:workflow_mode, :inclusion)
       return
     end
 
@@ -242,7 +242,7 @@ class TranslationWorkspace
 
   def validate_manual_selection
     if workflow_profile_revision_id.present? || automatic_confirmation == "1"
-      errors.add(:workflow_mode, "cannot mix manual models with automatic pipeline settings")
+      errors.add(:workflow_mode, :mixed_settings)
       return
     end
 
@@ -250,15 +250,15 @@ class TranslationWorkspace
     saved_ids = Array(model_ids).reject(&:blank?)
     selected_count = (identifiers + saved_ids).length
     if selected_count.zero?
-      errors.add(:model_ids, "Select at least one valid translation model")
+      errors.add(:model_ids, :models_required)
       return
     end
     if selected_count > Ai::UsageLimits::MAX_TRANSLATION_MODELS
-      errors.add(:model_ids, "Select no more than #{Ai::UsageLimits::MAX_TRANSLATION_MODELS} translation models")
+      errors.add(:model_ids, :too_many_models, count: Ai::UsageLimits::MAX_TRANSLATION_MODELS)
       return
     end
     if identifiers.uniq.length != identifiers.length
-      errors.add(:model_identifiers, "cannot contain duplicate models")
+      errors.add(:model_identifiers, :duplicate_models)
       return
     end
 
@@ -270,7 +270,7 @@ class TranslationWorkspace
 
     @llm_models = (saved_models + resolved_models).uniq(&:model_identifier)
     if @llm_models.empty?
-      errors.add(:model_ids, "Select at least one valid translation model")
+      errors.add(:model_ids, :models_required)
     end
   end
 
@@ -285,13 +285,13 @@ class TranslationWorkspace
     models = LlmModel.active_openrouter.where(id: selected_ids).order(:id).to_a
 
     unless models.map(&:id) == selected_ids.sort
-      errors.add(:model_ids, "contain an inactive or unsupported model")
+      errors.add(:model_ids, :model_unavailable)
       return nil
     end
 
     models
-  rescue Ai::UsageLimits::InvalidSelection => error
-    errors.add(:model_ids, error.message)
+  rescue Ai::UsageLimits::InvalidSelection
+    errors.add(:model_ids, :invalid)
     nil
   end
 
@@ -304,18 +304,18 @@ class TranslationWorkspace
       raise OpenRouter::ModelResolver::InactiveModelError if !model.active? && model.persisted?
       model
     rescue OpenRouter::ModelResolver::Error
-      errors.add(:model_identifiers, "contain an unavailable or unsupported model")
+      errors.add(:model_identifiers, :model_unavailable)
       return nil
     end
   end
 
   def validate_automatic_selection
     if model_ids.any?(&:present?)
-      errors.add(:workflow_mode, "cannot mix automatic pipeline settings with manual model IDs")
+      errors.add(:workflow_mode, :mixed_settings)
       return
     end
     unless workflow_profile_revision_id.to_s.match?(/\A[1-9]\d*\z/)
-      errors.add(:workflow_profile_revision_id, "is not a valid profile revision")
+      errors.add(:workflow_profile_revision_id, :invalid)
       return
     end
 
@@ -324,15 +324,15 @@ class TranslationWorkspace
       model_selections: :llm_model
     ).joins(:workflow_profile).where(workflow_profiles: { user_id: user.id }).find_by(id: workflow_profile_revision_id)
     unless @workflow_profile_revision
-      errors.add(:workflow_profile_revision_id, "is not available")
+      errors.add(:workflow_profile_revision_id, :unavailable)
       return
     end
     profile = @workflow_profile_revision.workflow_profile
-    errors.add(:workflow_profile_revision_id, "is stale; review the latest profile revision") unless profile.current_revision_id == @workflow_profile_revision.id
-    errors.add(:workflow_profile_revision_id, "belongs to an inactive profile") unless profile.active?
-    errors.add(:automatic_confirmation, "must be accepted for each launch") unless automatic_confirmation == Pipelines::Start::CONFIRMATION_VALUE
+    errors.add(:workflow_profile_revision_id, :stale_selection) unless profile.current_revision_id == @workflow_profile_revision.id
+    errors.add(:workflow_profile_revision_id, :inactive_workflow) unless profile.active?
+    errors.add(:automatic_confirmation, :confirmation_required) unless automatic_confirmation == Pipelines::Start::CONFIRMATION_VALUE
     unless @workflow_profile_revision.routing_eligible?
-      errors.add(:workflow_profile_revision_id, "references unavailable or changed model routing")
+      errors.add(:workflow_profile_revision_id, :workflow_models_unavailable)
     end
     validate_automatic_provider_plan
   end
@@ -385,12 +385,12 @@ class TranslationWorkspace
 
   def validate_source_import
     if source_import_id.blank?
-      errors.add(:source_import_project_token, "is unexpected") if source_import_project_token.present?
+      errors.add(:source_import_project_token, :invalid) if source_import_project_token.present?
       return
     end
 
     if source_import.nil? || source_import.user_id != user&.id
-      errors.add(:source_import_id, "is not available")
+      errors.add(:source_import_id, I18n.t("source_imports.errors.unavailable_import"))
     elsif source_import.availability_failure(at: current_time)
       errors.add(:source_import_id, source_import.availability_message(at: current_time))
     elsif !SourceImports::ProjectBinding.valid?(
@@ -398,7 +398,7 @@ class TranslationWorkspace
       source_import:,
       project: binding_project
     )
-      errors.add(:source_import_id, "is not available for this workspace")
+      errors.add(:source_import_id, I18n.t("source_imports.errors.project_binding_invalid"))
     end
   end
 
@@ -406,21 +406,21 @@ class TranslationWorkspace
     return if glossary_revision_id.blank?
 
     unless glossary_revision_id.to_s.match?(/\A[1-9]\d*\z/)
-      errors.add(:glossary_revision_id, "is not a valid glossary revision")
+      errors.add(:glossary_revision_id, :invalid)
       return
     end
     @glossary_revision = GlossaryRevision.includes(:glossary).joins(:glossary)
       .where(glossaries: { user_id: user.id, active: true }).find_by(id: glossary_revision_id)
     unless @glossary_revision
-      errors.add(:glossary_revision_id, "is not available")
+      errors.add(:glossary_revision_id, :unavailable)
       return
     end
     unless @glossary_revision.glossary.current_revision_id == @glossary_revision.id
-      errors.add(:glossary_revision_id, "is stale; select the current glossary revision")
+      errors.add(:glossary_revision_id, :stale_selection)
       return
     end
     unless @glossary_revision.language_pair_matches?(source_language: source_language, target_language: target_language)
-      errors.add(:glossary_revision_id, "must match the project's source and target languages")
+      errors.add(:glossary_revision_id, :language_mismatch)
       return
     end
 
@@ -431,7 +431,7 @@ class TranslationWorkspace
     return if methodology_profile_revision_id.blank?
 
     unless methodology_profile_revision_id.to_s.match?(/\A[1-9]\d*\z/)
-      errors.add(:methodology_profile_revision_id, "is not a valid methodology revision")
+      errors.add(:methodology_profile_revision_id, :invalid)
       return
     end
     @methodology_profile_revision = MethodologyProfileRevision.includes(:methodology_profile)
@@ -439,18 +439,18 @@ class TranslationWorkspace
       .where(methodology_profiles: { user_id: user.id, active: true })
       .find_by(id: methodology_profile_revision_id)
     unless @methodology_profile_revision
-      errors.add(:methodology_profile_revision_id, "is not available")
+      errors.add(:methodology_profile_revision_id, :unavailable)
       return
     end
     unless @methodology_profile_revision.methodology_profile.current_revision_id == @methodology_profile_revision.id
-      errors.add(:methodology_profile_revision_id, "is stale; select the current methodology revision")
+      errors.add(:methodology_profile_revision_id, :stale_selection)
       return
     end
     unless @methodology_profile_revision.language_pair_matches?(
       source_language: source_language,
       target_language: target_language
     )
-      errors.add(:methodology_profile_revision_id, "must match the project's source and target languages")
+      errors.add(:methodology_profile_revision_id, :language_mismatch)
       return
     end
 
@@ -460,20 +460,20 @@ class TranslationWorkspace
   def validate_reference_selection
     ids = translation_reference_revision_ids
     unless ids.is_a?(Array)
-      errors.add(:translation_reference_revision_ids, "must be a list")
+      errors.add(:translation_reference_revision_ids, :invalid)
       return
     end
     submitted = ids.map(&:to_s)
     if submitted.length > ExperimentReferenceRevision::MAXIMUM_REFERENCES
-      errors.add(:translation_reference_revision_ids, "cannot include more than 5 references")
+      errors.add(:translation_reference_revision_ids, :too_many_references, count: 5)
       return
     end
     unless submitted.all? { |id| id.match?(/\A[1-9]\d*\z/) }
-      errors.add(:translation_reference_revision_ids, "contain an invalid reference selection")
+      errors.add(:translation_reference_revision_ids, :invalid)
       return
     end
     if submitted.uniq.length != submitted.length
-      errors.add(:translation_reference_revision_ids, "cannot contain duplicates")
+      errors.add(:translation_reference_revision_ids, :duplicate_references)
       return
     end
 
@@ -485,18 +485,18 @@ class TranslationWorkspace
         translation_references: { user_id: user.id, active: true }
       ).order(:id).to_a
     unless @selected_reference_revisions.map(&:id) == selected_ids
-      errors.add(:translation_reference_revision_ids, "contain an unavailable reference")
+      errors.add(:translation_reference_revision_ids, :reference_unavailable)
       return
     end
 
     @selected_reference_revisions.each do |revision|
       reference = revision.translation_reference
       unless reference.current_revision_id == revision.id
-        errors.add(:translation_reference_revision_ids, "contain a stale reference revision")
+        errors.add(:translation_reference_revision_ids, :stale_selection)
         next
       end
       unless revision.language_pair_matches?(source_language: source_language, target_language: target_language)
-        errors.add(:translation_reference_revision_ids, "must match the project's source and target languages")
+        errors.add(:translation_reference_revision_ids, :language_mismatch)
       end
     end
   end
@@ -529,7 +529,7 @@ class TranslationWorkspace
       return true
     end
 
-    errors.add(:methodology_profile_revision_id, "is no longer the active current methodology revision")
+    errors.add(:methodology_profile_revision_id, :stale_selection)
     false
   end
 
@@ -550,7 +550,7 @@ class TranslationWorkspace
     end
     return true if eligible
 
-    errors.add(:translation_reference_revision_ids, "are no longer active current references for this project")
+    errors.add(:translation_reference_revision_ids, :reference_unavailable)
     false
   end
 
@@ -573,7 +573,7 @@ class TranslationWorkspace
   end
 
   def submission_expired
-    errors.add(:submission_token, "has expired. Reload the workspace and try again.")
+    errors.add(:submission_token, :expired)
     false
   end
 

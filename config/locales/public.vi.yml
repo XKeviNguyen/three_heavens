@@ -29,7 +29,7 @@ vi:
     start_translation: Bắt đầu dịch
     see_how_it_works: Xem cách hoạt động
     open_workspace: Mở không gian làm việc
-    access_note: Quyền dùng AI để dịch được cấp riêng cho từng tài khoản. Tạo tài khoản không bao gồm quyền sử dụng AI do hệ thống quản lý.
+    access_note: "Quyền dùng AI để dịch được bật riêng cho từng tài khoản đã duyệt. Tạo tài khoản không bao gồm quyền dùng AI."
     nav:
       product: Sản phẩm
       how_it_works: Cách hoạt động
@@ -96,7 +96,7 @@ vi:
         title: Thuật ngữ
         description: Những cách dùng cần nhất quán.
       references:
-        title: Tài liệu tham khảo
+        title: "Bản dịch tham khảo"
         description: Các bản dịch bạn đã tin dùng.
       methodology:
         title: Phương pháp
@@ -186,6 +186,9 @@ vi:
     cancel_unavailable: Không thể hủy tệp nguồn này nữa.
     canceled: Đã hủy tệp nguồn.
     errors:
+      already_consumed: Tệp này đã được dùng cho một lượt dịch. Hãy tải lên lại để bắt đầu lượt dịch khác.
+      expired_import: Tệp tải lên này đã hết hạn. Hãy tải tệp lên lại.
+      unavailable_import: Tệp tải lên này không còn khả dụng. Hãy tải tệp lên lại.
       file_too_large: Tệp nguồn vượt giới hạn 10 MiB.
       invalid_utf8: Tệp nguồn phải chứa văn bản UTF-8 hợp lệ.
       binary_source: Tệp không chứa văn bản thuần có thể đọc được.
@@ -207,7 +210,7 @@ vi:
       pdf_no_text: Tệp PDF này không có văn bản có thể trích xuất. PDF dạng ảnh cần OCR, hiện chưa được hỗ trợ.
       pdf_timeout: Quá trình xử lý PDF mất quá nhiều thời gian.
       pdf_too_many_pages: Tệp PDF có quá nhiều trang để xử lý an toàn.
-      project_binding_invalid: Tệp nguồn đã nhập không còn dùng được cho dự án này.
+      project_binding_invalid: "Tệp tải lên này thuộc một dự án khác. Hãy tải tệp lên lại tại đây."
       request_key_reused: Lượt tải lên này đã được gửi với một tệp khác. Hãy chọn lại tệp.
       source_too_long: Văn bản trích xuất vượt giới hạn ký tự.
       storage_unavailable: Không thể lưu tệp. Hãy chọn lại tệp và thử lại.
@@ -230,19 +233,19 @@ vi:
       new_translation: Bản dịch mới
       projects: Dự án
       history: Lịch sử
-      terminology: Thuật ngữ
-      references: Tài liệu tham khảo
+      terminology: "Bảng thuật ngữ"
+      references: "Bản dịch tham khảo"
       methodology: Phương pháp
-      workflows: Quy trình
-      benchmarks: Đánh giá mô hình
+      workflows: "Cấu hình quy trình"
+      benchmarks: "Thống kê mô hình"
       users: Người dùng
       models: Mô hình
       operations: Vận hành
   managed_ai:
-    unavailable: Tài khoản này chưa được cấp quyền dùng AI để dịch. Bạn vẫn có thể chuẩn bị tài liệu và hướng dẫn; quản trị viên cần bật quyền dùng AI trước khi bắt đầu dịch.
+    unavailable: "Tài khoản này chưa được bật quyền dùng AI để dịch. Bạn vẫn có thể chuẩn bị tài liệu và hướng dẫn; quản trị viên cần bật quyền dùng AI trước khi bắt đầu dịch."
   admin_users:
     title: Người dùng
-    description: Quyết định ai được dùng AI do hệ thống quản lý. Quyền truy cập tài khoản và quyền dùng AI là hai quyền riêng.
+    description: "Chọn ai được dùng AI để dịch. Quyền đăng nhập và quyền dùng AI là hai quyền riêng."
     status: Trạng thái tài khoản
     verification: Xác nhận email
     managed_ai: Quyền dùng AI

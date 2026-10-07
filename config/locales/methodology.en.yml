@@ -1,6 +1,6 @@
 en:
   methodology_ui:
-    title: Methodology Profiles · Three Heavens
+    title: Methodologies · Three Heavens
     edit_title: Revise methodology · Three Heavens
     new_title: New methodology · Three Heavens
     show_title: '%{name} · Methodology · Three Heavens'
@@ -8,18 +8,18 @@ en:
     guidance: Methodology guidance
     guidance_help: Describe philosophy, literalness, tone, theological handling, citation, writing, and formatting conventions. Internal line breaks and spacing are preserved.
     revise: Revise %{name}
-    edit_intro: Saving creates a new immutable revision. Existing experiments continue using their original methodology snapshot.
-    heading: Methodology profiles
-    singular: Methodology profile
-    index_intro: Owner-private, reusable guidance for how translations should be produced. Methodologies are separate from literal terminology glossaries and workflow/model profiles.
+    edit_intro: Saving creates a new version. Translations that already used this methodology keep the version they used.
+    heading: Methodologies
+    singular: Methodology
+    index_intro: Your private, reusable guidance on how translations should be written. Methodologies are separate from glossaries (preferred terms) and workflow setups (which AI models to use).
     new: New methodology
-    empty: No methodology profiles yet
+    empty: No methodologies yet
     empty_intro: Create reusable style and translation guidance, then select it in the workspace.
     create: Create a methodology
-    archive_confirm: Archive this methodology? Existing experiments keep their exact revision.
-    new_heading: New methodology profile
-    new_intro: Methodology controls how translation is produced. Use a glossary for literal term mappings and a workflow profile for model/stage selection.
-    show_intro: Historical revisions remain immutable and viewable after archive.
+    archive_confirm: Archive this methodology? Translations that already used it keep the version they used.
+    new_heading: New methodology
+    new_intro: A methodology describes how the translation should be written. Use a glossary for fixed term pairs, and a workflow setup to choose AI models and steps.
+    show_intro: Earlier versions never change, and you can still view them after archiving.
     all: All methodologies
     using: 'Using methodologies:'
-    using_intro: Choose this profile for a matching language pair in the
+    using_intro: Choose this methodology for a matching language pair in the

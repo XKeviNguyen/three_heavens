@@ -1,53 +1,53 @@
 vi:
   pipelines_ui:
     title: Quy trình tự động · Three Heavens
-    methodology_snapshot: Bản phương pháp được lưu
+    methodology_snapshot: "Phương pháp đã dùng"
     started: '%{revision} · %{mode} · bắt đầu %{at}'
-    blocked_at: Quy trình bị chặn ở bước %{stage}
-    blocked_generic: Giai đoạn này đã bị chặn. Xem trang liên quan trước khi tiếp tục.
-    blocked_help: Dùng trang giai đoạn liên quan để thử lại hoặc tiếp tục thủ công.
-    ready_editor: Sẵn sàng để biên tập
-    ready_help: Tự động hóa đã dừng. Không đề xuất nào được áp dụng, bản nháp không bị tự sửa và bản dịch chưa được hoàn tất.
-    stopped: Đã dừng các bước tự động tiếp theo
-    stopped_help: Lịch sử đã hoàn tất được giữ nguyên. Các yêu cầu AI đang chờ hoặc đang chạy không bị hủy; bạn có thể tiếp tục thủ công.
+    blocked_at: "Quy trình tạm dừng ở bước %{stage}"
+    blocked_generic: "Bước này cần bạn xem lại. Hãy mở trang của bước đó để biết chuyện gì đã xảy ra."
+    blocked_help: "Mở trang của bước đó để thử lại hoặc tự tiếp tục."
+    ready_editor: "Sẵn sàng để bạn biên tập"
+    ready_help: "Các bước tự động đã xong. Không đề xuất nào được áp dụng, bản nháp không bị thay đổi và chưa có gì được hoàn tất. Quyết định cuối cùng là của bạn."
+    stopped: "Đã dừng tự động hóa"
+    stopped_help: "Các kết quả đã xong được giữ lại và bạn có thể tự tiếp tục. Các yêu cầu AI đã bắt đầu vẫn sẽ chạy xong."
     progress: Tiến độ
-    current_stage: 'Giai đoạn hiện tại:'
-    plan: Kế hoạch yêu cầu AI đã cho phép
-    plan_intro: '%{segments} đoạn nguồn · %{slots} yêu cầu AI ban đầu · tối đa %{maximum} yêu cầu gồm cả giới hạn thử lại %{attempts} lần. Mỗi lần thử lại thủ công về sau cần thao tác xác nhận riêng.'
-    plan_role: '%{logical} lượt × %{segments} đoạn = %{requests} yêu cầu ban đầu'
-    execution_status: Trạng thái thực hiện
-    logical_runs: Lượt xử lý
-    physical_slots: Mục xử lý thực tế
-    attempts_started: Lượt yêu cầu AI đã bắt đầu
+    current_stage: "Bước hiện tại:"
+    plan: "Mức dùng AI đã duyệt"
+    plan_intro: "Tài liệu được xử lý thành %{segments} đoạn. Bạn đã duyệt %{slots} yêu cầu AI ban đầu và tối đa %{maximum} yêu cầu, tính cả tối đa %{attempts} lần tự động thử lại cho mỗi yêu cầu. Mọi lần thử lại sau đó đều cần bạn duyệt lại."
+    plan_role: "%{logical} mô hình × %{segments} đoạn = %{requests} yêu cầu"
+    execution_status: "Trạng thái yêu cầu AI"
+    logical_runs: "Tác vụ AI"
+    physical_slots: "Yêu cầu AI"
+    attempts_started: "Lượt thử AI đã bắt đầu, kể cả thử lại"
     pending_running_failed: Đang chờ · đang chạy · thất bại
-    known_tokens: Số token đã biết
-    known_attempt_cost: Chi phí yêu cầu đã biết
-    average_latency: Độ trễ trung bình của yêu cầu đã hoàn tất
-    logical_progress: '%{completed} hoàn tất / %{total} tổng cộng'
-    physical_progress: '%{completed} hoàn tất / %{total} đã tạo'
-    token_coverage: Tổng phụ đã biết; %{known}/%{total} lượt có số token.
-    cost_coverage: Tổng phụ đã biết; chi phí chưa rõ không được tính là 0.
-    recent_failures: Yêu cầu AI thất bại gần đây
-    failure_intro: Chỉ hiển thị mã lỗi đã lọc và nguồn gốc yêu cầu không thể sửa. Không hiển thị phản hồi AI, lời nhắc, nguồn hay lỗi thô.
-    attempt_number: lượt %{number}
-    snapshots: Bản chụp mô hình đã cho phép
-    logical_coverage: Phạm vi chi phí của lượt xử lý
-    known_logical_total: Tổng chi phí đã biết
-    logical_records: Số lượt xử lý
+    known_tokens: "Token đã dùng (đã biết)"
+    known_attempt_cost: "Chi phí đến nay (đã biết)"
+    average_latency: "Thời gian phản hồi trung bình"
+    logical_progress: "%{completed}/%{total} đã xong"
+    physical_progress: "Đã xong %{completed}/%{total} yêu cầu đã tạo"
+    token_coverage: "Tổng chưa đầy đủ; %{known}/%{total} lượt thử có báo số token."
+    cost_coverage: "Tổng chưa đầy đủ; chi phí chưa rõ không được tính là 0."
+    recent_failures: "Yêu cầu AI thất bại gần đây"
+    failure_intro: "Chỉ hiển thị mã lỗi an toàn. Lời nhắc, văn bản của bạn và phản hồi gốc từ dịch vụ AI không bao giờ được hiển thị."
+    attempt_number: "lần thử %{number}"
+    snapshots: "Mô hình quy trình này dùng"
+    logical_coverage: "Chi phí từ bản ghi cũ"
+    known_logical_total: "Tổng đã biết"
+    logical_records: "Tác vụ AI"
     with_known_cost: Có chi phí đã biết
-    coverage_help: Lịch sử từng yêu cầu bao gồm %{tracked}/%{total} mục xử lý. Tổng riêng của lượt xử lý giữ lại chi phí cũ đã biết; không cộng vào tổng phụ vì có thể trùng phạm vi. Chi phí chưa rõ không tính là 0.
-    links: Liên kết quy trình
+    coverage_help: "Lịch sử theo yêu cầu bao gồm %{tracked}/%{total} yêu cầu. Tổng này lấy từ bản ghi theo tác vụ, có thể trùng với các tổng theo yêu cầu ở trên nên được hiển thị riêng. Chi phí chưa rõ không được tính là 0."
+    links: "Các bước trong quy trình"
     final_translation: Bản dịch cuối
-    stop_heading: Dừng tự động hóa tiếp theo
-    stop_help: Thao tác này chặn các giai đoạn tự động tiếp theo. Không thể hủy yêu cầu AI đang chờ hoặc chạy, không xóa lịch sử và vẫn có thể tiếp tục thủ công.
+    stop_heading: "Dừng tự động hóa"
+    stop_help: "Thao tác này dừng các bước tự động còn lại. Các yêu cầu AI đã bắt đầu vẫn sẽ chạy xong. Không có gì bị xóa và bạn có thể tự tiếp tục."
     stop: Dừng tự động hóa
-    stop_confirm: Dừng mọi giai đoạn tự động tiếp theo? Không thể hủy yêu cầu AI đã xếp lịch hoặc đang chạy.
+    stop_confirm: "Dừng các bước tự động còn lại? Không thể hủy các yêu cầu AI đã bắt đầu."
     blocked_reasons:
-      managed_ai_access_revoked: Tài khoản này chưa được bật quyền dùng AI của máy chủ.
-      stage_failed: Một hoặc nhiều lượt xử lý thất bại. Dùng nút thử lại trên trang giai đoạn liên quan.
-      configuration_unavailable: Cấu hình mô hình của giai đoạn tiếp theo không còn khả dụng. Dừng tự động hóa và tiếp tục thủ công, hoặc khôi phục cấu hình ban đầu.
-      stage_conflict: Trạng thái quy trình hiện tại xung đột với giai đoạn tự động này. Dừng tự động hóa và tiếp tục từ trang giai đoạn liên quan.
-      reference_context_budget: Các bản tham chiếu đã chọn vượt giới hạn ngữ cảnh của mô hình.
+      managed_ai_access_revoked: "Tài khoản này chưa được bật quyền dùng AI để dịch."
+      stage_failed: "Một số tác vụ AI thất bại. Mở trang của bước đó để thử lại."
+      configuration_unavailable: "Một mô hình mà quy trình cần cho bước tiếp theo không còn khả dụng. Hãy dừng tự động hóa và tự tiếp tục, hoặc bật lại mô hình ban đầu."
+      stage_conflict: "Bước này đã được bắt đầu theo cách khác. Hãy dừng tự động hóa và tiếp tục từ trang của bước đó."
+      reference_context_budget: "Các bản dịch tham khảo đã chọn quá dài so với giới hạn văn bản của mô hình."
     events:
       pipeline_started: Đã bắt đầu quy trình
       translation_started: Đã bắt đầu dịch
@@ -56,17 +56,17 @@ vi:
       review_completed: Đã nhận xét xong
       judge_started: Đã bắt đầu chấm điểm
       judge_completed: Đã chấm điểm xong
-      final_workspace_created: Đã tạo không gian biên tập
+      final_workspace_created: "Đã tạo bản nháp cuối"
       refinement_started: Đã bắt đầu đề xuất chỉnh sửa
       refinement_completed: Đã hoàn tất đề xuất chỉnh sửa
       ready_for_editor: Sẵn sàng biên tập
       automation_stopped: Đã dừng tự động hóa
-      configuration_blocked: Bị chặn do cấu hình
-      translation_blocked: Dịch bị chặn
-      translation_retry_resumed: Dịch đã thử lại
-      review_blocked: Nhận xét bị chặn
-      review_retry_resumed: Nhận xét đã thử lại
-      judge_blocked: Chấm điểm bị chặn
-      judge_retry_resumed: Chấm điểm đã thử lại
-      finalization_blocked: Hoàn thiện bị chặn
-      finalization_retry_resumed: Hoàn thiện đã thử lại
+      configuration_blocked: "Tạm dừng vì một mô hình không khả dụng"
+      translation_blocked: "Dịch tạm dừng"
+      translation_retry_resumed: "Tiếp tục dịch sau khi thử lại"
+      review_blocked: "Nhận xét tạm dừng"
+      review_retry_resumed: "Tiếp tục nhận xét sau khi thử lại"
+      judge_blocked: "Chấm điểm tạm dừng"
+      judge_retry_resumed: "Tiếp tục chấm điểm sau khi thử lại"
+      finalization_blocked: "Đề xuất chỉnh sửa tạm dừng"
+      finalization_retry_resumed: "Tiếp tục đề xuất chỉnh sửa sau khi thử lại"

@@ -1,53 +1,53 @@
 ja:
   pipelines_ui:
     title: 自動ワークフロー · Three Heavens
-    methodology_snapshot: 保存された翻訳方針
+    methodology_snapshot: "使用した翻訳方針"
     started: '%{revision} · %{mode} · 開始 %{at}'
-    blocked_at: '%{stage}の段階で処理が停止しました'
-    blocked_generic: この段階で処理が停止しました。続行する前に該当ページを確認してください。
-    blocked_help: 該当する段階のページから再試行するか、手動で続行してください。
-    ready_editor: 編集者に引き継げます
-    ready_help: 自動処理は終了しました。提案は適用されず、下書きも自動変更・確定されていません。
-    stopped: 以降の自動処理を停止しました
-    stopped_help: 完了済みの履歴は残ります。待機中または実行中のAI処理は取り消されません。手動で続行できます。
+    blocked_at: "%{stage}の段階で一時停止しました"
+    blocked_generic: "この段階で確認が必要です。該当ページを開いて状況を確認してください。"
+    blocked_help: "該当する段階のページから再試行するか、手動で続けてください。"
+    ready_editor: "編集できます"
+    ready_help: "自動処理は完了しました。修正案は適用されず、下書きは変更されず、確定もされていません。最終的な判断はあなたが行います。"
+    stopped: "自動処理を停止しました"
+    stopped_help: "完了した結果は残り、手動で続けられます。すでに始まったAIリクエストは最後まで実行されます。"
     progress: 進行状況
-    current_stage: 現在の段階：
-    plan: 承認したAI処理計画
-    plan_intro: 原文%{segments}セグメント · 初回リクエスト枠%{slots}件 · 組み込みの最大%{attempts}回の試行を含め、AIリクエストは最大%{maximum}件です。後から手動再試行する場合は別途操作が必要です。
-    plan_role: 論理処理%{logical}件 × セグメント%{segments}件 = 初回リクエスト%{requests}件
-    execution_status: 実行状況
-    logical_runs: 論理処理
-    physical_slots: 実処理枠
-    attempts_started: 開始したAI試行
+    current_stage: "現在の段階："
+    plan: "承認したAI利用"
+    plan_intro: "この文書は%{segments}部分に分けて処理します。最初のAIリクエスト%{slots}件と、1リクエストあたり最大%{attempts}回の自動再試行を含めて合計最大%{maximum}件を承認しました。後から再試行する場合は、改めて承認が必要です。"
+    plan_role: "モデル%{logical}件 × %{segments}部分 = リクエスト%{requests}件"
+    execution_status: "AIリクエストの状況"
+    logical_runs: "AI処理"
+    physical_slots: "AIリクエスト"
+    attempts_started: "開始したAI試行（再試行を含む）"
     pending_running_failed: 待機 · 実行中 · 失敗
-    known_tokens: 判明しているトークン数
-    known_attempt_cost: 判明している試行費用
-    average_latency: 完了した試行の平均所要時間
+    known_tokens: "使用したトークン（判明分）"
+    known_attempt_cost: "これまでの費用（判明分）"
+    average_latency: "平均応答時間"
     logical_progress: 完了%{completed}件 / 全%{total}件
     physical_progress: 完了%{completed}件 / 作成%{total}件
-    token_coverage: 既知分の小計です。%{known}/%{total}件の試行でトークン数が報告されました。
-    cost_coverage: 既知分の小計です。不明な費用を0とはみなしません。
-    recent_failures: 最近失敗したAI試行
-    failure_intro: 安全なエラーコードと変更できないリクエスト履歴のみを表示します。提供元の応答、プロンプト、原文、生のエラーは表示しません。
-    attempt_number: 試行%{number}
-    snapshots: 承認済みモデルの記録
-    logical_coverage: 論理処理の費用範囲
-    known_logical_total: 判明している合計費用
-    logical_records: 論理処理の件数
-    with_known_cost: 費用が判明した件数
-    coverage_help: 試行ごとの履歴は実処理%{tracked}/%{total}件をカバーします。別掲の論理処理合計は以前の費用を残すためのもので、重複する可能性があるため小計には加算しません。不明な費用を0とはみなしません。
-    links: ワークフローへのリンク
+    token_coverage: "一部のみの合計です。%{known}/%{total}件の試行でトークン数が報告されました。"
+    cost_coverage: "一部のみの合計です。不明な費用は0として扱いません。"
+    recent_failures: "最近失敗したAIリクエスト"
+    failure_intro: "安全なエラーコードだけを表示します。プロンプト、あなたの文章、AIサービスからの生の応答は表示しません。"
+    attempt_number: "%{number}回目"
+    snapshots: "このワークフローで使うモデル"
+    logical_coverage: "以前の記録による費用"
+    known_logical_total: "判明している合計"
+    logical_records: "AI処理"
+    with_known_cost: "費用が判明した件数"
+    coverage_help: "リクエスト単位の履歴は%{total}件中%{tracked}件を含みます。この合計は処理単位の記録によるもので、上のリクエスト単位の合計と重なる場合があるため別に表示しています。不明な費用は0として扱いません。"
+    links: "このワークフローの各段階"
     final_translation: 最終訳
-    stop_heading: 以降の自動処理を停止
-    stop_help: 以降の自動段階を止めます。待機中・実行中のAI処理は取り消せず、履歴は削除されません。手動で続行できます。
+    stop_heading: "自動処理を停止"
+    stop_help: "残りの自動段階を停止します。すでに始まったAIリクエストは最後まで実行されます。何も削除されず、手動で続けられます。"
     stop: 自動処理を停止
-    stop_confirm: 以降の自動段階をすべて停止しますか？待機中・実行中のAI処理は取り消せません。
+    stop_confirm: "残りの自動段階を停止しますか？すでに始まったAIリクエストは取り消せません。"
     blocked_reasons:
-      managed_ai_access_revoked: このアカウントではサーバー管理のAIを利用できません。
-      stage_failed: 1件以上の処理に失敗しました。該当段階のページから明示的に再試行してください。
-      configuration_unavailable: 次の段階で承認されたモデル設定が利用できません。自動処理を止めて手動で続行するか、元の設定を復元してください。
-      stage_conflict: 現在の状態がこの自動段階と競合しています。自動処理を止め、該当ページから続行してください。
-      reference_context_budget: 選択した参考訳がモデルのコンテキスト上限を超えています。
+      managed_ai_access_revoked: "このアカウントではAI翻訳が有効になっていません。"
+      stage_failed: "一部のAI処理に失敗しました。該当する段階のページから再試行してください。"
+      configuration_unavailable: "次の段階で使うモデルが利用できなくなりました。自動処理を停止して手動で続けるか、元のモデルを再び利用できるようにしてください。"
+      stage_conflict: "この段階は別の方法ですでに開始されています。自動処理を停止し、該当ページから続けてください。"
+      reference_context_budget: "選択した参考訳が長すぎて、モデルの文字数上限に収まりません。"
     events:
       pipeline_started: ワークフローを開始
       translation_started: 翻訳を開始
@@ -56,17 +56,17 @@ ja:
       review_completed: レビューが完了
       judge_started: 判定を開始
       judge_completed: 判定が完了
-      final_workspace_created: 最終訳の編集画面を作成
+      final_workspace_created: "最終訳の下書きを作成"
       refinement_started: 修正案の作成を開始
       refinement_completed: 修正案の作成が完了
-      ready_for_editor: 編集者に引き継ぎ可能
+      ready_for_editor: "編集できる状態になりました"
       automation_stopped: 自動処理を停止
-      configuration_blocked: 設定により停止
-      translation_blocked: 翻訳を停止
-      translation_retry_resumed: 翻訳を再試行を再開
-      review_blocked: レビューを停止
-      review_retry_resumed: レビューを再試行を再開
-      judge_blocked: 判定を停止
-      judge_retry_resumed: 判定を再試行を再開
-      finalization_blocked: 最終調整を停止
-      finalization_retry_resumed: 最終調整を再試行を再開
+      configuration_blocked: "モデルが利用できないため一時停止"
+      translation_blocked: "翻訳を一時停止"
+      translation_retry_resumed: "再試行後に翻訳を再開"
+      review_blocked: "レビューを一時停止"
+      review_retry_resumed: "再試行後にレビューを再開"
+      judge_blocked: "判定を一時停止"
+      judge_retry_resumed: "再試行後に判定を再開"
+      finalization_blocked: "修正案の作成を一時停止"
+      finalization_retry_resumed: "再試行後に修正案の作成を再開"

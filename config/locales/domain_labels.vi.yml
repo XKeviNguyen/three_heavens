@@ -5,7 +5,7 @@ vi:
     completed: Hoàn tất
     failed: Thất bại
     blocked: Đã chặn
-    ready_for_editor: Sẵn sàng để biên tập
+    ready_for_editor: "Sẵn sàng để bạn biên tập"
     stopped: Đã dừng
     draft: Bản nháp
     finalized: Đã hoàn tất
@@ -18,18 +18,18 @@ vi:
     available: Có sẵn
     canceled: Đã hủy
   guidance_labels:
-    reference_examples: Ví dụ tham khảo
+    reference_examples: "Bản dịch tham khảo"
     glossary: Thuật ngữ trong bảng
     experiment_instruction: Hướng dẫn của lượt dịch này
   next_actions:
     final_translation: Bản dịch cuối (%{status})
-    pipeline_progress: Tiến độ quy trình
-    judge_results: Kết quả chấm chọn
-    view_judge_progress: Xem tiến độ chấm chọn
-    continue_judging: Tiếp tục chấm chọn
-    view_blind_review: Xem đánh giá ẩn danh
-    continue_blind_review: Tiếp tục đánh giá ẩn danh
+    pipeline_progress: "Tiến độ quy trình tự động"
+    judge_results: "Kết quả chấm điểm"
+    view_judge_progress: "Xem tiến độ chấm điểm"
+    continue_judging: "Tiếp tục chấm điểm"
+    view_blind_review: "Xem nhận xét ẩn danh"
+    continue_blind_review: "Tiếp tục nhận xét ẩn danh"
     view_translation_progress: Xem tiến độ dịch
   workflow_modes:
-    winner_draft: Bản nháp được chọn
-    refinement_proposals: Đề xuất tinh chỉnh
+    winner_draft: "Chỉ tạo bản nháp từ bản thắng"
+    refinement_proposals: "Bản nháp từ bản thắng + đề xuất AI"

@@ -10,38 +10,38 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     visit new_workflow_profile_path
     fill_in "Name", with: "Browser winner profile"
     fill_in "Description", with: "Browser managed"
-    choose "Winner draft"
+    choose "Winner draft only"
     select_role_models
-    click_button "Create workflow profile"
+    click_button "Create workflow setup"
 
-    assert_text "Workflow profile created."
-    assert_text "Revision 1 · Current"
+    assert_text "Workflow setup created."
+    assert_text "Version 1 · Current"
     assert_text "Translators (2)"
     assert_text "Reviewers (1)"
     assert_text "Judges (1)"
-    assert_text "Finalizers (0)"
+    assert_text "Suggestion models (0)"
 
-    click_link "Create revision"
+    click_link "Edit", match: :first
     fill_in "Name", with: "Browser winner profile revised"
-    click_button "Create new revision"
-    assert_text "Workflow profile revision 2 created."
-    assert_text "Revision 2 · Current"
-    assert_text "Revision 1"
+    click_button "Save new version"
+    assert_text "Workflow setup saved as version 2."
+    assert_text "Version 2 · Current"
+    assert_text "Version 1"
 
     visit workflow_profiles_path
     click_button "Duplicate", match: :first
-    assert_text "Workflow profile duplicated."
+    assert_text "Workflow setup duplicated."
     assert_text "Copy of Browser winner profile revised"
 
     visit new_workflow_profile_path
     fill_in "Name", with: "Browser refinement profile"
-    choose "Refinement proposals"
+    choose "Winner draft + AI suggestions"
     select_role_models(finalizer: true)
-    click_button "Create workflow profile"
+    click_button "Create workflow setup"
 
-    assert_text "Workflow profile created."
-    assert_text "Refinement proposals"
-    assert_text "Finalizers (1)"
+    assert_text "Workflow setup created."
+    assert_text "Winner draft + AI suggestions"
+    assert_text "Suggestion models (1)"
   end
 
   test "automatic workspace requires confirmation starts a pipeline and lets owner stop" do
@@ -57,7 +57,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
     click_button "Start translation"
-    assert_text "Automatic confirmation must be accepted for each launch"
+    assert_text "Cost approval must be checked each time you start a translation"
     assert_field "Automatic", checked: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     assert_equal 0, PipelineRun.count
@@ -65,16 +65,16 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     check "translation_workspace_automatic_confirmation"
     assert_enqueued_jobs 2, only: TranslationRunJob do
       click_button "Start translation"
-      assert_text "Automatic translation pipeline started."
+      assert_text "Automatic workflow started."
     end
     pipeline = PipelineRun.order(:id).last
     assert_text profile.name
-    assert_text "Revision 1"
+    assert_text "Version 1"
     assert_text "Translation"
     assert_button "Stop automation"
 
     accept_confirm { click_button "Stop automation" }
-    assert_text "Future automatic advancement stopped"
+    assert_text "Automation stopped. AI requests that had already started will still finish."
     assert pipeline.reload.stopped?
   end
 
@@ -85,8 +85,8 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
 
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     visit pipeline_run_path(pipeline)
-    assert_text "Ready for human editor"
-    assert_no_button "Apply proposal"
+    assert_text "Ready for you to edit"
+    assert_no_button "Apply suggestion"
     assert_no_button "Finalize translation"
     assert_no_button "Stop automation"
 
@@ -113,7 +113,7 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     add_catalog_models("Translators", 2)
     add_catalog_models("Reviewers", 1)
     add_catalog_models("Judges", 1)
-    add_catalog_models("Finalizers", 1) if finalizer
+    add_catalog_models("Suggestion models", 1) if finalizer
   end
 
   def add_catalog_models(role_label, count)

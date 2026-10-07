@@ -29,7 +29,7 @@ en:
     start_translation: Start a translation
     see_how_it_works: See how it works
     open_workspace: Open workspace
-    access_note: AI translation access is enabled separately for approved accounts. Creating an account does not include managed AI usage.
+    access_note: AI translation is turned on separately for approved accounts. Creating an account does not include AI usage.
     nav:
       product: Product
       how_it_works: How it works
@@ -183,9 +183,12 @@ en:
   source_imports:
     imported_notice: Source text extracted. Review and edit it before starting translation.
     invalid_request: The upload request is invalid. Choose one source file and try again.
-    cancel_unavailable: This source import can no longer be canceled.
-    canceled: Source import canceled.
+    cancel_unavailable: "This upload can no longer be removed."
+    canceled: "Upload removed."
     errors:
+      already_consumed: This uploaded file was already used for a translation. Upload it again to start another one.
+      expired_import: This upload has expired. Upload the file again.
+      unavailable_import: This upload is no longer available. Upload the file again.
       file_too_large: The source file is larger than the 10 MiB limit.
       invalid_utf8: The source file must contain valid UTF-8 text.
       binary_source: The file does not contain readable plain text.
@@ -207,7 +210,7 @@ en:
       pdf_no_text: This PDF does not contain extractable text. Scanned PDFs need OCR, which is not supported yet.
       pdf_timeout: This PDF took too long to process.
       pdf_too_many_pages: This PDF has too many pages to process safely.
-      project_binding_invalid: The source import is no longer available for this project.
+      project_binding_invalid: "This upload belongs to a different project. Upload the file again here."
       request_key_reused: This upload was already submitted with a different file. Choose the file again.
       source_too_long: The extracted source exceeds the character limit.
       storage_unavailable: The file could not be stored. Choose it again and retry.
@@ -230,28 +233,28 @@ en:
       new_translation: New translation
       projects: Projects
       history: History
-      terminology: Terminology
+      terminology: "Glossaries"
       references: References
       methodology: Methodology
-      workflows: Workflows
+      workflows: "Workflow setups"
       benchmarks: Benchmarks
       users: Users
       models: Models
       operations: Operations
   managed_ai:
-    unavailable: AI translation access isn't enabled for this account. You can prepare documents and guidance; an administrator must enable managed AI access before translation requests can run.
+    unavailable: AI translation isn't turned on for this account yet. You can prepare documents and guidance now; an administrator must turn on AI access before translations can run.
   admin_users:
     title: Users
-    description: Control who can use server-managed AI. Account access and AI access are separate.
+    description: Choose who can use AI translation. Signing in and using AI are separate permissions.
     status: Account status
     verification: Email verification
-    managed_ai: Managed AI access
+    managed_ai: AI access
     action: Action
     verified: Verified
     unverified: Unverified
     enabled: Enabled
     disabled: Disabled
-    enable: Enable managed AI access
-    disable: Disable managed AI access
-    granted: Managed AI access enabled.
-    revoked: Managed AI access disabled.
+    enable: Turn on AI access
+    disable: Turn off AI access
+    granted: AI access turned on.
+    revoked: AI access turned off.

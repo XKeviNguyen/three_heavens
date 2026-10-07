@@ -12,8 +12,8 @@
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @experiment.name.presence || @experiment.document.title %></h1>
       <p class="mt-2 text-sm text-slate-600"><%= @experiment.document.project.name %> · <%= @experiment.document.project.source_language %> → <%= @experiment.document.project.target_language %></p>
       <% if @experiment.glossary_revision %><p class="mt-1 text-sm text-slate-600"><%= t("results_ui.glossary") %> <%= link_to "#{@experiment.glossary_revision.name} · #{t("projects_ui.revision", version: @experiment.glossary_revision.version)}", glossary_path(@experiment.glossary_revision.glossary), class: "text-blue-700" %></p><% end %>
-      <% if @experiment.methodology_profile_revision %><p class="mt-1 text-sm text-slate-600"><%= t("projects_ui.methodology") %> <%= link_to "#{@experiment.methodology_profile_revision.name} · #{t("projects_ui.revision", version: @experiment.methodology_profile_revision.version)}", methodology_profile_path(@experiment.methodology_profile_revision.methodology_profile), class: "text-blue-700" %> · <span class="font-mono text-xs"><%= @experiment.methodology_profile_revision.configuration_digest %></span></p><% end %>
-      <p class="mt-1 text-sm text-slate-600"><%= t("projects_ui.guidance_preference") %> <%= localized_guidance_label(@experiment.guidance_preference) %></p>
+      <% if @experiment.methodology_profile_revision %><p class="mt-1 text-sm text-slate-600"><%= t("projects_ui.methodology") %> <%= link_to "#{@experiment.methodology_profile_revision.name} · #{t("projects_ui.revision", version: @experiment.methodology_profile_revision.version)}", methodology_profile_path(@experiment.methodology_profile_revision.methodology_profile), class: "text-blue-700" %></p><% end %>
+      <p class="mt-1 text-sm text-slate-600"><%= t("projects_ui.guidance_preference") %>: <%= localized_guidance_label(@experiment.guidance_preference) %></p>
       <% if @experiment.experiment_reference_revisions.any? %>
         <p class="mt-1 text-sm text-slate-600"><%= t("projects_ui.references") %> <%= @experiment.experiment_reference_revisions.map { |snapshot| "#{snapshot.translation_reference_revision.title} · #{t("projects_ui.revision", version: snapshot.translation_reference_revision.version)}" }.to_sentence %></p>
       <% end %>
@@ -115,22 +115,7 @@
             </p>
           <% end %>
 
-          <% telemetry = {
-               t("results_ui.telemetry.prompt_tokens") => run.prompt_tokens,
-               t("results_ui.telemetry.completion_tokens") => run.completion_tokens,
-               t("results_ui.telemetry.total_tokens") => run.total_tokens,
-               t("results_ui.telemetry.cost") => (number_to_currency(run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless run.cost.nil?)
-             }.compact %>
-          <% if telemetry.any? %>
-            <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
-              <% telemetry.each do |label, value| %>
-                <div>
-                  <dt class="text-slate-500"><%= label %></dt>
-                  <dd class="font-medium text-slate-900"><%= value %></dd>
-                </div>
-              <% end %>
-            </dl>
-          <% end %>
+          <%= render "shared/ai_usage", run: run %>
         </article>
       <% end %>
     </div>

@@ -25,7 +25,7 @@ ja:
     headline_first: AI翻訳を比べる。
     headline_second_lead: 最終判断は、
     headline_second_emphasis: あなたに。
-    introduction: 原文、用語集、参考資料を準備。複数のAIモデルがそれぞれ翻訳し、結果を比較できます。最終訳を決めるのは、あなたです。
+    introduction: "原文、用語集、参考訳を準備。複数のAIモデルがそれぞれ翻訳し、結果を比較できます。最終訳を決めるのは、あなたです。"
     start_translation: 翻訳を始める
     see_how_it_works: 仕組みを見る
     open_workspace: ワークスペースを開く
@@ -78,7 +78,7 @@ ja:
         description: 複数のAIモデルから、独立した翻訳候補を得られます。
       guide:
         title: 導く
-        description: 用語、文体、翻訳方針、参考資料で方向性を示せます。
+        description: "用語、文体、翻訳方針、参考訳で方向性を示せます。"
       review:
         title: 検討する
         description: 明確な品質フィードバックをもとに候補を比較できます。
@@ -96,7 +96,7 @@ ja:
         title: 用語集
         description: 表記を統一したい言葉。
       references:
-        title: 参考資料
+        title: "参考訳"
         description: 信頼できる既存の翻訳。
       methodology:
         title: 翻訳方針
@@ -186,6 +186,9 @@ ja:
     cancel_unavailable: この原文ファイルの読み込みは取り消せません。
     canceled: 原文ファイルの読み込みを取り消しました。
     errors:
+      already_consumed: このファイルはすでに翻訳に使用されています。別の翻訳を始めるには、もう一度アップロードしてください。
+      expired_import: このアップロードは有効期限が切れました。ファイルをもう一度アップロードしてください。
+      unavailable_import: このアップロードは利用できなくなりました。ファイルをもう一度アップロードしてください。
       file_too_large: 原文ファイルが10 MiBの上限を超えています。
       invalid_utf8: 原文ファイルには有効なUTF-8テキストが必要です。
       binary_source: 読み取れるテキストが含まれていません。
@@ -207,7 +210,7 @@ ja:
       pdf_no_text: このPDFからテキストを抽出できません。画像だけのPDFにはOCRが必要ですが、現在は対応していません。
       pdf_timeout: PDFの処理に時間がかかりすぎました。
       pdf_too_many_pages: PDFのページ数が安全上の上限を超えています。
-      project_binding_invalid: このプロジェクトでは、読み込んだ原文を利用できません。
+      project_binding_invalid: "このアップロードは別のプロジェクトのものです。ここでもう一度ファイルをアップロードしてください。"
       request_key_reused: このアップロードは別のファイルで送信済みです。ファイルを選び直してください。
       source_too_long: 抽出した原文が文字数の上限を超えています。
       storage_unavailable: ファイルを保存できませんでした。もう一度ファイルを選んでやり直してください。
@@ -230,19 +233,19 @@ ja:
       new_translation: 新しい翻訳
       projects: プロジェクト
       history: 履歴
-      terminology: 用語集
-      references: 参考資料
+      terminology: "用語集"
+      references: "参考訳"
       methodology: 翻訳方針
-      workflows: ワークフロー
+      workflows: "ワークフロー設定"
       benchmarks: モデル評価
       users: ユーザー
       models: モデル
       operations: 運用
   managed_ai:
-    unavailable: このアカウントではAI翻訳を利用できません。資料や翻訳方針は準備できます。翻訳を始めるには管理者による許可が必要です。
+    unavailable: "このアカウントではAI翻訳がまだ有効になっていません。資料や翻訳方針は今から準備できます。翻訳を始めるには、管理者がAI利用を有効にする必要があります。"
   admin_users:
     title: ユーザー
-    description: サーバー管理のAIを利用できるユーザーを設定します。アカウントとAIの利用権限は別です。
+    description: "AI翻訳を利用できるユーザーを設定します。ログインとAIの利用は別の権限です。"
     status: アカウント状態
     verification: メール確認
     managed_ai: AI利用権限

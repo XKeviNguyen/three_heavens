@@ -38,7 +38,7 @@ class WorkspaceCatalogModelsTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_select "li", text: /Model identifiers.*unavailable or unsupported/
+    assert_select "li", text: /AI models include a model that is no longer available/
   end
 
   test "saved model checkboxes and catalog identifiers can be combined without duplicates" do
@@ -68,7 +68,7 @@ class WorkspaceCatalogModelsTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_select "li", text: /Select no more than/
+    assert_select "li", text: /AI models are limited to/
   end
 
   test "validation and invalid launches do not materialize catalog models" do

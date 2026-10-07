@@ -1,8 +1,8 @@
 class SourceImport < ApplicationRecord
-  AVAILABILITY_MESSAGES = {
-    expired: "has expired; upload the source file again",
-    already_consumed: "was already used",
-    unavailable: "is no longer available; upload the source file again"
+  AVAILABILITY_ERROR_CODES = {
+    already_consumed: "already_consumed",
+    expired: "expired_import",
+    unavailable: "unavailable_import"
   }.freeze
 
   belongs_to :user
@@ -57,9 +57,14 @@ class SourceImport < ApplicationRecord
     :unavailable
   end
 
-  def availability_message(at: Time.current)
+  def availability_error_code(at: Time.current)
     failure = availability_failure(at:)
-    AVAILABILITY_MESSAGES.fetch(failure) if failure
+    AVAILABILITY_ERROR_CODES.fetch(failure) if failure
+  end
+
+  def availability_message(at: Time.current)
+    code = availability_error_code(at:)
+    I18n.t("source_imports.errors.#{code}") if code
   end
 
   private

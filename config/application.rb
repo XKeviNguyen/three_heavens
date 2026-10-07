@@ -14,6 +14,9 @@ module ThreeHeavens
     config.load_defaults 8.1
     config.i18n.available_locales = %i[en vi ja]
     config.i18n.default_locale = :en
+    # Lets a form attribute whose errors are complete sentences (such as an
+    # upload failure) drop the attribute-name prefix from its full message.
+    config.active_model.i18n_customize_full_message = true
 
     # Reject declared oversized request bodies before multipart parsing or
     # application allocation, and bound the bytes read from requests without a
