@@ -149,7 +149,7 @@ export default class extends Controller {
     const snapshot = JSON.stringify(workspace)
     if (this.unacknowledged === null && snapshot === this.lastSavedState) {
       this.needsSaveValue = false
-      this.setStatus(this.settledStatus)
+      this.setStatus(this.savedStatus)
       return true
     }
     // Resending unchanged content whose outcome is unknown is a replay of the
@@ -175,7 +175,7 @@ export default class extends Controller {
       this.needsSaveValue = !!this.editPending
       this.settledStatus = this.messagesValue.saved
       // Edits made while this save was in flight have their own timer.
-      if (!this.editPending) this.setStatus(this.messagesValue.saved)
+      if (!this.editPending) this.setStatus(this.savedStatus)
       return true
     } catch (error) {
       this.setStatus(error.conflict ? this.messagesValue.saveConflict : this.messagesValue.saveFailed)
@@ -226,6 +226,12 @@ export default class extends Controller {
     return response.json()
   }
 
+  // Until work that outlasted a wait ends (flush), the draft lacks its result,
+  // so a save meanwhile keeps reporting the failure rather than "saved".
+  get savedStatus() {
+    return this.pendingWaitFailed ? this.messagesValue.saveFailed : this.settledStatus
+  }
+
   // Waits for pending changes, then saves until the persisted draft matches
   // the form; false means edits are not safe.
   async flush() {
@@ -240,10 +246,12 @@ export default class extends Controller {
       const settled = await Promise.race([this.settlePending(), timeout])
       window.clearTimeout(timer)
       if (!settled) {
+        this.pendingWaitFailed = true
         this.setStatus(this.messagesValue.saveFailed)
         // The work may still finish without changing anything to save; then
         // this failure, unless another message replaced it, no longer applies.
         this.settlePending().then(() => {
+          this.pendingWaitFailed = false
           if (!this.busy() && this.statusTarget.textContent === this.messagesValue.saveFailed) this.setStatus(this.settledStatus)
         })
         return false
@@ -260,14 +268,16 @@ export default class extends Controller {
   // The interface-language switch waits for this before navigating, and is
   // abandoned (keeping the page and its edits) unless the draft is saved.
   persistBeforeLocaleSwitch(event) {
-    if (this.discarding) {
+    // A launch's response shows what became of paid work, so the switch
+    // waits for neither it nor a discard and is refused.
+    if (this.launching || this.discarding) {
       event.preventDefault()
       return
     }
-    // Nothing here is kept any more: a launch or a Leave is replacing the
-    // page, or the saved page is reloading. Like a link (onBeforeVisit), the
-    // switch replaces that load (beforeSubmit).
-    if (this.allowVisit || this.launching || this.navigation?.phase === "allowed") return
+    // Nothing here is kept any more: a Leave or the saved page is replacing
+    // it. Like a link (onBeforeVisit), the switch replaces that load
+    // (beforeSubmit).
+    if (this.allowVisit || this.navigation?.phase === "allowed") return
     this.cancelNavigation()
     // Like a form, the switch holds the claim while it saves; a newer action
     // (a link, Back, another form, a discard) takes it, and the switch lapses.
@@ -280,6 +290,13 @@ export default class extends Controller {
   // before the save can change this page, its head, or Turbo's history and
   // snapshot state, whatever the user decides afterwards.
   onTraverse(event) {
+    // A browser load is already replacing this page (see onBeforeVisit);
+    // only another browser load of the new entry can replace it.
+    if (this.navigation?.phase === "allowed") {
+      event.preventDefault()
+      window.location.reload()
+      return
+    }
     if (this.allowVisit || this.launching) return
     if (this.discarding) {
       // A discard ends in a fresh workspace or keeps this page, so the
@@ -510,8 +527,11 @@ export default class extends Controller {
       return
     }
     // Edits typed while it loads would be lost unguarded, as would any made
-    // if the load is stopped, so the page is frozen first.
+    // if the load is stopped, so the page is frozen first. A newer action
+    // must replace this browser load the way it replaces the post-save
+    // reload, which Turbo's own fetches cannot.
     this.element.inert = true
+    this.navigation = { phase: "allowed" }
     // Assigning a URL that differs only by its fragment would keep this page.
     if (new URL(destination).href.split("#")[0] === window.location.href.split("#")[0]) window.location.reload()
     else window.location.assign(destination)
@@ -545,10 +565,15 @@ export default class extends Controller {
       if (!response || (!response.ok && response.status !== 404)) {
         this.discarding = false
         this.setStatus(response?.status === 409 ? this.messagesValue.discardConflict : this.messagesValue.discardFailed)
+        // Edits typed meanwhile were not scheduled (changed); they are kept.
+        if (this.dirty()) this.saveTimer = window.setTimeout(() => this.save(), SAVE_DELAY_MS)
         return
       }
     }
     this.allowVisit = true
+    // As with Leave, nothing typed while the fresh workspace loads, or after
+    // that load is stopped, would be guarded.
+    this.element.inert = true
     window.location.assign(this.resetUrlValue)
   }
 

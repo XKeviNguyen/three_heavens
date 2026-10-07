@@ -135,8 +135,8 @@ module BlindReviews
         properties: {
           evaluations: {
             type: "array",
-            minItems: review_run.review_evaluations.size,
-            maxItems: review_run.review_evaluations.size,
+            minItems: candidate_labels.size,
+            maxItems: candidate_labels.size,
             items: {
               type: "object",
               properties: evaluation_properties,
@@ -150,6 +150,10 @@ module BlindReviews
       }
     end
 
+    def candidate_labels
+      @candidate_labels ||= review_run.review_evaluations.order(:anonymous_label).pluck(:anonymous_label)
+    end
+
     def evaluation_properties
       score_properties = SCORE_FIELDS.index_with do
         { type: "integer", minimum: 1, maximum: 10 }
@@ -158,7 +162,7 @@ module BlindReviews
       score_properties.merge(
         "candidate_label" => {
           type: "string",
-          enum: review_run.review_evaluations.order(:anonymous_label).pluck(:anonymous_label)
+          enum: candidate_labels
         },
         "strengths" => { type: "string", maxLength: 5_000 },
         "issues" => { type: "string", maxLength: 5_000 },

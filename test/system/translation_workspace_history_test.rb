@@ -292,31 +292,27 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_empty users(:normal).translation_workspace_drafts
   end
 
-  test "Leave freezes the page, so nothing is typed unguarded if the page stays" do
-    project = users(:normal).projects.create!(name: "Download project", source_language: "Vietnamese", target_language: "Japanese")
-    document = project.documents.create!(title: "Downloadable", source_text: "Original text", source_format: "txt", original_filename: "original.txt")
-    document.source_file.attach(io: StringIO.new("Original text"), filename: "original.txt", content_type: "text/plain")
-    open_workspace_from_projects
-    install_history_harness
-    page.execute_script("window.__harness.saveMode = 'fail'")
-    fill_in "Project name", with: "Abandoned by Leave"
-    assert_status I18n.t("workspace.save_failed")
-
-    # A download leaves this document in place, as a stopped load would.
-    page.execute_script(<<~JS, download_original_document_path(document))
-      const link = document.createElement("a")
-      link.href = arguments[0]
-      link.textContent = "Download the original"
-      document.querySelector("main").append(link)
-    JS
-    click_link "Download the original"
-    assert_selector "dialog[open]", text: "Leave this translation?"
-    click_button "Leave"
-    assert_until { page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert") }
-    assert page.evaluate_script("!!window.__harness")
-
+  test "Leave freezes the page, and a newer link replaces its browser load" do
+    leave_to_a_download
     click_link "Projects"
     assert_selector "h1", text: "Projects"
+    # A browser load, not a Turbo visit that the pending load could override.
+    assert page.evaluate_script("!window.__harness")
+  end
+
+  test "a language switch after Leave replaces its browser load" do
+    leave_to_a_download
+    within("aside#app-sidebar") { select "日本語", from: "Interface language" }
+    assert_selector "html[lang='ja']"
+    assert page.evaluate_script("!window.__harness")
+    assert_equal "ja", users(:normal).reload.locale
+  end
+
+  test "Back after Leave replaces its browser load" do
+    leave_to_a_download
+    page.execute_script("history.back()")
+    assert_selector "h1", text: "Projects"
+    assert page.evaluate_script("!window.__harness")
   end
 
   test "an import that finishes after a link is clicked reaches the draft before the page leaves" do
@@ -536,6 +532,39 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_imported_draft "Imported while launching"
   end
 
+  test "a discard freezes the page before the fresh workspace loads" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Discarded and frozen"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script(<<~JS)
+      window.addEventListener("pagehide", () => {
+        sessionStorage.setItem("inertAtPagehide", String(document.querySelector("[data-controller='workspace-guard']").inert))
+      })
+    JS
+    accept_confirm { click_button "Discard draft" }
+    assert_until { page.evaluate_script("!window.__harness && document.readyState === 'complete'") }
+    assert_field "Project name", with: ""
+    assert_equal "true", page.evaluate_script("sessionStorage.getItem('inertAtPagehide')")
+    page.execute_script("sessionStorage.removeItem('inertAtPagehide')")
+    assert_empty users(:normal).translation_workspace_drafts
+  end
+
+  test "edits typed while a discard is refused are saved afterwards" do
+    open_workspace_from_projects
+    fill_in "Project name", with: "Before the refused discard"
+    assert_status I18n.t("workspace.saved")
+    install_history_harness
+    page.execute_script("window.__harness.discardMode = 'hold'")
+    accept_confirm { click_button "Discard draft" }
+    assert_until { page.evaluate_script("window.__harness.heldDiscards.length === 1") }
+    fill_in "Project name", with: "Typed during the refused discard"
+
+    page.execute_script("window.__harness.heldDiscards.shift().release()")
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name") == "Typed during the refused discard" }
+    assert_status I18n.t("workspace.saved")
+  end
+
   test "a pending import that ends without a change never hides a failed discard" do
     open_workspace_from_projects
     fill_in "Project name", with: "Discard fails during import"
@@ -613,6 +642,12 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_status I18n.t("workspace.save_failed")
     click_button "Stay"
     assert_no_page_requests
+
+    # The import still has not reached the draft, so a save of new typing
+    # keeps reporting the failure.
+    fill_in "Project name", with: "Typed while the import waits"
+    assert_until { users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name") == "Typed while the import waits" }
+    assert_status I18n.t("workspace.save_failed")
 
     page.execute_script("window.__releaseImport()")
     assert_text "Rejected import"
@@ -915,9 +950,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_equal "Saved without a switch", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
   end
 
-  test "a language switch during a launch replaces the launch like a link would" do
+  test "a language switch during a launch is refused so the launch's outcome is shown" do
     open_workspace_from_projects
-    fill_in "Project name", with: "Launch replaced by a switch"
+    fill_in "Project name", with: "Launch kept over a switch"
     choose_known_language("Source language", "Vietnamese")
     choose_known_language("Target language", "Japanese")
     fill_in "Document title", with: "Switched launch document"
@@ -941,9 +976,9 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
     assert_until { page.evaluate_script("window.__launchHeld === true") }
     within("aside#app-sidebar") { select "日本語", from: "Interface language" }
 
-    assert_selector "html[lang='ja']"
-    assert_equal "ja", users(:normal).reload.locale
-    assert_equal "Launch replaced by a switch", users(:normal).translation_workspace_drafts.sole.payload.fetch("project_name")
+    within("aside#app-sidebar") { assert_field "Interface language", with: "en" }
+    assert page.evaluate_script("window.__launchHeld === true && document.querySelector(\"[data-controller='workspace-guard']\").inert")
+    assert_equal "en", users(:normal).reload.locale
   end
 
   test "signing out from a saved workspace or another page stays immediate" do
@@ -963,6 +998,30 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
   end
 
   private
+
+  # Fails a save, then chooses Leave for a download link. A download keeps
+  # this document in place, as a stopped or still-pending browser load would.
+  def leave_to_a_download
+    project = users(:normal).projects.create!(name: "Download project", source_language: "Vietnamese", target_language: "Japanese")
+    document = project.documents.create!(title: "Downloadable", source_text: "Original text", source_format: "txt", original_filename: "original.txt")
+    document.source_file.attach(io: StringIO.new("Original text"), filename: "original.txt", content_type: "text/plain")
+    open_workspace_from_projects
+    install_history_harness
+    page.execute_script("window.__harness.saveMode = 'fail'")
+    fill_in "Project name", with: "Abandoned by Leave"
+    assert_status I18n.t("workspace.save_failed")
+    page.execute_script(<<~JS, download_original_document_path(document))
+      const link = document.createElement("a")
+      link.href = arguments[0]
+      link.textContent = "Download the original"
+      document.querySelector("main").append(link)
+    JS
+    click_link "Download the original"
+    assert_selector "dialog[open]", text: "Leave this translation?"
+    click_button "Leave"
+    assert_until { page.evaluate_script("document.querySelector(\"[data-controller='workspace-guard']\").inert") }
+    assert page.evaluate_script("!!window.__harness")
+  end
 
   # Records draft saves and the sign-out request in the order they are sent;
   # session_status: answers the sign-out with that status instead.
@@ -1046,7 +1105,7 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
       // only the visits a test drives are held. <html> survives Turbo visits.
       document.documentElement.dataset.turboPrefetch = "false"
       const deliver = window.fetch.bind(window)
-      const harness = window.__harness = { saveMode: "ok", discardMode: "ok", heldSaves: [], holdPages: new Set(), heldPages: [], pageRequests: [], events: {} }
+      const harness = window.__harness = { saveMode: "ok", discardMode: "ok", heldSaves: [], heldDiscards: [], holdPages: new Set(), heldPages: [], pageRequests: [], events: {} }
       const hold = (list, entry, signal) => new Promise((resolve, reject) => {
         entry.release = resolve
         list.push(entry)
@@ -1063,6 +1122,10 @@ class TranslationWorkspaceHistoryTest < ApplicationSystemTestCase
             if (held.fail) return new Response("", { status: 503 })
           }
           if (method === "DELETE" && harness.discardMode === "fail") return new Response("", { status: 503 })
+          if (method === "DELETE" && harness.discardMode === "hold") {
+            await hold(harness.heldDiscards, {})
+            return new Response("", { status: 503 })
+          }
           return deliver(url, options)
         }
         // A hover prefetch is not a navigation; the visit still decides.
