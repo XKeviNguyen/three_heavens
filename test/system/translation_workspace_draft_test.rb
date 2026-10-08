@@ -334,10 +334,15 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
   test "Back then Forward renders the current draft instead of a stale snapshot" do
     visit projects_path
     click_link "New translation"
+    assert_field "Project name"
+    page.execute_script("document.body.dataset.historyDocument = 'old'")
     fill_in "Project name", with: "Typed then Back"
     page.go_back
     assert_current_path projects_path
     page.go_forward
+    # A claimed Back or Forward saves, then reloads the entry reached; Forward
+    # can return before that, so query only the document that replaced this one.
+    assert_document_replaced "body[data-history-document='old']"
     assert_field "Project name", with: "Typed then Back"
 
     fill_in "Project name", with: "Edited after Forward"
