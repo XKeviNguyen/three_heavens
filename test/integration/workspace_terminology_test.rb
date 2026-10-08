@@ -96,6 +96,55 @@ class WorkspaceTerminologyTest < ActionDispatch::IntegrationTest
     assert_response :conflict
   end
 
+  test "rejected duplicate normalized entries preserve every submitted field and removal" do
+    entries = [
+      { source_term: "  ân điển  ", preferred_target_term: "恵み🙂", note: "変更 & <draft>" },
+      { source_term: "ân điển", preferred_target_term: "恩恵", note: "Tiếng Việt e\u0301" },
+      { source_term: "新しい", preferred_target_term: "新規", note: "追加" }
+    ]
+    version = @glossary.current_revision.version.to_s
+    assert_no_difference -> { GlossaryRevision.count } do
+      patch workspace_terminology_path, params: {
+        glossary_id: @glossary.id, glossary: { expected_version: version, entries: }
+      }
+    end
+    assert_response :unprocessable_content
+    assert_select "[role=alert]", text: /duplicate/i
+    assert_submitted_entries(entries)
+    assert_select "input[name='glossary[expected_version]'][value='#{version}']"
+    assert_equal "Sabbath", @glossary.reload.current_revision.entries.sole.source_term
+  end
+
+  test "stale edit preserves submitted values and stale token without overwriting the winner" do
+    version = @glossary.current_revision.version.to_s
+    Glossaries::Revise.call(glossary: @glossary, expected_version: version, attributes: glossary_attributes.merge(
+      entries: [ { source_term: "Winner", preferred_target_term: "勝者", note: "Current" } ]
+    ))
+    entries = [ { source_term: "Losing edit", preferred_target_term: "編集", note: "Keep my work" } ]
+    assert_no_difference -> { GlossaryRevision.count } do
+      patch workspace_terminology_path, params: {
+        glossary_id: @glossary.id, glossary: { expected_version: version, entries: }
+      }
+    end
+    assert_response :conflict
+    assert_select "[role=alert]", text: /changed while you were editing/
+    assert_submitted_entries(entries)
+    assert_select "input[name='glossary[expected_version]'][value='#{version}']"
+    assert_equal "Winner", @glossary.reload.current_revision.entries.sole.source_term
+  end
+
+  test "rejected blank fields retain entries and their exact field values" do
+    entries = [ { source_term: "", preferred_target_term: "", note: "Removed old term" } ]
+    assert_no_difference -> { GlossaryRevision.count } do
+      patch workspace_terminology_path, params: {
+        glossary_id: @glossary.id,
+        glossary: { expected_version: @glossary.current_revision.version, entries: }
+      }
+    end
+    assert_response :unprocessable_content
+    assert_submitted_entries(entries)
+  end
+
   test "rejects malformed entries and unexpected parameters" do
     assert_no_difference -> { GlossaryRevision.count } do
       patch workspace_terminology_path, params: {
@@ -126,6 +175,14 @@ class WorkspaceTerminologyTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def assert_submitted_entries(entries)
+    %i[source_term preferred_target_term note].each do |key|
+      assert_select "[data-glossary-entries-target=list] input[name='glossary[entries][][#{key}]']" do |inputs|
+        assert_equal entries.map { |entry| entry.fetch(key) }, inputs.map { |input| input["value"] }
+      end
+    end
+  end
 
   def glossary_attributes
     {

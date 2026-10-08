@@ -12,6 +12,36 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     sign_in_as @current_test_user
   end
 
+  test "admin can select an active saved outage model without catalog access or activation" do
+    model = llm_models(:openrouter_claude)
+    original_transport = OpenRouter::Catalog.transport
+    OpenRouter::Catalog.transport = -> { flunk "saved selection must not fetch the catalog" }
+    assert_no_difference -> { LlmModel.count } do
+      post catalog_settings_models_path, params: { model_id: model.id.to_s }
+    end
+    assert_redirected_to settings_models_path
+    assert model.reload.active?
+  ensure
+    OpenRouter::Catalog.transport = original_transport
+  end
+
+  test "saved admin catalog selections reject inactive IDs malformed IDs and mixed contracts" do
+    model = llm_models(:openrouter_claude)
+    model.update!(active: false)
+    post catalog_settings_models_path, params: { model_id: model.id.to_s }
+    assert_response :not_found
+    refute model.reload.active?
+    [ { model_id: "#{model.id}oops" }, { model_id: [ model.id.to_s ] },
+      { model_id: model.id.to_s, model_identifier: model.model_identifier } ].each do |selection|
+      post catalog_settings_models_path, params: selection
+      assert_response :bad_request
+    end
+    sign_out
+    sign_in_as users(:normal)
+    post catalog_settings_models_path, params: { model_id: llm_models(:openrouter_gpt).id.to_s }
+    assert_redirected_to root_path
+  end
+
   test "catalog lists model metadata usage actions and only valid benchmark links" do
     used_model = llm_models(:openrouter_claude)
     unused_model = create_model("unused-list")

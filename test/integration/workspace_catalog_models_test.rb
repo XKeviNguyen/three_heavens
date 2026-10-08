@@ -41,6 +41,48 @@ class WorkspaceCatalogModelsTest < ActionDispatch::IntegrationTest
     assert_select "li", text: /AI models include a model that is no longer available/
   end
 
+  test "catalog outage choice carries its saved ID and launches through the saved model contract" do
+    saved = llm_models(:openrouter_claude)
+    OpenRouter::Catalog.transport = -> { raise OpenRouter::Catalog::Error }
+    get open_router_catalog_path
+    assert_response :success
+    choice = response.parsed_body.fetch("models").find { |model| model["identifier"] == saved.model_identifier }
+    assert_equal saved.id, choice.fetch("id", nil)
+    assert_difference -> { TranslationRun.count }, 1 do
+      assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count } ] do
+        post translation_workspace_path, params: { translation_workspace: workspace_attributes.merge(model_ids: [ choice.fetch("id").to_s ]) }
+      end
+    end
+    assert_response :redirect
+  end
+
+  test "saved fallback IDs reject unknown inactive foreign gateway and malformed selections" do
+    saved = llm_models(:openrouter_claude)
+    OpenRouter::Catalog.transport = -> { raise OpenRouter::Catalog::Error }
+    foreign_gateway = saved.dup
+    foreign_gateway.update!(gateway: "other", model_identifier: "vendor/other-gateway")
+    saved.update!(active: false)
+    [ saved.id.to_s, foreign_gateway.id.to_s, "999999999999", "#{saved.id}oops" ].each do |id|
+      assert_no_difference [ -> { TranslationRun.count }, -> { LlmModel.count }, -> { AiProviderAttempt.count } ] do
+        post translation_workspace_path, params: { translation_workspace: workspace_attributes.merge(model_ids: [ id ]) }
+      end
+      assert_response :unprocessable_content
+    end
+    refute saved.reload.active?
+    get open_router_catalog_path
+    assert_empty response.parsed_body.fetch("models").select { |model| [ saved.model_identifier, foreign_gateway.model_identifier ].include?(model["identifier"]) }
+  end
+
+  test "signed out callers cannot discover or use saved fallback models" do
+    sign_out
+    get open_router_catalog_path
+    assert_redirected_to login_path
+    assert_no_difference -> { TranslationRun.count } do
+      post translation_workspace_path, params: { translation_workspace: workspace_attributes.merge(model_ids: [ llm_models(:openrouter_claude).id.to_s ]) }
+    end
+    assert_redirected_to login_path
+  end
+
   test "saved model checkboxes and catalog identifiers can be combined without duplicates" do
     saved = llm_models(:openrouter_claude)
 

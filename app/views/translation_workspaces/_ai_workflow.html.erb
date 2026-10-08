@@ -18,6 +18,7 @@
     <%= render "shared/model_browser",
           role: "translator",
           name: "translation_workspace[model_identifiers][]",
+          saved_name: "translation_workspace[model_ids][]",
           max: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
           label: t("workflow_ui.ai_models"),
           hint: t("workflow_ui.models_hint"),

@@ -43,6 +43,7 @@
         <%= render "shared/model_browser",
               role: role,
               name: "workflow_profile[#{role}_identifiers][]",
+              saved_name: "workflow_profile[#{role}_ids][]",
               max: role_limits.fetch(role),
               label: t("workflows_ui.role_models", role: t("workflows_ui.roles.#{role}")),
               hint: role_hints.fetch(role),

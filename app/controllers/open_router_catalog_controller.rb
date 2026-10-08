@@ -105,6 +105,7 @@ class OpenRouterCatalogController < ApplicationController
   def serialize_fallback(models, role:, query:, provider:, free_only:)
     serialized = models.map do |model|
       {
+        id: model.id,
         identifier: model.model_identifier,
         name: model.display_name,
         provider: model.provider,

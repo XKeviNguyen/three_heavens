@@ -7,7 +7,7 @@ const SEARCH_DEBOUNCE_MS = 220
 // trusted server-side resolution; existing saved selections retain their IDs.
 export default class extends Controller {
   static targets = ["search", "list", "selected", "count", "status", "provider", "free", "sort", "meta", "empty"]
-  static values = { role: String, name: String, max: Number, endpoint: String, messages: Object }
+  static values = { role: String, name: String, savedName: String, max: Number, endpoint: String, messages: Object }
 
   connect() {
     this.onDocumentPointerDown = this.onDocumentPointerDown.bind(this)
@@ -209,8 +209,9 @@ export default class extends Controller {
 
     const hidden = document.createElement("input")
     hidden.type = "hidden"
-    hidden.name = this.nameValue
-    hidden.value = model.identifier
+    const saved = model.source === "fallback"
+    hidden.name = saved ? this.savedNameValue : this.nameValue
+    hidden.value = saved ? model.id : model.identifier
     card.appendChild(hidden)
 
     const details = document.createElement("div")

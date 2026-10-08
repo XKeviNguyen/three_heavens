@@ -1,6 +1,7 @@
 require_relative "boot"
 require_relative "../app/middleware/request_body_limit"
 require_relative "../app/middleware/client_ip_header_filter"
+require_relative "../app/middleware/upload_attempt_admission"
 
 require "rails/all"
 
@@ -27,6 +28,10 @@ module ThreeHeavens
     config.middleware.insert_before 0, RequestBodyLimit
     config.middleware.insert_after ActionDispatch::ShowExceptions, RequestBodyLimit
     config.middleware.insert_before ActionDispatch::RemoteIp, ClientIpHeaderFilter
+    # MethodOverride parses POST multipart bodies. Authenticate and charge each
+    # delivery before that parser runs; keep the extraction/replay budget separate.
+    config.middleware.insert_after ActionDispatch::Session::CookieStore, UploadAttemptAdmission
+    config.middleware.move_after UploadAttemptAdmission, Rack::MethodOverride
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

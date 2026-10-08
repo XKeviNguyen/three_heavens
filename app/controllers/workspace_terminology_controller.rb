@@ -32,9 +32,11 @@ class WorkspaceTerminologyController < ApplicationController
 
   def update
     @glossary = owned_glossaries.find(glossary_id_param)
+    @submitted_entries = entry_attributes
+    @expected_version = expected_version_param
     revision = Glossaries::Revise.call(
       glossary: @glossary,
-      expected_version: expected_version_param,
+      expected_version: @expected_version,
       attributes: revision_attributes
     )
     render_panel(selected_revision_id: revision.id, status: :ok)
@@ -76,7 +78,7 @@ class WorkspaceTerminologyController < ApplicationController
       "description" => revision.description,
       "source_language" => revision.source_language,
       "target_language" => revision.target_language,
-      "entries" => entry_attributes
+      "entries" => @submitted_entries
     }
   end
 
@@ -95,6 +97,10 @@ class WorkspaceTerminologyController < ApplicationController
 
     entries.each do |entry|
       raise ActionController::BadRequest, "Unexpected entry parameters" if (entry.keys - ENTRY_KEYS).any?
+      ENTRY_KEYS.each do |key|
+        value = entry[key]
+        raise ActionController::BadRequest, "#{key} must be a scalar" unless value.nil? || value.is_a?(String)
+      end
     end
 
     entries.map { |entry| entry.permit(*ENTRY_KEYS).to_h }
