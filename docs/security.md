@@ -29,6 +29,7 @@ See [Google sign-in](identity/google-sign-in.md) for the identity flow.
 ## Request and input limits
 
 - Each route has a request-body limit enforced from `Content-Length` before parsing and while reading bodies without one: 64 KiB by default, 8 KiB for signed-out identity forms, 2 MiB for long-text forms, 21 MiB for the two upload forms (POST/PATCH/PUT only). Puma also stops chunked bodies above 21 MiB, and kamal-proxy enforces the same 21 MiB cap.
+- Source-import deliveries and multipart reference requests require an active, verified account with an unexpired server-side session before Rack parses the body. PostgreSQL admits at most 30 deliveries per account per fixed 5-minute window, including malformed uploads and retries. Denied requests return 401 or 429 without reading `rack.input`; 429 includes `Retry-After: 300`. The separate 10-request extraction budget still allows exact upload replay at exhaustion and retains receipt-based Busy refunds. Both counters use one row per account. Proxy/Puma buffering happens before this gate; their existing byte limits still apply. This account limit does not provide network flood protection.
 - JSON bodies are limited to 512 KiB for draft autosave and 8 KiB elsewhere, and are parsed only if they contain at most 1,000 strings, containers, and separators.
 - Requests with null bytes, unknown parameter keys on sensitive endpoints, or malformed identities are rejected with 400.
 

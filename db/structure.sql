@@ -3421,6 +3421,9 @@ CREATE TABLE public.upload_budgets (
     window_id bigint NOT NULL,
     count integer NOT NULL,
     receipts uuid[] NOT NULL,
+    attempt_window_id bigint DEFAULT 0 NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT upload_budgets_attempt_count_bounds CHECK (((attempt_count >= 0) AND (attempt_count <= 30))),
     CONSTRAINT upload_budgets_count_bounds CHECK (((count >= 0) AND (count <= 10))),
     CONSTRAINT upload_budgets_receipt_count CHECK ((count = cardinality(receipts)))
 );
@@ -6713,6 +6716,7 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261008090000'),
 ('20261005120000'),
 ('20261005110000'),
 ('20261005100000'),

@@ -3,6 +3,25 @@ class UploadBudget < ApplicationRecord
 
   Receipt = Data.define(:user_id, :window_id, :token)
 
+  # Separate from admitted extraction work: every HTTP delivery, including an
+  # invalid file or replay, costs multipart parsing. Three deliveries per work
+  # slot leave room for response-loss/Busy retries without unlimited parsing.
+  ATTEMPTS_PER_WINDOW = 30
+
+  def self.admit_attempt(user:)
+    connection.exec_query(sanitize_sql_array([ <<~SQL, user.id ])).any?
+      INSERT INTO upload_budgets (user_id, window_id, count, receipts, attempt_window_id, attempt_count)
+      VALUES (?, #{current_window_sql}, 0, ARRAY[]::uuid[], #{current_window_sql}, 1)
+      ON CONFLICT (user_id) DO UPDATE
+      SET attempt_window_id = EXCLUDED.attempt_window_id,
+          attempt_count = CASE WHEN upload_budgets.attempt_window_id < EXCLUDED.attempt_window_id
+                               THEN 1 ELSE upload_budgets.attempt_count + 1 END
+      WHERE upload_budgets.attempt_window_id < EXCLUDED.attempt_window_id
+         OR (upload_budgets.attempt_window_id = EXCLUDED.attempt_window_id AND upload_budgets.attempt_count < #{ATTEMPTS_PER_WINDOW})
+      RETURNING user_id
+    SQL
+  end
+
   # One bounded row per account, shared by both upload entry points. PostgreSQL
   # supplies the clock and serializes even the first insert. Each admitted
   # request owns a receipt, so a refund can only remove its own charge once.

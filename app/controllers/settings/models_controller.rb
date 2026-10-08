@@ -29,6 +29,16 @@ module Settings
     end
 
     def create_from_catalog
+      if params.key?(:model_id)
+        id = params[:model_id]
+        unless id.is_a?(String) && id.match?(/\A[1-9]\d*\z/) && !params.key?(:model_identifier)
+          raise ActionController::BadRequest, "model_id is invalid"
+        end
+        model = LlmModel.active_openrouter.find(id)
+        redirect_to settings_models_path, notice: t("flash_ui.model.catalog_action", name: model.display_name, action: t("flash_ui.model.actions.already_active"))
+        return
+      end
+
       identifier = params.require(:model_identifier)
       unless identifier.is_a?(String) && identifier.match?(LlmModel::OPENROUTER_IDENTIFIER_FORMAT)
         raise ActionController::BadRequest, "model_identifier is invalid"

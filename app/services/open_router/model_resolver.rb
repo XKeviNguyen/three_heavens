@@ -23,7 +23,7 @@ module OpenRouter
     end
 
     def self.materialize!(model, activate: false)
-      LlmModel.transaction do
+      LlmModel.transaction(requires_new: true) do
         existing = LlmModel.lock.find_by(gateway: "openrouter", model_identifier: model.model_identifier)
         if existing
           raise InactiveModelError if !existing.active? && !activate
@@ -35,7 +35,12 @@ module OpenRouter
           model
         end
       end
+    rescue ActiveRecord::RecordNotUnique
+      materialize!(LlmModel.find_by!(gateway: "openrouter", model_identifier: model.model_identifier), activate:)
     rescue ActiveRecord::RecordInvalid => error
+      if error.record.errors.details == { model_identifier: [ { error: :taken, value: model.model_identifier } ] }
+        return materialize!(LlmModel.find_by!(gateway: "openrouter", model_identifier: model.model_identifier), activate:)
+      end
       raise Error, error.message
     end
 

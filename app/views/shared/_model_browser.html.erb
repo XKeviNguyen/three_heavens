@@ -1,9 +1,10 @@
-<%# locals: role:, name:, max:, selected:, label:, hint:, description: nil %>
+<%# locals: role:, name:, saved_name:, max:, selected:, label:, hint:, description: nil %>
 <% browser_id = "model-browser-#{name.parameterize}" %>
 <div data-controller="model-browser"
      id="<%= browser_id %>"
      data-model-browser-role-value="<%= role %>"
      data-model-browser-name-value="<%= name %>"
+     data-model-browser-saved-name-value="<%= saved_name %>"
      data-model-browser-max-value="<%= max %>"
      data-model-browser-endpoint-value="<%= open_router_catalog_path %>"
      data-model-browser-messages-value="<%= t("model_browser").to_json %>"

@@ -152,7 +152,7 @@ class RequestBodyLimitTest < ActiveSupport::TestCase
     assert_equal 204, middleware.call("rack.input" => StringIO.new("Streamed body")).first
   end
 
-  test "application stack returns 413 for an undeclared oversized multipart body" do
+  test "application stack denies signed out undeclared multipart uploads before reading their size" do
     boundary = "RequestBodyLimitTestBoundary"
     oversized = "--#{boundary}\r\n" \
       "Content-Disposition: form-data; name=\"source_file\"; filename=\"oversized.txt\"\r\n" \
@@ -162,11 +162,11 @@ class RequestBodyLimitTest < ActiveSupport::TestCase
 
     status, headers, = Rails.application.call(undeclared_multipart_environment(oversized, boundary))
 
-    assert_equal 413, status
+    assert_equal 401, status
     assert_equal "no-store", headers.fetch("cache-control")
   end
 
-  test "application stack reads small undeclared multipart bodies normally" do
+  test "application stack denies small signed out undeclared multipart uploads" do
     boundary = "RequestBodyLimitTestBoundary"
     body = "--#{boundary}\r\n" \
       "Content-Disposition: form-data; name=\"source_text\"\r\n\r\n" \
@@ -175,7 +175,7 @@ class RequestBodyLimitTest < ActiveSupport::TestCase
 
     status, = Rails.application.call(undeclared_multipart_environment(body, boundary))
 
-    assert_not_equal 413, status
+    assert_equal 401, status
   end
 
   private

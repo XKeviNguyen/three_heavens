@@ -89,8 +89,7 @@ class MalformedInputTest < ActionDispatch::IntegrationTest
     assert_equal "ab.txt", SourceImport.order(:id).last.original_filename
   end
 
-  # Rack parses these before Rails' exception handling (in Rack::MethodOverride).
-  test "a form body over one of Rack's multipart limits is a bad request, signed out" do
+  test "Rack multipart limits reject signed in bodies while signed out uploads are denied before parsing" do
     boundary = "LimitBoundary"
     part = ->(name, value, filename = nil) do
       disposition = "form-data; name=\"#{name}\"#{"; filename=\"#{filename}\"" if filename}"
@@ -102,6 +101,13 @@ class MalformedInputTest < ActionDispatch::IntegrationTest
       "130 files" => Array.new(130) { |index| part.call("f#{index}", "v", "f#{index}.txt") }.join
     }
 
+    bodies.each do |label, body|
+      post source_imports_path, params: "#{body}--#{boundary}--\r\n",
+                                headers: { "CONTENT_TYPE" => "multipart/form-data; boundary=#{boundary}" }
+      assert_response :unauthorized, label
+    end
+
+    sign_in_as users(:normal)
     bodies.each do |label, body|
       post source_imports_path, params: "#{body}--#{boundary}--\r\n",
                                 headers: { "CONTENT_TYPE" => "multipart/form-data; boundary=#{boundary}" }

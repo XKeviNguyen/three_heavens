@@ -14,6 +14,38 @@ class UploadBudgetTest < ActiveSupport::TestCase
 
   teardown { UploadBudget.where(user: [ @user, users(:other) ]).delete_all }
 
+  test "simultaneous first HTTP attempts admit exactly thirty across independent processes" do
+    assert_nil UploadBudget.find_by(user: @user)
+    assert_equal 30, in_processes(40) { UploadBudget.admit_attempt(user: @user) }.count(true)
+    budget = UploadBudget.uncached { UploadBudget.find_by!(user: @user) }
+    assert_equal 30, budget.attempt_count
+    assert_equal 0, budget.count
+    assert_empty budget.receipts
+    assert_not UploadBudget.admit_attempt(user: @user)
+    assert UploadBudget.admit_attempt(user: users(:other))
+    assert_raises ActiveRecord::StatementInvalid do
+      budget.update_columns(attempt_count: 31)
+    end
+  end
+
+  test "attempt rollover and work refunds do not change each other's budgets" do
+    receipt = UploadBudget.consume(user: @user)
+    30.times { assert UploadBudget.admit_attempt(user: @user) }
+    assert UploadBudget.refund(receipt)
+    assert_not UploadBudget.admit_attempt(user: @user)
+    budget = UploadBudget.find_by!(user: @user)
+    assert_equal 0, budget.count
+    assert_equal 30, budget.attempt_count
+    with_upload_budget_window(1_000_001) do
+      assert UploadBudget.admit_attempt(user: @user)
+      assert_equal 1, budget.reload.attempt_count
+      assert_equal 0, budget.count
+      assert UploadBudget.consume(user: @user)
+      assert_equal 1, budget.reload.count
+      assert_equal 1, budget.attempt_count
+    end
+  end
+
   test "simultaneous first consumes admit exactly the limit across independent processes" do
     assert_nil UploadBudget.find_by(user: @user)
     results = in_processes(32) { UploadBudget.consume(user: @user) }
