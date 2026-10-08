@@ -11,11 +11,12 @@ export default class extends Controller {
     this.toggle(false)
   }
 
-  toggle(paste) {
+  toggle(paste, { notify = true } = {}) {
+    const changed = this.pasteTarget.hidden === paste
     this.pasteTarget.hidden = !paste
     this.uploadTarget.hidden = paste
     this.pasteTabTarget.setAttribute("aria-selected", String(paste))
     this.uploadTabTarget.setAttribute("aria-selected", String(!paste))
-    this.element.dispatchEvent(new CustomEvent("workspace-source:changed", { bubbles: true }))
+    if (changed && notify) this.element.dispatchEvent(new CustomEvent("workspace-source:changed", { bubbles: true }))
   }
 }
