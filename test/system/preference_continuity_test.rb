@@ -293,7 +293,11 @@ class PreferenceContinuitySystemTest < ApplicationSystemTestCase
     page.evaluate_script("getComputedStyle(document.body).backgroundColor")
   end
 
+  # The URL changes before a Turbo visit completes, and a visit slow enough to
+  # show the progress bar removes it only after a fade. The blocked Google
+  # Identity script is removed by its error handler. Count the settled page.
   def page_footprint
+    assert_no_selector "html[aria-busy], .turbo-progress-bar, script[src*='accounts.google.com']", visible: :all
     browser = page.driver.browser
     listeners = %w[document window].sum do |target|
       object = browser.execute_cdp("Runtime.evaluate", expression: target, objectGroup: "footprint").dig("result", "objectId")
