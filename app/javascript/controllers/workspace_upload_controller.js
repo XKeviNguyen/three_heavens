@@ -5,6 +5,33 @@ export default class extends Controller {
   static targets = ["file", "button", "message", "import", "filename", "metadata"]
   static values = { replayLease: String, projectId: String, createUrl: String, messages: Object }
 
+  initialize() {
+    this.sourceGeneration = 0
+    this.titleGeneration = 0
+  }
+
+  disconnect() {
+    this.invalidateSource()
+  }
+
+  changed(event) {
+    if (event.target === this.field("document_title")) {
+      this.titleGeneration += 1
+    } else if (event.target === this.field("source_text") || event.target === this.fileTarget) {
+      this.invalidateSource()
+      if (event.target === this.fileTarget) this.buttonTarget.disabled = false
+    }
+  }
+
+  invalidateSource() {
+    this.sourceGeneration += 1
+    this.messageTarget.textContent = ""
+  }
+
+  ownsSource(requestKey, generation) {
+    return this.element.isConnected && this.requestKey === requestKey && this.sourceGeneration === generation
+  }
+
   async upload() {
     const file = this.fileTarget.files[0]
     if (!file) {
@@ -17,8 +44,14 @@ export default class extends Controller {
     if (this.uploadedFile !== file) {
       this.uploadedFile = file
       this.requestKey = `${this.replayLeaseValue}.${randomHex(16)}`
+      // Ownership belongs to the action, not each delivery. A transport retry
+      // must not regain authority after the user superseded that action.
+      this.uploadSourceGeneration = ++this.sourceGeneration
+      this.uploadTitleGeneration = this.titleGeneration
     }
     const requestKey = this.requestKey
+    const generation = this.uploadSourceGeneration
+    const titleGeneration = this.uploadTitleGeneration
     this.buttonTarget.disabled = true
     this.messageTarget.textContent = this.messagesValue.extracting
     const body = new FormData()
@@ -32,8 +65,9 @@ export default class extends Controller {
         method: "POST", body, credentials: "same-origin",
         headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
       })
+      if (!this.ownsSource(requestKey, generation)) return
       const result = await response.json().catch(() => ({}))
-      if (this.requestKey !== requestKey) return
+      if (!this.ownsSource(requestKey, generation)) return
       if (!response.ok) {
         // Admission and an in-progress delivery leave the action unresolved.
         // A terminal validation/extraction failure lets an explicit retry
@@ -45,26 +79,30 @@ export default class extends Controller {
       this.field("source_import_id").value = result.id
       this.field("source_import_project_token").value = result.project_binding || ""
       this.field("source_text").value = result.extracted_text
-      if (!this.field("document_title").value.trim()) {
+      if (this.titleGeneration === titleGeneration && !this.field("document_title").value.trim()) {
         this.field("document_title").value = result.original_filename.replace(/\.[^.]+$/, "")
       }
       this.filenameTarget.textContent = result.original_filename
       this.metadataTarget.textContent = `${result.imported_format.toUpperCase()} · ${(result.byte_size / 1024).toFixed(0)} KiB`
       document.querySelector("label[for='translation_workspace_source_text']").textContent = this.messagesValue.reviewedSource
       this.importTarget.classList.remove("hidden")
-      this.messageTarget.textContent = this.messagesValue.imported
       this.element.querySelector("[data-source-mode-target='pasteTab']").click()
+      this.messageTarget.textContent = this.messagesValue.imported
       this.field("source_text").focus()
       this.element.dispatchEvent(new Event("input", { bubbles: true }))
     } catch (error) {
-      if (this.requestKey === requestKey) this.messageTarget.textContent = error.message || this.messagesValue.importFailed
+      if (this.ownsSource(requestKey, generation)) this.messageTarget.textContent = error.message || this.messagesValue.importFailed
     } finally {
-      if (this.requestKey === requestKey) this.buttonTarget.disabled = false
+      if (this.requestKey === requestKey) {
+        this.buttonTarget.disabled = false
+        if (!this.ownsSource(requestKey, generation) && this.messageTarget.textContent === this.messagesValue.extracting) this.messageTarget.textContent = ""
+      }
       settle()
     }
   }
 
   async remove() {
+    this.invalidateSource()
     const id = this.field("source_import_id").value
     if (!id) return
     const requestKey = this.requestKey
