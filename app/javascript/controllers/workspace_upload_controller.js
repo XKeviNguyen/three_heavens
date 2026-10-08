@@ -19,13 +19,13 @@ export default class extends Controller {
       this.titleGeneration += 1
     } else if (event.target === this.field("source_text") || event.target === this.fileTarget) {
       this.invalidateSource()
-      if (event.target === this.fileTarget) this.buttonTarget.disabled = false
     }
   }
 
   invalidateSource() {
     this.sourceGeneration += 1
     this.messageTarget.textContent = ""
+    this.buttonTarget.disabled = false
   }
 
   ownsSource(requestKey, generation) {
@@ -39,13 +39,13 @@ export default class extends Controller {
       return
     }
 
-    // Uploading the same chosen file again (a retry or double click) is the
-    // same action, so the server returns its import instead of a second copy.
-    if (this.uploadedFile !== file) {
+    // A transport retry or double click replays the current action. Explicitly
+    // uploading after a newer source decision starts a distinct action, even
+    // when the selected File is unchanged; old deliveries stay superseded.
+    if (this.uploadedFile !== file || this.uploadSourceGeneration !== this.sourceGeneration) {
       this.uploadedFile = file
       this.requestKey = `${this.replayLeaseValue}.${randomHex(16)}`
-      // Ownership belongs to the action, not each delivery. A transport retry
-      // must not regain authority after the user superseded that action.
+      // Ownership belongs to the action, not each delivery.
       this.uploadSourceGeneration = ++this.sourceGeneration
       this.uploadTitleGeneration = this.titleGeneration
     }
@@ -86,7 +86,9 @@ export default class extends Controller {
       this.metadataTarget.textContent = `${result.imported_format.toUpperCase()} · ${(result.byte_size / 1024).toFixed(0)} KiB`
       document.querySelector("label[for='translation_workspace_source_text']").textContent = this.messagesValue.reviewedSource
       this.importTarget.classList.remove("hidden")
-      this.element.querySelector("[data-source-mode-target='pasteTab']").click()
+      // Revealing the installed import for review is part of this action,
+      // not a newer user decision that would invalidate its own ownership.
+      this.application.getControllerForElementAndIdentifier(this.element, "source-mode").toggle(true, { notify: false })
       this.messageTarget.textContent = this.messagesValue.imported
       this.field("source_text").focus()
       this.element.dispatchEvent(new Event("input", { bubbles: true }))

@@ -16,6 +16,75 @@ class SourceImportOwnershipTest < ApplicationSystemTestCase
     @sources.each(&:close!)
   end
 
+  test "clicking the active upload tab preserves the pending action and feedback" do
+    start_upload "Import survives a no-op mode click"
+    before = upload_ownership
+    click_button "Upload file"
+    after = upload_ownership
+    feedback = find("[data-workspace-upload-target=message]", visible: :all).text(:all)
+    release_upload 0
+    assert_field "Reviewed source text", with: "Import survives a no-op mode click"
+    assert_equal before, after
+    assert_equal I18n.t("upload.extracting"), feedback
+    assert_selector "#workspace-source-import", text: File.basename(@sources.first.path)
+    assert_saved_source "Import survives a no-op mode click"
+    draft = users(:normal).translation_workspace_drafts.sole.payload
+    import = users(:normal).source_imports.sole
+    assert_equal import.id.to_s, draft.fetch("source_import_id")
+    binding = find("#translation_workspace_source_import_project_token", visible: :all).value
+    assert SourceImports::ProjectBinding.valid?(token: binding, source_import: import, project: nil)
+    page.refresh
+    assert_field "Reviewed source text", with: "Import survives a no-op mode click"
+  end
+
+  test "clicking the active paste tab does not change source ownership or feedback" do
+    page.execute_script("document.querySelector('[data-workspace-upload-target=message]').textContent = 'Keep feedback'")
+    before = upload_ownership
+    click_button "Paste text"
+    assert_equal before, upload_ownership
+    assert_text "Keep feedback"
+    assert_selector "#source-paste-panel", visible: true
+    assert_selector "[data-source-mode-target=pasteTab][aria-selected=true]"
+    assert_selector "[data-source-mode-target=uploadTab][aria-selected=false]"
+  end
+
+  test "explicit same file upload after supersession owns a new action and the old response stays stale" do
+    start_upload "Same file deliberately uploaded again"
+    click_button "Paste text"
+    fill_in "Source text", with: "Intervening newer source"
+    click_button "Upload file"
+    # Retry with the exact same browser File while the old response is held.
+    click_button "Upload and review"
+    assert_upload_held 1
+    assert_not_equal page.evaluate_script("window.__uploads[0].key"), page.evaluate_script("window.__uploads[1].key")
+    release_upload 0, pending: 1, button_disabled: true
+    assert_field "Source text", with: "Intervening newer source", visible: :all
+    assert_no_import
+    release_upload 1
+    assert_field "Reviewed source text", with: "Same file deliberately uploaded again"
+    assert_saved_source "Same file deliberately uploaded again"
+  end
+
+  test "same file transport retry keeps its replay identity and successful adoption does not invalidate itself" do
+    start_upload "Replay the current upload"
+    generation = upload_ownership.fetch("generation")
+    page.execute_script("window.__uploads[0].drop = true")
+    release_upload 0
+    click_button "Upload and review"
+    assert_upload_held 1
+    assert_equal generation, upload_ownership.fetch("generation")
+    release_upload 1
+    assert_field "Reviewed source text", with: "Replay the current upload"
+    assert_equal generation, upload_ownership.fetch("generation")
+    assert_text I18n.t("upload.imported")
+    page.execute_script("window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('#workspace-source'), 'workspace-upload').upload()")
+    assert_upload_held 2
+    release_upload 2
+    assert_equal 1, page.evaluate_script("new Set(window.__uploads.map(upload => upload.key)).size")
+    assert_equal 1, users(:normal).source_imports.count
+    assert_saved_source "Replay the current upload"
+  end
+
   test "a held upload cannot overwrite newer source in the encrypted draft or after refresh" do
     fill_in "Source text", with: "Initial source before import"
     start_upload "Imported source from older action"
@@ -138,7 +207,7 @@ class SourceImportOwnershipTest < ApplicationSystemTestCase
     assert_saved_source "First imported source"
   end
 
-  test "retry after a lost superseded response cannot regain source authority" do
+  test "explicit retry after a lost superseded response starts a new authorized action" do
     start_upload "Older response lost"
     click_button "Paste text"
     fill_in "Source text", with: "Newer source after response loss"
@@ -148,14 +217,13 @@ class SourceImportOwnershipTest < ApplicationSystemTestCase
     click_button "Upload and review"
     assert_upload_held 1
     release_upload 1
-    assert_equal "Newer source after response loss", find("#translation_workspace_source_text", visible: :all).value
-    assert_no_import
-    assert_equal 1, users(:normal).source_imports.count
-    assert_equal 1, page.evaluate_script("new Set(window.__uploads.map(upload => upload.key)).size")
+    assert_field "Reviewed source text", with: "Older response lost"
+    assert_equal 2, users(:normal).source_imports.count
+    assert_equal 2, page.evaluate_script("new Set(window.__uploads.map(upload => upload.key)).size")
     assert_no_text I18n.t("upload.extracting")
-    assert_saved_source "Newer source after response loss"
+    assert_saved_source "Older response lost"
     page.refresh
-    assert_field "Source text", with: "Newer source after response loss"
+    assert_field "Reviewed source text", with: "Older response lost"
   end
 
   test "navigation waits for a superseded upload then saves the newer source" do
@@ -178,6 +246,15 @@ class SourceImportOwnershipTest < ApplicationSystemTestCase
   end
 
   private
+
+  def upload_ownership
+    page.evaluate_script(<<~JS)
+      (() => {
+        const controller = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('#workspace-source'), 'workspace-upload')
+        return { generation: controller.sourceGeneration, key: controller.requestKey || null }
+      })()
+    JS
+  end
 
   # Hold actual successful server responses, and observe the complete upload
   # promise (including finally/pending settlement), rather than waiting a delay.
@@ -241,10 +318,10 @@ class SourceImportOwnershipTest < ApplicationSystemTestCase
     assert_equal 201, page.evaluate_script("window.__uploads[#{index}].status")
   end
 
-  def release_upload(index, pending: 0)
+  def release_upload(index, pending: 0, button_disabled: false)
     page.execute_script("window.__uploads[#{index}].release()")
     assert_until { page.evaluate_script("window.__uploads[#{index}].finished === true") }
-    assert_not find("[data-workspace-upload-target='button']", visible: :all).disabled?
+    assert_equal button_disabled, find("[data-workspace-upload-target='button']", visible: :all).disabled?
     assert_until do
       page.evaluate_script("window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=workspace-guard]'), 'workspace-guard').pending.size === #{pending}")
     end
