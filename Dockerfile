@@ -3,11 +3,11 @@
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
 # docker build -t three_heavens .
-# Supply every production environment variable documented in README.md when running the image.
+# Supply every production environment variable documented in docs/operations/configuration.md when running the image.
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
-# Keep the tag aligned with .ruby-version; refresh the multi-architecture index per README.md.
+# Keep the tag aligned with .ruby-version; refresh the multi-architecture index per docs/operations/configuration.md.
 FROM docker.io/library/ruby:3.4.10-slim@sha256:9d50d98e61ccbe4f1ef436349911e09b53c42a00364bcd3bda6ac107abc29528 AS base
 
 # Rails app lives here
@@ -20,11 +20,16 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
+# jemalloc returns freed pages at once: request bodies arriving on many
+# connections (Puma copies every chunk of a chunked body) otherwise keep
+# hundreds of MiB of freed memory resident and can exhaust a small container.
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development:test" \
-    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so" \
+    MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0" \
+    RACK_MULTIPART_BUFFERED_UPLOAD_BYTESIZE_LIMIT="2097152"
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build

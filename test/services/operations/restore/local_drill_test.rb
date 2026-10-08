@@ -36,6 +36,12 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
 
       assert_equal database, ActiveRecord::Base.connection_db_config.database
       assert_equal :sql, ActiveRecord::Base.connection_db_config.schema_format
+      assert ActiveRecord::Base.connection.table_exists?(:source_import_retirements)
+      assert ActiveRecord::Base.connection.table_exists?(:translation_workspace_draft_editors)
+      assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT count(*) FROM pg_constraint
+        WHERE conname = 'source_import_retirements_request_key_check'
+      SQL
       assert_equal 1, ActiveRecord::Base.connection.select_value(<<~SQL)
         SELECT count(*) FROM pg_trigger
         WHERE tgname = 'enforce_experiment_glossary_owner_trigger' AND NOT tgisinternal
@@ -92,5 +98,91 @@ class Operations::Restore::LocalDrillTest < ActiveSupport::TestCase
     drill&.send(:restore_application_connection, original_configuration) if original_configuration
     drill&.send(:drop_databases!, admin) if admin
     admin&.close
+  end
+
+  test "detects any restored row difference and reads representative data through the application" do
+    drill = Operations::Restore::LocalDrill.new(
+      environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" }
+    )
+    original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
+    original_storage_service = ActiveStorage::Blob.service
+    original_storage_services = ActiveStorage::Blob.services
+    admin = PG.connect(drill.send(:pg_options, original_configuration, database: "postgres"))
+    source = drill.send(:create_database!, admin, "source")
+
+    Dir.mktmpdir("three-heavens-drill-compare-") do |storage_root|
+      drill.send(:configure_source!, original_configuration, source, storage_root)
+      expected = drill.send(:create_representative_data!)
+      ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+      copy = "#{Operations::Restore::LocalDrill::DATABASE_PREFIX}copy_#{SecureRandom.hex(8)}"
+      admin.exec("CREATE DATABASE #{PG::Connection.quote_ident(copy)} TEMPLATE #{PG::Connection.quote_ident(source)}")
+      drill.send(:database_names) << copy
+      source_url = drill.send(:connection_string, original_configuration, source)
+      copy_url = drill.send(:connection_string, original_configuration, copy)
+
+      assert_operator drill.send(:compare_durable_data!, source_url, copy_url), :>=, 40
+      drill.send(:verify_application_reads!, original_configuration, copy, expected)
+      ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+
+      copy_connection = PG.connect(copy_url)
+      begin
+        copy_connection.exec("DELETE FROM public.federated_identities")
+      ensure
+        copy_connection.close
+      end
+      error = assert_raises(Operations::Restore::LocalDrill::UnsafeDrill) do
+        drill.send(:compare_durable_data!, source_url, copy_url)
+      end
+      assert_equal "restored rows differ from the source", error.message
+    end
+  ensure
+    ActiveStorage::Blob.service = original_storage_service if original_storage_service
+    ActiveStorage::Blob.services = original_storage_services if original_storage_services
+    drill&.send(:restore_application_connection, original_configuration) if original_configuration
+    drill&.send(:drop_databases!, admin) if admin
+    admin&.close
+  end
+
+  test "editor ledger migration preserves existing draft replay ordering through cleanup" do
+    require Rails.root.join("db/migrate/20261005110000_create_translation_workspace_draft_editors")
+    require Rails.root.join("db/migrate/20261005120000_bound_replay_coordination_lifetimes")
+    drill = Operations::Restore::LocalDrill.new(environment: { Operations::Restore::LocalDrill::CONFIRMATION_NAME => "1" })
+    original_configuration = ActiveRecord::Base.connection_db_config.configuration_hash
+    original_storage_service = ActiveStorage::Blob.service
+    original_storage_services = ActiveStorage::Blob.services
+    admin = PG.connect(drill.send(:pg_options, original_configuration, database: "postgres"))
+    database = drill.send(:create_database!, admin, "upgrade")
+    Dir.mktmpdir("three-heavens-editor-upgrade-") do |storage_root|
+      drill.send(:configure_source!, original_configuration, database, storage_root)
+      migration = CreateTranslationWorkspaceDraftEditors.new
+      # Only this explicitly disposable database is changed to the old schema.
+      lifecycle = BoundReplayCoordinationLifetimes.new
+      lifecycle.migrate(:down)
+      migration.migrate(:down)
+      ActiveRecord::Base.connection.schema_cache.clear!
+      TranslationWorkspaceDraftEditor.reset_column_information
+      user = User.create!(email: "editor-upgrade@example.test", password: "synthetic upgrade password")
+      editor = SecureRandom.hex(16)
+      user.translation_workspace_drafts.create!(context_key: "new", editor_id: editor, editor_sequence: 1,
+        workspace_payload: JSON.generate("source_text" => "Previously saved private work"), expires_at: 1.minute.ago)
+      migration.migrate(:up)
+      lifecycle.migrate(:up)
+      ActiveRecord::Base.connection.schema_cache.clear!
+      TranslationWorkspaceDraftEditor.reset_column_information
+      assert_equal 1, user.translation_workspace_draft_editors.sole.sequence
+      TranslationWorkspaceDraftCleanupJob.perform_now
+      assert_empty user.translation_workspace_drafts.reload
+      result = TranslationWorkspaceDrafts::Save.call(user:, context_key: "new", editor_id: editor, sequence: 1,
+        draft_id: nil, version: nil, payload: { "source_text" => "Previously saved private work" })
+      assert result.conflict?
+      assert_empty user.translation_workspace_drafts.reload
+    end
+  ensure
+    ActiveStorage::Blob.service = original_storage_service if original_storage_service
+    ActiveStorage::Blob.services = original_storage_services if original_storage_services
+    drill&.send(:restore_application_connection, original_configuration) if original_configuration
+    drill&.send(:drop_databases!, admin) if admin
+    admin&.close
+    TranslationWorkspaceDraftEditor.reset_column_information
   end
 end

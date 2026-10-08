@@ -1,0 +1,54 @@
+en:
+  flash_ui:
+    glossary:
+      created: Glossary created.
+      revision: Glossary saved as version %{version}.
+      activated: Glossary activated.
+      archived: Glossary archived. Its earlier versions are still available.
+    methodology:
+      created: Methodology created.
+      revision: Methodology saved as version %{version}.
+      activated: Methodology activated.
+      archived: Methodology archived. Its earlier versions are still available.
+    workflow:
+      created: Workflow setup created.
+      revision: Workflow setup saved as version %{version}.
+      duplicated: Workflow setup duplicated.
+      activated: Workflow setup activated.
+      deactivated: Workflow setup deactivated.
+    reference:
+      created: Reference created.
+      revision: Reference saved as version %{version}.
+      activated: Reference activated.
+      archived: Reference archived. Translations that used it keep their copy.
+    final:
+      workspace_ready: Your final translation draft is ready.
+      revision_saved: Version saved.
+      revision_restored: Earlier version restored as a new version.
+      refinement_started: AI suggestions requested.
+      proposal_applied: AI suggestion applied as a new version.
+      finalized: Final translation finalized.
+      reopened: Final translation reopened for editing.
+    review:
+      started: Blind review started.
+    judge:
+      started: Judging started.
+    pipeline:
+      stopped: Automation stopped. AI requests that had already started will still finish.
+    operations:
+      reconciled: Marked %{count} stuck AI task(s) as failed. No AI requests were sent.
+    model:
+      added: Model added and activated.
+      catalog_action: '%{name} was %{action}.'
+      actions:
+        activated: activated
+        added_and_activated: added and activated
+        already_active: already active
+      catalog_failed: The selected model could not be added from the OpenRouter catalog.
+      updated: Model details updated.
+      activated: '%{name} activated.'
+      deactivated: '%{name} deactivated. Its history was kept.'
+    workspace:
+      replayed: This translation was already started. Showing it now.
+      automatic_started: Automatic workflow started.
+      experiment_started: Translation started.

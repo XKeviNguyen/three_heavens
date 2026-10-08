@@ -18,7 +18,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
   test "completed judge page creates or opens an idempotent workspace" do
     get judge_round_path(@final_translation.judge_round)
     assert_response :success
-    assert_select "a[href='#{final_translation_path(@final_translation)}']", text: /Open final translation workspace/
+    assert_select "a[href='#{final_translation_path(@final_translation)}']", text: /Open final translation/
 
     review_round = create_completed_review_round
     judge = create_judge_model
@@ -84,10 +84,10 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     get final_translation_path(workspace)
 
     assert_response :success
-    assert_select "summary", text: /Glossary snapshot.*Editor terminology.*revision 1/
+    assert_select "summary", text: /Glossary used.*Editor terminology.*version 1/
     assert_select "dt", text: /grace.*恵み/
     assert_select "dd", text: "Use consistently"
-    assert_select "summary", text: /Methodology snapshot.*#{Regexp.escape(methodology.name)}.*revision 1/
+    assert_select "summary", text: /Methodology used.*#{Regexp.escape(methodology.name)}.*version 1/
     assert_includes response.body, "Preserve register and paragraph structure."
   end
 
@@ -115,8 +115,8 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_select "textarea", text: "Unsaved stale text <script>keep()</script>"
     assert_select "input[name='final_translation[change_note]'][value='Keep this unsaved note']"
     assert_select "input[name='final_translation[expected_version_number]'][value='2']"
-    assert_select "section[aria-label='Current persisted version for reconciliation']", text: /Browser revision/
-    assert_select "summary", text: /Current persisted version 2/
+    assert_select "section[aria-label='Saved version to compare against']", text: /Browser revision/
+    assert_select "summary", text: /Saved version 2/
     assert_includes response.body, "&lt;script&gt;keep()&lt;/script&gt;"
     assert_equal "Browser revision", @final_translation.reload.current_version.content
   end
@@ -130,7 +130,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     )
 
     get final_translation_path(@final_translation)
-    assert_select "article", text: /Version 1 · Seed/
+    assert_select "article", text: /Version 1 · Winning translation/
     assert_select "article", text: /Version 2 · Manual.*Current version/m
     assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}']"
 
@@ -161,15 +161,15 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
 
     get final_translation_path(@final_translation)
     assert_response :success
-    assert_select "nav[aria-label='Versions pagination']", text: /Page 1 of 2.*26 versions/m
+    assert_select "nav[aria-label='Versions pagination']", text: /Page 1 of 2.*26 items/m
     assert_select "article", text: /Version 26 · Manual.*Current version/m
-    assert_select "article", text: /Version 1 · Seed/, count: 0
+    assert_select "article", text: /Version 1 · Winning translation/, count: 0
 
     get final_translation_path(@final_translation, version_page: 999)
     assert_response :success
     assert_select "nav[aria-label='Versions pagination']", text: /Page 2 of 2/
-    assert_select "article", text: /Version 1 · Seed/
-    assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}'] input[value='#{seed.id}']", count: 1
+    assert_select "article", text: /Version 1 · Winning translation/
+    assert_select "form[action='#{restore_revision_final_translation_path(@final_translation)}'] input[name='restore[version_id]'][value='#{seed.id}']", count: 1
 
     post restore_revision_final_translation_path(@final_translation), params: {
       restore: { version_id: seed.id, expected_version_number: @final_translation.current_version.version_number }
@@ -199,11 +199,11 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     get final_translation_path(@final_translation)
     assert_select "meta[http-equiv='refresh']", count: 0
     assert_select "[role='status']", text: /will not reload automatically/
-    assert_select "a[href='#{final_translation_path(@final_translation)}'][data-turbo-confirm]", text: "Refresh proposal status" do |links|
-      assert_equal "Refresh proposal status? Any unsaved editor changes will be discarded.",
+    assert_select "a[href='#{final_translation_path(@final_translation)}'][data-turbo-confirm]", text: "Check for new suggestions" do |links|
+      assert_equal "Check for new suggestions? Any unsaved editor changes will be discarded.",
                    links.first["data-turbo-confirm"]
     end
-    assert_select "article", text: /exact base version 1/i
+    assert_select "article", text: /Based on version: 1/
     assert_select "section", text: /#{Regexp.escape(@finalizer.display_name)}/
   end
 
@@ -234,9 +234,9 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "&lt;img src=x onerror=summary()&gt;"
     assert_not_includes response.body, "<script>proposal()</script>"
     assert_select "form[action='#{apply_proposal_final_translation_path(@final_translation)}']"
-    assert_select "span", text: "Applicable proposal"
+    assert_select "span", text: "Ready to apply"
     assert_select "section", text: /Change summary.*Terminology notes.*Warnings/m
-    assert_select "section", text: /Prompt tokens.*100/m
+    assert_select "section", text: /Input tokens.*100/m
 
     post apply_proposal_final_translation_path(@final_translation), params: {
       proposal: { finalization_run_id: run.id }
@@ -261,8 +261,8 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     )
 
     get final_translation_path(@final_translation)
-    assert_select "span", text: "Stale proposal"
-    assert_select "section", text: /This proposal is stale.*It cannot be applied/m
+    assert_select "span", text: "Out of date"
+    assert_select "section", text: /This suggestion was made for an earlier version.*can't be applied/m
     assert_select "form[action='#{apply_proposal_final_translation_path(@final_translation)}'] input[value='#{stale_run.id}']", count: 0
 
     other_round = @final_translation.finalization_rounds.create!(
@@ -278,7 +278,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     )
     Finalizations::ReconcileRound.call(other_round)
     get final_translation_path(@final_translation)
-    assert_includes response.body, "AI work failed."
+    assert_includes response.body, "The AI request failed."
     assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
     assert_not_includes response.body, "secret-value"
     assert_not_includes response.body, "&lt;script&gt;error()&lt;/script&gt;"
@@ -290,7 +290,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
 
     get final_translation_path(@final_translation)
     assert_response :success
-    assert_select "nav[aria-label='Refinement rounds pagination']", text: /Page 1 of 2.*26 refinement rounds/m
+    assert_select "nav[aria-label='Suggestion rounds pagination']", text: /Page 1 of 2.*26 items/m
     assert_not_includes response.body, oldest_run.proposed_translation
 
     get final_translation_path(@final_translation, refinement_page: 2)
@@ -320,7 +320,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     get final_translation_path(@final_translation)
 
     assert_response :success
-    assert_select "[role='status']", text: /Refinement is still running/
+    assert_select "[role='status']", text: /AI suggestions are still being written/
     assert_select "form[action='#{refine_final_translation_path(@final_translation)}'] input[type='submit'][disabled]", count: 1
     assert_select "article", text: /#{Regexp.escape(old_finalizer.display_name)}/, count: 0
   end

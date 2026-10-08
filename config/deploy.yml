@@ -4,6 +4,14 @@
   image_name = ENV.fetch("KAMAL_IMAGE")
   registry_server = ENV.fetch("KAMAL_REGISTRY_SERVER")
   registry_username = ENV.fetch("KAMAL_REGISTRY_USERNAME")
+  # Production refuses to boot without mail delivery configuration. The SMTP
+  # username and password are secrets; these are not.
+  mail_from = ENV.fetch("MAIL_FROM")
+  smtp_host = ENV.fetch("SMTP_HOST")
+  smtp_port = ENV.fetch("SMTP_PORT", "587")
+  # The production Google OAuth Web client ID: a public identifier, not a
+  # secret. Sign in with Google uses no client secret.
+  google_client_id = ENV.fetch("GOOGLE_CLIENT_ID")
 %>
 
 service: three_heavens
@@ -11,7 +19,17 @@ image: <%= image_name %>
 
 servers:
   web:
-    - <%= web_host %>
+    hosts:
+      - <%= web_host %>
+    # Each connection's kernel socket buffers count against the container's
+    # memory and otherwise grow to several MiB, so many simultaneous request
+    # bodies could exhaust a small container. These limits are per network
+    # namespace: they apply to this container only (Kamal runs it on its own
+    # network) and leave ample throughput for its upstream calls.
+    options:
+      sysctl:
+        - net.ipv4.tcp_rmem=4096 65536 262144
+        - net.ipv4.tcp_wmem=4096 65536 262144
 
 proxy:
   ssl: true
@@ -35,8 +53,14 @@ env:
     - QUEUE_DATABASE_URL
     - CABLE_DATABASE_URL
     - OPENROUTER_API_KEY
+    - SMTP_USERNAME
+    - SMTP_PASSWORD
   clear:
     APP_HOST: <%= app_host %>
+    MAIL_FROM: <%= mail_from.to_json %>
+    SMTP_HOST: <%= smtp_host.to_json %>
+    SMTP_PORT: <%= smtp_port.to_json %>
+    GOOGLE_CLIENT_ID: <%= google_client_id.to_json %>
     SOLID_QUEUE_IN_PUMA: true
     RAILS_LOG_LEVEL: info
     AI_STALE_EXECUTION_THRESHOLD_MINUTES: 120

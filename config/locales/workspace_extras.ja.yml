@@ -1,0 +1,16 @@
+ja:
+  workspace_ui:
+    adding_to: 追加先：
+    file_limits: TXT・Markdown・DOCX・PDF · 最大%{maximum} MiB
+    references_selected: 参考訳を%{count}/5件選択
+    references_empty_suffix: して承認済みの訳例を追加できます。
+    models: モデル：
+    profile_summary: "%{mode} · 翻訳：%{translators} · レビュー：%{reviewers} · 判定：%{judges} · 修正案：%{finalizers}"
+    paid_plan: "この文書は%{segments}部分に分けて処理します。最初のAIリクエストは%{slots}件、自動再試行を含めて最大%{maximum}件です。"
+    paid_plan_role: "%{role}：モデル%{runs}件 × %{segments}部分 = リクエスト%{requests}件"
+    draft_import_detached: 元のアップロードファイルは添付されていません。確認済みの原文は保持されています。
+    draft_configuration_changed: 保存した設定の一部は利用できなくなりました。残りの選択内容を確認してください。
+    draft_unreadable: "保存した下書きを読み取れなかったため、復元しませんでした。次に変更を保存すると置き換えられます。今すぐ削除するには「下書きを破棄」を選択してください。"
+    repeat_profile_unavailable: "前回使った自動ワークフローには、この文書に必要なモデル情報がありません。そのため、まだ利用できる翻訳モデルを手動設定として入力しました。開始する前に確認または変更してください。"
+    profile_unavailable: 利用できません
+    repeat_of: '%{name} の再実行'

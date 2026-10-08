@@ -1,0 +1,24 @@
+en:
+  history_ui:
+    title: Translation history · Three Heavens
+    analytics: Insights
+    heading: Translation history
+    intro: Newest first. AI cost counts each translation, review, judging, and
+      suggestion task once. If any task did not report its cost, the total is marked as partial.
+    empty: No translations yet
+    empty_intro: Start a translation to build your history.
+    new_experiment: New translation
+    translation_candidates: Translation candidates
+    execution: Processing
+    segmented: In %{count} parts
+    single_request: In one piece
+    judge_round: Judging
+    official_winner: Winning translation
+    system_cost: AI cost
+    partial_cost: Known cost so far · some tasks did not report cost (%{complete} of %{total}
+      tasks finished; %{known} with known cost)
+    reported_cost: '%{count} task(s) reported cost'
+    no_cost: No cost reported
+    automatic_pipeline: Automatic workflow
+    repeat_configuration: Reuse these settings
+    final_translation_status: Final translation (%{status})

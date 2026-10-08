@@ -1,0 +1,23 @@
+class AppearancesController < ApplicationController
+  skip_before_action :require_authentication
+  # The preference lives on the user or in its own cookie. Saves often finish
+  # in the background, so a session written here could overwrite a newer one.
+  before_action { request.session_options[:skip] = true }
+
+  def update
+    appearance = params[:appearance].to_s
+    raise ActionController::BadRequest unless User::APPEARANCES.include?(appearance)
+
+    if current_user
+      ui_preferences.choose_as_user(current_user, appearance: appearance)
+    else
+      ui_preferences.choose_as_guest(appearance: appearance)
+    end
+    revision = ui_preferences.advance_appearance_revision
+
+    respond_to do |format|
+      format.json { render json: { appearance:, revision: } }
+      format.html { redirect_back_to_same_origin }
+    end
+  end
+end

@@ -7,10 +7,14 @@ module Operations
     class LocalDrill
       class UnsafeDrill < StandardError; end
 
-      Result = Data.define(:blob_count, :attachment_count, :document_count, :critical_count, :warning_count)
+      Result = Data.define(
+        :blob_count, :attachment_count, :document_count, :critical_count, :warning_count, :compared_table_count
+      )
+      DRAFT_SOURCE_TEXT = "Synthetic draft source: Giữ nguyên · 承認 · 🙏🏽"
 
       DATABASE_PREFIX = "three_heavens_restore_drill_"
       CONFIRMATION_NAME = "ALLOW_DISPOSABLE_RESTORE_DRILL"
+      TABLES_SQL = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename"
       PRODUCTION_MARKER_NAMES = %w[
         DATABASE_URL CACHE_DATABASE_URL QUEUE_DATABASE_URL CABLE_DATABASE_URL
         KAMAL_VERSION KAMAL_CONTAINER_NAME
@@ -40,7 +44,7 @@ module Operations
           backup_root = File.join(temporary_root, "backups")
           FileUtils.mkdir_p(source_storage, mode: 0o700)
           configure_source!(original_configuration, source_database, source_storage)
-          blob_key, expected_bytes = create_representative_data!
+          expected = create_representative_data!
           source_connection = connection_string(original_configuration, source_database)
           target_connection = connection_string(original_configuration, target_database)
           bundle = Operations::Backup::BundleCreator.call(
@@ -57,16 +61,18 @@ module Operations
           verify_representative_data!(
             target_connection: target_connection,
             restore_storage: restore_storage,
-            blob_key: blob_key,
-            expected_bytes: expected_bytes
+            expected: expected
           )
+          compared_table_count = compare_durable_data!(source_connection, target_connection)
+          verify_application_reads!(original_configuration, target_database, expected)
           integrity = verification.integrity
           Result.new(
             blob_count: integrity.blob_count,
             attachment_count: integrity.attachment_count,
             document_count: integrity.document_source_attachment_count,
             critical_count: integrity.critical_count,
-            warning_count: integrity.warning_count
+            warning_count: integrity.warning_count,
+            compared_table_count: compared_table_count
           )
         end
       ensure
@@ -115,14 +121,21 @@ module Operations
         ActiveStorage::Blob.service = services.fetch(:restore_drill)
       end
 
+      # Covers every table whose restore depends on database functions (the
+      # payload digest CHECK constraints) plus identity, preferences, staged
+      # imports, and the encrypted workspace draft. No provider is involved.
       def create_representative_data!
-        bytes = "synthetic restore drill source bytes\n".b
+        # Real uploads (PDF, DOCX, UTF-8 text) are arbitrary bytes.
+        bytes = "synthetic restore drill source · 承認 · 🙏🏽\n".b + (0..255).map(&:chr).join.b
         user = User.create!(
           email: "restore-drill-#{SecureRandom.hex(6)}@example.test",
           password: "synthetic restore drill password",
           role: :user,
-          status: :active
+          status: :active,
+          locale: "ja",
+          appearance: "dark"
         )
+        user.federated_identities.create!(provider: "google", provider_uid: "restore-drill-#{SecureRandom.hex(8)}")
         project = user.projects.create!(
           name: "Synthetic restore drill",
           source_language: "Vietnamese",
@@ -146,20 +159,106 @@ module Operations
           source_sha256: Digest::SHA256.hexdigest(bytes),
           extraction_version: "restore-drill-v1"
         )
-        [ document.source_file.blob.key, bytes ]
+        languages = { source_language: "Vietnamese", target_language: "Japanese" }
+        methodology = MethodologyProfiles::Create.call(
+          user: user,
+          attributes: languages.merge(name: "Synthetic method", description: "", guidance: "Giữ nguyên sắc thái.")
+        )
+        TranslationReferences::Create.call(
+          user: user,
+          attributes: languages.merge(title: "Synthetic reference", source_text: "Nguồn.", approved_translation: "承認。")
+        )
+        Glossaries::Create.call(
+          user: user,
+          attributes: languages.merge(
+            name: "Synthetic glossary", description: "",
+            entries: [ { source_term: "Sabbath", preferred_target_term: "安息日", note: "" } ]
+          )
+        )
+        source_import = user.source_imports.create!(
+          status: :ready, request_key: ReplayIdentity.issue, original_filename: "synthetic-import.txt",
+          detected_content_type: "text/plain",
+          imported_format: "txt", byte_size: bytes.bytesize, sha256: Digest::SHA256.hexdigest(bytes),
+          extracted_text: "Synthetic import text", extraction_version: "restore-drill-v1",
+          expires_at: 1.day.from_now
+        )
+        source_import.source_file.attach(io: StringIO.new(bytes), filename: "synthetic-import.txt", content_type: "text/plain")
+        source_import.source_file.blob.update!(cleanup_retry_at: 1.hour.from_now)
+        retired_key = SecureRandom.hex(16)
+        user.source_import_retirements.create!(request_key: retired_key)
+        draft_editor = SecureRandom.hex(16)
+        user.translation_workspace_draft_editors.create!(context_key: "new", editor_id: draft_editor, sequence: 1, state: :retired)
+        user.translation_workspace_drafts.create!(
+          context_key: TranslationWorkspaceDraft.context_key(project),
+          workspace_payload: JSON.generate("source_text" => DRAFT_SOURCE_TEXT),
+          expires_at: 1.day.from_now
+        )
+        {
+          blob_key: document.source_file.blob.key,
+          bytes: bytes,
+          email: user.email,
+          methodology_digest: methodology.current_revision.configuration_digest,
+          retired_key: retired_key,
+          draft_editor: draft_editor
+        }
       end
 
-      def verify_representative_data!(target_connection:, restore_storage:, blob_key:, expected_bytes:)
+      def verify_representative_data!(target_connection:, restore_storage:, expected:)
         connection = PG.connect(target_connection)
         document_count = Integer(connection.exec("SELECT COUNT(*) FROM documents").getvalue(0, 0))
         raise UnsafeDrill, "representative database record did not survive" unless document_count == 1
 
+        blob_key = expected.fetch(:blob_key)
         object_path = Pathname.new(restore_storage).join(blob_key[0..1], blob_key[2..3], blob_key)
-        unless object_path.file? && ActiveSupport::SecurityUtils.secure_compare(object_path.binread, expected_bytes)
+        unless object_path.file? && ActiveSupport::SecurityUtils.secure_compare(object_path.binread, expected.fetch(:bytes))
           raise UnsafeDrill, "representative storage bytes did not survive"
         end
       ensure
         connection&.close
+      end
+
+      # Every public table must restore with identical rows. Rows are compared
+      # as their canonical text form, so encrypted columns compare ciphertext.
+      def compare_durable_data!(source_connection, target_connection)
+        source = PG.connect(source_connection)
+        target = PG.connect(target_connection)
+        tables = source.exec(TABLES_SQL).column_values(0)
+        raise UnsafeDrill, "restored table set differs from the source" unless tables == target.exec(TABLES_SQL).column_values(0)
+
+        tables.each do |table|
+          sql = table_fingerprint_sql(source, table)
+          next if source.exec(sql).values == target.exec(sql).values
+
+          raise UnsafeDrill, "restored rows differ from the source"
+        end
+        tables.size
+      ensure
+        source&.close
+        target&.close
+      end
+
+      def table_fingerprint_sql(connection, table)
+        quoted = "public.#{connection.quote_ident(table)}"
+        "SELECT COUNT(*), md5(COALESCE(string_agg(row_text, E'\\n' ORDER BY row_text), '')) " \
+          "FROM (SELECT t::text AS row_text FROM #{quoted} t) rows"
+      end
+
+      # The restored database must also be readable by the application:
+      # encrypted drafts decrypt and sealed digests still match Ruby's.
+      def verify_application_reads!(configuration, target_database, expected)
+        ActiveRecord::Base.connection_handler.clear_all_connections!(:all)
+        ActiveRecord::Base.establish_connection(configuration.merge(database: target_database))
+        user = User.find_by!(email: expected.fetch(:email))
+        revision = MethodologyProfileRevision.joins(:methodology_profile).find_by!(methodology_profiles: { user_id: user.id })
+        readable = user.federated_identities.count == 1 &&
+          user.locale == "ja" && user.appearance == "dark" &&
+          user.translation_workspace_drafts.sole.payload.fetch("source_text") == DRAFT_SOURCE_TEXT &&
+          revision.configuration_digest == expected.fetch(:methodology_digest) &&
+          MethodologyProfiles::ConfigurationDigest.call(revision) == revision.configuration_digest &&
+          user.source_imports.sole.source_file.attached? &&
+          user.source_import_retirements.sole.request_key == expected.fetch(:retired_key) &&
+          user.translation_workspace_draft_editors.sole.editor_id == expected.fetch(:draft_editor)
+        raise UnsafeDrill, "restored records are not readable by the application" unless readable
       end
 
       def restore_application_connection(configuration)

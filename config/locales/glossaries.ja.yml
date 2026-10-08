@@ -1,0 +1,55 @@
+ja:
+  glossaries_ui:
+    title: 用語集 · Three Heavens
+    show_title: '%{name} · 用語集 · Three Heavens'
+    edit_title: 用語集の改訂 · Three Heavens
+    new_title: 新しい用語集 · Three Heavens
+    translation_guidance: 翻訳ガイド
+    heading: 用語集
+    singular: 用語集
+    index_intro: "自分だけの推奨訳語の一覧です。保存するたびに以前の版も残ります。"
+    new: 新しい用語集
+    empty: 用語集はまだありません
+    empty_intro: 再利用できる用語ガイドを作成し、翻訳開始時に選択できます。
+    create: 用語集を作成
+    revision: 第%{version}版
+    entries:
+      one: 1件
+      other: '%{count}件'
+    no_description: 説明なし
+    view_history: 履歴を見る
+    create_revision: "編集"
+    archive: アーカイブ
+    activate: 有効にする
+    archive_confirm: この用語集をアーカイブしますか？過去の翻訳では使用した版が保持されます。
+    show_intro: "以前の版は変わりません。新しい翻訳では、有効な用語集の最新版を使います。"
+    active_workspace: 有効 · ワークスペースで利用可能
+    archived_history: アーカイブ済み · 履歴のみ
+    all: 用語集一覧
+    using: 用語集の使い方：
+    using_intro: 言語の組み合わせが合う場合は、
+    translation_workspace: 翻訳ワークスペース
+    current: 最新
+    preserved_by:
+      one: "1件の翻訳で使用されています。"
+      other: "%{count}件の翻訳で使用されています。"
+    revisions: 版の一覧
+    correct_errors: 次の項目を修正してください：
+    configuration: 用語集の設定
+    name: 名前
+    description_optional: 説明（任意）
+    terminology_entries: 用語の登録
+    entries_intro: "用語は最大%{count}件まで登録できます。前後の空白は除去し、大文字小文字と綴りはそのまま保持します。"
+    mapping: 用語ペア
+    remove: 削除
+    source_term: 原語
+    preferred_target_term: 推奨訳語
+    note_optional: メモ（任意）
+    add_mapping: 用語ペアを追加
+    saving: "用語集を保存中…"
+    revision_label: "用語集の版"
+    revise: '%{name}を改訂'
+    edit_intro: "保存すると新しい版が作られます。この用語集を使った翻訳では、使用した版がそのまま残ります。"
+    create_new_revision: "新しい版を保存"
+    new_intro: "自分だけの推奨訳語の一覧を作成します。保存してもAIには何も送信されません。"
+    revision_inline: 第%{version}版

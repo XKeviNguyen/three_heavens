@@ -1,0 +1,51 @@
+en:
+  references_ui:
+    title: Translation references · Three Heavens
+    show_title: '%{title} · Translation references · Three Heavens'
+    new_title: New translation reference · Three Heavens
+    edit_title: Edit translation reference · Three Heavens
+    library: Reference library
+    heading: References
+    singular: Reference
+    intro: References are examples of translations you already approve. They help AI follow your established wording and style.
+    new: New reference
+    empty: No translation references yet
+    empty_intro: Add an approved bilingual example, then select it in the translation workspace.
+    create: Create a reference
+    field_title: Title
+    languages: Languages
+    status: Status
+    updated: Updated
+    archive_confirm: Archive this reference? Translations that already used it keep their copy.
+    using: 'Using references:'
+    using_intro: Choose up to five matching references in the
+    using_preserved: Each translation keeps the exact version it used.
+    exact_source: Exact source text
+    exact_translation: Exact approved translation
+    history: Version history
+    current_digest: 'Current SHA-256 fingerprint:'
+    used_by:
+      one: used by 1 translation
+      other: used by %{count} translations
+    all: ← All references
+    create_heading: Create a translation reference
+    edit_heading: Save a new version of this reference
+    edit_intro: Saving creates a new version. If you choose a new file for a side you did not edit, the file replaces the text shown.
+    save_revision: Save new version
+    conflict: A newer version was saved
+    conflict_intro: Compare the latest version below with what you entered, combine the changes, then save.
+    current_title: Current title
+    current_source_language: Current source language
+    current_target_language: Current target language
+    current_revision_number: Current version number
+    current_source_example: Current source example (version %{version})
+    current_translation: Current approved translation
+    source_example: Source example
+    source_upload_help: Paste text or upload one TXT, MD, DOCX, or PDF file. Do not provide both.
+    pasted_source: Pasted source text
+    upload_source: Or upload source file
+    approved_translation: Approved translation
+    translation_upload_help: Paste the approved translation or upload one TXT, MD, DOCX, or PDF file. Do not provide both.
+    pasted_translation: Pasted approved translation
+    upload_translation: Or upload approved translation file
+    saving: Saving reference…

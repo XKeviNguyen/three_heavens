@@ -15,7 +15,7 @@ class MethodologyProfilesTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     assert_select "h1", text: "Faithful literary methodology"
-    assert_select "h2", text: /Revision 1 · Current/
+    assert_select "h2", text: /Version 1 · Current/
     assert_includes response.body, profile.current_revision.configuration_digest
 
     get methodology_profiles_path

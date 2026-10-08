@@ -1,0 +1,43 @@
+en:
+  terminology_sheet:
+    add_title: Add terminology
+    add_intro: Create a private glossary you can reuse, without leaving this translation. Nothing is sent to AI.
+    edit_title: Edit terminology
+    edit_intro: Saving creates a new version. Earlier versions, and translations that used them, stay unchanged. Editing terms never sends anything to AI.
+    glossary_name: Glossary name
+    glossary_placeholder: Japanese Sermon Terms
+    description: Description (optional)
+    terms: Terms
+    entry_count: "%{count}/%{max} entries"
+    mappings: Terminology mappings
+    term: Term
+    new_term: New term
+    source_term: Source term
+    preferred_term: Preferred target term
+    note: Note (optional)
+    remove: Remove
+    cancel: Cancel
+    add_another: Add another term
+    add_term: Add term
+    create_select: Create & select
+    creating: Creating terminology…
+    save: Save terminology
+    saving: Saving terminology…
+    revision: "Version %{version}"
+    terms_count:
+      one: "%{count} term"
+      other: "%{count} terms"
+    more_terms: "+ %{count} more terms"
+    edit: Edit
+    add_link_term: "+ Add term"
+    add_terminology: "+ Add terminology"
+    edit_terminology: Edit terminology
+    source: Source
+    preferred: Preferred
+    none_selected: No terminology selected
+    panel_intro: Add preferred terms here or choose a saved glossary. Changing terms never sends anything to AI.
+    choose_saved: Choose saved glossary
+    no_terminology: No terminology
+    continue_without: Continue without a glossary.
+    open_library: Open terminology library
+    glossaries: Glossaries

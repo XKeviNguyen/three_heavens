@@ -877,24 +877,24 @@ $$;
 CREATE FUNCTION public.glossary_revision_configuration_digest(revision_id bigint) RETURNS text
     LANGUAGE sql STABLE
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(glossary_revisions.source_language)::text ||
-    ',"target_language":' || to_json(glossary_revisions.target_language)::text ||
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(glossary_revisions.source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(glossary_revisions.target_language)::text ||
     ',"entries":[' || COALESCE((
-      SELECT string_agg(
-        '{"position":' || position ||
-        ',"source_term":' || to_json(source_term)::text ||
-        ',"preferred_target_term":' || to_json(preferred_target_term)::text ||
-        ',"note":' || COALESCE(to_json(note)::text, 'null') || '}',
-        ',' ORDER BY position
+      SELECT pg_catalog.string_agg(
+        '{"position":' || glossary_entries.position ||
+        ',"source_term":' || pg_catalog.to_json(glossary_entries.source_term)::text ||
+        ',"preferred_target_term":' || pg_catalog.to_json(glossary_entries.preferred_target_term)::text ||
+        ',"note":' || COALESCE(pg_catalog.to_json(glossary_entries.note)::text, 'null') || '}',
+        ',' ORDER BY glossary_entries.position
       )
-      FROM glossary_entries
-      WHERE glossary_revision_id = glossary_revisions.id
+      FROM public.glossary_entries
+      WHERE glossary_entries.glossary_revision_id = glossary_revisions.id
     ), '') || ']}',
-    'sha256'
-  ), 'hex')
-  FROM glossary_revisions
-  WHERE id = revision_id;
+    'UTF8'
+  )), 'hex')
+  FROM public.glossary_revisions
+  WHERE glossary_revisions.id = revision_id;
 $$;
 
 
@@ -905,12 +905,12 @@ $$;
 CREATE FUNCTION public.methodology_revision_configuration_digest(source_language text, target_language text, guidance text) RETURNS text
     LANGUAGE sql IMMUTABLE STRICT
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"guidance":' || to_json(guidance)::text || '}',
-    'sha256'
-  ), 'hex');
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(target_language)::text ||
+    ',"guidance":' || pg_catalog.to_json(guidance)::text || '}',
+    'UTF8'
+  )), 'hex');
 $$;
 
 
@@ -1315,13 +1315,13 @@ $$;
 CREATE FUNCTION public.translation_reference_revision_configuration_digest(source_language text, target_language text, source_text text, approved_translation text) RETURNS text
     LANGUAGE sql IMMUTABLE STRICT
     AS $$
-  SELECT encode(digest(
-    '{"source_language":' || to_json(source_language)::text ||
-    ',"target_language":' || to_json(target_language)::text ||
-    ',"source_text":' || to_json(source_text)::text ||
-    ',"approved_translation":' || to_json(approved_translation)::text || '}',
-    'sha256'
-  ), 'hex');
+  SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+    '{"source_language":' || pg_catalog.to_json(source_language)::text ||
+    ',"target_language":' || pg_catalog.to_json(target_language)::text ||
+    ',"source_text":' || pg_catalog.to_json(source_text)::text ||
+    ',"approved_translation":' || pg_catalog.to_json(approved_translation)::text || '}',
+    'UTF8'
+  )), 'hex');
 $$;
 
 
@@ -1377,7 +1377,8 @@ CREATE TABLE public.active_storage_blobs (
     byte_size bigint NOT NULL,
     checksum character varying,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    cleanup_retry_at timestamp(6) without time zone
 );
 
 
@@ -1462,16 +1463,16 @@ CREATE TABLE public.ai_provider_attempts (
     CONSTRAINT ai_provider_attempts_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT ai_provider_attempts_display_name_snapshot_check CHECK (((char_length((display_name_snapshot)::text) >= 1) AND (char_length((display_name_snapshot)::text) <= 150))),
     CONSTRAINT ai_provider_attempts_duration_check CHECK (((completed_at IS NULL) OR (completed_at >= started_at))),
-    CONSTRAINT ai_provider_attempts_error_code_format_check CHECK (((error_code IS NULL) OR (((char_length((error_code)::text) >= 1) AND (char_length((error_code)::text) <= 80)) AND ((error_code)::text ~ '^[a-z0-9_.:-]+$'::text)))),
+    CONSTRAINT ai_provider_attempts_error_code_format_check CHECK (((error_code IS NULL) OR ((char_length((error_code)::text) >= 1) AND (char_length((error_code)::text) <= 80) AND ((error_code)::text ~ '^[a-z0-9_.:-]+$'::text)))),
     CONSTRAINT ai_provider_attempts_gateway_snapshot_check CHECK (((char_length((gateway_snapshot)::text) >= 1) AND (char_length((gateway_snapshot)::text) <= 50))),
     CONSTRAINT ai_provider_attempts_identifier_snapshot_check CHECK (((char_length((model_identifier_snapshot)::text) >= 1) AND (char_length((model_identifier_snapshot)::text) <= 255))),
     CONSTRAINT ai_provider_attempts_lifecycle_check CHECK (((((status)::text = 'running'::text) AND (completed_at IS NULL) AND (error_code IS NULL)) OR (((status)::text = 'completed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NULL)) OR (((status)::text = 'failed'::text) AND (completed_at IS NOT NULL) AND (error_code IS NOT NULL)))),
     CONSTRAINT ai_provider_attempts_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT ai_provider_attempts_provider_snapshot_check CHECK (((char_length((provider_snapshot)::text) >= 1) AND (char_length((provider_snapshot)::text) <= 100))),
     CONSTRAINT ai_provider_attempts_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT ai_provider_attempts_run_type_check CHECK (((provider_run_type)::text = ANY ((ARRAY['TranslationRun'::character varying, 'TranslationSegmentRun'::character varying, 'ReviewRun'::character varying, 'ReviewSegmentRun'::character varying, 'JudgeRun'::character varying, 'JudgeSegmentRun'::character varying, 'FinalizationRun'::character varying, 'FinalizationSegmentRun'::character varying])::text[]))),
-    CONSTRAINT ai_provider_attempts_stage_check CHECK (((stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying])::text[]))),
-    CONSTRAINT ai_provider_attempts_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT ai_provider_attempts_run_type_check CHECK (((provider_run_type)::text = ANY (ARRAY[('TranslationRun'::character varying)::text, ('TranslationSegmentRun'::character varying)::text, ('ReviewRun'::character varying)::text, ('ReviewSegmentRun'::character varying)::text, ('JudgeRun'::character varying)::text, ('JudgeSegmentRun'::character varying)::text, ('FinalizationRun'::character varying)::text, ('FinalizationSegmentRun'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_stage_check CHECK (((stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text]))),
+    CONSTRAINT ai_provider_attempts_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT ai_provider_attempts_token_consistency_check CHECK (((total_tokens IS NULL) OR (((prompt_tokens IS NULL) OR (prompt_tokens <= total_tokens)) AND ((completion_tokens IS NULL) OR (completion_tokens <= total_tokens)) AND ((cached_tokens IS NULL) OR (cached_tokens <= total_tokens)) AND ((reasoning_tokens IS NULL) OR (reasoning_tokens <= total_tokens))))),
     CONSTRAINT ai_provider_attempts_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
@@ -1506,6 +1507,38 @@ CREATE TABLE public.ar_internal_metadata (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
+
+
+--
+-- Name: consumed_nonces; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.consumed_nonces (
+    id bigint NOT NULL,
+    digest character varying(64) NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT consumed_nonces_digest_format CHECK (((digest)::text ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+--
+-- Name: consumed_nonces_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.consumed_nonces_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: consumed_nonces_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.consumed_nonces_id_seq OWNED BY public.consumed_nonces.id;
 
 
 --
@@ -1566,8 +1599,8 @@ CREATE TABLE public.documents (
     source_sha256 character varying,
     extraction_version character varying,
     CONSTRAINT documents_original_byte_size_check CHECK (((original_byte_size IS NULL) OR ((original_byte_size >= 0) AND (original_byte_size <= 10485760)))),
-    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
-    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY ((ARRAY['pasted_text'::character varying, 'uploaded_file'::character varying])::text[]))),
+    CONSTRAINT documents_source_format_check CHECK (((source_format IS NULL) OR ((source_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text, ('pdf'::character varying)::text])))),
+    CONSTRAINT documents_source_kind_check CHECK (((source_kind)::text = ANY (ARRAY[('pasted_text'::character varying)::text, ('uploaded_file'::character varying)::text]))),
     CONSTRAINT documents_source_sha256_check CHECK (((source_sha256 IS NULL) OR (char_length((source_sha256)::text) = 64)))
 );
 
@@ -1678,7 +1711,7 @@ CREATE TABLE public.experiments (
     glossary_revision_id bigint,
     methodology_profile_revision_id bigint,
     guidance_preference character varying DEFAULT 'reference_examples'::character varying NOT NULL,
-    CONSTRAINT experiments_guidance_preference_check CHECK (((guidance_preference)::text = ANY ((ARRAY['reference_examples'::character varying, 'glossary'::character varying, 'experiment_instruction'::character varying])::text[])))
+    CONSTRAINT experiments_guidance_preference_check CHECK (((guidance_preference)::text = ANY (ARRAY[('reference_examples'::character varying)::text, ('glossary'::character varying)::text, ('experiment_instruction'::character varying)::text])))
 );
 
 
@@ -1699,6 +1732,41 @@ CREATE SEQUENCE public.experiments_id_seq
 --
 
 ALTER SEQUENCE public.experiments_id_seq OWNED BY public.experiments.id;
+
+
+--
+-- Name: federated_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.federated_identities (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    provider character varying NOT NULL,
+    provider_uid character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT federated_identities_provider_check CHECK (((provider)::text = 'google'::text)),
+    CONSTRAINT federated_identities_provider_uid_length_check CHECK (((char_length((provider_uid)::text) >= 1) AND (char_length((provider_uid)::text) <= 255)))
+);
+
+
+--
+-- Name: federated_identities_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.federated_identities_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: federated_identities_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.federated_identities_id_seq OWNED BY public.federated_identities.id;
 
 
 --
@@ -1971,7 +2039,7 @@ CREATE TABLE public.finalization_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT finalization_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_change_summary_check CHECK (((jsonb_typeof(change_summary) = 'array'::text) AND (octet_length((change_summary)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
@@ -1979,11 +2047,11 @@ CREATE TABLE public.finalization_segment_runs (
     CONSTRAINT finalization_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT finalization_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT finalization_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT finalization_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_proposal_length_check CHECK (((proposed_translation IS NULL) OR (char_length(proposed_translation) <= 20000))),
     CONSTRAINT finalization_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT finalization_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT finalization_segment_runs_terminology_notes_check CHECK (((jsonb_typeof(terminology_notes) = 'array'::text) AND (octet_length((terminology_notes)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_warnings_check CHECK (((jsonb_typeof(warnings) = 'array'::text) AND (octet_length((warnings)::text) <= 50000)))
@@ -2317,7 +2385,7 @@ CREATE TABLE public.judge_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT judge_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT judge_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT judge_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -2325,10 +2393,10 @@ CREATE TABLE public.judge_segment_runs (
     CONSTRAINT judge_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT judge_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT judge_segment_runs_judgment_check CHECK (((jsonb_typeof(judgment) = 'object'::text) AND (octet_length((judgment)::text) <= 100000))),
-    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT judge_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT judge_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT judge_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT judge_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -2487,12 +2555,12 @@ CREATE TABLE public.pipeline_events (
     reason_code character varying,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
+    CONSTRAINT pipeline_events_from_stage_check CHECK (((from_stage IS NULL) OR ((from_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
     CONSTRAINT pipeline_events_key_check CHECK (((char_length((event_key)::text) >= 1) AND (char_length((event_key)::text) <= 120))),
     CONSTRAINT pipeline_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND (octet_length((metadata)::text) <= 2048))),
     CONSTRAINT pipeline_events_reason_check CHECK (((reason_code IS NULL) OR (char_length((reason_code)::text) <= 80))),
     CONSTRAINT pipeline_events_sequence_check CHECK ((sequence_number > 0)),
-    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[])))),
+    CONSTRAINT pipeline_events_to_stage_check CHECK (((to_stage IS NULL) OR ((to_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text])))),
     CONSTRAINT pipeline_events_type_check CHECK (((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 80)))
 );
 
@@ -2548,16 +2616,16 @@ CREATE TABLE public.pipeline_runs (
     CONSTRAINT pipeline_runs_authorized_count_check CHECK ((((provider_work_plan = '{}'::jsonb) AND (authorized_initial_provider_run_count = (((translator_count + reviewer_count) + judge_count) + finalizer_count))) OR ((provider_work_plan <> '{}'::jsonb) AND (jsonb_typeof((provider_work_plan -> 'roles'::text)) = 'object'::text) AND (((provider_work_plan ->> 'authorized_initial_provider_request_slots'::text))::integer = authorized_initial_provider_run_count) AND (authorized_initial_provider_run_count >= (((translator_count + reviewer_count) + judge_count) + finalizer_count))))),
     CONSTRAINT pipeline_runs_blocked_message_check CHECK (((blocked_message IS NULL) OR (char_length((blocked_message)::text) <= 500))),
     CONSTRAINT pipeline_runs_blocked_reason_check CHECK (((blocked_reason_code IS NULL) OR (char_length((blocked_reason_code)::text) <= 80))),
-    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying])::text[])))),
+    CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text])))),
     CONSTRAINT pipeline_runs_blocked_state_check CHECK ((((status)::text = 'blocked'::text) = ((blocked_stage IS NOT NULL) AND (blocked_reason_code IS NOT NULL)))),
     CONSTRAINT pipeline_runs_completion_finalizer_check CHECK (((((completion_mode)::text = 'winner_draft'::text) AND (finalizer_count = 0)) OR (((completion_mode)::text = 'refinement_proposals'::text) AND (finalizer_count > 0)))),
-    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
-    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY ((ARRAY['translation'::character varying, 'review'::character varying, 'judge'::character varying, 'finalization'::character varying, 'editor'::character varying])::text[]))),
+    CONSTRAINT pipeline_runs_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
+    CONSTRAINT pipeline_runs_current_stage_check CHECK (((current_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text, ('editor'::character varying)::text]))),
     CONSTRAINT pipeline_runs_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT pipeline_runs_provider_work_plan_check CHECK (((jsonb_typeof(provider_work_plan) = 'object'::text) AND (octet_length((provider_work_plan)::text) <= 16384))),
     CONSTRAINT pipeline_runs_ready_timestamp_check CHECK ((((status)::text = 'ready_for_editor'::text) = (ready_for_editor_at IS NOT NULL))),
-    CONSTRAINT pipeline_runs_role_counts_check CHECK ((((translator_count >= 2) AND (translator_count <= 6)) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
-    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'blocked'::character varying, 'ready_for_editor'::character varying, 'stopped'::character varying])::text[]))),
+    CONSTRAINT pipeline_runs_role_counts_check CHECK (((translator_count >= 2) AND (translator_count <= 6) AND ((reviewer_count >= 1) AND (reviewer_count <= 5)) AND ((judge_count >= 1) AND (judge_count <= 5)) AND ((finalizer_count >= 0) AND (finalizer_count <= 5)))),
+    CONSTRAINT pipeline_runs_status_check CHECK (((status)::text = ANY (ARRAY[('running'::character varying)::text, ('blocked'::character varying)::text, ('ready_for_editor'::character varying)::text, ('stopped'::character varying)::text]))),
     CONSTRAINT pipeline_runs_stopped_timestamp_check CHECK ((((status)::text = 'stopped'::text) = (stopped_at IS NOT NULL)))
 );
 
@@ -2805,7 +2873,7 @@ CREATE TABLE public.review_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT review_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT review_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT review_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -2813,10 +2881,10 @@ CREATE TABLE public.review_segment_runs (
     CONSTRAINT review_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT review_segment_runs_evaluations_check CHECK (((jsonb_typeof(evaluations) = 'array'::text) AND (octet_length((evaluations)::text) <= 100000))),
     CONSTRAINT review_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
-    CONSTRAINT review_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT review_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT review_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT review_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT review_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -2850,6 +2918,70 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sessions (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sessions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sessions_id_seq OWNED BY public.sessions.id;
+
+
+--
+-- Name: source_import_retirements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_import_retirements (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    request_key character varying(512) NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
+    CONSTRAINT source_import_retirements_request_key_check CHECK (((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))
+);
+
+
+--
+-- Name: source_import_retirements_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.source_import_retirements_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_import_retirements_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.source_import_retirements_id_seq OWNED BY public.source_import_retirements.id;
+
+
+--
 -- Name: source_imports; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2871,13 +3003,15 @@ CREATE TABLE public.source_imports (
     consumed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    request_key character varying,
     CONSTRAINT source_imports_byte_size_check CHECK (((byte_size IS NULL) OR ((byte_size >= 0) AND (byte_size <= 10485760)))),
     CONSTRAINT source_imports_consumed_at_check CHECK ((((status)::text = 'consumed'::text) = (consumed_at IS NOT NULL))),
     CONSTRAINT source_imports_consumed_document_check CHECK ((((status)::text <> 'consumed'::text) OR (resulting_document_id IS NOT NULL))),
-    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY ((ARRAY['txt'::character varying, 'md'::character varying, 'docx'::character varying])::text[])))),
+    CONSTRAINT source_imports_format_check CHECK (((imported_format IS NULL) OR ((imported_format)::text = ANY (ARRAY[('txt'::character varying)::text, ('md'::character varying)::text, ('docx'::character varying)::text, ('pdf'::character varying)::text])))),
     CONSTRAINT source_imports_ready_text_check CHECK ((((status)::text <> 'ready'::text) OR (extracted_text IS NOT NULL))),
+    CONSTRAINT source_imports_request_key_check CHECK (((request_key IS NULL) OR ((request_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
     CONSTRAINT source_imports_sha256_check CHECK (((sha256 IS NULL) OR (char_length((sha256)::text) = 64))),
-    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'ready'::character varying, 'failed'::character varying, 'consumed'::character varying])::text[])))
+    CONSTRAINT source_imports_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('ready'::character varying)::text, ('failed'::character varying)::text, ('consumed'::character varying)::text])))
 );
 
 
@@ -2898,6 +3032,46 @@ CREATE SEQUENCE public.source_imports_id_seq
 --
 
 ALTER SEQUENCE public.source_imports_id_seq OWNED BY public.source_imports.id;
+
+
+--
+-- Name: translation_reference_creations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_reference_creations (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    translation_reference_id bigint,
+    creation_key character varying(512) NOT NULL,
+    payload_digest character varying(64) NOT NULL,
+    status character varying DEFAULT 'pending'::character varying NOT NULL,
+    failure text,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
+    CONSTRAINT reference_creations_failure_size_check CHECK (((failure IS NULL) OR (octet_length(failure) <= 2097152))),
+    CONSTRAINT reference_creations_identity_check CHECK ((((creation_key)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text) AND ((payload_digest)::text ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT reference_creations_outcome_check CHECK (((((status)::text = ANY (ARRAY['pending'::text, 'expired'::text])) AND (translation_reference_id IS NULL) AND (failure IS NULL)) OR (((status)::text = 'completed'::text) AND (translation_reference_id IS NOT NULL) AND (failure IS NULL)) OR (((status)::text = 'failed'::text) AND (translation_reference_id IS NULL) AND (failure IS NOT NULL))))
+);
+
+
+--
+-- Name: translation_reference_creations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_reference_creations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_reference_creations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_reference_creations_id_seq OWNED BY public.translation_reference_creations.id;
 
 
 --
@@ -3082,7 +3256,7 @@ CREATE TABLE public.translation_segment_runs (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT translation_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
-    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK ((((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT translation_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT translation_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
@@ -3090,10 +3264,10 @@ CREATE TABLE public.translation_segment_runs (
     CONSTRAINT translation_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
     CONSTRAINT translation_segment_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT translation_segment_runs_output_length_check CHECK (((translated_text IS NULL) OR (char_length(translated_text) <= 20000))),
-    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK ((((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
+    CONSTRAINT translation_segment_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000) AND (max_output_tokens_snapshot < context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT translation_segment_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
-    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT translation_segment_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
     CONSTRAINT translation_segment_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -3118,6 +3292,86 @@ ALTER SEQUENCE public.translation_segment_runs_id_seq OWNED BY public.translatio
 
 
 --
+-- Name: translation_workspace_draft_editors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_workspace_draft_editors (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    context_key character varying(80) NOT NULL,
+    editor_id character varying(512) NOT NULL,
+    state character varying DEFAULT 'active'::character varying NOT NULL,
+    sequence bigint DEFAULT 0 NOT NULL,
+    expires_at timestamp(6) without time zone DEFAULT (CURRENT_TIMESTAMP + '24:00:00'::interval) NOT NULL,
+    CONSTRAINT workspace_draft_editors_identity_check CHECK (((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text)),
+    CONSTRAINT workspace_draft_editors_sequence_check CHECK (((sequence >= 0) AND (sequence <= '9007199254740991'::bigint))),
+    CONSTRAINT workspace_draft_editors_state_check CHECK (((state)::text = ANY (ARRAY['active'::text, 'rejected'::text, 'retired'::text])))
+);
+
+
+--
+-- Name: translation_workspace_draft_editors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_workspace_draft_editors_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_workspace_draft_editors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_workspace_draft_editors_id_seq OWNED BY public.translation_workspace_draft_editors.id;
+
+
+--
+-- Name: translation_workspace_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.translation_workspace_drafts (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    public_id character varying NOT NULL,
+    context_key character varying NOT NULL,
+    workspace_payload text NOT NULL,
+    lock_version integer DEFAULT 0 NOT NULL,
+    expires_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    editor_id character varying,
+    editor_sequence bigint,
+    CONSTRAINT workspace_drafts_context_key_check CHECK ((char_length((context_key)::text) <= 80)),
+    CONSTRAINT workspace_drafts_editor_id_check CHECK (((editor_id IS NULL) OR ((editor_id)::text ~ '^[0-9a-f]{32}$|^[A-Za-z0-9_-]{16,255}--[0-9a-f]{64}\.[0-9a-f]{32}$'::text))),
+    CONSTRAINT workspace_drafts_editor_pair_check CHECK (((editor_id IS NULL) = (editor_sequence IS NULL))),
+    CONSTRAINT workspace_drafts_editor_sequence_check CHECK (((editor_sequence IS NULL) OR (editor_sequence > 0))),
+    CONSTRAINT workspace_drafts_lock_version_check CHECK ((lock_version >= 0))
+);
+
+
+--
+-- Name: translation_workspace_drafts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.translation_workspace_drafts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: translation_workspace_drafts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.translation_workspace_drafts_id_seq OWNED BY public.translation_workspace_drafts.id;
+
+
+--
 -- Name: translation_workspace_submissions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3134,7 +3388,7 @@ CREATE TABLE public.translation_workspace_submissions (
     CONSTRAINT translation_workspace_submissions_digest_check CHECK ((char_length((token_digest)::text) = 64)),
     CONSTRAINT translation_workspace_submissions_expiry_check CHECK ((expires_at > created_at)),
     CONSTRAINT translation_workspace_submissions_lifecycle_check CHECK (((((status)::text = 'available'::text) AND (consumed_at IS NULL) AND (experiment_id IS NULL)) OR (((status)::text = 'consumed'::text) AND (consumed_at IS NOT NULL) AND (experiment_id IS NOT NULL)))),
-    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'consumed'::character varying])::text[])))
+    CONSTRAINT translation_workspace_submissions_status_check CHECK (((status)::text = ANY (ARRAY[('available'::character varying)::text, ('consumed'::character varying)::text])))
 );
 
 
@@ -3158,6 +3412,43 @@ ALTER SEQUENCE public.translation_workspace_submissions_id_seq OWNED BY public.t
 
 
 --
+-- Name: upload_budgets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.upload_budgets (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    window_id bigint NOT NULL,
+    count integer NOT NULL,
+    receipts uuid[] NOT NULL,
+    attempt_window_id bigint DEFAULT 0 NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT upload_budgets_attempt_count_bounds CHECK (((attempt_count >= 0) AND (attempt_count <= 30))),
+    CONSTRAINT upload_budgets_count_bounds CHECK (((count >= 0) AND (count <= 10))),
+    CONSTRAINT upload_budgets_receipt_count CHECK ((count = cardinality(receipts)))
+);
+
+
+--
+-- Name: upload_budgets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.upload_budgets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: upload_budgets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.upload_budgets_id_seq OWNED BY public.upload_budgets.id;
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3165,10 +3456,17 @@ CREATE TABLE public.users (
     id bigint NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     email character varying NOT NULL,
-    password_digest character varying NOT NULL,
+    password_digest character varying,
     role character varying DEFAULT 'user'::character varying NOT NULL,
     status character varying DEFAULT 'active'::character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    email_verified_at timestamp(6) without time zone,
+    confirmation_sent_at timestamp(6) without time zone,
+    locale character varying DEFAULT 'en'::character varying NOT NULL,
+    managed_ai_access boolean DEFAULT false NOT NULL,
+    appearance character varying DEFAULT 'system'::character varying NOT NULL,
+    CONSTRAINT users_appearance_check CHECK (((appearance)::text = ANY (ARRAY[('system'::character varying)::text, ('light'::character varying)::text, ('dark'::character varying)::text]))),
+    CONSTRAINT users_locale_check CHECK (((locale)::text = ANY (ARRAY[('en'::character varying)::text, ('vi'::character varying)::text, ('ja'::character varying)::text]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
     CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
@@ -3211,7 +3509,7 @@ CREATE TABLE public.workflow_profile_model_selections (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT workflow_profile_model_selections_position_check CHECK (("position" > 0)),
-    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY ((ARRAY['translator'::character varying, 'reviewer'::character varying, 'judge'::character varying, 'finalizer'::character varying])::text[]))),
+    CONSTRAINT workflow_profile_model_selections_role_check CHECK (((role)::text = ANY (ARRAY[('translator'::character varying)::text, ('reviewer'::character varying)::text, ('judge'::character varying)::text, ('finalizer'::character varying)::text]))),
     CONSTRAINT workflow_profile_selections_display_name_check CHECK (((char_length((display_name_snapshot)::text) >= 1) AND (char_length((display_name_snapshot)::text) <= 150))),
     CONSTRAINT workflow_profile_selections_gateway_check CHECK (((char_length((gateway_snapshot)::text) >= 1) AND (char_length((gateway_snapshot)::text) <= 50))),
     CONSTRAINT workflow_profile_selections_identifier_check CHECK (((char_length((model_identifier_snapshot)::text) >= 1) AND (char_length((model_identifier_snapshot)::text) <= 255))),
@@ -3252,7 +3550,7 @@ CREATE TABLE public.workflow_profile_revisions (
     configuration_digest character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY ((ARRAY['winner_draft'::character varying, 'refinement_proposals'::character varying])::text[]))),
+    CONSTRAINT workflow_profile_revisions_completion_mode_check CHECK (((completion_mode)::text = ANY (ARRAY[('winner_draft'::character varying)::text, ('refinement_proposals'::character varying)::text]))),
     CONSTRAINT workflow_profile_revisions_description_check CHECK (((description IS NULL) OR (char_length((description)::text) <= 500))),
     CONSTRAINT workflow_profile_revisions_digest_check CHECK ((char_length((configuration_digest)::text) = 64)),
     CONSTRAINT workflow_profile_revisions_name_check CHECK (((char_length(btrim((name)::text)) >= 1) AND (char_length(btrim((name)::text)) <= 150))),
@@ -3341,6 +3639,13 @@ ALTER TABLE ONLY public.ai_provider_attempts ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: consumed_nonces id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.consumed_nonces ALTER COLUMN id SET DEFAULT nextval('public.consumed_nonces_id_seq'::regclass);
+
+
+--
 -- Name: document_execution_plans id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3373,6 +3678,13 @@ ALTER TABLE ONLY public.experiment_segments ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.experiments ALTER COLUMN id SET DEFAULT nextval('public.experiments_id_seq'::regclass);
+
+
+--
+-- Name: federated_identities id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities ALTER COLUMN id SET DEFAULT nextval('public.federated_identities_id_seq'::regclass);
 
 
 --
@@ -3537,10 +3849,31 @@ ALTER TABLE ONLY public.review_segment_runs ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
+-- Name: sessions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions ALTER COLUMN id SET DEFAULT nextval('public.sessions_id_seq'::regclass);
+
+
+--
+-- Name: source_import_retirements id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements ALTER COLUMN id SET DEFAULT nextval('public.source_import_retirements_id_seq'::regclass);
+
+
+--
 -- Name: source_imports id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_imports ALTER COLUMN id SET DEFAULT nextval('public.source_imports_id_seq'::regclass);
+
+
+--
+-- Name: translation_reference_creations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations ALTER COLUMN id SET DEFAULT nextval('public.translation_reference_creations_id_seq'::regclass);
 
 
 --
@@ -3572,10 +3905,31 @@ ALTER TABLE ONLY public.translation_segment_runs ALTER COLUMN id SET DEFAULT nex
 
 
 --
+-- Name: translation_workspace_draft_editors id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors ALTER COLUMN id SET DEFAULT nextval('public.translation_workspace_draft_editors_id_seq'::regclass);
+
+
+--
+-- Name: translation_workspace_drafts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts ALTER COLUMN id SET DEFAULT nextval('public.translation_workspace_drafts_id_seq'::regclass);
+
+
+--
 -- Name: translation_workspace_submissions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.translation_workspace_submissions ALTER COLUMN id SET DEFAULT nextval('public.translation_workspace_submissions_id_seq'::regclass);
+
+
+--
+-- Name: upload_budgets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets ALTER COLUMN id SET DEFAULT nextval('public.upload_budgets_id_seq'::regclass);
 
 
 --
@@ -3647,6 +4001,14 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: consumed_nonces consumed_nonces_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.consumed_nonces
+    ADD CONSTRAINT consumed_nonces_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: document_execution_plans document_execution_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3684,6 +4046,14 @@ ALTER TABLE ONLY public.experiment_segments
 
 ALTER TABLE ONLY public.experiments
     ADD CONSTRAINT experiments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: federated_identities federated_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities
+    ADD CONSTRAINT federated_identities_pkey PRIMARY KEY (id);
 
 
 --
@@ -3879,11 +4249,35 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_import_retirements source_import_retirements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements
+    ADD CONSTRAINT source_import_retirements_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: source_imports source_imports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_imports
     ADD CONSTRAINT source_imports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_reference_creations translation_reference_creations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT translation_reference_creations_pkey PRIMARY KEY (id);
 
 
 --
@@ -3919,11 +4313,35 @@ ALTER TABLE ONLY public.translation_segment_runs
 
 
 --
+-- Name: translation_workspace_draft_editors translation_workspace_draft_editors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors
+    ADD CONSTRAINT translation_workspace_draft_editors_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: translation_workspace_drafts translation_workspace_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts
+    ADD CONSTRAINT translation_workspace_drafts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: translation_workspace_submissions translation_workspace_submissions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.translation_workspace_submissions
     ADD CONSTRAINT translation_workspace_submissions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: upload_budgets upload_budgets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets
+    ADD CONSTRAINT upload_budgets_pkey PRIMARY KEY (id);
 
 
 --
@@ -3980,6 +4398,13 @@ CREATE INDEX idx_on_status_expires_at_ed9c9803ce ON public.translation_workspace
 
 
 --
+-- Name: idx_on_translation_reference_id_4839cc91cb; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_translation_reference_id_4839cc91cb ON public.translation_reference_creations USING btree (translation_reference_id);
+
+
+--
 -- Name: idx_on_translation_reference_id_6fd1e25754; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4001,10 +4426,10 @@ CREATE UNIQUE INDEX index_active_storage_attachments_uniqueness ON public.active
 
 
 --
--- Name: index_active_storage_blobs_for_cleanup; Type: INDEX; Schema: public; Owner: -
+-- Name: index_active_storage_blobs_on_cleanup_deadline; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_active_storage_blobs_for_cleanup ON public.active_storage_blobs USING btree (created_at, id);
+CREATE INDEX index_active_storage_blobs_on_cleanup_deadline ON public.active_storage_blobs USING btree (COALESCE(cleanup_retry_at, (created_at + make_interval(days => 7))), id);
 
 
 --
@@ -4033,6 +4458,20 @@ CREATE UNIQUE INDEX index_ai_provider_attempts_on_run_and_attempt ON public.ai_p
 --
 
 CREATE INDEX index_ai_provider_attempts_on_status_and_completed_at_and_id ON public.ai_provider_attempts USING btree (status, completed_at, id);
+
+
+--
+-- Name: index_consumed_nonces_on_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_consumed_nonces_on_digest ON public.consumed_nonces USING btree (digest);
+
+
+--
+-- Name: index_consumed_nonces_on_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_consumed_nonces_on_expires_at ON public.consumed_nonces USING btree (expires_at);
 
 
 --
@@ -4117,6 +4556,20 @@ CREATE INDEX index_experiments_on_glossary_revision_id ON public.experiments USI
 --
 
 CREATE INDEX index_experiments_on_methodology_profile_revision_id ON public.experiments USING btree (methodology_profile_revision_id);
+
+
+--
+-- Name: index_federated_identities_on_provider_and_provider_uid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_federated_identities_on_provider_and_provider_uid ON public.federated_identities USING btree (provider, provider_uid);
+
+
+--
+-- Name: index_federated_identities_on_user_id_and_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_federated_identities_on_user_id_and_provider ON public.federated_identities USING btree (user_id, provider);
 
 
 --
@@ -4617,6 +5070,20 @@ CREATE INDEX index_projects_on_user_id ON public.projects USING btree (user_id);
 
 
 --
+-- Name: index_reference_creations_on_expiring_failure; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_reference_creations_on_expiring_failure ON public.translation_reference_creations USING btree (created_at, id) WHERE ((status)::text = 'failed'::text);
+
+
+--
+-- Name: index_reference_creations_on_owner_and_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_reference_creations_on_owner_and_key ON public.translation_reference_creations USING btree (user_id, creation_key);
+
+
+--
 -- Name: index_review_evaluations_on_review_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4729,10 +5196,38 @@ CREATE INDEX index_review_segment_runs_on_running_last_claimed_at ON public.revi
 
 
 --
--- Name: index_source_imports_for_cleanup; Type: INDEX; Schema: public; Owner: -
+-- Name: index_sessions_on_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_source_imports_for_cleanup ON public.source_imports USING btree (status, expires_at, id);
+CREATE INDEX index_sessions_on_created_at ON public.sessions USING btree (created_at);
+
+
+--
+-- Name: index_sessions_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_sessions_on_user_id ON public.sessions USING btree (user_id);
+
+
+--
+-- Name: index_source_import_retirements_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_source_import_retirements_on_expiry ON public.source_import_retirements USING btree (expires_at, id);
+
+
+--
+-- Name: index_source_import_retirements_on_owner_and_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_source_import_retirements_on_owner_and_key ON public.source_import_retirements USING btree (user_id, request_key);
+
+
+--
+-- Name: index_source_imports_on_cleanup_deadline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_source_imports_on_cleanup_deadline ON public.source_imports USING btree (expires_at, id) WHERE ((status)::text = ANY (ARRAY['pending'::text, 'ready'::text, 'failed'::text]));
 
 
 --
@@ -4740,6 +5235,13 @@ CREATE INDEX index_source_imports_for_cleanup ON public.source_imports USING btr
 --
 
 CREATE UNIQUE INDEX index_source_imports_on_resulting_document_id ON public.source_imports USING btree (resulting_document_id) WHERE (resulting_document_id IS NOT NULL);
+
+
+--
+-- Name: index_source_imports_on_user_and_request_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_source_imports_on_user_and_request_key ON public.source_imports USING btree (user_id, request_key) WHERE (request_key IS NOT NULL);
 
 
 --
@@ -4754,6 +5256,13 @@ CREATE INDEX index_source_imports_on_user_id ON public.source_imports USING btre
 --
 
 CREATE INDEX index_source_imports_on_user_id_and_status ON public.source_imports USING btree (user_id, status);
+
+
+--
+-- Name: index_translation_reference_creations_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_reference_creations_on_expiry ON public.translation_reference_creations USING btree (expires_at, id);
 
 
 --
@@ -4775,6 +5284,13 @@ CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_id ON
 --
 
 CREATE UNIQUE INDEX index_translation_reference_revisions_on_reference_and_version ON public.translation_reference_revisions USING btree (translation_reference_id, version);
+
+
+--
+-- Name: index_translation_references_on_owner_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_references_on_owner_and_id ON public.translation_references USING btree (user_id, id);
 
 
 --
@@ -4876,6 +5392,48 @@ CREATE INDEX index_translation_segment_runs_on_running_last_claimed_at ON public
 
 
 --
+-- Name: index_translation_workspace_draft_editors_on_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_draft_editors_on_expiry ON public.translation_workspace_draft_editors USING btree (expires_at, id);
+
+
+--
+-- Name: index_translation_workspace_draft_editors_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_draft_editors_on_user_id ON public.translation_workspace_draft_editors USING btree (user_id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_expires_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_drafts_on_expires_at_and_id ON public.translation_workspace_drafts USING btree (expires_at, id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_public_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_workspace_drafts_on_public_id ON public.translation_workspace_drafts USING btree (public_id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_workspace_drafts_on_user_id ON public.translation_workspace_drafts USING btree (user_id);
+
+
+--
+-- Name: index_translation_workspace_drafts_on_user_id_and_context_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_translation_workspace_drafts_on_user_id_and_context_key ON public.translation_workspace_drafts USING btree (user_id, context_key);
+
+
+--
 -- Name: index_translation_workspace_submissions_on_experiment_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4901,6 +5459,13 @@ CREATE INDEX index_translation_workspace_submissions_on_user_id ON public.transl
 --
 
 CREATE INDEX index_translation_workspace_submissions_on_user_id_and_status ON public.translation_workspace_submissions USING btree (user_id, status);
+
+
+--
+-- Name: index_upload_budgets_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_upload_budgets_on_user_id ON public.upload_budgets USING btree (user_id);
 
 
 --
@@ -4957,6 +5522,13 @@ CREATE INDEX index_workflow_profiles_on_owner_and_recent ON public.workflow_prof
 --
 
 CREATE INDEX index_workflow_profiles_on_user_id ON public.workflow_profiles USING btree (user_id);
+
+
+--
+-- Name: index_workspace_draft_editors_on_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_workspace_draft_editors_on_identity ON public.translation_workspace_draft_editors USING btree (user_id, context_key, editor_id);
 
 
 --
@@ -5602,6 +6174,14 @@ ALTER TABLE ONLY public.finalization_runs
 
 
 --
+-- Name: source_import_retirements fk_rails_2192db283c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_import_retirements
+    ADD CONSTRAINT fk_rails_2192db283c FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: source_imports fk_rails_258d226d74; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5754,6 +6334,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: upload_budgets fk_rails_570a83c4ee; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_budgets
+    ADD CONSTRAINT fk_rails_570a83c4ee FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- Name: workflow_profile_revisions fk_rails_583a4f3dd8; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5799,6 +6387,22 @@ ALTER TABLE ONLY public.review_evaluations
 
 ALTER TABLE ONLY public.judge_evaluations
     ADD CONSTRAINT fk_rails_726a6c8b0b FOREIGN KEY (judge_run_id) REFERENCES public.judge_runs(id);
+
+
+--
+-- Name: translation_workspace_drafts fk_rails_72cbb19784; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_drafts
+    ADD CONSTRAINT fk_rails_72cbb19784 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sessions fk_rails_758836b4f0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT fk_rails_758836b4f0 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -5914,6 +6518,14 @@ ALTER TABLE ONLY public.glossary_revisions
 
 
 --
+-- Name: translation_reference_creations fk_rails_a2770b12b1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT fk_rails_a2770b12b1 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- Name: experiments fk_rails_a797eeb5e6; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5970,6 +6582,14 @@ ALTER TABLE ONLY public.projects
 
 
 --
+-- Name: federated_identities fk_rails_ba05d5a23b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.federated_identities
+    ADD CONSTRAINT fk_rails_ba05d5a23b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: finalization_segment_runs fk_rails_c171c093d3; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5999,6 +6619,14 @@ ALTER TABLE ONLY public.active_storage_attachments
 
 ALTER TABLE ONLY public.finalization_runs
     ADD CONSTRAINT fk_rails_c4273eec6a FOREIGN KEY (finalizer_llm_model_id) REFERENCES public.llm_models(id);
+
+
+--
+-- Name: translation_workspace_draft_editors fk_rails_c47ab55a2b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_workspace_draft_editors
+    ADD CONSTRAINT fk_rails_c47ab55a2b FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -6074,12 +6702,38 @@ ALTER TABLE ONLY public.workflow_profiles
 
 
 --
+-- Name: translation_reference_creations reference_creations_owner_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_reference_creations
+    ADD CONSTRAINT reference_creations_owner_fk FOREIGN KEY (user_id, translation_reference_id) REFERENCES public.translation_references(user_id, id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261008090000'),
+('20261005120000'),
+('20261005110000'),
+('20261005100000'),
+('20261004170000'),
+('20261004090000'),
+('20261003090000'),
+('20261002090000'),
+('20260930090000'),
+('20260929120200'),
+('20260929120100'),
+('20260929120000'),
+('20260929090200'),
+('20260929090100'),
+('20260929090000'),
+('20260924090200'),
+('20260924090100'),
+('20260924090000'),
 ('20260920090100'),
 ('20260920090000'),
 ('20260914090300'),
@@ -6119,3 +6773,4 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20260824050254'),
 ('20260824050253'),
 ('20260824050252');
+

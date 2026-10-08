@@ -1,5 +1,5 @@
-<% steps = { translation: "Translation", review: "Blind review", judge: "Judge", editor: "Human editor" } %>
-<nav aria-label="Translation workflow" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+<% steps = { translation: t("shared_ui.steps.translation"), review: t("shared_ui.steps.review"), judge: t("shared_ui.steps.judge"), editor: t("shared_ui.steps.editor") } %>
+<nav aria-label="<%= t("shared_ui.steps.label") %>" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
   <ol class="grid gap-2 sm:grid-cols-4">
     <% steps.each_with_index do |(key, label), index| %>
       <% state = workflow_step_state(experiment, key) %>
@@ -10,7 +10,7 @@
             <span class="flex size-7 shrink-0 items-center justify-center rounded-full border border-current text-xs font-bold" aria-hidden="true"><%= index + 1 %></span>
             <span>
               <span class="block text-sm font-semibold"><%= label %></span>
-              <span class="block text-xs"><%= state == :complete ? "Complete" : state.to_s.humanize %></span>
+              <span class="block text-xs"><%= t("shared_ui.step_states.#{state}") %></span>
             </span>
           </span>
         <% end %>

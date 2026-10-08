@@ -1,0 +1,35 @@
+ja:
+  statuses:
+    pending: 保留中
+    running: 実行中
+    completed: 完了
+    failed: 失敗
+    blocked: 停止中
+    ready_for_editor: "編集できます"
+    stopped: 停止済み
+    draft: 下書き
+    finalized: 確定済み
+    active: 有効
+    inactive: 無効
+    archived: アーカイブ済み
+    disabled: 無効
+    consumed: 使用済み
+    ready: 準備完了
+    available: 利用可能
+    canceled: キャンセル済み
+  guidance_labels:
+    reference_examples: "参考訳"
+    glossary: 用語集
+    experiment_instruction: この翻訳の指示
+  next_actions:
+    final_translation: 最終訳（%{status}）
+    pipeline_progress: "自動ワークフローの進行状況"
+    judge_results: "判定結果"
+    view_judge_progress: "判定の進行状況を見る"
+    continue_judging: "判定に進む"
+    view_blind_review: "ブラインドレビューを見る"
+    continue_blind_review: "ブラインドレビューに進む"
+    view_translation_progress: 翻訳の進捗を見る
+  workflow_modes:
+    winner_draft: "採用訳の下書きのみ"
+    refinement_proposals: "採用訳の下書き＋AIの修正案"

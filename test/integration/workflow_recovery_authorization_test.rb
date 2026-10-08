@@ -20,7 +20,7 @@ class WorkflowRecoveryAuthorizationTest < ActionDispatch::IntegrationTest
     get experiment_path(@own_experiment)
     assert_response :success
     assert_select "form[action='#{retry_failed_experiment_path(@own_experiment)}']"
-    assert_select "p", text: /incur additional cost/
+    assert_select "p", text: /may add cost/
 
     assert_no_difference -> { TranslationRun.count } do
       assert_enqueued_with(job: TranslationRunJob, args: [ failed.id ]) do

@@ -3,15 +3,21 @@ normal:
   password_digest: <%= BCrypt::Password.create("correct horse battery staple", cost: BCrypt::Engine::MIN_COST) %>
   role: user
   status: active
+  email_verified_at: 2026-09-01 00:00:00
+  managed_ai_access: true
 
 other:
   email: other@example.test
   password_digest: <%= BCrypt::Password.create("other secure password value", cost: BCrypt::Engine::MIN_COST) %>
   role: user
   status: active
+  email_verified_at: 2026-09-01 00:00:00
+  managed_ai_access: true
 
 admin:
   email: admin@example.test
   password_digest: <%= BCrypt::Password.create("admin secure password value", cost: BCrypt::Engine::MIN_COST) %>
   role: admin
   status: active
+  email_verified_at: 2026-09-01 00:00:00
+  managed_ai_access: true

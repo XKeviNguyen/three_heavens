@@ -1,6 +1,7 @@
 module Pipelines
   class Advance
     BLOCKED_MESSAGES = {
+      "managed_ai_access_revoked" => Ai::ManagedAccess::DENIED_MESSAGE,
       "stage_failed" => "One or more runs failed. Use the existing explicit retry action on the linked stage page.",
       "configuration_unavailable" => "The next stage's authorized model configuration is unavailable. Stop automation and continue manually, or restore the original model configuration.",
       "stage_conflict" => "Existing workflow state conflicts with this automatic stage. Stop automation and continue from the linked stage page.",
@@ -18,6 +19,11 @@ module Pipelines
     def call
       pipeline_run.with_lock do
         return pipeline_run if pipeline_run.stopped? || pipeline_run.ready_for_editor?
+
+        unless Ai::ManagedAccess.allowed?(pipeline_run.experiment.document.project.user.reload)
+          block!(reason: "managed_ai_access_revoked")
+          next
+        end
 
         # A failed stage must roll back its graph and commit callbacks before
         # the outer transaction records the recoverable pipeline block.

@@ -1,9 +1,9 @@
-<% content_for :title, "Edit translation reference · Three Heavens" %>
+<% content_for :title, t("references_ui.edit_title") %>
 <div class="mx-auto max-w-4xl space-y-6">
   <header>
-    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation Reference Library</p>
-    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Create a new reference revision</h1>
-    <p class="mt-2 text-slate-600">Saving creates a new immutable revision. Selecting a replacement file for an unchanged side replaces its prefilled text.</p>
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("references_ui.library") %></p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("references_ui.edit_heading") %></h1>
+    <p class="mt-2 text-slate-600"><%= t("references_ui.edit_intro") %></p>
   </header>
-  <%= render "form", form_url: translation_reference_path(@translation_reference), form_method: :patch, submit_label: "Save new revision" %>
+  <%= render "form", form_url: translation_reference_path(@translation_reference), form_method: :patch, submit_label: t("references_ui.save_revision") %>
 </div>

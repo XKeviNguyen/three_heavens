@@ -22,10 +22,36 @@ module Settings
       @llm_model = openrouter_models.new(model_params.merge(active: true))
 
       if @llm_model.save
-        redirect_to settings_models_path, notice: "Model added and activated."
+        redirect_to settings_models_path, notice: t("flash_ui.model.added")
       else
         render :new, status: :unprocessable_content
       end
+    end
+
+    def create_from_catalog
+      if params.key?(:model_id)
+        id = params[:model_id]
+        unless id.is_a?(String) && id.match?(/\A[1-9]\d*\z/) && !params.key?(:model_identifier)
+          raise ActionController::BadRequest, "model_id is invalid"
+        end
+        model = LlmModel.active_openrouter.find(id)
+        redirect_to settings_models_path, notice: t("flash_ui.model.catalog_action", name: model.display_name, action: t("flash_ui.model.actions.already_active"))
+        return
+      end
+
+      identifier = params.require(:model_identifier)
+      unless identifier.is_a?(String) && identifier.match?(LlmModel::OPENROUTER_IDENTIFIER_FORMAT)
+        raise ActionController::BadRequest, "model_identifier is invalid"
+      end
+
+      resolved = OpenRouter::ModelResolver.call(identifier: identifier, role: "translator")
+      was_inactive = resolved.persisted? && !resolved.active?
+      was_new = !resolved.persisted?
+      model = OpenRouter::ModelResolver.materialize!(resolved, activate: true)
+      action = was_inactive ? "activated" : (was_new ? "added and activated" : "already active")
+      redirect_to settings_models_path, notice: t("flash_ui.model.catalog_action", name: model.display_name, action: t("flash_ui.model.actions.#{action.parameterize(separator: "_")}"))
+    rescue OpenRouter::ModelResolver::Error, OpenRouter::Catalog::Error
+      redirect_to settings_models_path, alert: t("flash_ui.model.catalog_failed")
     end
 
     def edit
@@ -33,7 +59,7 @@ module Settings
 
     def update
       if @llm_model.update(model_params)
-        redirect_to settings_models_path, notice: "Model metadata updated."
+        redirect_to settings_models_path, notice: t("flash_ui.model.updated")
       else
         render :edit, status: :unprocessable_content
       end
@@ -41,12 +67,12 @@ module Settings
 
     def activate
       @llm_model.update!(active: true)
-      redirect_to settings_models_path, notice: "#{@llm_model.display_name} activated."
+      redirect_to settings_models_path, notice: t("flash_ui.model.activated", name: @llm_model.display_name)
     end
 
     def deactivate
       @llm_model.update!(active: false)
-      redirect_to settings_models_path, notice: "#{@llm_model.display_name} deactivated. Its history was preserved."
+      redirect_to settings_models_path, notice: t("flash_ui.model.deactivated", name: @llm_model.display_name)
     end
 
     private

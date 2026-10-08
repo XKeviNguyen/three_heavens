@@ -8,7 +8,7 @@ class AdminAuthorizationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "OpenRouter model catalog"
-    assert_select "a[href='#{settings_models_path}']", "Settings / Models"
+    assert_select "a[href='#{settings_models_path}']", "Models"
   end
 
   test "normal user is denied server-side and does not see the navigation link" do

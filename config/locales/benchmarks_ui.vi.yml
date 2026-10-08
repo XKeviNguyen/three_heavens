@@ -1,0 +1,67 @@
+vi:
+  benchmarks_ui:
+    title: Thống kê mô hình · Three Heavens
+    show_title: Thống kê %{name} · Three Heavens
+    heading: Bảng thống kê mô hình
+    intro: Nhóm theo mô hình đã chọn, kể cả mô hình đã tắt nhưng có lịch sử dịch. Mỗi giá trị trung bình và tỷ lệ có số mẫu; dữ liệu thiếu được ghi rõ.
+    sort_by: Sắp xếp theo
+    sort_button: Sắp xếp
+    sort:
+      judge_samples: Số mẫu điểm chấm (nhiều đến ít)
+      wins: "Số lần thắng (nhiều đến ít)"
+      win_rate: "Tỷ lệ thắng (cao đến thấp)"
+      review_score: Điểm nhận xét ẩn danh (cao đến thấp)
+      judge_score: Điểm chấm (cao đến thấp)
+      translation_cost: Chi phí dịch trung bình (thấp đến cao)
+      latency: "Thời gian phản hồi trung bình (thấp đến cao)"
+    empty: Chưa có dữ liệu thống kê
+    empty_intro: "Mô hình sẽ xuất hiện ở đây sau khi tham gia một lượt dịch."
+    diagnostics: Phân tích mô hình nhận xét và chấm điểm
+    diagnostics_intro: Chênh lệch điểm tự đánh giá là điểm trung bình mô hình nhận xét chấm cho bản dịch từ chính mô hình đó trừ điểm cho các mô hình khác. Đây chỉ là chỉ số tham khảo, không chứng minh nguyên nhân. Mức đồng thuận của mô hình chấm là với kết quả tổng hợp, không phải thước đo đúng sai khách quan.
+    model_role: Vai trò mô hình
+    self_scores: Điểm cho chính mình
+    other_scores: Điểm cho mô hình khác
+    self_difference: Chênh lệch điểm tự đánh giá
+    agreement: "Đồng thuận với bản thắng chung"
+    metric_notes: Ghi chú chỉ số
+    metric_notes_intro: "Tỷ lệ thắng = số vòng chấm đã xong mà mô hình thắng ÷ số vòng đã xong có bản dịch của mô hình. Không tính vòng thất bại hay chưa xong. Số lượt dịch và tỷ lệ thất bại tính mỗi bản dịch toàn văn một lần, kể cả khi tài liệu được xử lý theo đoạn. Điểm chất lượng dùng điểm từ các lượt nhận xét và chấm điểm đã xong. Chi phí, token và thời gian phản hồi chỉ tính các bản dịch đã hoàn tất."
+    cost_note: "Chi phí trên mỗi điểm chấm được tính bằng chi phí của từng bản dịch có tính phí đã hoàn tất chia cho điểm chấm trung bình, rồi lấy trung bình. Không tính bản dịch miễn phí hoặc chưa được chấm."
+    all: ← Tất cả thống kê
+    summary: Tổng quan
+    role_diagnostics: Phân tích theo vai trò
+    role_intro: "So sánh mô hình nhận xét dựa trên mô hình bạn đã chọn, không dựa trên mã mô hình do dịch vụ AI báo lại. Chênh lệch chỉ mô tả dữ liệu, không chứng minh nguyên nhân. Mức đồng thuận là đồng ý với bản thắng chung, không phải đúng sai khách quan."
+    self_difference_heading: "Mô hình nhận xét có ưu ái bản dịch của chính nó không?"
+    self: Chính mình
+    other: Mô hình khác
+    difference: Chênh lệch
+    no_review_scores: Không có dữ liệu · chưa có điểm nhận xét đã hoàn tất.
+    agreement_heading: Đồng thuận với bản thắng tổng hợp
+    agreement_detail: '%{agreements} lượt đồng thuận trên %{total} lượt chấm đủ điều kiện'
+    no_judge_runs: Không có dữ liệu · chưa có lượt chấm hoàn tất đủ điều kiện.
+    resolved_history: Lịch sử mô hình thực tế
+    resolved_intro: OpenRouter có thể dùng một mã mô hình thực tế khác với mã đã chọn. Giá trị thiếu hoặc không được báo cáo sẽ được ghi rõ. Tổng chi phí bên dưới chỉ gồm lượt dịch đã hoàn tất có báo cáo chi phí.
+    resolved_identifier: Mã mô hình thực tế
+    runs: "Lượt dịch"
+    wins: Lượt thắng
+    judge_score: Điểm chấm
+    known_cost: Chi phí đã biết
+    unknown: "Chưa báo cáo"
+    recent_history: Lịch sử dịch gần đây
+    recent_intro: 25 lượt dịch gần nhất đã chọn mô hình này.
+    sample: Mẫu thống kê dịch
+    official_winner: "Bản thắng"
+    latency: "Thời gian phản hồi"
+    review_score: Điểm nhận xét ẩn danh
+    completed_translations: Lượt dịch đã hoàn tất
+    participation: '%{count} lượt tham gia · %{failed} thất bại · tỷ lệ thất bại %{rate}'
+    official_wins: "Số lần thắng"
+    win_rate_detail: '%{rate} trong %{count} vòng hoàn tất đủ điều kiện'
+    score_samples: '%{count} điểm mẫu · %{candidates} ứng viên'
+    known_translation_cost: Chi phí dịch đã biết
+    total: Tổng %{value}
+    average_samples: Trung bình %{value} · %{count} lượt hoàn tất
+    average_latency: "Thời gian phản hồi trung bình"
+    completed_samples: '%{count} lượt hoàn tất'
+    average_total_tokens: Tổng token trung bình
+    cost_per_point: Chi phí trung bình trên mỗi điểm chấm
+    cost_quality_samples: "%{count} bản dịch có tính phí đã được chấm · càng thấp càng tốt"

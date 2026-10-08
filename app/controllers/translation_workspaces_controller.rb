@@ -1,5 +1,7 @@
 class TranslationWorkspacesController < ApplicationController
+  before_action :require_managed_ai_access, only: :create
   CONFIGURATION_OPTION_LIMIT = 100
+  CONFIGURATION_PAGE_PARAMS = %i[workflow_profile_page glossary_page methodology_profile_page translation_reference_page].freeze
   SCALAR_ATTRIBUTES = %w[
     project_id
     project_name
@@ -22,21 +24,32 @@ class TranslationWorkspacesController < ApplicationController
   ].freeze
 
   def new
-    attributes = pagination_workspace_params
-    project = find_owned_project(attributes ? attributes[:project_id] : project_id_param)
-    source_import = load_source_import(attributes ? attributes[:source_import_id] : source_import_id_param)
-    project_binding = attributes ? attributes[:source_import_project_token] : source_import_project_token_param
+    project = find_owned_project(project_id_param)
+    source_import = load_source_import(source_import_id_param)
+    project_binding = source_import_project_token_param
     validate_source_import_project_binding!(source_import:, project:, token: project_binding)
-    workspace_attributes = attributes || {
-      source_import_project_token: project_binding,
-      source_text: source_import&.extracted_text,
-      document_title: source_import && File.basename(source_import.original_filename, ".*")
-    }
+    load_draft(project)
+    restored_attributes = restored_draft_attributes(project)
+    # Revisiting the import link (Back, reload) must not replace the reviewed
+    # text of a draft that already holds this import.
+    source_import = nil if source_import && restored_attributes&.dig(:source_import_id).to_s == source_import.id.to_s
+    @draft_needs_save = source_import.present?
+    workspace_attributes = restored_attributes || {}
+    if source_import
+      workspace_attributes = workspace_attributes.merge(
+        source_import_id: source_import.id,
+        source_import_project_token: project_binding,
+        source_text: source_import.extracted_text,
+        document_title: File.basename(source_import.original_filename, ".*")
+      )
+    end
+    source_import ||= load_source_import(workspace_attributes[:source_import_id]) if workspace_attributes[:source_import_id].present?
     @translation_workspace = TranslationWorkspace.new(
       workspace_attributes.merge(user: current_user, source_import: source_import),
       existing_project: project
     )
     load_available_models(project:, workspace: @translation_workspace)
+    restore_paged_provider_authorization
     if source_import && !source_import.available?
       @translation_workspace.errors.add(:source_import_id, source_import.availability_message)
     end
@@ -44,10 +57,25 @@ class TranslationWorkspacesController < ApplicationController
     head :bad_request
   end
 
+  # Changing a configuration page posts the workspace form, which the page has
+  # saved to its draft before sending, and shows the requested page restored
+  # from that draft. Only the project and page numbers travel in the URL. The
+  # paid-work authorization, which a draft never holds, crosses the redirect
+  # in the session and is checked again against the restored workspace.
   def options
-    new
-    rebuild_paged_provider_work_plan unless performed?
-    render :new unless performed?
+    attributes = translation_workspace_params
+    project = find_owned_project(attributes[:project_id])
+    if attributes[:workflow_mode] == "automatic"
+      digest = attributes[:automatic_plan_digest].to_s
+      flash[:workspace_authorization] = {
+        "automatic_plan_digest" => digest.match?(/\A\h{64}\z/) ? digest : "",
+        "automatic_confirmation" => attributes[:automatic_confirmation] == "1" ? "1" : "0"
+      }
+    end
+    pages = params.slice(*CONFIGURATION_PAGE_PARAMS).permit(*CONFIGURATION_PAGE_PARAMS).to_h.select { |_name, value| value.to_s.match?(/\A[1-9]\d{0,5}\z/) }
+    redirect_to new_translation_workspace_path(project_id: project&.id, **pages.symbolize_keys), status: :see_other
+  rescue ActionController::ParameterMissing, ActionController::BadRequest
+    head :bad_request
   end
 
   def repeat
@@ -60,6 +88,7 @@ class TranslationWorkspacesController < ApplicationController
       document: :project
     ).find(params[:experiment_id])
     @repeated_from_experiment = historical
+    @draft_needs_save = true
     project = historical.document.project
     attributes = repeat_attributes(historical)
     @translation_workspace = TranslationWorkspace.new(
@@ -86,8 +115,12 @@ class TranslationWorkspacesController < ApplicationController
       existing_project: project
     )
     load_available_models(project:, workspace: @translation_workspace)
+    load_draft(project)
+    @draft_id = params[:translation_workspace_draft_id].to_s
+    @draft_version = params[:translation_workspace_draft_version].to_s
 
     if @translation_workspace.submit
+      consume_draft(project)
       destination = @translation_workspace.pipeline_run || @translation_workspace.experiment
       Operations::EventLogger.emit(
         @translation_workspace.replayed? ? "workspace_launch_replayed" : "workspace_launch_succeeded",
@@ -98,14 +131,15 @@ class TranslationWorkspacesController < ApplicationController
         outcome: @translation_workspace.replayed? ? "replayed" : "success"
       )
       notice = if @translation_workspace.replayed?
-        "This translation launch was already completed; showing its existing result."
+        t("flash_ui.workspace.replayed")
       elsif @translation_workspace.pipeline_run
-        "Automatic translation pipeline started."
+        t("flash_ui.workspace.automatic_started")
       else
-        "Translation experiment started."
+        t("flash_ui.workspace.experiment_started")
       end
       redirect_to destination, notice: notice
     else
+      @draft_needs_save = true
       render :new, status: :unprocessable_content
     end
   rescue ActionController::ParameterMissing, ActionController::BadRequest
@@ -114,12 +148,40 @@ class TranslationWorkspacesController < ApplicationController
 
   private
 
+  def load_draft(project)
+    @draft = current_user.translation_workspace_drafts.current.find_by(
+      context_key: TranslationWorkspaceDraft.context_key(project)
+    )
+  end
+
+  def restored_draft_attributes(project)
+    return unless @draft
+
+    result = TranslationWorkspaceDrafts::Restore.call(draft: @draft, user: current_user, project:)
+    unless result
+      @draft_unreadable = true
+      return
+    end
+
+    @draft_configuration_notice = result.configuration_notice
+    @draft_import_notice = result.import_notice
+    @draft_restored = true
+    result.attributes
+  end
+
+  def consume_draft(project)
+    public_id = params[:translation_workspace_draft_id]
+    version = params[:translation_workspace_draft_version]
+    return if public_id.blank? || !version.to_s.match?(/\A\d+\z/)
+
+    TranslationWorkspaceDrafts::Discard.after_launch(user: current_user,
+      public_id:, context_key: TranslationWorkspaceDraft.context_key(project), version: version.to_i)
+  end
+
   def prepare_repeat_preview(revision, historical)
     @translation_workspace.prepare_provider_work_plan_preview(revision: revision)
   rescue Ai::ContextBudget::Error
-    @repeat_configuration_notice =
-      "The historical automatic profile no longer has the model capability data required for this source. " \
-      "A manual launch has been prefilled with its currently active translation models; review or replace them before authorizing work."
+    @repeat_configuration_notice = t("workspace_ui.repeat_profile_unavailable")
     @translation_workspace.workflow_mode = "manual"
     @translation_workspace.workflow_profile_revision_id = nil
     @translation_workspace.automatic_plan_digest = nil
@@ -134,7 +196,7 @@ class TranslationWorkspacesController < ApplicationController
     end
     unless profile
       reset_paged_provider_authorization
-      @translation_workspace.errors.add(:workflow_profile_revision_id, "is not available")
+      @translation_workspace.errors.add(:workflow_profile_revision_id, t("workspace_ui.profile_unavailable"))
       return
     end
 
@@ -150,6 +212,17 @@ class TranslationWorkspacesController < ApplicationController
     @translation_workspace.errors.add(:workflow_profile_revision_id, error.message)
   end
 
+  # A page change keeps the paid-work authorization only while the restored
+  # workspace is still automatic and still produces the confirmed plan.
+  def restore_paged_provider_authorization
+    authorization = flash[:workspace_authorization]
+    return unless authorization.is_a?(Hash) && @translation_workspace.workflow_mode == "automatic"
+
+    @translation_workspace.automatic_plan_digest = authorization["automatic_plan_digest"].to_s
+    @translation_workspace.automatic_confirmation = authorization["automatic_confirmation"].to_s
+    rebuild_paged_provider_work_plan
+  end
+
   def reset_paged_provider_authorization
     @translation_workspace.automatic_confirmation = "0"
     @translation_workspace.automatic_plan_digest = nil
@@ -160,7 +233,7 @@ class TranslationWorkspacesController < ApplicationController
     {
       document_title: historical.document.title,
       source_text: historical.document.source_text,
-      experiment_name: "Repeat of #{historical.name.presence || historical.document.title}".first(150),
+      experiment_name: t("workspace_ui.repeat_of", name: historical.name.presence || historical.document.title).first(150),
       instruction_prompt: historical.instruction_prompt,
       glossary_revision_id: repeatable_glossary_revision_id(historical),
       methodology_profile_revision_id: repeatable_methodology_revision_id(historical),
@@ -270,6 +343,15 @@ class TranslationWorkspacesController < ApplicationController
       selected_limit: ExperimentReferenceRevision::MAXIMUM_REFERENCES,
       page_param: :translation_reference_page
     )
+    @terminology_summary = terminology_summary(workspace)
+  end
+
+  def terminology_summary(workspace)
+    return if workspace&.glossary_revision_id.blank?
+
+    GlossaryRevision.joins(:glossary)
+      .where(glossaries: { user_id: current_user.id }, id: workspace.glossary_revision_id)
+      .pick(:name)
   end
 
   def paginated_configuration_options(scope, selected_revision_ids:, selected_limit:, page_param:)
@@ -302,12 +384,6 @@ class TranslationWorkspacesController < ApplicationController
     1
   end
 
-  def pagination_workspace_params
-    return unless params[:translation_workspace].present?
-
-    translation_workspace_params
-  end
-
   def translation_workspace_params
     submitted = params.require(:translation_workspace)
     unless submitted.is_a?(ActionController::Parameters)
@@ -315,7 +391,7 @@ class TranslationWorkspacesController < ApplicationController
     end
     # The legacy form object exposes a virtual `user` attribute. Ignore it at
     # this boundary and always inject current_user server-side.
-    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "translation_reference_revision_ids", "user" ])
+    unexpected = submitted.keys - (SCALAR_ATTRIBUTES + [ "model_ids", "model_identifiers", "translation_reference_revision_ids", "user" ])
     raise ActionController::BadRequest, "Unexpected parameters" if unexpected.any?
 
     SCALAR_ATTRIBUTES.each do |attribute|
@@ -334,13 +410,17 @@ class TranslationWorkspacesController < ApplicationController
       raise ActionController::BadRequest, "model_ids must be a list of scalar values"
     end
 
+    model_identifiers = submitted[:model_identifiers]
+    unless model_identifiers.nil? || (model_identifiers.is_a?(Array) && model_identifiers.all? { |id| id.is_a?(String) })
+      raise ActionController::BadRequest, "model_identifiers must be a list of scalar values"
+    end
 
     reference_ids = submitted[:translation_reference_revision_ids]
     unless reference_ids.nil? || (reference_ids.is_a?(Array) && reference_ids.all? { |id| id.is_a?(String) })
       raise ActionController::BadRequest, "translation_reference_revision_ids must be a list of scalar values"
     end
 
-    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [], translation_reference_revision_ids: [])
+    submitted.permit(*SCALAR_ATTRIBUTES, model_ids: [], model_identifiers: [], translation_reference_revision_ids: [])
   end
 
   def load_source_import(id)

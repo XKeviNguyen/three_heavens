@@ -1,0 +1,43 @@
+ja:
+  terminology_sheet:
+    add_title: 用語を追加
+    add_intro: "この翻訳画面のまま、再利用できる個人用の用語集を作成できます。AIには何も送信されません。"
+    edit_title: 用語を編集
+    edit_intro: "保存すると新しい版が作られます。以前の版と、それを使った翻訳は変わりません。用語を編集してもAIには何も送信されません。"
+    glossary_name: 用語集の名前
+    glossary_placeholder: 日本語の説教用語
+    description: 説明（任意）
+    terms: 用語
+    entry_count: "%{count}/%{max}件"
+    mappings: 用語の対応
+    term: 用語
+    new_term: 新しい用語
+    source_term: 原語
+    preferred_term: 推奨訳語
+    note: メモ（任意）
+    remove: 削除
+    cancel: キャンセル
+    add_another: 用語を追加
+    add_term: 用語を追加
+    create_select: 作成して選択
+    creating: 用語集を作成中…
+    save: 用語集を保存
+    saving: 用語集を保存中…
+    revision: "第%{version}版"
+    terms_count:
+      one: "%{count}語"
+      other: "%{count}語"
+    more_terms: "ほか%{count}語"
+    edit: 編集
+    add_link_term: "+ 用語を追加"
+    add_terminology: "+ 用語を追加"
+    edit_terminology: 用語を編集
+    source: 原語
+    preferred: 推奨訳語
+    none_selected: 用語集を選択していません
+    panel_intro: "推奨する訳語をここに追加するか、保存済みの用語集を選んでください。用語を変更してもAIには何も送信されません。"
+    choose_saved: 保存済みの用語集を選択
+    no_terminology: 用語集を使わない
+    continue_without: 用語集を使わずに続けます。
+    open_library: 用語集を開く
+    glossaries: 用語集

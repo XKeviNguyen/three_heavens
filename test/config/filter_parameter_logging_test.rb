@@ -21,6 +21,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     ).filter(
       "password" => "password-value",
       "submission_token" => "opaque-launch-value",
+      "request_key" => "opaque-upload-value",
+      "creation_key" => "opaque-reference-value",
+      "editor_id" => "opaque-editor-value",
       "source_text" => "source-value",
       "extracted_text" => "extracted-value",
       "preview_text" => "preview-value",
@@ -37,6 +40,9 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
 
     assert_equal "[FILTERED]", filtered["password"]
     assert_equal "[FILTERED]", filtered["submission_token"]
+    assert_equal "[FILTERED]", filtered["request_key"]
+    assert_equal "[FILTERED]", filtered["creation_key"]
+    assert_equal "[FILTERED]", filtered["editor_id"]
     assert_equal "[FILTERED]", filtered["source_text"]
     assert_equal "[FILTERED]", filtered["extracted_text"]
     assert_equal "[FILTERED]", filtered["preview_text"]
@@ -47,5 +53,14 @@ class FilterParameterLoggingTest < ActiveSupport::TestCase
     assert_equal "[FILTERED]", filtered.dig("final_translation", "content")
     assert_equal "[FILTERED]", filtered.dig("final_translation", "change_note")
     assert_equal "operational-value", filtered.dig("unrelated", "content")
+  end
+
+  test "logs any other long value truncated and short values unchanged" do
+    filtered = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters).filter(
+      "unknown" => "x" * 5_000, "page" => "2"
+    )
+
+    assert_equal "#{"x" * 200}[TRUNCATED]", filtered["unknown"]
+    assert_equal "2", filtered["page"]
   end
 end

@@ -1,12 +1,81 @@
 module ApplicationHelper
-  NAVIGATION_SECTIONS = {
-    workspace: %w[translation_workspaces source_imports],
-    projects: %w[projects documents experiments review_rounds judge_rounds final_translations pipeline_runs],
-    history: %w[history],
-    libraries: %w[workflow_profiles glossaries methodology_profiles translation_references],
-    benchmarks: %w[benchmarks],
-    administration: %w[settings/models settings/operations]
-  }.freeze
+  INTERFACE_LOCALE_NAMES = { "en" => "English", "vi" => "Tiếng Việt", "ja" => "日本語" }.freeze
+
+  # The UA paints its default canvas and form controls in this scheme before
+  # the stylesheet loads, so a saved Dark preference never flashes light.
+  def color_scheme_for(appearance)
+    appearance.in?(%w[light dark]) ? appearance : "light dark"
+  end
+
+  # Where preference forms return after an HTML submission; only GET pages can
+  # be revisited (a re-rendered POST response has no URL to go back to).
+  def preference_return_path
+    request.fullpath if request.get? || request.head?
+  end
+
+  def appearance_labels
+    { heading: t("appearance.label") }.merge(User::APPEARANCES.to_h { |appearance| [ appearance, t("appearance.options.#{appearance}") ] })
+  end
+
+  SIDEBAR_SECTIONS = [
+    {
+      label: "Work",
+      items: [
+        { label: "New translation", path: :new_translation_workspace_path, controllers: %w[translation_workspaces source_imports workspace_terminology] },
+        { label: "Projects", path: :projects_path, controllers: %w[projects documents experiments review_rounds judge_rounds final_translations pipeline_runs] },
+        { label: "History", path: :history_path, controllers: %w[history] }
+      ]
+    },
+    {
+      label: "Library",
+      items: [
+        { label: "Terminology", path: :glossaries_path, controllers: %w[glossaries] },
+        { label: "References", path: :translation_references_path, controllers: %w[translation_references] },
+        { label: "Methodology", path: :methodology_profiles_path, controllers: %w[methodology_profiles] },
+        { label: "Workflows", path: :workflow_profiles_path, controllers: %w[workflow_profiles] }
+      ]
+    },
+    {
+      label: "Insights",
+      items: [
+        { label: "Benchmarks", path: :benchmarks_path, controllers: %w[benchmarks] }
+      ]
+    },
+    {
+      label: "Admin",
+      admin: true,
+      items: [
+        { label: "Users", path: :settings_users_path, controllers: %w[settings/users] },
+        { label: "Models", path: :settings_models_path, controllers: %w[settings/models open_router_catalog] },
+        { label: "Operations", path: :settings_operations_path, controllers: %w[settings/operations] }
+      ]
+    }
+  ].freeze
+
+  def interface_locale_names
+    INTERFACE_LOCALE_NAMES
+  end
+
+  def sidebar_sections
+    SIDEBAR_SECTIONS.select { |section| !section[:admin] || current_user&.admin? }.map do |section|
+      section.merge(label: t("navigation.sections.#{section[:label].downcase}"))
+    end
+  end
+
+  def sidebar_item_active?(item)
+    item[:controllers].include?(controller_path)
+  end
+
+  def sidebar_link(item, compact: false)
+    active = sidebar_item_active?(item)
+    classes = if compact
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+    else
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+    end
+
+    link_to t("navigation.items.#{item[:label].parameterize(separator: "_")}"), public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {})
+  end
 
   def status_badge_classes(status)
     case status.to_s
@@ -102,24 +171,32 @@ module ApplicationHelper
     end
   end
 
+  def localized_status(status)
+    t("statuses.#{status}")
+  end
+
+  def localized_guidance_label(preference)
+    t("guidance_labels.#{preference}")
+  end
+
   def experiment_next_action(experiment)
     if experiment.final_translation
-      return [ "Final translation (#{experiment.final_translation.status.humanize})", final_translation_path(experiment.final_translation) ]
+      return [ t("next_actions.final_translation", status: localized_status(experiment.final_translation.status)), final_translation_path(experiment.final_translation) ]
     end
     if experiment.pipeline_run&.status.in?(%w[running blocked ready_for_editor])
-      return [ "Pipeline progress", pipeline_run_path(experiment.pipeline_run) ]
+      return [ t("next_actions.pipeline_progress"), pipeline_run_path(experiment.pipeline_run) ]
     end
 
     judge_round = experiment.review_round&.judge_round
-    return [ judge_round.completed? ? "Judge results" : "View judge progress", judge_round_path(judge_round) ] if judge_round
-    return [ experiment.review_round.completed? ? "Continue to judging" : "View blind review", review_round_path(experiment.review_round) ] if experiment.review_round
+    return [ judge_round.completed? ? t("next_actions.judge_results") : t("next_actions.view_judge_progress"), judge_round_path(judge_round) ] if judge_round
+    return [ experiment.review_round.completed? ? t("next_actions.continue_judging") : t("next_actions.view_blind_review"), review_round_path(experiment.review_round) ] if experiment.review_round
 
-    [ experiment.completed? ? "Continue to blind review" : "View translation progress", experiment_path(experiment) ]
+    [ experiment.completed? ? t("next_actions.continue_blind_review") : t("next_actions.view_translation_progress"), experiment_path(experiment) ]
   end
 
   def safe_provider_error(_message)
     # Historical rows may contain provider bodies from before safe error storage.
-    "AI work failed. Review the error code before retrying explicitly."
+    t("results_ui.provider_failure")
   end
 
   def safe_provider_error_code(code)
@@ -127,25 +204,25 @@ module ApplicationHelper
   end
 
   def analytics_number(value, precision: 2)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     number_with_precision(value, precision: precision, strip_insignificant_zeros: true)
   end
 
   def analytics_percent(value)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     "#{analytics_number(value * 100, precision: 1)}%"
   end
 
   def analytics_money(value)
-    return "N/A" if value.nil?
+    return t("common.not_available") if value.nil?
 
     number_to_currency(value, unit: "$", precision: 10, strip_insignificant_zeros: true)
   end
 
   def analytics_duration(seconds)
-    return "N/A" if seconds.nil?
+    return t("common.not_available") if seconds.nil?
 
     if seconds < 1
       "#{analytics_number(seconds * 1_000, precision: 0)} ms"

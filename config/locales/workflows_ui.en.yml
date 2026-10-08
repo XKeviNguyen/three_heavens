@@ -1,0 +1,55 @@
+en:
+  workflows_ui:
+    title: Workflow setups · Three Heavens
+    edit_title: Edit workflow setup · Three Heavens
+    new_title: New workflow setup · Three Heavens
+    show_title: '%{name} · Workflow setup · Three Heavens'
+    configuration: Setup
+    completion_mode: When to stop
+    winner_help: Create a draft from the winning translation, then stop so you can edit it.
+    refinement_help: Also ask AI for suggestions, but never apply or finalize them.
+    select_range: Select %{minimum}–%{maximum}
+    finalizer_range: Choose none to stop at the winner draft, or 1–%{maximum} to add AI suggestions
+    role_order: '%{selection}. Models are used in the order shown.'
+    role_models: "Select %{role}"
+    role_hints:
+      translator: Models that each write their own translation.
+      reviewer: Models that give structured feedback on each candidate.
+      judge: Models that independently score and rank the reviewed candidates.
+      finalizer: Models that suggest improvements without applying them.
+    roles:
+      translator: Translators
+      reviewer: Reviewers
+      judge: Judges
+      finalizer: "Suggestion models"
+    saving: Saving workflow setup…
+    automation: Automation
+    create_revision: Save as version %{version}
+    edit_intro: Version %{version} stays unchanged, so workflows that already used it remain traceable.
+    heading: Workflow setups
+    singular: Workflow setup
+    index_intro: Your private, reusable automatic workflows. Every edit saves a new version.
+    new: New workflow setup
+    empty: No workflow setups yet
+    empty_intro: Create one to run translation, review, and judging automatically when you start a translation.
+    updated: Updated %{at}
+    revision: Version
+    mode: Mode
+    view: View
+    edit: Edit
+    duplicate: Duplicate
+    deactivate: Deactivate
+    deactivate_confirm: Deactivate this workflow setup? Workflows that already ran stay unchanged.
+    new_intro: Saving a setup never sends anything to AI. You approve the cost each time you start a translation with it.
+    create: Create workflow setup
+    active_new: Active · available for new translations
+    inactive_history: Inactive · history only
+    all: All workflow setups
+    using: 'Using workflow setups:'
+    using_intro: Choose this setup in the
+    using_confirmation: You still approve the AI cost each time you start.
+    eligible: Currently available
+    ineligible: No longer available
+    launched:
+      one: 1 automatic workflow has used this version.
+      other: '%{count} automatic workflows have used this version.'

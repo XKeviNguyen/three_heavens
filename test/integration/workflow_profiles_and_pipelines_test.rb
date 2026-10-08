@@ -9,6 +9,57 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     sign_in_as users(:normal)
   end
 
+  test "invalid profile with a catalog identifier leaves no model or provider attempt" do
+    entry = {
+      "id" => "vendor/profile-new",
+      "name" => "Vendor Profile New",
+      "context_length" => 128_000,
+      "architecture" => { "input_modalities" => [ "text" ], "output_modalities" => [ "text" ] },
+      "top_provider" => { "max_completion_tokens" => 8_192 },
+      "pricing" => { "prompt" => "0.000001", "completion" => "0.000002" },
+      "supported_parameters" => [ "max_tokens", "response_format" ]
+    }
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => [ entry ]) }
+    submitted = profile_params.merge(
+      translator_identifiers: [ entry["id"] ],
+      reviewer_ids: [],
+      judge_ids: []
+    )
+
+    assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count }, -> { WorkflowProfile.count } ] do
+      post workflow_profiles_path, params: { workflow_profile: submitted }
+    end
+    assert_response :unprocessable_content
+  ensure
+    OpenRouter::Catalog.transport = nil
+  end
+
+  test "profile rejects over-limit and forged catalog selections without model writes" do
+    entries = Array.new(Ai::UsageLimits::MAX_TRANSLATION_MODELS + 1) do |index|
+      {
+        "id" => "vendor/profile-bounded-#{index}",
+        "name" => "Vendor Profile #{index}",
+        "context_length" => 128_000,
+        "architecture" => { "input_modalities" => [ "text" ], "output_modalities" => [ "text" ] },
+        "top_provider" => { "max_completion_tokens" => 8_192 },
+        "pricing" => { "prompt" => "0.000001", "completion" => "0.000002" },
+        "supported_parameters" => [ "max_tokens", "response_format" ]
+      }
+    end
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => entries) }
+
+    [ entries.map { |entry| entry["id"] }, [ entries.first["id"], "../../forged" ] ].each do |identifiers|
+      assert_no_difference [ -> { LlmModel.count }, -> { AiProviderAttempt.count }, -> { WorkflowProfile.count } ] do
+        post workflow_profiles_path, params: {
+          workflow_profile: profile_params.merge(translator_ids: [], translator_identifiers: identifiers)
+        }
+      end
+      assert_response :unprocessable_content
+    end
+  ensure
+    OpenRouter::Catalog.transport = nil
+  end
+
   test "owner creates edits duplicates and changes lifecycle without mutating history" do
     assert_difference -> { WorkflowProfile.count }, 1 do
       post workflow_profiles_path, params: { workflow_profile: profile_params }
@@ -110,7 +161,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     )
     assert_no_automatic_records { post translation_workspace_path, params: { translation_workspace: base } }
     assert_response :unprocessable_content
-    assert_select "li", text: /confirmation.*accepted/i
+    assert_select "li", text: /Cost approval must be checked/
 
     assert_no_automatic_records do
       post translation_workspace_path, params: {
@@ -121,7 +172,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /cannot mix/
+    assert_select "li", text: /can't combine/
 
     old_revision = profile.current_revision
     WorkflowProfiles::Revise.call(
@@ -138,7 +189,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /stale/
+    assert_select "li", text: /changed after this page was opened/
 
     other = create_workflow_profile(user: users(:other))
     assert_no_automatic_records do
@@ -150,7 +201,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
       }
     end
     assert_response :unprocessable_content
-    assert_select "li", text: /not available/
+    assert_select "li", text: /no longer available/
   end
 
   test "workspace and stop parameter shapes reject tampering without a 500" do
@@ -177,7 +228,7 @@ class WorkflowProfilesAndPipelinesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", pipeline.workflow_profile_revision.name
     assert_select "h2", text: /Progress/
-    assert_select "h2", text: /Logical-run cost coverage/
+    assert_select "h2", text: /Cost from earlier records/
     assert_select "form[action='#{stop_pipeline_run_path(pipeline)}']"
 
     patch stop_pipeline_run_path(pipeline)

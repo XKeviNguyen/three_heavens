@@ -1,0 +1,72 @@
+vi:
+  pipelines_ui:
+    title: Quy trình tự động · Three Heavens
+    methodology_snapshot: "Phương pháp đã dùng"
+    started: '%{revision} · %{mode} · bắt đầu %{at}'
+    blocked_at: "Quy trình tạm dừng ở bước %{stage}"
+    blocked_generic: "Bước này cần bạn xem lại. Hãy mở trang của bước đó để biết chuyện gì đã xảy ra."
+    blocked_help: "Mở trang của bước đó để thử lại hoặc tự tiếp tục."
+    ready_editor: "Sẵn sàng để bạn biên tập"
+    ready_help: "Các bước tự động đã xong. Không đề xuất nào được áp dụng, bản nháp không bị thay đổi và chưa có gì được hoàn tất. Quyết định cuối cùng là của bạn."
+    stopped: "Đã dừng tự động hóa"
+    stopped_help: "Các kết quả đã xong được giữ lại và bạn có thể tự tiếp tục. Các yêu cầu AI đã bắt đầu vẫn sẽ chạy xong."
+    progress: Tiến độ
+    current_stage: "Bước hiện tại:"
+    plan: "Mức dùng AI đã duyệt"
+    plan_intro: "Tài liệu được xử lý thành %{segments} đoạn. Bạn đã duyệt %{slots} yêu cầu AI ban đầu và tối đa %{maximum} yêu cầu, tính cả tối đa %{attempts} lần tự động thử lại cho mỗi yêu cầu. Mọi lần thử lại sau đó đều cần bạn duyệt lại."
+    plan_role: "%{logical} mô hình × %{segments} đoạn = %{requests} yêu cầu"
+    execution_status: "Trạng thái yêu cầu AI"
+    logical_runs: "Tác vụ AI"
+    physical_slots: "Yêu cầu AI"
+    attempts_started: "Lượt thử AI đã bắt đầu, kể cả thử lại"
+    pending_running_failed: Đang chờ · đang chạy · thất bại
+    known_tokens: "Token đã dùng (đã biết)"
+    known_attempt_cost: "Chi phí đến nay (đã biết)"
+    average_latency: "Thời gian phản hồi trung bình"
+    logical_progress: "%{completed}/%{total} đã xong"
+    physical_progress: "Đã xong %{completed}/%{total} yêu cầu đã tạo"
+    token_coverage: "Tổng chưa đầy đủ; %{known}/%{total} lượt thử có báo số token."
+    cost_coverage: "Tổng chưa đầy đủ; chi phí chưa rõ không được tính là 0."
+    recent_failures: "Yêu cầu AI thất bại gần đây"
+    failure_intro: "Chỉ hiển thị mã lỗi an toàn. Lời nhắc, văn bản của bạn và phản hồi gốc từ dịch vụ AI không bao giờ được hiển thị."
+    attempt_number: "lần thử %{number}"
+    snapshots: "Mô hình quy trình này dùng"
+    logical_coverage: "Chi phí từ bản ghi cũ"
+    known_logical_total: "Tổng đã biết"
+    logical_records: "Tác vụ AI"
+    with_known_cost: Có chi phí đã biết
+    coverage_help: "Lịch sử theo yêu cầu bao gồm %{tracked}/%{total} yêu cầu. Tổng này lấy từ bản ghi theo tác vụ, có thể trùng với các tổng theo yêu cầu ở trên nên được hiển thị riêng. Chi phí chưa rõ không được tính là 0."
+    links: "Các bước trong quy trình"
+    final_translation: Bản dịch cuối
+    stop_heading: "Dừng tự động hóa"
+    stop_help: "Thao tác này dừng các bước tự động còn lại. Các yêu cầu AI đã bắt đầu vẫn sẽ chạy xong. Không có gì bị xóa và bạn có thể tự tiếp tục."
+    stop: Dừng tự động hóa
+    stop_confirm: "Dừng các bước tự động còn lại? Không thể hủy các yêu cầu AI đã bắt đầu."
+    blocked_reasons:
+      managed_ai_access_revoked: "Tài khoản này chưa được bật quyền dùng AI để dịch."
+      stage_failed: "Một số tác vụ AI thất bại. Mở trang của bước đó để thử lại."
+      configuration_unavailable: "Một mô hình mà quy trình cần cho bước tiếp theo không còn khả dụng. Hãy dừng tự động hóa và tự tiếp tục, hoặc bật lại mô hình ban đầu."
+      stage_conflict: "Bước này đã được bắt đầu theo cách khác. Hãy dừng tự động hóa và tiếp tục từ trang của bước đó."
+      reference_context_budget: "Các bản dịch tham khảo đã chọn quá dài so với giới hạn văn bản của mô hình."
+    events:
+      pipeline_started: Đã bắt đầu quy trình
+      translation_started: Đã bắt đầu dịch
+      translation_completed: Đã dịch xong
+      review_started: Đã bắt đầu nhận xét
+      review_completed: Đã nhận xét xong
+      judge_started: Đã bắt đầu chấm điểm
+      judge_completed: Đã chấm điểm xong
+      final_workspace_created: "Đã tạo bản nháp cuối"
+      refinement_started: Đã bắt đầu đề xuất chỉnh sửa
+      refinement_completed: Đã hoàn tất đề xuất chỉnh sửa
+      ready_for_editor: Sẵn sàng biên tập
+      automation_stopped: Đã dừng tự động hóa
+      configuration_blocked: "Tạm dừng vì một mô hình không khả dụng"
+      translation_blocked: "Dịch tạm dừng"
+      translation_retry_resumed: "Tiếp tục dịch sau khi thử lại"
+      review_blocked: "Nhận xét tạm dừng"
+      review_retry_resumed: "Tiếp tục nhận xét sau khi thử lại"
+      judge_blocked: "Chấm điểm tạm dừng"
+      judge_retry_resumed: "Tiếp tục chấm điểm sau khi thử lại"
+      finalization_blocked: "Đề xuất chỉnh sửa tạm dừng"
+      finalization_retry_resumed: "Tiếp tục đề xuất chỉnh sửa sau khi thử lại"

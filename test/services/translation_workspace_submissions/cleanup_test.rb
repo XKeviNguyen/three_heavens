@@ -5,10 +5,10 @@ module TranslationWorkspaceSubmissions
     test "bounded cleanup removes only expired unused identities" do
       expired = nil
       travel_to 2.days.ago do
-        expired = TranslationWorkspaceSubmission.issue!(user: users(:normal))
+        expired = claimed_submission
       end
-      fresh = TranslationWorkspaceSubmission.issue!(user: users(:normal))
-      consumed = TranslationWorkspaceSubmission.issue!(user: users(:normal))
+      fresh = claimed_submission
+      consumed = claimed_submission
       consumed.update!(status: :consumed, consumed_at: Time.current, experiment: experiments(:one))
 
       result = Cleanup.call(batch_size: 1)
@@ -18,6 +18,13 @@ module TranslationWorkspaceSubmissions
       assert TranslationWorkspaceSubmission.exists?(fresh.id)
       assert TranslationWorkspaceSubmission.exists?(consumed.id)
       assert_raises(ArgumentError) { Cleanup.call(batch_size: 0) }
+    end
+
+    private
+
+    def claimed_submission
+      token = TranslationWorkspaceSubmission.issue_token(user: users(:normal))
+      TranslationWorkspaceSubmission.claim!(user: users(:normal), token:)
     end
   end
 end

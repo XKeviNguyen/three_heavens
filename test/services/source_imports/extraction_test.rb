@@ -30,6 +30,16 @@ module SourceImports
       assert_equal "a\tb\nc", TextNormalizer.call("a\tb\u0001\nc")
     end
 
+    test "the DOCX test builder gives the same bytes for the same document whenever it runs" do
+      inputs = [ {}, { document_xml: "not valid XML" }, { entries: { "word/vbaProject.bin" => "macro" } }, { encrypted: true } ]
+      first = inputs.map { |input| Digest::SHA256.hexdigest(build_docx(**input)) }
+      travel 3.seconds
+      again = inputs.map { |input| Digest::SHA256.hexdigest(build_docx(**input)) }
+
+      assert_equal first, again
+      assert_equal inputs.size, first.uniq.size
+    end
+
     test "detects only explicit supported extensions with matching content" do
       assert_equal "txt", Detector.call(filename: "source.TXT", bytes: "text").format
       assert_equal "md", Detector.call(filename: "source.md", bytes: "# text").format
@@ -37,7 +47,7 @@ module SourceImports
       assert_equal "docx", Detector.call(filename: "source.docx", bytes: build_docx).format
 
       assert_equal "unsupported_format", assert_raises(Error) {
-        Detector.call(filename: "source.pdf", bytes: "%PDF")
+        Detector.call(filename: "source.rtf", bytes: "text")
       }.code
       assert_equal "mismatched_type", assert_raises(Error) {
         Detector.call(filename: "source.txt", bytes: build_docx)
@@ -233,6 +243,20 @@ module SourceImports
       assert bytes.start_with?("PK")
       refute_includes zip_entry_names(bytes).map(&:downcase), "word/vbaproject.bin"
       assert_equal content, TextExtractor.call(format: "docx", bytes:)
+    end
+
+    test "DOCX export drops only XML-forbidden characters and keeps every part well-formed" do
+      content = "神は愛です\u0001 Tiếng Việt\f 😀\u000B\tend\uFFFE\r\nnext\rlast\u001F"
+      bytes = DocumentExports::Docx.call(title: "Title\u0001 \u0007😀", content:)
+
+      Zip::File.open_buffer(StringIO.new(bytes)) do |archive|
+        archive.entries.each do |entry|
+          Nokogiri::XML(entry.get_input_stream.read) { |config| config.strict.nonet }
+        end
+        title = Nokogiri::XML(archive.read("docProps/core.xml")).at_xpath("//dc:title", "dc" => DocumentExports::Docx::DUBLIN_CORE)
+        assert_equal "Title 😀", title.text
+      end
+      assert_equal "神は愛です Tiếng Việt 😀\tend\nnext\nlast", TextExtractor.call(format: "docx", bytes:)
     end
 
     test "extracts deterministic numbering notes headers and footers exactly once" do

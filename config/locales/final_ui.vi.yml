@@ -1,0 +1,104 @@
+vi:
+  final_ui:
+    title: Không gian biên tập bản dịch cuối · Three Heavens
+    return_project: ← Về %{name}
+    heading: Không gian biên tập bản dịch cuối
+    seed_winner: "bắt đầu từ bản dịch thắng của"
+    finalized_at: Hoàn tất %{at}
+    refinement_running: AI vẫn đang chuẩn bị đề xuất chỉnh sửa.
+    no_auto_reload: Trang sẽ không tự tải lại để giữ nguyên nội dung bạn đang sửa.
+    refresh: "Kiểm tra đề xuất mới"
+    refresh_confirm: "Kiểm tra đề xuất mới? Nội dung chưa lưu trong trình biên tập sẽ mất."
+    related_pages: "Các bước trước"
+    reference: "Bản dịch tham khảo"
+    glossary_snapshot: "Bảng thuật ngữ đã dùng"
+    reference_examples: "Bản dịch tham khảo · đã dùng %{count}"
+    no_references: "Lượt dịch này không dùng bản dịch tham khảo."
+    evidence: "Vì sao bản dịch này thắng"
+    evidence_intro: "Kết quả nhận xét ẩn danh và chấm điểm được giữ lại để bạn tham khảo khi biên tập."
+    original_winner: "Xem bản dịch thắng ban đầu"
+    review_score: Nhận xét %{number} · điểm %{score}/10
+    judge_score: Chấm điểm %{number} · hạng %{rank} · điểm %{score}/100
+    editor: Trình biên tập bản dịch cuối
+    approved: Bản dịch cuối đã duyệt
+    current_draft: Bản nháp hiện tại
+    version: Phiên bản %{number}
+    origin_label: 'Nguồn gốc: %{origin}'
+    origins:
+      seed: "Bản dịch thắng"
+      manual: Biên tập thủ công
+      ai_applied: Áp dụng đề xuất AI
+      restored: Khôi phục
+    finalized_read_only: Đã hoàn tất · chỉ xem
+    draft_editable: Bản nháp · có thể sửa
+    persisted_for_reconciliation: "Phiên bản đã lưu để so sánh"
+    newer_version: 'Đã có bản lưu mới hơn: phiên bản %{number}'
+    conflict_intro: "Nội dung của bạn vẫn ở trình biên tập bên dưới. Hãy so sánh với phiên bản đã lưu, gộp các thay đổi rồi lưu lại."
+    persisted_version: "Phiên bản đã lưu %{number}"
+    submitted_draft: "Nội dung của bạn"
+    draft_label: Bản nháp bản dịch cuối
+    save_help: "Mỗi lần lưu tạo một phiên bản mới; các phiên bản cũ vẫn được giữ. Sau khi lưu, các đề xuất AI cho phiên bản hiện tại sẽ không áp dụng được nữa."
+    change_note_optional: Ghi chú thay đổi (không bắt buộc)
+    change_note_placeholder: "Mô tả ngắn gọn bạn đã thay đổi gì"
+    save_revision: Lưu phiên bản
+    save_immutable: "Khi lưu, hệ thống tạo phiên bản mới. Các phiên bản cũ không thay đổi."
+    download_txt: Tải TXT
+    download_docx: Tải DOCX
+    proposals: Đề xuất chỉnh sửa của AI
+    proposals_intro: "Mỗi mô hình đề xuất cách cải thiện phiên bản hiện tại. Bản nháp không đổi cho đến khi bạn tự áp dụng một đề xuất."
+    segment_cost: "Tài liệu được xử lý thành %{count} đoạn, nên mỗi mô hình bạn chọn sẽ gửi %{count} yêu cầu AI. Việc tự động thử lại có thể thêm vài yêu cầu."
+    alignment_unavailable: "Không thể dùng đề xuất AI cho bản nháp này vì nó đã được sửa tay và không còn khớp với các đoạn của văn bản nguồn. Bạn vẫn có thể tự sửa và hoàn tất."
+    active_finalizers: "Mô hình có sẵn (chọn tối đa %{maximum})"
+    no_finalizers: "Chưa có mô hình đề xuất nào."
+    start_refinement: Bắt đầu tạo đề xuất
+    start_refinement_confirm: "Nhờ các mô hình đã chọn đề xuất chỉnh sửa? Thao tác này gửi yêu cầu AI và có thể phát sinh chi phí. Đề xuất không bao giờ được tự áp dụng."
+    starting_refinement: Đang bắt đầu tạo đề xuất…
+    no_proposals: "Chưa có đề xuất chỉnh sửa. Bạn vẫn có thể lưu và hoàn tất bản nháp mà không dùng AI."
+    round: "Đề xuất cho phiên bản %{version}"
+    retry_intro: "Có %{count} đề xuất thất bại. Các đề xuất đã xong vẫn giữ nguyên. Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+    retry: Thử lại đề xuất thất bại
+    retry_confirm: "Chỉ thử lại các đề xuất thất bại? Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+    retry_old_version: "Các đề xuất này dành cho phiên bản cũ nên không thể thử lại."
+    retry_unavailable: Không thể thử lại khi bản dịch đã hoàn tất hoặc mô hình cũ đã ngừng hoạt động hay không còn hỗ trợ.
+    exact_base: "Dựa trên phiên bản"
+    already_applied: Đã áp dụng
+    stale_proposal: "Đã lỗi thời"
+    applicable_proposal: Có thể áp dụng
+    segmented_progress: "Tiến độ theo đoạn"
+    proposed_translation: Bản dịch đề xuất
+    change_summary: Tóm tắt thay đổi
+    terminology_notes: Ghi chú thuật ngữ
+    warnings: Lưu ý
+    none_reported: Không có nội dung được báo cáo.
+    apply_proposal: Áp dụng đề xuất
+    apply_confirm: "Áp dụng đề xuất này thành phiên bản mới? Phiên bản hiện tại vẫn nằm trong lịch sử."
+    applying: Đang áp dụng đề xuất…
+    applied_as: Đã áp dụng thành %{versions}.
+    stale_help: "Đề xuất này dành cho một phiên bản cũ của bản nháp nên không thể áp dụng."
+    reopen_before_apply: Mở lại bản dịch trước khi áp dụng đề xuất này.
+    refinement_failed: Tạo đề xuất thất bại
+    proposal_running: Mô hình đang chuẩn bị đề xuất.
+    proposal_queued: "Đang chờ bắt đầu."
+    rounds: Các vòng đề xuất
+    history_intro: "Các phiên bản cũ không bao giờ thay đổi. Khôi phục một bản sẽ tạo phiên bản mới."
+    version_origin: Phiên bản %{number} · %{origin}
+    current_version: Phiên bản hiện tại
+    change_note: Ghi chú thay đổi
+    none: Không có
+    ai_source: "Mô hình đề xuất"
+    restore: Khôi phục thành phiên bản mới
+    restore_confirm: "Khôi phục phiên bản %{number} thành phiên bản hiện tại mới? Không có gì bị xóa."
+    restoring: Đang khôi phục…
+    view_history: "Xem phiên bản này"
+    versions: Các phiên bản
+    approve_heading: Duyệt bản dịch cuối
+    approve_intro: Hoàn tất sẽ đánh dấu bản hiện tại là bản dịch cuối đã duyệt và chuyển sang chỉ xem. Bạn có thể mở lại để sửa mà không mất lịch sử.
+    finalize: Hoàn tất bản hiện tại
+    finalize_confirm: Hoàn tất phiên bản %{number} thành bản dịch cuối đã duyệt? Việc sửa và tạo đề xuất sẽ bị tắt cho đến khi bạn mở lại.
+    finalizing: Đang hoàn tất…
+    finalized_heading: Bản dịch đã hoàn tất
+    finalized_intro: Phiên bản %{number} là bản dịch cuối đã duyệt. Chỉ mở lại nếu cần sửa hoặc tạo thêm đề xuất.
+    reopen: Mở lại để sửa
+    reopen_confirm: Mở lại bản dịch đã duyệt để sửa? Tệp tải xuống sẽ mang nhãn bản nháp cho đến khi bạn hoàn tất lại.
+    reopening: Đang mở lại…
+    version_inline: phiên bản %{number}

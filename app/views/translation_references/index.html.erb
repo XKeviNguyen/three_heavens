@@ -1,29 +1,29 @@
-<% content_for :title, "Translation references · Three Heavens" %>
+<% content_for :title, t("references_ui.title") %>
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Translation Reference Library</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">References</h1>
-      <p class="mt-2 max-w-3xl text-slate-600">References are examples of translations you already approve. They help AI follow your established wording and style.</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("references_ui.library") %></p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("references_ui.heading") %></h1>
+      <p class="mt-2 max-w-3xl text-slate-600"><%= t("references_ui.intro") %></p>
     </div>
-    <%= link_to "New reference", new_translation_reference_path, class: "w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+    <%= link_to t("references_ui.new"), new_translation_reference_path, class: "w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
   </header>
 
   <% if @translation_references.empty? %>
-    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm"><h2 class="font-semibold text-slate-950">No translation references yet</h2><p class="mt-2 text-sm text-slate-600">Add an approved bilingual example, then select it in the translation workspace.</p><%= link_to "Create a reference", new_translation_reference_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white" %></section>
+    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm"><h2 class="font-semibold text-slate-950"><%= t("references_ui.empty") %></h2><p class="mt-2 text-sm text-slate-600"><%= t("references_ui.empty_intro") %></p><%= link_to t("references_ui.create"), new_translation_reference_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white" %></section>
   <% else %>
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead class="bg-slate-50 text-slate-600"><tr><th scope="col" class="px-5 py-3">Title</th><th scope="col" class="px-5 py-3">Languages</th><th scope="col" class="px-5 py-3">Revision</th><th scope="col" class="px-5 py-3">Status</th><th scope="col" class="px-5 py-3">Updated</th></tr></thead>
+          <thead class="bg-slate-50 text-slate-600"><tr><th scope="col" class="px-5 py-3"><%= t("references_ui.field_title") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.languages") %></th><th scope="col" class="px-5 py-3"><%= t("workflows_ui.revision") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.status") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.updated") %></th></tr></thead>
           <tbody class="divide-y divide-slate-100">
             <% @translation_references.each do |reference| %>
-              <tr><th scope="row" class="px-5 py-4 font-semibold"><%= link_to reference.title, reference, class: "text-blue-700 hover:text-blue-900" %></th><td class="px-5 py-4"><%= reference.source_language %> → <%= reference.target_language %></td><td class="px-5 py-4"><%= reference.current_revision.version %></td><td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold <%= status_badge_classes(reference.active? ? :active : :archived) %>"><%= reference.active? ? "Active" : "Archived" %></span></td><td class="whitespace-nowrap px-5 py-4"><%= l reference.updated_at, format: :long %></td></tr>
+              <tr><th scope="row" class="px-5 py-4 font-semibold"><%= link_to reference.title, reference, class: "text-blue-700 hover:text-blue-900" %></th><td class="px-5 py-4"><%= reference.source_language %> → <%= reference.target_language %></td><td class="px-5 py-4"><%= reference.current_revision.version %></td><td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold <%= status_badge_classes(reference.active? ? :active : :archived) %>"><%= localized_status(reference.active? ? :active : :archived) %></span></td><td class="whitespace-nowrap px-5 py-4"><%= l reference.updated_at, format: :long %></td></tr>
             <% end %>
           </tbody>
         </table>
       </div>
     </section>
-    <%= render "shared/pagination", pagination: @pagination, label: "Translation references" %>
+    <%= render "shared/pagination", pagination: @pagination, label: t("references_ui.heading") %>
   <% end %>
 </div>

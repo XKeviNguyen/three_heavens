@@ -19,6 +19,7 @@ module Operations
                      bundle_verifier: BundleVerifier,
                      database_target_factory: ->(**arguments) { DatabaseTarget.new(**arguments) },
                      integrity_auditor: IntegrityAudit,
+                     legacy_schema_upgrader: LegacyDigestFunctions,
                      live_database_url: ENV["DATABASE_URL"], clock: -> { Time.current })
         @bundle_path = bundle_path
         @database_url = database_url.to_s
@@ -27,6 +28,7 @@ module Operations
         @bundle_verifier = bundle_verifier
         @database_target_factory = database_target_factory
         @integrity_auditor = integrity_auditor
+        @legacy_schema_upgrader = legacy_schema_upgrader
         @live_database_url = live_database_url
         @clock = clock
       end
@@ -78,7 +80,7 @@ module Operations
 
       attr_reader :bundle_path, :bundle_verifier, :clock, :command_runner,
                   :database_target_factory, :database_url, :integrity_auditor,
-                  :live_database_url, :storage_path
+                  :legacy_schema_upgrader, :live_database_url, :storage_path
 
       def verify_dump_catalog!(bundle)
         command_runner.call(
@@ -96,13 +98,23 @@ module Operations
         raise RestoreFailed, error.message
       end
 
+      # The schema is restored before the data so that bundles predating the
+      # restore-safe digest functions can be corrected before COPY evaluates
+      # their CHECK constraints (see LegacyDigestFunctions).
       def restore_database!(bundle)
         database_environment = PostgresConnectionEnvironment.from_url(database_url)
+        restore_section!(bundle, database_environment, "pre-data")
+        legacy_schema_upgrader.call(database_url)
+        restore_section!(bundle, database_environment, "data")
+        restore_section!(bundle, database_environment, "post-data")
+      end
+
+      def restore_section!(bundle, database_environment, section)
         command_runner.call(
           environment: database_environment,
           arguments: [
             "pg_restore", "--exit-on-error", "--no-owner", "--no-privileges",
-            "--dbname=#{database_environment.fetch("PGDATABASE")}",
+            "--dbname=#{database_environment.fetch("PGDATABASE")}", "--section=#{section}",
             bundle.path.join(Operations::Backup::Manifest::DATABASE_FILENAME).to_s
           ]
         )

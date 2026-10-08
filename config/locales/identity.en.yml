@@ -1,0 +1,41 @@
+en:
+  google_identity:
+    or: or
+    button_unavailable: Google sign-in is unavailable right now. You can still use your email and password.
+    button_expired: This page has been open for a long time. Reload it to continue with Google.
+    messages:
+      link_failed: Google could not be connected. Please try again.
+      failed: Google sign-in could not be completed. Please try again.
+      unavailable: Google sign-in is temporarily unavailable. Try again later or use your email and password.
+      rate_limited: Too many sign-in attempts. Wait three minutes, then try again.
+      email_taken: An account already exists for this email. Sign in first, then connect Google.
+      confirmation_required: Confirm your email before signing in.
+      email_not_authoritative: Google can't confirm this email address for a new account. Create an account with your email and password, then connect Google from Account.
+  appearance:
+    label: Appearance
+    options:
+      system: System
+      light: Light
+      dark: Dark
+  account:
+    title: Account
+    description: How you sign in to Three Heavens.
+    password:
+      set: Set
+      not_set: Not set. This account signs in with Google.
+    google:
+      status_connected: Connected. You can sign in with Google.
+      status_not_connected: Not connected.
+      connect_hint: Continue with the Google account you want to connect.
+      confirm_prompt: Connect the Google account %{email} to this Three Heavens account?
+      confirm: Connect Google
+      cancel: Cancel
+      disconnect: Disconnect
+      connected: Google is connected.
+      disconnected: Google was disconnected.
+      not_configured: Google sign-in is not available on this server.
+      errors:
+        expired: The Google confirmation expired. Connect Google again.
+        taken: This Google account is already connected to another account.
+        other_connected: A different Google account is already connected. Disconnect it first.
+        only_sign_in_method: Google is the only way to sign in to this account, so it can't be disconnected.

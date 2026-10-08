@@ -1,0 +1,46 @@
+en:
+  admin_models:
+    title: Model catalog · Three Heavens
+    edit_title: Edit %{name} · Three Heavens
+    new_title: Add model · Three Heavens
+    provider_help: Catalog metadata only; do not enter a key or credential.
+    identifier_locked: Locked because this model has historical translation, review, or judge usage.
+    identifier_help: Use the OpenRouter catalog ID. It can't be changed after the model has been used.
+    context_help: Needed for long documents. Leave blank only if the model will be used for short documents.
+    output_help: This must be large enough for the longest answer each step needs; otherwise AI requests are refused before they are sent.
+    context_window: Context window (tokens)
+    maximum_output: Maximum output (tokens)
+    add_active: Add active model
+    save_metadata: Save metadata
+    saving: Saving model…
+    breadcrumb: Settings / Models
+    edit_heading: Edit model metadata
+    gateway: 'Gateway:'
+    edit_intro: Use the catalog list’s explicit action to change active state.
+    settings: Settings
+    heading: OpenRouter model catalog
+    intro: Manage the catalog used by translation, review, judging, and finalization workflows. Provider API keys remain environment-only and are never managed here.
+    add: Add model
+    deactivation_help: Models are never deleted from this area. Deactivation removes a model from future active selectors while preserving all translation, review, judge, finalization, and benchmark history.
+    search: Search OpenRouter
+    search_intro: Find a compatible text model and add it with details from the catalog. Searching is free and sends no paid AI request.
+    browse: Browse OpenRouter
+    browse_help: Search the live OpenRouter catalog and add a model with canonical metadata.
+    add_and_activate: Add and activate model
+    empty: No OpenRouter models configured
+    empty_intro: Add the first catalog model to make it available to future workflows.
+    model: Model
+    provider_gateway: Provider / gateway
+    usage: Usage
+    actions: Actions
+    capability: '%{context} context · %{output} max output tokens'
+    capability_missing: Context capability not configured
+    translations: 'Translations:'
+    reviews: 'Reviews as reviewer:'
+    judgments: 'Judgments as judge:'
+    finalizations: 'Finalizations as finalizer:'
+    wins: 'Official wins:'
+    benchmark: Benchmark
+    deactivate_confirm: Deactivate %{name}? Existing history will be preserved.
+    new_heading: Add OpenRouter model
+    new_intro: New models are activated immediately. Gateway and active state are controlled by the server; API keys remain environment-only.

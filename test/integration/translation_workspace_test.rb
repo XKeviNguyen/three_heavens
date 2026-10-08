@@ -37,7 +37,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     @second_model = llm_models(:openrouter_gpt)
   end
 
-  test "workspace is the application root and lists only active OpenRouter models" do
+  test "workspace is the application root and uses the trusted OpenRouter catalog browser" do
     inactive_model = LlmModel.create!(
       gateway: "openrouter",
       provider: "anthropic",
@@ -53,13 +53,14 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
       active: true
     )
 
-    get root_path
+    get new_translation_workspace_path
 
     assert_response :success
-    assert_select "h1", "Start a translation experiment"
+    assert_select "h1", "New translation"
     assert_select "form[action='#{translation_workspace_path}']"
-    assert_select "input[type='checkbox'][value='#{@first_model.id}']"
-    assert_select "input[type='checkbox'][value='#{@second_model.id}']"
+    assert_select "[data-controller='model-browser'][data-model-browser-endpoint-value='#{open_router_catalog_path}']"
+    assert_select "input[type='checkbox'][value='#{@first_model.id}']", count: 0
+    assert_select "input[type='checkbox'][value='#{@second_model.id}']", count: 0
     assert_select "input[type='checkbox'][value='#{inactive_model.id}']", count: 0
     assert_select "input[type='checkbox'][value='#{other_gateway_model.id}']", count: 0
   end
@@ -163,8 +164,27 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_select "li", text: /Model.*Select at least one valid translation model/i
+    assert_select "li", text: /AI models must include at least one available model/
     assert_select "input[name='translation_workspace[project_name]'][value='Vietnamese Sermons']"
+  end
+
+  test "workspace validation errors are written in the interface language" do
+    {
+      "ja" => [ "プロジェクト名を入力してください", "AIモデルを1つ以上選んでください" ],
+      "vi" => [ "Tên dự án không được để trống", "Mô hình AI cần có ít nhất một mô hình khả dụng" ]
+    }.each do |locale, messages|
+      users(:normal).update!(locale: locale)
+
+      assert_no_workspace_records_created do
+        post translation_workspace_path,
+             params: { translation_workspace: valid_attributes.merge(project_name: "", model_ids: []) }
+      end
+
+      assert_response :unprocessable_content
+      section = css_select("section[aria-labelledby='form-errors-heading']").first
+      messages.each { |message| assert_includes section.text, message, locale }
+      assert_no_match(/must include|can't be blank|model_ids|revision/i, section.text, locale)
+    end
   end
 
   test "workspace validation errors link to the section that needs correction" do
@@ -186,9 +206,9 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby='form-errors-heading']" do
       assert_select "a[href='#workspace-project']", text: /Project name.*blank/
       assert_select "a[href='#workspace-source']", text: /Source text.*blank/
-      assert_select "a[href='#workspace-manual-models']", text: /Select at least one valid translation model/i
-      assert_select "a[href='#workspace-glossary']", text: /Glossary revision.*not available/
-      assert_select "a[href='#workspace-references']", text: /unavailable reference/
+      assert_select "a[href='#workspace-manual-models']", text: /AI models must include at least one available model/
+      assert_select "a[href='#workspace-glossary']", text: /Glossary is no longer available/
+      assert_select "a[href='#workspace-references']", text: /reference that is no longer available/
     end
 
     assert_select "section#workspace-project"
@@ -245,7 +265,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
       end
 
       assert_response :unprocessable_content
-      assert_select "li", text: /Model.*invalid|Model.*inactive or unsupported/
+      assert_select "li", text: /AI models (is invalid|include a model that is no longer available)/
     end
   end
 
@@ -269,8 +289,8 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "li", minimum: 7
     assert_select "li", text: /Project name.*blank/
     assert_select "li", text: /Source text.*blank/
-    assert_select "li", text: /Experiment name.*too long/
-    assert_select "li", text: /Instruction prompt.*blank/
+    assert_select "li", text: /Translation name.*too long/
+    assert_select "li", text: /Instructions.*blank/
   end
 
   test "an orchestration failure rolls back every workspace record" do
@@ -289,10 +309,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     end
 
     assert_includes workspace.errors[:base].join, "could not be started"
-    submission = TranslationWorkspaceSubmission.find_owned_by_token!(
-      user: users(:normal),
-      token: workspace.submission_token
-    )
+    submission = translation_workspace_submission_for(workspace.submission_token)
     assert submission.available?
 
     retry_workspace = TranslationWorkspace.new(valid_attributes.merge(submission_token: workspace.submission_token))
@@ -354,7 +371,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "meta[http-equiv='refresh'][content='5']", count: 1
     assert_select "[role='status']", text: /refreshes automatically every 5 seconds/
     assert_select "article", minimum: 1
-    assert_select "article", text: /queued and waiting to start/
+    assert_select "article", text: /Waiting to start/
   end
 
   test "completed experiment page renders results model identifiers and telemetry" do
@@ -379,8 +396,8 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "article", text: /#{Regexp.escape(run.llm_model.model_identifier)}/
     assert_select "article", text: /openai\/gpt-resolved/
     assert_select "article", text: /Translated result.*Second line/m
-    assert_select "article", text: /Prompt tokens.*120/m
-    assert_select "article", text: /Completion tokens.*45/m
+    assert_select "article", text: /Input tokens.*120/m
+    assert_select "article", text: /Output tokens.*45/m
     assert_select "article", text: /Total tokens.*165/m
     assert_select "article", text: /Cost.*\$0\.0012345678/m
   end
@@ -401,7 +418,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_select "meta[http-equiv='refresh']", count: 0
     assert_select "article", text: /Translation failed/
     assert_select "article", text: /provider_failure/
-    assert_includes response.body, "AI work failed."
+    assert_includes response.body, "The AI request failed."
     assert_not_includes response.body, "PRIVATE_PROVIDER_ERROR_CODE"
     assert_not_includes response.body, "&lt;script&gt;alert"
     assert_not_includes response.body, "provider-secret"

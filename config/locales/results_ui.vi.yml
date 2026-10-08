@@ -1,0 +1,109 @@
+vi:
+  results_ui:
+    back_project: Về dự án
+    back_project_arrow: ← Về dự án
+    back_review: Về phần nhận xét ẩn danh
+    back_translation: "Về các bản dịch ứng viên"
+    candidate_translation: Bản dịch ứng viên
+    corrections: Đề xuất chỉnh sửa
+    error_code: Mã lỗi
+    glossary: 'Bảng thuật ngữ:'
+    human_mapping: "Do mô hình này viết (AI không được biết)"
+    issues: Vấn đề
+    original_file: Tệp nguồn gốc
+    overall: tổng thể
+    pasted_source: "Văn bản đã dán · nội dung bên dưới là bản nguồn đã được dịch"
+    provider_requests_complete: "đoạn đã xong."
+    queueing_retries: "Đang bắt đầu thử lại…"
+    rationale: Lý do
+    requested_model: Mô hình đã chọn
+    resolved_model: Mô hình thực tế
+    risks: Rủi ro
+    segmented: Xử lý theo đoạn
+    source_document: Tài liệu nguồn
+    strengths: Điểm mạnh
+    suggested_translation: Bản dịch cải thiện được đề xuất
+    translation_instruction: Hướng dẫn dịch
+    uploaded_file: Tệp đã tải lên
+    view_pipeline: "Xem tiến độ quy trình tự động"
+    telemetry:
+      prompt_tokens: Token đầu vào
+      completion_tokens: Token đầu ra
+      total_tokens: Tổng token
+      cost: Chi phí
+    translation:
+      title: "Bản dịch ứng viên · Three Heavens"
+      heading: "Bản dịch ứng viên"
+      running: Các bản dịch vẫn đang được xử lý. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại bản dịch thất bại
+      retry_intro: "Có %{count} bản dịch thất bại. Thử lại chỉ làm lại phần thất bại; các bản đã xong và mô hình đã chọn vẫn giữ nguyên. Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry: Thử lại bản dịch thất bại
+      retry_confirm: "Chỉ thử lại các bản dịch thất bại? Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry_unavailable: Không thể thử lại vì một mô hình từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      model_runs: "Kết quả theo mô hình"
+      failed: Dịch thất bại
+      run_running: Mô hình đang dịch tài liệu này.
+      run_pending: "Đang chờ bắt đầu."
+      review_exists: "Lượt dịch này đã có phần nhận xét ẩn danh."
+      view_review: Xem nhận xét ẩn danh
+      start_review: "Bắt đầu nhận xét ẩn danh"
+      review_intro: "Chọn 1–%{maximum} mô hình nhận xét. Mỗi mô hình nhận văn bản nguồn, hướng dẫn của bạn, tiêu chí chấm và các bản dịch dưới nhãn ẩn danh. Mô hình nhận xét không bao giờ biết mô hình nào đã viết bản nào."
+      segment_cost: "Tài liệu được xử lý thành %{count} đoạn, nên mỗi mô hình nhận xét bạn chọn sẽ gửi %{count} yêu cầu AI. Việc tự động thử lại có thể thêm vài yêu cầu."
+      active_reviewers: "Mô hình nhận xét có sẵn"
+      no_reviewers: "Chưa có mô hình nhận xét nào."
+      start_review_button: Bắt đầu nhận xét ẩn danh
+      start_review_confirm: "Bắt đầu nhận xét ẩn danh với các mô hình đã chọn? Thao tác này gửi yêu cầu AI và có thể phát sinh chi phí."
+      starting_review: Đang bắt đầu nhận xét…
+    review:
+      title: Nhận xét ẩn danh · Three Heavens
+      heading: "Nhận xét ẩn danh"
+      running: Các mô hình vẫn đang nhận xét bản dịch. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại lượt nhận xét thất bại
+      retry_intro: "Có %{count} lượt nhận xét thất bại. Thử lại chỉ làm lại phần thất bại; các nhận xét đã xong và nhãn ẩn danh vẫn giữ nguyên. Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry: Thử lại nhận xét thất bại
+      retry_confirm: "Chỉ thử lại các lượt nhận xét thất bại? Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry_unavailable: Không thể thử lại vì một mô hình nhận xét từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      runs: Lượt nhận xét
+      reviewer: Mô hình nhận xét
+      failed: Nhận xét thất bại
+      run_running: Mô hình đang nhận xét các ứng viên ẩn danh.
+      run_pending: "Đang chờ bắt đầu."
+      faithfulness: Độ trung thành
+      naturalness: Độ tự nhiên
+      terminology: Thuật ngữ
+      instruction_adherence: Tuân thủ hướng dẫn
+      judge_exists: "Phần nhận xét ẩn danh này đã được chấm điểm."
+      view_judge: Xem kết quả chấm điểm
+      start_judge: Bắt đầu chấm điểm
+      judge_intro: "Chọn 1–%{maximum} mô hình chấm điểm. Mô hình chấm điểm nhận các bản dịch và nhận xét dưới nhãn ẩn danh, không bao giờ biết tên mô hình đã viết hay nhận xét."
+      segment_cost: "Tài liệu được xử lý thành %{count} đoạn, nên mỗi mô hình chấm điểm bạn chọn sẽ gửi %{count} yêu cầu AI. Việc tự động thử lại có thể thêm vài yêu cầu."
+      active_judges: "Mô hình chấm điểm có sẵn"
+      no_judges: "Chưa có mô hình chấm điểm nào."
+      start_judge_button: Bắt đầu chấm điểm
+      start_judge_confirm: "Bắt đầu chấm điểm với các mô hình đã chọn? Thao tác này gửi yêu cầu AI và có thể phát sinh chi phí."
+      starting_judge: Đang bắt đầu chấm điểm…
+    judge:
+      title: Chấm điểm · Three Heavens
+      heading: Chấm điểm
+      running: Các mô hình đang chấm điểm bản dịch. Trang tự cập nhật sau mỗi 5 giây.
+      recover: Thử lại lượt chấm điểm thất bại
+      retry_intro: "Có %{count} lượt chấm điểm thất bại. Thử lại chỉ làm lại phần thất bại; kết quả đã xong và nhãn ẩn danh vẫn giữ nguyên. Bản thắng chỉ được chọn khi mọi mô hình chấm xong. Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry: Thử lại chấm điểm thất bại
+      retry_confirm: "Chỉ thử lại các lượt chấm điểm thất bại? Mỗi yêu cầu thất bại có thể được thử thêm tối đa %{attempts} lần và có thể phát sinh chi phí."
+      retry_unavailable: Không thể thử lại vì một mô hình chấm điểm từng dùng đã ngừng hoạt động hoặc không còn được hỗ trợ.
+      winner: "Bản dịch thắng"
+      open_editor: "Mở bản dịch cuối"
+      create_editor: "Biên tập bản dịch thắng"
+      opening_editor: Đang mở trình biên tập…
+      ranking: "%{points} điểm xếp hạng · điểm trung bình %{score}/100 · %{count} mô hình chấm"
+      aggregation_explanation: "Mỗi mô hình chấm điểm xếp hạng tất cả bản dịch. Hạng càng cao thì càng được nhiều điểm xếp hạng; bản có nhiều điểm nhất sẽ thắng, nếu hòa thì bản có điểm trung bình cao hơn thắng."
+      no_winner: "Chưa có bản thắng"
+      no_winner_intro: "Ít nhất một lượt chấm điểm thất bại nên chưa chọn được bản thắng. Các kết quả thành công vẫn được giữ bên dưới."
+      runs: Lượt chấm điểm
+      judge: Mô hình chấm điểm
+      failed: Chấm điểm thất bại
+      run_running: Mô hình đang xếp hạng các ứng viên ẩn danh.
+      run_pending: "Đang chờ bắt đầu."
+      judge_winner: "Lựa chọn của mô hình này"
+      confidence: Độ tin cậy
+    provider_failure: "Yêu cầu AI thất bại. Hãy xem mã lỗi rồi thử lại nếu muốn."

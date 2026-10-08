@@ -3,7 +3,8 @@ module SourceImports
     module_function
 
     def safe_original(value, fallback: "source")
-      basename = File.basename(value.to_s.tr("\\", "/"))
+      # File.basename raises on NUL, which a multipart filename can carry.
+      basename = File.basename(value.to_s.delete("\0").tr("\\", "/"))
       sanitized = ActiveStorage::Filename.new(basename).sanitized
       sanitized = sanitized.delete("\r\n\0").strip
       truncate_preserving_extension(sanitized.presence || fallback)

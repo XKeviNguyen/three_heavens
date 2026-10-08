@@ -1,0 +1,67 @@
+en:
+  activemodel:
+    attributes:
+      translation_workspace:
+        project_name: Project name
+        project_id: Project
+        source_language: Source language
+        target_language: Target language
+        document_title: Document title
+        source_text: Source text
+        source_import_id: Uploaded file
+        source_import_project_token: Uploaded file
+        experiment_name: Translation name
+        instruction_prompt: Instructions
+        model_ids: AI models
+        model_identifiers: AI models
+        workflow_mode: AI workflow
+        workflow_profile_revision_id: Saved workflow
+        glossary_revision_id: Glossary
+        methodology_profile_revision_id: Methodology
+        translation_reference_revision_ids: References
+        guidance_preference: Guidance priority
+        automatic_confirmation: Cost approval
+        submission_token: This form
+    errors:
+      models:
+        translation_workspace:
+          too_many_submissions: Too many translations were started in a short time. Wait a moment, then try again.
+          start_failed: The translation could not be started. Review the form and try again.
+          references_too_long: The selected references are too long for a chosen model's text limit. Remove a reference or choose a model that accepts longer text.
+          unavailable: is no longer available
+          mixed_settings: can't combine manual model choices with automatic workflow settings
+          models_required: must include at least one available model
+          too_many_models: are limited to %{count}
+          duplicate_models: can't include the same model twice
+          model_unavailable: include a model that is no longer available
+          stale_selection: changed after this page was opened. Choose the latest version and try again.
+          inactive_workflow: is no longer active
+          confirmation_required: must be checked each time you start a translation
+          workflow_models_unavailable: uses a model that is no longer available
+          language_mismatch: must use this project's source and target languages
+          too_many_references: are limited to %{count}
+          duplicate_references: can't include the same reference twice
+          reference_unavailable: include a reference that is no longer available
+          expired: This form has expired. Reload the page and try again.
+          attributes:
+            source_import_id:
+              format: "%{message}"
+            submission_token:
+              format: "%{message}"
+  activerecord:
+    attributes:
+      user:
+        email: Email
+        password: Password
+        password_confirmation: Password confirmation
+        locale: Interface language
+  errors:
+    format: "%{attribute} %{message}"
+    messages:
+      blank: can't be blank
+      too_short: "is too short (minimum is %{count} characters)"
+      too_long: "is too long (maximum is %{count} characters)"
+      confirmation: doesn't match %{attribute}
+      taken: has already been taken
+      invalid: is invalid
+      inclusion: is not included in the list

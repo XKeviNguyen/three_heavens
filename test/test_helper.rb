@@ -3,6 +3,7 @@ require "digest"
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require_relative "support/network_guard"
 
 module ActiveSupport
   class TestCase
@@ -35,8 +36,19 @@ module AuthenticationTestHelper
     delete session_path
   end
 
+  # The account the integration session's cookie authenticates as, via its
+  # server-side session row.
+  def signed_in_user_id
+    Session.find_by(id: session[:authentication_session_id])&.user_id
+  end
+
   def issue_translation_workspace_token(user: users(:normal), at: Time.current)
-    TranslationWorkspaceSubmission.issue!(user: user, at: at).public_token
+    TranslationWorkspaceSubmission.issue_token(user: user, at: at)
+  end
+
+  # Looks up the launch row without creating it (claim! would create it).
+  def translation_workspace_submission_for(token, user: users(:normal))
+    user.translation_workspace_submissions.find_by!(token_digest: Digest::SHA256.hexdigest(token))
   end
 
   private
@@ -57,3 +69,6 @@ module AuthenticationTestHelper
 end
 
 ActionDispatch::IntegrationTest.include(AuthenticationTestHelper)
+# Each example starts with independent login throttle windows; the per-account
+# budget would otherwise carry over between examples signing in as a fixture.
+ActionDispatch::IntegrationTest.setup { ActionController::Base.cache_store.clear }

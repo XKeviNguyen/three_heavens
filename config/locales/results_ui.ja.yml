@@ -1,0 +1,109 @@
+ja:
+  results_ui:
+    back_project: プロジェクトに戻る
+    back_project_arrow: ← プロジェクトに戻る
+    back_review: ブラインドレビューに戻る
+    back_translation: "翻訳候補に戻る"
+    candidate_translation: 翻訳候補
+    corrections: 修正の提案
+    error_code: エラーコード
+    glossary: 用語集：
+    human_mapping: "作成したモデル（AIには非公開）"
+    issues: 問題点
+    original_file: 元の原文ファイル
+    overall: 総合
+    pasted_source: "貼り付けたテキスト · 以下の原文を翻訳しました"
+    provider_requests_complete: "部分が完了しました。"
+    queueing_retries: "再試行を開始中…"
+    rationale: 理由
+    requested_model: 指定したモデル
+    resolved_model: 実際に使用されたモデル
+    risks: 懸念点
+    segmented: 分割処理
+    source_document: 原文資料
+    strengths: 良い点
+    suggested_translation: 改善案の訳文
+    translation_instruction: 翻訳指示
+    uploaded_file: アップロード済みファイル
+    view_pipeline: "自動ワークフローの進行状況を見る"
+    telemetry:
+      prompt_tokens: 入力トークン
+      completion_tokens: 出力トークン
+      total_tokens: 合計トークン
+      cost: 費用
+    translation:
+      title: "翻訳候補 · Three Heavens"
+      heading: "翻訳候補"
+      running: 翻訳を処理中です。このページは5秒ごとに自動更新されます。
+      recover: 失敗した翻訳を再試行
+      retry_intro: "%{count}件の翻訳に失敗しました。再試行では失敗した部分だけをやり直し、完了済みの訳文と選んだモデルは変わりません。失敗したリクエストごとに最大%{attempts}回まで再試行するため、追加費用が発生する場合があります。"
+      retry: 失敗した翻訳を再試行
+      retry_confirm: "失敗した翻訳だけを再試行しますか？失敗したリクエストごとに最大%{attempts}回まで再試行し、費用が発生する場合があります。"
+      retry_unavailable: 過去に使用したモデルが無効か非対応のため、再試行できません。
+      model_runs: "モデル別の結果"
+      failed: 翻訳に失敗しました
+      run_running: このモデルは現在、文書を翻訳しています。
+      run_pending: 処理は開始待ちです。
+      review_exists: "この翻訳にはすでにブラインドレビューがあります。"
+      view_review: ブラインドレビューを見る
+      start_review: ブラインドレビューを開始
+      review_intro: "レビューモデルを1～%{maximum}件選びます。各モデルには原文、指示、評価基準、匿名化した翻訳候補を渡します。どのモデルがどの候補を作ったかは伝えません。"
+      segment_cost: "この文書は%{count}部分に分けて処理するため、選んだレビューモデルごとに%{count}件のAIリクエストを送ります。自動再試行で少し増える場合があります。"
+      active_reviewers: "利用できるレビューモデル"
+      no_reviewers: "利用できるレビューモデルがありません。"
+      start_review_button: ブラインドレビューを開始
+      start_review_confirm: "選択したモデルでブラインドレビューを開始しますか？AIリクエストが送信され、費用が発生する場合があります。"
+      starting_review: レビューを開始中…
+    review:
+      title: ブラインドレビュー · Three Heavens
+      heading: ブラインドレビュー
+      running: レビュー中です。このページは5秒ごとに自動更新されます。
+      recover: 失敗したレビューを再試行
+      retry_intro: "%{count}件のレビューに失敗しました。再試行では失敗したレビューだけをやり直し、完了済みのレビューと匿名の表示名は変わりません。失敗したリクエストごとに最大%{attempts}回まで再試行するため、追加費用が発生する場合があります。"
+      retry: 失敗したレビューを再試行
+      retry_confirm: "失敗したレビューだけを再試行しますか？失敗したリクエストごとに最大%{attempts}回まで再試行し、費用が発生する場合があります。"
+      retry_unavailable: 過去のレビューモデルが無効か非対応のため、再試行できません。
+      runs: レビュー処理
+      reviewer: レビューモデル
+      failed: レビューに失敗しました
+      run_running: このレビューモデルは匿名の候補を評価中です。
+      run_pending: レビューは開始待ちです。
+      faithfulness: 原文への忠実さ
+      naturalness: 自然さ
+      terminology: 用語
+      instruction_adherence: 指示の遵守
+      judge_exists: "このブラインドレビューはすでに判定済みです。"
+      view_judge: 判定結果を見る
+      start_judge: 判定を開始
+      judge_intro: "判定モデルを1～%{maximum}件選びます。匿名化した翻訳候補とレビュー結果を渡し、翻訳やレビューを行ったモデル名は伝えません。"
+      segment_cost: "この文書は%{count}部分に分けて処理するため、選んだ判定モデルごとに%{count}件のAIリクエストを送ります。自動再試行で少し増える場合があります。"
+      active_judges: "利用できる判定モデル"
+      no_judges: "利用できる判定モデルがありません。"
+      start_judge_button: 判定を開始
+      start_judge_confirm: "選択したモデルで判定を開始しますか？AIリクエストが送信され、費用が発生する場合があります。"
+      starting_judge: 判定を開始中…
+    judge:
+      title: 判定 · Three Heavens
+      heading: 判定
+      running: 判定中です。このページは5秒ごとに自動更新されます。
+      recover: 失敗した判定を再試行
+      retry_intro: "%{count}件の判定に失敗しました。再試行では失敗した判定だけをやり直し、完了済みの判定と匿名の表示名は変わりません。採用される翻訳は、すべての判定が完了してから決まります。失敗したリクエストごとに最大%{attempts}回まで再試行するため、追加費用が発生する場合があります。"
+      retry: 失敗した判定を再試行
+      retry_confirm: "失敗した判定だけを再試行しますか？失敗したリクエストごとに最大%{attempts}回まで再試行し、費用が発生する場合があります。"
+      retry_unavailable: 過去の判定モデルが無効か非対応のため、再試行できません。
+      winner: "採用された翻訳"
+      open_editor: "最終訳を開く"
+      create_editor: "採用された翻訳を編集する"
+      opening_editor: 編集画面を開いています…
+      ranking: "順位ポイント%{points} · 平均%{score}/100点 · 判定モデル%{count}件"
+      aggregation_explanation: "各判定モデルがすべての候補を順位付けします。順位が高いほど多くの順位ポイントを得て、合計が最も多い翻訳が採用されます。同点の場合は平均点が高い方を採用します。"
+      no_winner: "採用された翻訳はありません"
+      no_winner_intro: "失敗した判定があるため、採用する翻訳は決まっていません。成功した判定は下に残っています。"
+      runs: 判定処理
+      judge: 判定モデル
+      failed: 判定に失敗しました
+      run_running: この判定モデルは匿名の候補を順位付けしています。
+      run_pending: 判定は開始待ちです。
+      judge_winner: "この判定モデルの選択"
+      confidence: 確信度
+    provider_failure: "AIリクエストに失敗しました。エラーコードを確認し、必要に応じて再試行してください。"

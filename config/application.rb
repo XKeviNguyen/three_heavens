@@ -1,5 +1,7 @@
 require_relative "boot"
 require_relative "../app/middleware/request_body_limit"
+require_relative "../app/middleware/client_ip_header_filter"
+require_relative "../app/middleware/upload_attempt_admission"
 
 require "rails/all"
 
@@ -11,6 +13,11 @@ module ThreeHeavens
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
+    config.i18n.available_locales = %i[en vi ja]
+    config.i18n.default_locale = :en
+    # Lets a form attribute whose errors are complete sentences (such as an
+    # upload failure) drop the attribute-name prefix from its full message.
+    config.active_model.i18n_customize_full_message = true
 
     # Reject declared oversized request bodies before multipart parsing or
     # application allocation, and bound the bytes read from requests without a
@@ -20,6 +27,11 @@ module ThreeHeavens
     # parameter parsing still returns 413 instead of a generic error response.
     config.middleware.insert_before 0, RequestBodyLimit
     config.middleware.insert_after ActionDispatch::ShowExceptions, RequestBodyLimit
+    config.middleware.insert_before ActionDispatch::RemoteIp, ClientIpHeaderFilter
+    # MethodOverride parses POST multipart bodies. Authenticate and charge each
+    # delivery before that parser runs; keep the extraction/replay budget separate.
+    config.middleware.insert_after ActionDispatch::Session::CookieStore, UploadAttemptAdmission
+    config.middleware.move_after UploadAttemptAdmission, Rack::MethodOverride
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
@@ -29,6 +41,10 @@ module ThreeHeavens
     # Files are served only through owner-authorized application controllers.
     # This application does not use direct uploads or signed public blob routes.
     config.active_storage.draw_routes = false
+
+    # Sign in with Google authenticates identity only. The OAuth client ID is a
+    # public identifier; no client secret is used. Absent means Google is disabled.
+    config.x.google_identity.client_id = ENV["GOOGLE_CLIENT_ID"].presence
 
     config.action_dispatch.default_headers.merge!(
       "Referrer-Policy" => "strict-origin-when-cross-origin",

@@ -1,0 +1,22 @@
+vi:
+  history_ui:
+    title: "Lịch sử dịch · Three Heavens"
+    analytics: "Thống kê"
+    heading: "Lịch sử dịch"
+    intro: "Mới nhất ở trên. Chi phí AI tính mỗi tác vụ dịch, nhận xét, chấm điểm và đề xuất chỉnh sửa một lần. Nếu có tác vụ chưa báo chi phí, tổng sẽ được ghi là chưa đầy đủ."
+    empty: Chưa có lượt dịch
+    empty_intro: Bắt đầu một lượt dịch để tạo lịch sử.
+    new_experiment: Lượt dịch mới
+    translation_candidates: "Bản dịch ứng viên"
+    execution: "Cách xử lý"
+    segmented: "Chia thành %{count} đoạn"
+    single_request: "Xử lý một lần"
+    judge_round: "Chấm điểm"
+    official_winner: "Bản dịch thắng"
+    system_cost: "Chi phí AI"
+    partial_cost: "Chi phí đã biết · một số tác vụ chưa báo chi phí (%{complete}/%{total} tác vụ hoàn tất; %{known} tác vụ có chi phí đã biết)"
+    reported_cost: "%{count} tác vụ đã báo chi phí"
+    no_cost: "Chưa có chi phí được báo"
+    automatic_pipeline: Quy trình tự động
+    repeat_configuration: "Dùng lại thiết lập này"
+    final_translation_status: Bản dịch cuối (%{status})

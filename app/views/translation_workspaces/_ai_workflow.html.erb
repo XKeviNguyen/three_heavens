@@ -1,0 +1,61 @@
+<section class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-5">
+  <div class="flex items-center gap-1.5">
+    <h2 class="text-base font-semibold text-slate-950"><%= t("workflow_ui.ai_workflow") %></h2>
+    <%= render "shared/hint", text: t("workflow_ui.workflow_hint"), label: t("workflow_ui.workflow_mode") %>
+  </div>
+
+  <fieldset id="workspace-workflow-mode" class="mt-4 min-w-0">
+    <legend class="sr-only"><%= t("workflow_ui.workflow_mode") %></legend>
+    <div class="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+      <label class="flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold text-slate-600 has-checked:bg-white has-checked:text-slate-950 has-checked:shadow-sm"><%= form.radio_button :workflow_mode, "manual", checked: @translation_workspace.workflow_mode == "manual", class: "size-3.5", data: { action: "workflow-mode#update" } %><span><%= t("workflow_ui.manual") %></span></label>
+      <label class="flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold text-slate-600 has-checked:bg-white has-checked:text-slate-950 has-checked:shadow-sm"><%= form.radio_button :workflow_mode, "automatic", checked: @translation_workspace.workflow_mode == "automatic", class: "size-3.5", data: { action: "workflow-mode#update" } %><span><%= t("workflow_ui.automatic") %></span></label>
+    </div>
+    <p class="mt-2 text-xs leading-5 text-slate-500"><%= t("workflow_ui.mode_help") %></p>
+  </fieldset>
+
+  <fieldset id="workspace-manual-models" class="mt-5 min-w-0" data-workflow-mode-target="manual" data-available="true">
+    <legend class="sr-only"><%= t("workflow_ui.ai_models") %></legend>
+    <%= render "shared/model_browser",
+          role: "translator",
+          name: "translation_workspace[model_identifiers][]",
+          saved_name: "translation_workspace[model_ids][]",
+          max: Ai::UsageLimits::MAX_TRANSLATION_MODELS,
+          label: t("workflow_ui.ai_models"),
+          hint: t("workflow_ui.models_hint"),
+          description: t("workflow_ui.models_description", maximum: Ai::UsageLimits::MAX_TRANSLATION_MODELS),
+          selected: @translation_workspace.model_identifier_selections %>
+  </fieldset>
+
+  <fieldset id="workspace-automatic" class="mt-5 min-w-0" data-workflow-mode-target="automatic" data-available="<%= @workflow_profiles.any? %>">
+    <legend class="sr-only"><%= t("workflow_ui.saved_workflow") %></legend>
+    <% if @workflow_profiles.any? %>
+      <div class="flex items-center gap-1.5">
+        <h3 class="text-sm font-semibold text-slate-900"><%= t("workflow_ui.saved_workflow") %></h3>
+        <%= render "shared/hint", text: t("workflow_ui.saved_hint"), label: t("workflow_ui.workflow_mode") %>
+      </div>
+      <div class="mt-3 space-y-2">
+        <% @workflow_profiles.each do |profile| %>
+          <% revision = profile.current_revision %>
+          <label class="block rounded-xl border border-slate-200 p-3 has-checked:border-blue-500 has-checked:bg-blue-50/50">
+            <span class="flex items-start gap-3"><%= form.radio_button :workflow_profile_revision_id, revision.id, checked: @translation_workspace.workflow_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · <%= t("glossaries_ui.revision_inline", version: revision.version) %></span><span class="mt-1 block text-xs leading-5 text-slate-600"><%= t("workspace_ui.profile_summary", mode: t("workflow_modes.#{revision.completion_mode}"), translators: revision.role_count("translator"), reviewers: revision.role_count("reviewer"), judges: revision.role_count("judge"), finalizers: revision.role_count("finalizer")) %></span><span class="mt-1 block text-xs text-slate-500"><%= t("workspace_ui.models") %> <%= revision.model_selections.map(&:display_name_snapshot).to_sentence %></span></span></span>
+          </label>
+        <% end %>
+      </div>
+      <%= render "translation_workspaces/configuration_pagination", pagination: @workflow_profiles_pagination, label: t("workflows_ui.heading"), page_param: :workflow_profile_page %>
+      <% if @translation_workspace.provider_work_plan_preview %>
+        <% work_plan = @translation_workspace.provider_work_plan_preview %>
+        <section class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <div class="flex items-center gap-1.5"><h3 class="font-semibold"><%= t("workflow_ui.paid_authorization") %></h3><%= render "shared/hint", text: t("workflow_ui.paid_hint"), label: t("workflow_ui.paid_authorization") %></div>
+          <p class="mt-1 text-xs"><%= t("workspace_ui.paid_plan", segments: work_plan.fetch("segment_count"), slots: work_plan.fetch("authorized_initial_provider_request_slots"), maximum: work_plan.fetch("maximum_automatic_provider_requests")) %></p>
+          <ul class="mt-2 list-disc space-y-1 pl-5 text-xs"><% work_plan.fetch("roles").each do |role, details| %><li><%= t("workspace_ui.paid_plan_role", role: t("workflows_ui.roles.#{role}"), runs: details.fetch("logical_run_count"), segments: work_plan.fetch("segment_count"), requests: details.fetch("provider_request_slots")) %></li><% end %></ul>
+        </section>
+      <% end %>
+      <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        <%= form.check_box :automatic_confirmation, { checked: @translation_workspace.automatic_confirmation == "1", class: "mt-1 size-4" }, "1", "0" %>
+        <span><span class="font-semibold"><%= t("workflow_ui.authorize_plan") %></span> <%= t("workflow_ui.cost_note") %></span>
+      </label>
+    <% else %>
+      <p class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status"><%= t("workflow_ui.no_workflow") %> <%=  link_to t("workflow_ui.create_workflow"), new_workflow_profile_path, class: "font-semibold underline" %>, <%= t("workflow_ui.or_manual") %></p>
+    <% end %>
+  </fieldset>
+</section>

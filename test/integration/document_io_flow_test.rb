@@ -16,6 +16,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: TranslationRunJob do
       post source_imports_path, params: {
         source_import: {
+          request_key: ReplayIdentity.issue,
           source_file: uploaded_file("\xEF\xBB\xBFOriginal\r\ntext".b, filename: "sermon.txt", content_type: "text/plain")
         }
       }
@@ -35,7 +36,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Original\ntext"
     assert_select "input[name='translation_workspace[source_import_id]'][value='#{source_import.id}']"
-    assert_select "a", text: "Cancel this import"
+    assert_select "button[data-action='workspace-upload#remove']", text: "Remove import"
     assert_no_enqueued_jobs only: TranslationRunJob
 
     blob_id = source_import.source_file.blob_id
@@ -73,6 +74,43 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{download_original_document_path(document)}']", text: "Download original"
   end
 
+  test "text PDF is privately imported and reviewed before translation" do
+    assert_no_enqueued_jobs only: AI_JOBS do
+      post source_imports_path, params: {
+        source_import: {
+          request_key: ReplayIdentity.issue,
+          source_file: uploaded_file(pdf_with_text("Readable PDF source"), filename: "source.pdf", content_type: "application/pdf")
+        }
+      }
+    end
+
+    source_import = SourceImport.order(:id).last
+    assert source_import.ready?
+    assert_equal "pdf", source_import.imported_format
+    assert_equal "Readable PDF source", source_import.extracted_text
+    assert_equal "test", source_import.source_file.blob.service_name
+    assert_equal 0, AiProviderAttempt.count
+
+    follow_redirect!
+    assert_response :success
+    assert_select "textarea[name='translation_workspace[source_text]']", text: "Readable PDF source"
+    assert_select "input[name='translation_workspace[source_import_id]'][value='#{source_import.id}']"
+
+    assert_enqueued_jobs 1, only: TranslationRunJob do
+      post translation_workspace_path, params: {
+        translation_workspace: workspace_attributes.merge(
+          source_import_id: source_import.id,
+          source_import_project_token: source_import_binding(source_import),
+          source_text: "Reviewed PDF source"
+        )
+      }
+    end
+    document = Document.order(:id).last
+    assert_equal "pdf", document.source_format
+    assert_equal "Reviewed PDF source", document.source_text
+    assert_equal source_import.source_file.blob_id, document.source_file.blob_id
+  end
+
   test "pasted workflow remains supported with pasted provenance" do
     assert_enqueued_jobs 1, only: TranslationRunJob do
       post translation_workspace_path, params: {
@@ -88,14 +126,14 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
 
   test "unsupported invalid binary and oversized uploads show safe errors and enqueue no AI" do
     uploads = [
-      [ uploaded_file("%PDF", filename: "source.pdf"), /Choose a \.docx/ ],
+      [ uploaded_file("%PDF", filename: "source.pdf"), /type does not match/ ],
       [ uploaded_file("abc\0def", filename: "source.txt", content_type: "text/plain"), /plain text/ ],
       [ uploaded_file("a" * (SourceImports::Limits::MAX_UPLOAD_BYTES + 1), filename: "huge.txt"), /larger than/ ]
     ]
 
     uploads.each do |upload, message|
       assert_no_enqueued_jobs only: TranslationRunJob do
-        post source_imports_path, params: { source_import: { source_file: upload } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: ReplayIdentity.issue } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -108,15 +146,16 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       [ uploaded_file("plain", filename: "source.txt", content_type: SourceImports::Detector::DOCX_MIME), /type does not match/ ],
       [ uploaded_file("\xFF".b, filename: "source.txt", content_type: "text/plain"), /valid UTF-8/ ],
       [ uploaded_file(" \n\t", filename: "source.md", content_type: "text/markdown"), /readable text/ ],
-      [ uploaded_file("a" * (SourceImports::Limits::MAX_EXTRACTED_CHARACTERS + 1), filename: "long.txt", content_type: "text/plain"), /limit is/ ],
+      [ uploaded_file("a" * (SourceImports::Limits::MAX_EXTRACTED_CHARACTERS + 1), filename: "long.txt", content_type: "text/plain"), /character limit/ ],
       [ uploaded_file(build_docx(encrypted: true), filename: "encrypted.docx", content_type: SourceImports::Detector::DOCX_MIME), /Encrypted DOCX/ ],
+      [ uploaded_file(Rails.root.join("test/fixtures/files/encrypted_source.pdf").binread, filename: "encrypted.pdf", content_type: "application/pdf"), /Encrypted or password-protected PDF/ ],
       [ uploaded_file(build_docx(entries: { "word/vbaProject.bin" => "macro" }), filename: "macro.docx", content_type: SourceImports::Detector::DOCX_MIME), /Macro-enabled/ ],
       [ uploaded_file(build_docx(entries: { "../outside" => "unsafe" }), filename: "unsafe.docx", content_type: SourceImports::Detector::DOCX_MIME), /cannot be processed safely/ ]
     ]
 
     cases.each do |upload, message|
       assert_no_enqueued_jobs only: AI_JOBS do
-        post source_imports_path, params: { source_import: { source_file: upload } }
+        post source_imports_path, params: { source_import: { source_file: upload, request_key: ReplayIdentity.issue } }
       end
       assert_response :unprocessable_content
       assert_select "[role='alert']", text: message
@@ -131,8 +170,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       {},
       { source_import: "malformed" },
       { source_import: [ "malformed" ] },
-      { source_import: { source_file: { nested: "malformed" } } },
-      { source_import: { source_file: [ "malformed" ] } }
+      { source_import: { source_file: { nested: "malformed" }, request_key: ReplayIdentity.issue } },
+      { source_import: { source_file: [ "malformed" ], request_key: ReplayIdentity.issue } }
     ]
 
     payloads.each do |payload|
@@ -155,6 +194,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
+            request_key: ReplayIdentity.issue,
             source_file: uploaded_file(
               malformed_docx,
               filename: "broken.docx",
@@ -176,6 +216,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       assert_no_enqueued_jobs only: AI_JOBS do
         post source_imports_path, params: {
           source_import: {
+            request_key: ReplayIdentity.issue,
             source_file: uploaded_file("Retry source", filename: "retry.txt", content_type: "text/plain")
           }
         }
@@ -195,6 +236,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     source = "# Heading\n<script>alert('source only')</script>"
     post source_imports_path, params: {
       source_import: {
+        request_key: ReplayIdentity.issue,
         source_file: uploaded_file(source, filename: "source.md", content_type: "text/markdown")
       }
     }
@@ -325,7 +367,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
       )
     )
     assert_not second.submit
-    assert_includes second.errors[:source_import_id].join, "was already used"
+    assert_includes second.errors[:source_import_id].join, "This uploaded file was already used for a translation."
     assert_equal 1, SourceImport.find(source_import.id).resulting_document.experiments.count
   end
 
@@ -336,8 +378,8 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     binding = source_import_binding(source_import)
     get new_translation_workspace_path(source_import_id: source_import.id, source_import_project_token: binding)
     assert_response :success
-    assert_select "h2", text: /no longer available/i
-    assert_select "li", text: /Source import.*has expired/i
+    assert_select "h2", text: "Please correct the following:"
+    assert_select "li", text: /This upload has expired/
 
     assert_no_workspace_records_created do
       assert_no_enqueued_jobs only: AI_JOBS do
@@ -381,7 +423,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_operator clock_calls, :>=, 2
-    assert_includes workspace.errors[:source_import_id], "This source import has expired; upload the source file again."
+    assert_includes workspace.errors[:source_import_id], "This upload has expired. Upload the file again."
     assert source_import.reload.ready?
     assert_nil source_import.resulting_document
   end
@@ -418,7 +460,7 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     assert_no_enqueued_jobs only: [ ActiveStorage::PurgeJob, *AI_JOBS ] do
       delete source_import_path(source_import)
     end
-    assert_redirected_to root_path
+    assert_redirected_to new_translation_workspace_path
     assert_not SourceImport.exists?(source_import.id)
     assert_not ActiveStorage::Attachment.exists?(attachment_id)
     assert_not ActiveStorage::Blob.exists?(blob.id)
@@ -427,8 +469,126 @@ class DocumentIoFlowTest < ActionDispatch::IntegrationTest
     consumed = create_ready_import(user: users(:normal))
     consume_import(consumed)
     delete source_import_path(consumed)
-    assert_redirected_to root_path
+    assert_redirected_to new_translation_workspace_path
     assert SourceImport.exists?(consumed.id)
+
+    delete source_import_path(consumed, format: :json)
+    assert_response :conflict
+    assert_equal "This upload can no longer be removed.", response.parsed_body["error"]
+    assert SourceImport.exists?(consumed.id)
+  end
+
+  test "every upload must carry one well-formed request key" do
+    [ nil, "", "short", "A" * 32, [ ReplayIdentity.issue ], { nested: ReplayIdentity.issue } ].each do |key|
+      assert_no_difference -> { SourceImport.count } do
+        post source_imports_path(format: :json), params: {
+          source_import: { source_file: uploaded_file("Keyed", filename: "keyed.txt", content_type: "text/plain"), request_key: key }
+        }
+      end
+      assert_response :bad_request, key.inspect
+    end
+  end
+
+  test "a replayed upload returns the original import and a reused key with another file is refused" do
+    key = ReplayIdentity.issue
+    deliver = lambda do |content, filename: "replay.txt"|
+      post source_imports_path(format: :json), params: {
+        source_import: { source_file: uploaded_file(content, filename:, content_type: "text/plain"), request_key: key }
+      }
+      JSON.parse(response.body)
+    end
+
+    first = nil
+    assert_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ], 1 do
+      first = deliver.call("Delivered once")
+      assert_response :created
+      replay = deliver.call("Delivered once")
+      assert_response :created
+      assert_equal first.except("project_binding"), replay.except("project_binding")
+    end
+
+    assert_no_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ] do
+      refused = deliver.call("A different file")
+      assert_response :unprocessable_content
+      assert_equal I18n.t("source_imports.errors.request_key_reused"), refused.fetch("error")
+    end
+    assert_equal "Delivered once", SourceImport.find(first.fetch("id")).extracted_text
+  end
+
+  test "the upload form issues a fresh key per render and a double submit resolves to one import" do
+    keys = 2.times.map do
+      get new_source_import_path
+      assert_response :success
+      css_select("input[type='hidden'][name='source_import[request_key]']").sole["value"]
+    end
+    assert keys.all? { it.match?(SourceImports::Limits::REQUEST_KEY_FORMAT) }
+    assert_not_equal keys.first, keys.second
+    assert_equal 0, SourceImport.count
+
+    locations = []
+    assert_difference -> { SourceImport.count }, 1 do
+      2.times do
+        post source_imports_path, params: {
+          source_import: { source_file: uploaded_file("Double submit", filename: "double.txt", content_type: "text/plain"), request_key: keys.first }
+        }
+        assert_response :redirect
+        locations << response.location
+      end
+    end
+    assert_equal 1, locations.uniq.size
+  end
+
+  test "a PDF upload while every PDF worker is busy stores nothing, says so, and the same upload succeeds on retry" do
+    key = ReplayIdentity.issue
+    deliver = lambda do |format: :json|
+      post source_imports_path(format:), params: {
+        source_import: { source_file: uploaded_file(pdf_with_text("Retry later"), filename: "busy.pdf", content_type: "application/pdf"), request_key: key }
+      }
+    end
+    holding, finish = Queue.new, Queue.new
+    holder = Thread.new { SourceImports::PdfExtractor::WORKER_SLOTS.hold { holding << true; finish.pop } }
+    holding.pop
+
+    assert_no_difference [ -> { SourceImport.count }, -> { ActiveStorage::Blob.count } ] do
+      deliver.call
+      assert_response :service_unavailable
+      assert_equal SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s, response.headers["Retry-After"]
+      assert_equal I18n.t("source_imports.errors.pdf_busy"), response.parsed_body.fetch("error")
+
+      patch locale_path, params: { locale_code: "ja" }
+      deliver.call(format: :html)
+      assert_response :service_unavailable
+      assert_select "[role='alert']", text: I18n.t("source_imports.errors.pdf_busy", locale: :ja)
+      assert_no_match(/WorkerSlots|SourceImports::Busy|oom_score/, response.body)
+    end
+    finish << true
+    holder.join
+
+    deliver.call
+    assert_response :created
+    assert_includes response.parsed_body.fetch("extracted_text"), "Retry later"
+    assert users(:normal).source_imports.find_by!(request_key: key).ready?
+  ensure
+    finish << true if holder&.alive?
+    holder&.join
+  end
+
+  test "a storage failure is reported and every replay of that upload converges on it" do
+    ActiveStorage::Blob.service.define_singleton_method(:upload) { |*| raise IOError, "synthetic storage outage" }
+    key = ReplayIdentity.issue
+    2.times do
+      post source_imports_path(format: :json), params: {
+        source_import: { source_file: uploaded_file("Unstored", filename: "unstored.txt", content_type: "text/plain"), request_key: key }
+      }
+      assert_response :unprocessable_content
+      assert_equal I18n.t("source_imports.errors.storage_unavailable"), JSON.parse(response.body).fetch("error")
+    end
+    source_import = users(:normal).source_imports.find_by!(request_key: key)
+    assert source_import.failed?
+    assert_not source_import.source_file.attached?
+  ensure
+    singleton = ActiveStorage::Blob.service.singleton_class
+    singleton.remove_method(:upload) if singleton.method_defined?(:upload, false)
   end
 
   private

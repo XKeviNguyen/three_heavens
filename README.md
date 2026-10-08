@@ -1,248 +1,308 @@
 # Three Heavens
 
-Three Heavens is a Rails 8.1 application for authenticated, owner-scoped AI translation experiments, blind review, judge aggregation, and final translation refinement. PostgreSQL 17 is the source of truth; Solid Queue, Solid Cache, and Solid Cable use dedicated PostgreSQL databases in production.
+**An AI-assisted translation workspace where several models translate the same text, other models review and judge the results without knowing who wrote them, and a human editor makes the final call.**
 
-## Automatic translation pipelines
+[![CI](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml)
+![Ruby 3.4](https://img.shields.io/badge/Ruby-3.4-CC342D?logo=ruby&logoColor=white)
+![Rails 8.1](https://img.shields.io/badge/Rails-8.1-D30001?logo=rubyonrails&logoColor=white)
+![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Hotwire](https://img.shields.io/badge/Hotwire-Turbo%20%2B%20Stimulus-5A2D82)
+![Docker + Kamal](https://img.shields.io/badge/Deploy-Docker%20%2B%20Kamal-2496ED?logo=docker&logoColor=white)
 
-Workflow Profiles are private, reusable configurations for translator, reviewer, judge, and optional finalizer models. Each edit appends an immutable revision with model-routing snapshots and a deterministic SHA-256 configuration digest; historical revisions are never rewritten.
+It is built for translators of long-form texts — sermons, articles, books — who want more than one AI opinion, need terminology to stay consistent, and must stay responsible for the final wording. You paste or upload a document and add the terms that must not change. Several models translate it independently. Reviewer models score the anonymous candidates, judge models rank them, and you edit the winner, optionally with AI suggestions, before approving a final version. AI never finalizes anything on its own.
 
-The translation workspace remains manual by default. In automatic mode, the owner selects the exact current profile revision and explicitly confirms the configured initial provider run slots for that launch. This authorization covers automatic translation, blind review, judging, creation of the official winner draft, and—only in `refinement_proposals` mode—creation of AI refinement proposals. `winner_draft` stops after creating the draft. Both modes stop at the human editorial checkpoint: proposals are never applied, draft content is never changed, and a translation is never finalized automatically.
+![Judging page: the winning Japanese translation of an English sermon, chosen by two judge models, with ranking points for all three candidates and a button to edit the winner](docs/images/readme/04-judging.png)
 
-Every manual or automatic workspace form carries an owner-scoped, one-time opaque submission identity. Replaying or concurrently submitting the same form returns its existing experiment or pipeline without scheduling duplicate provider work. Invalid forms remain retryable with the same identity; unused identities expire after 24 hours and are removed in bounded cleanup batches.
+The interface is available in English, Vietnamese, and Japanese. New to the app? Start with the [user guide](docs/user-guide.md).
 
-Automatic progression can incur provider cost, and built-in bounded provider retries may add requests. Terminal failures block the pipeline and retain the existing explicit owner retry controls; a successful retry lets the already-authorized pipeline continue. Stopping automation prevents future stages but cannot cancel provider work already queued or running, removes no history, and does not prevent manual continuation.
+> **About the screenshots.** They come from the real application running locally against a throwaway database. All names, texts, scores, token counts, and costs are **synthetic demo data** from a deterministic fake AI client ([`bin/capture-readme-screenshots`](bin/capture-readme-screenshots)). No AI service was called.
 
-`PipelineReconciliationJob` scans a bounded indexed batch every 10 minutes in production to recover missed advancement after queue failures, crashes, or restarts. A dedicated least-recently-reconciled cursor and row locks prevent permanently blocked pipelines from starving newer work. It processes only running or blocked automatic pipelines and never manual, stopped, or ready-for-editor workflows. This is intentionally separate from the provider-free stale-AI watchdog. Operators may invoke the same safe bounded service with `bin/rails pipelines:reconcile`; output contains aggregate counts only.
+**Contents** — Product: [What it does](#what-it-does) · [Product tour](#product-tour) · [Using the app](#using-the-app) — Engineering: [Key design decisions](#key-design-decisions) · [Architecture](#architecture) · [Translation workflow](#translation-workflow) · [Data model](#data-model) · [Reliability](#reliability) · [Security](#security) · [Testing](#testing-and-release-quality) · [Tech stack](#tech-stack) · [Run it locally](#run-it-locally) · [Project structure](#project-structure) · [Deployment](#deployment) · [Status](#status-and-limitations)
 
-## Long-document execution and context safety
+## What it does
 
-Documents remain authoritative whole source records up to 100,000 characters. When a source exceeds the single-request target, Three Heavens derives an immutable, versioned sequence of lossless segments using paragraph, line, sentence-like punctuation, and finally Unicode-safe hard boundaries. Rejoining the ordered segment text reproduces the reviewed source exactly; segmentation never replaces or rewrites it.
+| Step (as named in the app) | What happens | Who decides |
+| --- | --- | --- |
+| **New translation** | Paste text or upload TXT, Markdown, DOCX, or text PDF. Add a glossary, approved reference translations, and a methodology (style guide). | You |
+| **Translation** | 1–6 models each write their own translation (at least 2 to continue to review and judging). | AI, in parallel |
+| **Blind review** | Reviewer models score every candidate on faithfulness, naturalness, terminology, and instructions — under anonymous labels. | AI |
+| **Judging** | Judge models rank the anonymous candidates; the rankings are combined into one winner. | AI |
+| **Human editor** | The winner becomes version 1 of your draft. Edit it, ask for AI suggestions, apply or ignore them, restore older versions. | You |
+| **Finalize** | Approve a version and download it as TXT or DOCX. | You |
 
-Translation, blind review, judging, and optional refinement then run one bounded provider request per logical model and source segment. The existing parent runs remain the candidate/reviewer/judge/finalizer records used by history, benchmarks, winner selection, and pipeline advancement. Their child segment runs are the physical provider calls, retain execution lineage and detailed telemetry, and retry only failed work. Parent cost is the sum of known child cost without counting child rows again in analytics; token completeness remains explicitly unknown if any child value is missing.
+Each step can be started by hand, or a saved **workflow setup** runs translation → review → judging (→ optional AI suggestions) automatically and then stops at the editor. A **Benchmarks** page compares models across your own translations (wins, review and judge scores, cost, response time). It describes past results; the app makes no claim that competing models produce better translations in general.
 
-Administrators configure each model's context-window and maximum-output token capabilities in Settings / Models. Each scheduled provider call stores the capability snapshot and a deterministic `serialized-utf8-bytes-v2` estimate based on the fully serialized request: approximately one estimated token per UTF-8 byte plus framing allowance, the response schema, a stage output reserve, and a separate 1,024-token safety margin. This is intentionally conservative and is not claimed to match any provider tokenizer exactly. Existing unconfigured models retain a conservative 16,384/4,096-token fallback only for sources of at most 8,000 characters; long-document planning fails before provider work when capabilities are absent or insufficient.
+## Product tour
 
-OpenRouter account or organization configuration must not force the context-compression plugin in a way that prevents per-request overrides, because Three Heavens disables it for fidelity-critical workflows.
+<table>
+<tr>
+<td width="50%"><img src="docs/images/readme/01-new-translation.png" alt="New translation form: English to Japanese, a pasted sermon, the 'Japanese Sermon Terms' glossary selected, and three demo models chosen"></td>
+<td width="50%"><img src="docs/images/readme/02-translation-candidates.png" alt="Translation candidates: each model's Japanese translation with its cost"></td>
+</tr>
+<tr>
+<td><b>1. Start a translation.</b> Pick languages, paste or upload the source, choose a glossary, and select several models. The form autosaves to the server about a second after you stop typing.</td>
+<td><b>2. Compare independent candidates.</b> Every model translates the same source with the same instructions; nothing is merged or hidden.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/03-blind-review.png" alt="Blind review: a reviewer model scores Candidate A and Candidate B on four criteria with strengths, issues, and corrections"></td>
+<td><img src="docs/images/readme/13-japanese-judging.png" alt="Judging page in the Japanese interface showing the winning translation and ranking points"></td>
+</tr>
+<tr>
+<td><b>3. Blind review.</b> Review prompts carry anonymous labels instead of model names, which is designed to reduce brand and self-preference bias. Only you see which model wrote each candidate.</td>
+<td><b>4. Judging</b> (shown in the Japanese interface). Each judge ranks every candidate; ranking points are summed across judges. No winner is declared until every judge finishes.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/05-final-editor.png" alt="Final translation workspace: source, instructions, and glossary on the left; the editable Japanese draft (version 1) on the right"></td>
+<td><img src="docs/images/readme/06-ai-suggestion.png" alt="An AI suggestion for version 1, marked Ready to apply, with a suggested translation, change summary, and terminology notes"></td>
+</tr>
+<tr>
+<td><b>5. You edit the winner.</b> Source, instructions, glossary, and review evidence stay beside the editor. Saving changed text creates a new version.</td>
+<td><b>6. AI suggests, you decide.</b> A suggestion is tied to the exact version it was made for and is applied only when you click <i>Apply suggestion</i>.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/07-workflow-setup.png" alt="Workflow setup 'Sunday sermon workflow' listing translator, reviewer, judge, and suggestion models"></td>
+<td><img src="docs/images/readme/08-automatic-approval.png" alt="Automatic mode selected with the saved workflow setup and a cost-approval checkbox"></td>
+</tr>
+<tr>
+<td><b>7. Save a workflow setup</b> once: which models translate, review, judge, and suggest.</td>
+<td><b>8. Run it automatically</b> on a second text ("Advent devotional"). You approve the AI requests for each translation before anything is sent.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/09-automatic-workflow.png" alt="Automatic workflow page reading 'Ready for you to edit' with a timeline of finished steps"></td>
+<td><img src="docs/images/readme/11-translation-history.png" alt="Translation history with both translations, their winners, and AI cost"></td>
+</tr>
+<tr>
+<td><b>9. It always stops for you.</b> The run ends at "Ready for you to edit": nothing applied, nothing finalized.</td>
+<td><b>10. History</b> keeps every translation, its winner, and its AI cost, marked partial if a step did not report cost.</td>
+</tr>
+</table>
 
-Every request sends an explicit stage completion limit, and provider responses are streamed through a 1 MiB byte ceiling before JSON parsing or persistence. Segment translations/refinements are limited to 20,000 characters and assembled documents remain limited to 100,000 characters; no output is silently truncated. Automatic pipeline authorization records the segment multiplier and exact initial provider-request slots (logical models × segments) for every stage. Built-in retries may add calls, so this is not a maximum HTTP request count.
+Also captured: [glossary](docs/images/readme/10-glossary.png) and [the editor on a phone](docs/images/readme/12-mobile-final-editor.png).
 
-Review scores are aggregated by source-character-weighted means. Each judge uses source-character-weighted segment Borda points, then weighted mean score and stable TranslationRun ID tie-breaking; the existing cross-judge Borda aggregate still selects one official logical candidate only after every required judge completes. Refinement proposals are reassembled but remain unapplied until the human editor chooses Apply Proposal. A manual edit deliberately invalidates segment alignment for further segmented AI refinement; manual editing, restoration, finalization, and export remain available. Historical non-segmented experiments continue to render without fabricated segment history, and benchmark translation/win counts remain logical candidate counts rather than physical segment-call counts.
+## Using the app
 
-These controls bound requests; they do not guarantee that every 100,000-character document fits every selected model or configuration. Unsupported plans fail safely before the affected stage schedules provider work.
+1. Sign in, and ask an administrator to turn on **AI access** for your account (Admin → Users).
+2. **New translation:** choose languages, paste or upload the source, add guidance, pick models or a workflow setup, and start.
+3. Follow the steps: candidates → blind review → judging → **Edit the winning translation**.
+4. Save versions, request AI suggestions, then **Finalize current version** and download TXT or DOCX.
 
-## Development workflow
+The [user guide](docs/user-guide.md) covers every screen and lists the key terms in English, Vietnamese, and Japanese.
 
-`develop` is the default integration branch. Normal Codex work starts from
-current `develop` on a focused task branch, and each task branch opens a Pull
-Request back to `develop`. Codex may autonomously merge a task Pull Request after
-its required checks pass. `main` is reserved for human-controlled releases:
-Codex never merges into `main`, and the final `develop` to `main` release occurs
-only after external and human audit.
+## Key design decisions
 
-## V1 feature freeze
+Most of the engineering is in making paid, slow, failure-prone AI calls behave like a dependable workflow. Each decision links to the code and the tests that exercise it.
 
-V1 feature development is frozen as of the `feature/product-completion-freeze`
-milestone. Until the public V1 release, a change to this repository must be one
-of:
+- **The human checkpoint is a domain invariant.** Only the explicit finalize action finalizes a translation, and AI suggestions become versions only when a person applies them. Automatic workflows always end at "Ready for you to edit". — [`Finalizations::ApplyProposal`](app/services/finalizations/apply_proposal.rb), [`Pipelines::Advance`](app/services/pipelines/advance.rb); [automatic pipeline tests](test/system/automatic_pipelines_test.rb)
+- **Paid AI work needs explicit, bounded approval.** An automatic launch stores the approved plan (models × document parts × retry limit) on the workflow run; for multi-part documents the plan's digest is rechecked at submit and the launch is refused if it changed. Actual spend is recorded per request and shown as known or partial; a later retry is a separate action with its own cost warning. — [`Pipelines::Start`](app/services/pipelines/start.rb); [submission tests](test/integration/translation_workspace_submission_test.rb)
+- **Every launch is idempotent.** Each form carries a signed, single-use submission identity consumed under a row lock, so a double click or a replayed POST returns the existing translation instead of starting a second paid run. — [`TranslationWorkspace`](app/forms/translation_workspace.rb), [`ReplayIdentity`](app/services/replay_identity.rb); [replay tests](test/integration/replay_adversarial_test.rb)
+- **AI jobs tolerate duplicates, late arrivals, and crashes.** Runs are committed before their jobs are enqueued; a job claims its run under a row lock by job ID and execution number, and a late result can only update the attempt that claimed it. A watchdog fails stuck work without calling a provider. — [`Ai::ExecutionClaim`](app/services/ai/execution_claim.rb), [`Ai::StaleExecutionReconciler`](app/services/ai/stale_execution_reconciler.rb); [job lineage tests](test/jobs/ai_job_lineage_test.rb)
+- **Drafts live on the server, not in localStorage.** An encrypted server draft, a per-tab editor identity, and a monotonically increasing sequence number resolve lost responses and late duplicates deterministically, report another tab's newer draft as a conflict, and work across devices. — [`TranslationWorkspaceDrafts::Save`](app/services/translation_workspace_drafts/save.rb); [draft tests](test/integration/translation_workspace_draft_test.rb), [browser history tests](test/system/translation_workspace_history_test.rb)
+- **Configuration is versioned, not edited in place.** Glossaries, methodologies, references, and workflow setups append revisions; a translation stores the exact revisions it used, and PostgreSQL triggers stop terminal history from being rewritten. — [database design](docs/architecture/database.md)
+- **PostgreSQL coordinates all persistent workflow state.** Row and advisory locks, unique indexes, and `SKIP LOCKED` give idempotency and batched cleanup; Solid Queue keeps jobs in PostgreSQL too, so there is one stateful dependency to back up and reason about. — [reliability](docs/architecture/reliability.md); [multi-process concurrency tests](test/support/process_barrier.rb)
+- **Untrusted input is contained.** DOCX goes through a bounded ZIP reader and DTD-free XML; PDFs are extracted in a resource-limited child process; model output is validated against JSON schemas before it is stored. — [`SourceImports::PdfExtractor`](app/services/source_imports/pdf_extractor.rb); [security](docs/security.md)
 
-- a real defect found by the whole-project audit;
-- a security correction;
-- a release or deployment correction;
-- a documented release-blocking usability problem.
+## Architecture
 
-New product features, providers, integrations, and architectural expansions
-(V2 work) are out of scope until after V1 ships. The frozen V1 surface is the
-owner-scoped journey from authentication through project, source import,
-manual or automatic translation, blind review, judging, the human final editor,
-and TXT/DOCX export, plus the libraries, benchmarks, history, and
-administrator operations pages described below.
-
-## Local development
-
-Install Ruby 3.4.10 and PostgreSQL 17, then install gems with `bundle install`. The included `compose.yml` runs PostgreSQL on the loopback interface. Local Rails configuration expects these environment variable names:
-
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_PORT`
-- optional `DB_HOST`
-- `OPENROUTER_API_KEY` only when a person explicitly starts real AI work
-
-Create and migrate the databases with:
-
-```sh
-bin/rails db:prepare
+```mermaid
+flowchart LR
+  B["Browser<br/>Turbo + Stimulus"] -->|HTTPS| KP["kamal-proxy (TLS)"]
+  KP --> PU["Puma · Rails 8.1<br/>controllers → forms/services"]
+  PU --> PG[("PostgreSQL 17<br/>app data")]
+  PU -->|enqueue after commit| Q[("Solid Queue<br/>(PostgreSQL)")]
+  Q --> J["Jobs<br/>AI runs · workflow advance · cleanup"]
+  J --> PG
+  J -->|HTTPS| OR["OpenRouter"]
+  PU --> FS[("Private file storage")]
+  PU --> PDF["Resource-limited PDF worker"]
 ```
 
-The PostgreSQL Docker volume contains persistent development data. Never run `docker compose down -v` unless intentionally destroying that local database.
+A single Rails monolith. Controllers handle HTTP and ownership checks; a form object and namespaced services (`TranslationExperiments::`, `BlindReviews::`, `Judging::`, `Finalizations::`, `Pipelines::`, `SourceImports::`) own the workflows; jobs make every AI call through one provider client (`Ai::OpenRouterClient`). There is no Redis: in production Solid Queue, Solid Cache, and Solid Cable each use their own PostgreSQL database. Full topology, request path, and recurring jobs: [architecture overview](docs/architecture/overview.md).
 
-Create or promote the first administrator:
+## Translation workflow
 
-```sh
-bin/rails accounts:bootstrap_admin
+```mermaid
+flowchart TD
+  S["Source + glossary + references + methodology"] --> T["Translation candidates<br/>1–6 models, independent"]
+  T --> R["Blind review<br/>anonymous labels A, B, C…"]
+  R --> J["Judging<br/>sees candidates + anonymous reviews"]
+  J --> W["Winning translation"]
+  W --> E["Human editor<br/>version 1 = winner"]
+  E -. optional .-> P["AI suggestions<br/>never auto-applied"]
+  P -. you apply or ignore .-> E
+  E --> F(["You finalize → TXT / DOCX"])
+
+  classDef human fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+  class E,F human
 ```
 
-From an interactive terminal the task prompts for the administrator email and
-reads the password and its confirmation without echoing either value. For
-automation, set `THREE_HEAVENS_ADMIN_EMAIL` and `THREE_HEAVENS_ADMIN_PASSWORD`
-through the process environment or an approved secret manager; the task never
-prints the password, and a non-interactive run without both values fails instead
-of waiting for input. Never place the literal password in shell history or a
-command line.
+Judges receive the anonymous candidates and the anonymous review feedback. The winner is chosen by a Borda count: a candidate ranked *r* of *N* earns *N − r + 1* points from each judge; ties go to the higher average score. Sources longer than 4,000 characters (up to 100,000) are split losslessly into parts at paragraph and sentence boundaries, and each model processes every part. Details: [workflow and long documents](docs/architecture/workflow.md).
 
-## Recoverable AI workflows
+## Data model
 
-Every scheduling cycle persists the intended Active Job `job_id`, a pending timestamp, and the last claimed execution number before the job is enqueued. The first execution and strictly newer built-in retries from that same job lineage may claim; duplicate executions, different jobs, and obsolete retries from an earlier manual-recovery cycle are harmless. Every accepted claim records a new execution attempt and refreshes `last_claimed_at`; the original `started_at` remains the first-start analytics timestamp. A late result can only update the exact attempt that claimed the run.
+The UI says **Translation**; the code calls it `Experiment`, because each one is one source run against several competing candidates. Users only see the plain name.
 
-Provider-run state commits to the primary database before enqueueing against the separate queue database. The actual adapter enqueue runs inside an `after_all_transactions_commit` callback, including when a workflow service is nested inside a wider application transaction; with no open transaction, that callback runs synchronously. A definite Solid Queue enqueue failure or Active Job false result is converted to the generic `enqueue_failed` state and reconciled; unexpected programming exceptions propagate, and raw queue/database errors are never stored. Successfully queued siblings remain valid.
-
-Production schedules `StaleAiWorkReconciliationJob` every 15 minutes through Solid Queue. Pending work that has not begun, or running work without a fresh claim, for 120 minutes is marked failed with the generic `stale_pending` or `stale_execution` code and its parent is reconciled. This closes the crash window between the primary commit and queue enqueue. A delayed job arriving after recovery is obsolete and cannot issue a provider request. Set `AI_STALE_EXECUTION_THRESHOLD_MINUTES` to an operator-chosen value from 15 through 1440 minutes. This server setting is never browser input.
-
-The watchdog never issues a provider request. Owners explicitly retry failed work from the workflow page, where the additional request/cost warning is shown. Completed siblings, stable run identities, anonymous mappings, and finalization base versions are preserved.
-
-An operator can run the same bounded, idempotent reconciliation manually:
-
-```sh
-bin/rails ai:reconcile_stale
+```mermaid
+erDiagram
+  PROJECT ||--o{ DOCUMENT : contains
+  DOCUMENT ||--o{ EXPERIMENT : "is translated in"
+  EXPERIMENT ||--o{ TRANSLATION_RUN : candidates
+  EXPERIMENT ||--o| REVIEW_ROUND : "blind review"
+  REVIEW_ROUND ||--o| JUDGE_ROUND : "judged in"
+  JUDGE_ROUND ||--o| FINAL_TRANSLATION : seeds
+  FINAL_TRANSLATION ||--|{ FINAL_TRANSLATION_VERSION : versions
+  EXPERIMENT ||--o| PIPELINE_RUN : "automatic workflow"
 ```
 
-With `SOLID_QUEUE_IN_PUMA=true`, the production Puma process supervises Solid Queue and its recurring schedule. Larger installations should use a dedicated `bin/jobs` role while keeping exactly one deliberate recurring-job topology.
+This is a simplified domain view. Diagrams of all 47 application tables with their keys, and the constraints that protect history, are in [database design](docs/architecture/database.md); per-table purpose and lifecycle are in the [data dictionary](docs/architecture/data-dictionary.md).
 
-## Secure document import and export
+## Reliability
 
-Authenticated owners may paste source text or upload `.txt`, `.md`, and `.docx` source files. Legacy `.doc`, `.docm`, RTF, HTML, ODT, PDF, images, and directly supplied archives are intentionally unsupported. PDF parsing and OCR require a separate security and product design.
+An AI run's lifecycle, the core of the reliability design:
 
-Uploads are limited by the application to 10 MiB per file, and normalized extracted text is limited to `Ai::UsageLimits::MAX_SOURCE_CHARACTERS` (currently 100,000 characters). The Translation Reference form supports two files in one request, so Kamal Proxy accepts request bodies up to 21 MiB: two 10 MiB files plus 1 MiB of bounded multipart overhead. Sanitized original filenames are limited to 255 Unicode characters while preserving their extension. TXT and Markdown must be valid UTF-8; an optional UTF-8 BOM is removed and line endings become LF. Markdown remains plain source text and is never rendered as trusted HTML.
-
-DOCX processing accepts genuine macro-free WordprocessingML packages only. The package declaration, main-document relationship, content types, internal relationship targets, and extension/MIME/magic-byte agreement are validated before text is accepted. Processing uses a bounded ZIP reader in memory: at most 500 entries, 50 MiB declared total expansion, 16 MiB across relevant XML, 8 MiB for the main document, 2 MiB per secondary Word text part, and 1 MiB per relationships part, with duplicate/ambiguous names, traversal variants, encrypted entries, macros, embedded objects, unsafe external relationships, and suspicious compression rejected. XML parsing is strict, DTD-free, and network-disabled.
-
-Visible DOCX text is converted deterministically to plain text. Paragraphs and blank paragraphs become LF-separated lines; run boundaries do not add whitespace; tabs and explicit Word line breaks are retained; table cells use tabs and rows use line breaks; nested tables are bounded. Hyperlinks, content controls, inserted/current revisions, ordinary field results, text boxes, soft hyphens, and nonbreaking hyphens are retained where WordprocessingML provides deterministic text. Deleted, moved-away, and hidden runs are excluded. Direct Word numbering is emitted as readable list labels. Referenced footnotes and endnotes are appended once with numbered labels, and each distinct referenced header/footer is appended once with its variant label. Separator/control notes are excluded. Three Heavens does not reproduce page layout, floating-object placement, styles, images, or other formatting it does not persist.
-
-Upload and extraction create an owner-scoped `SourceImport` staging record. The owner reviews and may edit extracted text in the normal translation workspace. Upload, parsing, preview, cancellation, cleanup, and export never enqueue or call an AI provider. A successful workspace submission locks and consumes an import once, atomically creates the normal Project/Document/Experiment graph, records immutable source text and provenance, and reuses the Active Storage blob for the Document without copying file bytes.
-
-Original uploads are private. Downloads pass application owner authorization, use attachment disposition, and never expose a permanent blob URL. Abandoned imports expire after 24 hours; production runs bounded cleanup hourly. Destroying an abandoned import synchronously purges its bounded local file after the database transaction commits, without relying on a purge-job enqueue. A blob shared by a consumed Document remains protected by its attachment. An operator may safely process one bounded batch manually:
-
-```sh
-bin/rails source_imports:cleanup
+```mermaid
+stateDiagram-v2
+  [*] --> pending: created in the launch transaction
+  pending --> running: job claims run under row lock (job id + execution no.)
+  running --> completed: output validated and stored on the claiming attempt
+  running --> failed: provider error after bounded retries
+  pending --> failed: watchdog — never started (no provider call)
+  running --> failed: watchdog — claim went stale (no provider call)
+  failed --> pending: owner clicks Retry (cost warning)
+  completed --> [*]
 ```
 
-Durable Projects, Documents, workflow snapshots, AI results, final translations, and final-version history are intentionally retained; Three Heavens does not silently expire user translation history. Temporary workspace submissions and SourceImports expire after 24 hours. Unattached Active Storage blobs older than seven days are collected once daily in bounded, lock-and-recheck batches, while any attached Document or SourceImport blob is preserved. Both maintenance tasks below are dry-run by default; set `EXECUTE=1` only after reviewing aggregate counts:
+| Problem | What the code does | Tested by |
+| --- | --- | --- |
+| Response lost after an autosave | Editor identity + increasing sequence; if this tab wrote last, equal or older sequences are acknowledged as replays | [draft tests](test/integration/translation_workspace_draft_test.rb) |
+| Two tabs edit one draft | Optimistic `lock_version` → HTTP 409; the tab keeps its local text | [draft concurrency tests](test/services/translation_workspace_drafts/save_concurrency_test.rb) |
+| Double-submitted launch | Signed single-use submission identity consumed under a row lock | [submission tests](test/integration/translation_workspace_submission_test.rb) |
+| Duplicate or late job execution | Claim by job ID + execution number; late results update only their own attempt | [job lineage tests](test/jobs/ai_job_lineage_test.rb) |
+| Many stuck automatic workflows | Bounded sweeper with a least-recently-reconciled cursor and `SKIP LOCKED` | [reliability doc](docs/architecture/reliability.md#4-automatic-workflows) |
+
+Autosave, idempotency, recovery, and cleanup fairness in detail: [reliability design](docs/architecture/reliability.md).
+
+## Security
+
+- Every owned record is loaded through the signed-in user's associations; other users' records look exactly like missing ones.
+- Database-backed sessions that sign-out revokes, bcrypt passwords with email confirmation, and Google ID-token verification with single-use nonces.
+- A strict nonce-based Content Security Policy, CSRF protection, per-route request-size limits, and rate limits on sign-in and uploads.
+- Hostile-file handling (bounded DOCX parsing, a resource-limited PDF worker), encrypted drafts, and log filtering of text and identities.
+
+Controls, limits, and residual risks: [security](docs/security.md).
+
+## Testing and release quality
+
+As of V1.1 (October 2026): **1,187 unit and integration tests** and **176 browser system tests** (headless Chrome).
+
+- **Concurrency:** multi-process tests with barriers for upload budgets, launches, and reference creation; draft-save races.
+- **Replay and recovery:** lost responses, Back/Forward navigation, multiple tabs, cancelled uploads, duplicate and stale jobs.
+- **Database:** constraint and trigger tests, migration lock rehearsals, and a check that `structure.sql` matches PostgreSQL's own output.
+- **Operations:** a local backup/restore drill, a production-boot contract test for the Kamal configuration, and a [breaker script](script/breakers/chunked_request_memory.rb) that loads the production Docker image with many large request bodies under a 768 MiB memory limit.
+- **Languages:** a test that the EN/VI/JA locale files define the same keys.
+
+`bin/ci` runs the full gate locally: RuboCop, whitespace, bundler-audit, importmap audit, Brakeman, Zeitwerk, a pending-migration check, and every test. GitHub Actions runs the same checks (except the local-only migration-status steps) as five jobs (`scan_ruby`, `scan_js`, `lint`, `test`, `system-test`), and [a test](test/config/ci_gate_test.rb) fails if `bin/ci` gains a step that CI does not run. Tests never call a real AI provider: provider clients are replaced by fakes, and Ruby `Net::HTTP` connections from tests are limited to loopback.
+
+Every change is reviewed along the same dimensions:
+
+| Dimension | Examples here |
+| --- | --- |
+| Security | ownership scoping, signed identities, input bounds, bounded file parsing |
+| Data | PostgreSQL constraints and triggers, versioned history, restore drills |
+| Flow | idempotent launches, replay-safe autosave, explicit retries |
+| Environment | browser system tests, production-boot contract, preflight checks |
+| Performance | bounded cleanup batches, upload and response size limits |
+| Simplicity | one monolith, PostgreSQL-only infrastructure, focused services |
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Backend | Ruby 3.4, Rails 8.1, Puma |
+| Frontend | Hotwire (Turbo, Stimulus) via importmap — no JavaScript build step; Tailwind CSS 4 |
+| Database | PostgreSQL 17 with `structure.sql`, CHECK constraints, triggers, advisory locks |
+| Jobs, cache, cable | Solid Queue, Solid Cache, Solid Cable (all PostgreSQL; no Redis) |
+| AI gateway | OpenRouter behind `Ai::OpenRouterClient` (timeouts, 1 MiB response cap) |
+| Files | Active Storage on a private volume; `rubyzip`, `pdf-reader` |
+| Auth | `has_secure_password`, database sessions, Google Identity Services |
+| Testing and scanning | Minitest, Capybara, Selenium; RuboCop, Brakeman, bundler-audit |
+| Deployment | Docker, Kamal 2, kamal-proxy, Thruster |
+
+## Run it locally
+
+**Prerequisites:** Ruby 3.4.10, Docker (for PostgreSQL 17), and Chrome or Chromium for system tests. Ubuntu and macOS both work.
 
 ```sh
-bin/rails backend:cleanup_unattached_blobs
-BEFORE=2026-01-01T00:00:00Z bin/rails backend:remediate_legacy_errors
+git clone https://github.com/XKeviNguyen/three_heavens.git
+cd three_heavens
+cp .env.example .env        # then set the values below
+bundle install
 ```
 
-The legacy-error task examines only failed AI runs before the explicit cutoff, never prints stored error content, replaces at most 100 rows per invocation by default with a fixed safe message, and is idempotent. Use `BATCH_SIZE` to select a smaller batch or at most 1,000 rows. Repository-controlled structured operational events go to standard output and contain only allowlisted bounded fields; production log retention belongs to the deployment log collector and must be configured there rather than by deleting durable product records.
-
-Final translation owners can download the current draft or finalized version as exact UTF-8 TXT or as a clean macro-free OOXML DOCX generated solely from the authoritative final text. TXT contains exactly the stored text with no BOM or added prose. DOCX preserves Unicode, LF paragraph/blank-line semantics, tabs, and XML whitespace, and contains a small app-generated style plus safe core metadata; it never copies the uploaded package, relationships, provider data, or hidden private content. Three Heavens' generated DOCX subset round-trips through its importer to the same normalized text. Exports are generated on demand and are not stored.
-
-## Health endpoints
-
-- `/up` is lightweight process liveness: Rails successfully booted.
-- `/ready` is web readiness: the primary database accepts a minimal `SELECT 1`.
-
-Readiness returns only `ready` or `unavailable`; it never calls OpenRouter or exposes database errors. The primary database is the readiness contract because every authenticated web workflow depends on it, while queue/cache/cable degradation is separately visible to operators and does not necessarily make basic web serving unsafe.
-
-## Production operations
-
-The authoritative recovery set is the primary PostgreSQL database plus private Active Storage files. Cache and cable are rebuildable; the queue database is rebuilt empty during disaster recovery so old paid-work jobs are not blindly replayed. Create a versioned checksum-protected bundle with `bin/ops/backup /absolute/backup-root`, verify an isolated restore with `RESTORE_DATABASE_URL` and `RESTORE_STORAGE_PATH` plus `bin/ops/restore-verify BUNDLE_PATH`, and preview/execute local completed-bundle retention with `bin/ops/backup-prune`.
-
-Run `bin/ops/preflight` before deployment and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. Operational events are fixed-schema one-line JSON on the normal Rails logger; arbitrary metadata and private content are rejected. `/up` remains process liveness, `/ready` remains primary-database readiness, and the admin-only Operations page reports generic aggregate dependency diagnostics. No health, preflight, restore, or smoke command calls OpenRouter automatically.
-
-The Operations page also reports migration readiness and a validated release SHA when `KAMAL_VERSION` or `RELEASE_SHA` exposes one. It never renders raw errors, source text, prompts, provider bodies, storage paths, keys, or credentials. Application requests declaring a body larger than 21 MiB are rejected before parsing, and bodies without `Content-Length` are bounded to the same 21 MiB while they are read. The trusted edge proxy must enforce the same 21 MiB limit so oversized bodies are rejected before they reach the application.
-
-Detailed executable procedures are in:
-
-- [Backup and restore](docs/operations/backup-and-restore.md)
-- [Disaster recovery](docs/operations/disaster-recovery.md)
-- [Production deployment and rollback](docs/operations/production-deploy.md)
-
-## Production configuration
-
-Production fails fast when its public host or database URLs are missing. Required runtime secret variable names are:
-
-- `RAILS_MASTER_KEY`
-- `DATABASE_URL`
-- `CACHE_DATABASE_URL`
-- `QUEUE_DATABASE_URL`
-- `CABLE_DATABASE_URL`
-- `OPENROUTER_API_KEY`
-
-Required non-secret runtime variable names are:
-
-- `APP_HOST`
-- optional `RAILS_LOG_LEVEL`
-- optional `RAILS_MAX_THREADS`
-- optional `JOB_CONCURRENCY`
-- optional `AI_STALE_EXECUTION_THRESHOLD_MINUTES`
-
-The four database URLs must point to distinct PostgreSQL databases or otherwise deliberately isolated databases for these roles:
-
-- primary application records and migrations;
-- Solid Cache (`db/cache_schema.rb`, migrations path `db/cache_migrate`);
-- Solid Queue (`db/queue_schema.rb`, migrations path `db/queue_migrate`);
-- Solid Cable (`db/cable_schema.rb`, migrations path `db/cable_migrate`).
-
-Production assumes TLS terminates at the trusted Kamal proxy, forces HTTPS for browser traffic, uses secure cookies and HSTS, and authorizes only `APP_HOST` for normal requests. Kamal-proxy checks the target container with its internal target-style Host, so only the lightweight `/up` liveness endpoint is excluded from Host Authorization. `/ready` remains Host-authorized. Both health endpoints may be checked directly inside the private container network without an HTTPS redirect. Do not expose PostgreSQL publicly; place it on a private network or bind any accessory port to loopback only.
-
-Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and does not require real secrets or a live database. That build-only flag must not be used for a running production server.
-
-Active Storage production files use the local `/rails/storage` path, backed by the named `three_heavens_storage` Kamal volume. The volume is not served as a public directory and survives application-container replacement. The image runs as uid/gid 1000, so the mounted storage volume must remain writable by that identity. Do not bake uploads into an image. Production backup and recovery cover the authoritative primary PostgreSQL database and the persistent storage volume; cache and cable are recreated, and queue state follows the documented no-stale-replay recovery policy.
-
-## Kamal prerequisites
-
-`config/deploy.yml` contains no example destination and fails fast until operators supply:
-
-- `KAMAL_WEB_HOST`
-- `APP_HOST`
-- `KAMAL_IMAGE` (the repository name/path within the registry, without the registry hostname)
-- `KAMAL_REGISTRY_SERVER`
-- `KAMAL_REGISTRY_USERNAME`
-- secret `KAMAL_REGISTRY_PASSWORD`
-- every runtime secret name listed above
-
-Populate Kamal secrets through the operator's approved secret manager or local Kamal secret mechanism; never commit their values. The image continues to run as the non-root `rails` user. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
-
-## Validation
-
-The complete local quality gate is:
+`.env` (read by `dotenv-rails` in development and test only, and ignored by git):
 
 ```sh
-bin/rails db:migrate
-bin/rails db:migrate:status
-bin/rails test
-bin/rails test:system
-bin/rubocop
-bin/brakeman --no-pager
-bin/bundler-audit
-bin/importmap audit
-git diff --check
-bin/rails zeitwerk:check
+POSTGRES_USER=three_heavens
+POSTGRES_PASSWORD=choose_a_local_password
+POSTGRES_PORT=5433
+OPENROUTER_API_KEY=          # optional; leave empty unless you intend to pay for real AI calls
+GOOGLE_CLIENT_ID=            # optional; Google sign-in is hidden when empty
 ```
 
-Tests use deterministic fakes and Active Job's test adapter. They require PostgreSQL and a local Chrome/Chromium browser for system tests, but never require `OPENROUTER_API_KEY` and never make a real provider request.
+```sh
+docker compose up -d postgres        # PostgreSQL 17 bound to 127.0.0.1 only
+bin/rails db:prepare                 # creates and migrates the databases
+bin/rails accounts:bootstrap_admin   # prompts for an admin email and password
+bin/dev                              # Rails + Tailwind watcher on http://localhost:3000
+```
 
-## Supply-chain maintenance
+In development, jobs run inside the web process (Rails' async adapter), so no separate worker is needed.
 
-CI actions use verified release commit SHAs with version comments, maintained by
-weekly grouped GitHub Actions Dependabot updates. Bundler updates remain weekly
-and separate. Update the setup-ruby pin when adopting a Ruby version newer than
-that action release. CI grants only `contents: read` and does not persist checkout
-credentials. Keep `pull_request` execution and all five fail-closed jobs.
+**Without an AI key** everything except the AI steps works: accounts, projects, uploads and text extraction, glossaries, references, methodologies, workflow setups, drafts, history, and the UI in all three languages. Running translations, reviews, judging, or suggestions needs a paid `OPENROUTER_API_KEY` and **AI access** turned on for the account under Admin → Users. Models are picked from the OpenRouter catalog right in the form; browsing the catalog is free. To see the full flow without paying, run `bin/capture-readme-screenshots`, which drives the real UI end to end with a fake AI client against the test database.
 
-The Dockerfile base, Dockerfile frontend, and both CI PostgreSQL services use
-official multi-architecture index digests resolved from Docker Hub. Before each
-release, review upstream security updates and refresh these digests with
-`docker buildx imagetools inspect <image:tag>`; use the top-level digest, retaining
-the readable tag. Update both PostgreSQL services together. These image pins
-require manual review; the configured Dependabot ecosystems maintain actions and
-gems. Validate a bounded production build and all five CI jobs after updates.
-Pinning the frontend also stabilizes build checks under `check=error=true`.
-Debian packages remain unpinned to receive repository security fixes, so builds
-are not claimed to be bit-for-bit reproducible. Kamal still builds for amd64.
+**Checks:**
 
-RuboCop caches contain lint results, and setup-ruby caches installed gems keyed
-by runtime and lockfile. Neither cache should contain secrets. GitHub's branch
-and pull-request cache scopes prevent caches written by a pull request from
-being restored by the base branch; keep this workflow free of privileged
-`pull_request_target` or `workflow_run` execution of pull-request code.
+```sh
+bin/rails test            # unit and integration tests
+bin/rails test:system     # browser tests (headless Chrome)
+bin/ci                    # the full local gate, same checks as CI
+```
+
+> The Compose volume `three_heavens_postgres_data` (prefixed with the Compose project name) holds your local data; `docker compose down -v` deletes it.
+
+## Project structure
+
+```text
+app/
+  controllers/   HTTP boundary: authentication, ownership lookups, parameter shape
+  forms/         TranslationWorkspace – validates and launches a translation
+  models/        durable state and invariants (Experiment, TranslationRun, …)
+  services/      workflows by domain: blind_reviews/, judging/, pipelines/,
+                 source_imports/, translation_workspace_drafts/, ai/, operations/
+  jobs/          AI runs, automatic-workflow advancement, reconciliation, cleanup
+  javascript/    Stimulus controllers: autosave and navigation guard, uploads, model browser
+  views/         server-rendered ERB with Turbo
+config/          routes, CI gate (ci.rb), recurring jobs, Kamal deploy.yml, locales (en/vi/ja)
+db/              migrations and structure.sql (PostgreSQL's own dump)
+bin/ops/         backup, restore verification, preflight, post-deploy smoke test
+docs/            architecture, security, operations, user guide
+script/          README screenshot capture, production-image breaker, edge-proxy evaluation
+test/            unit, integration, system, concurrency, migration, and config tests
+```
+
+## Deployment
+
+The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image behind kamal-proxy (TLS), Thruster in front of Puma, Solid Queue supervised inside Puma, four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
+
+Runbooks: [configuration](docs/operations/configuration.md) · [production deploy and rollback](docs/operations/production-deploy.md) · [backup and restore](docs/operations/backup-and-restore.md) · [disaster recovery](docs/operations/disaster-recovery.md).
+
+## Status and limitations
+
+- **V1.1, release candidate.** The `develop` branch passes the CI gate above. Production deployment is a separate, human-controlled step; this README does not claim a live deployment, traffic, or uptime.
+- **One AI provider:** all AI calls go through OpenRouter.
+- **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
+- **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
+- **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
+- **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
+- **License:** no open-source license has been chosen yet. You are welcome to read and evaluate the code; all other rights are reserved.
+
+Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)

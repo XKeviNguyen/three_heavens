@@ -1,0 +1,81 @@
+<%# locals: role:, name:, saved_name:, max:, selected:, label:, hint:, description: nil %>
+<% browser_id = "model-browser-#{name.parameterize}" %>
+<div data-controller="model-browser"
+     id="<%= browser_id %>"
+     data-model-browser-role-value="<%= role %>"
+     data-model-browser-name-value="<%= name %>"
+     data-model-browser-saved-name-value="<%= saved_name %>"
+     data-model-browser-max-value="<%= max %>"
+     data-model-browser-endpoint-value="<%= open_router_catalog_path %>"
+     data-model-browser-messages-value="<%= t("model_browser").to_json %>"
+     class="min-w-0 space-y-4">
+  <div class="flex flex-wrap items-center gap-1.5">
+    <h3 class="text-sm font-semibold text-slate-900"><%= label %></h3>
+    <%= render "shared/hint", text: hint, label: label %>
+    <span class="ml-auto text-xs font-medium text-slate-500"><%= t("model_browser.selected") %> <span data-model-browser-target="count">0/<%= max %></span></span>
+  </div>
+  <% if local_assigns[:description].present? %>
+    <p class="text-xs text-slate-500"><%= description %></p>
+  <% end %>
+
+  <div class="rounded-xl bg-blue-50/60 p-3 ring-1 ring-inset ring-blue-100">
+    <div class="flex items-center justify-between gap-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-blue-800"><%= t("model_browser.selected_models") %></p>
+      <p data-model-browser-target="meta" class="text-xs font-medium text-blue-700"><%= t("model_browser.selected_many", count: 0) %></p>
+    </div>
+    <div data-model-browser-target="selected" class="mt-2 space-y-2">
+      <% selected.each do |model| %>
+        <div data-model-card data-identifier="<%= model[:identifier] %>" class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          <input type="hidden" name="<%= model[:input_name] || name %>" value="<%= model[:input_value] || model[:identifier] %>">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold text-slate-900"><%= model[:name] %></p>
+            <p class="truncate font-mono text-xs text-slate-500"><%= model[:identifier] %></p>
+          </div>
+          <button type="button" data-action="model-browser#remove" aria-label="<%= t("model_browser.remove_model", name: model[:name]) %>" class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><%= t("model_browser.remove") %></button>
+        </div>
+      <% end %>
+    </div>
+    <p data-model-browser-target="empty" class="mt-2 text-xs text-blue-700"><%= t("model_browser.empty_selected") %></p>
+  </div>
+
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div class="relative border-b border-slate-100 p-3">
+      <svg class="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="9" cy="9" r="5.5"/>
+        <path stroke-linecap="round" d="M13.2 13.2 17 17"/>
+      </svg>
+      <input type="text"
+             data-model-browser-target="search"
+             data-action="input->model-browser#search focus->model-browser#openResults keydown->model-browser#keydown"
+             role="combobox"
+             aria-autocomplete="list"
+             aria-expanded="false"
+             aria-controls="<%= browser_id %>-results"
+             placeholder="<%= t("model_browser.search_placeholder") %>"
+             autocomplete="off"
+             class="block w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
+    </div>
+    <div class="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+      <label class="inline-flex items-center gap-1.5">
+        <span class="font-medium"><%= t("model_browser.provider") %></span>
+        <select data-model-browser-target="provider" data-action="change->model-browser#filter" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option value=""><%= t("model_browser.all_providers") %></option>
+        </select>
+      </label>
+      <label class="inline-flex items-center gap-1.5 font-medium">
+        <input type="checkbox" data-model-browser-target="free" data-action="change->model-browser#filter" class="size-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <%= t("model_browser.free_only") %>
+      </label>
+      <label class="ml-auto inline-flex items-center gap-1.5">
+        <span class="font-medium"><%= t("model_browser.sort") %></span>
+        <select data-model-browser-target="sort" data-action="change->model-browser#filter" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option value="name"><%= t("model_browser.name") %></option>
+          <option value="price"><%= t("model_browser.price") %></option>
+          <option value="context"><%= t("model_browser.context") %></option>
+        </select>
+      </label>
+    </div>
+    <div id="<%= browser_id %>-results" data-model-browser-target="list" role="listbox" aria-label="<%= t("model_browser.results") %>" class="max-h-[28rem] overflow-y-auto overflow-x-hidden"></div>
+  </div>
+  <p data-model-browser-target="status" role="status" aria-live="polite" class="text-xs text-slate-500"><%= t("model_browser.loading") %></p>
+</div>

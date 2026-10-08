@@ -22,6 +22,26 @@ class Operations::Restore::StorageExtractorTest < ActiveSupport::TestCase
     end
   end
 
+  # Stored uploads (PDF, DOCX, UTF-8 text) are arbitrary bytes. This round trip
+  # uses the backup archiver and crosses the extractor's 1 MiB read chunk.
+  test "restores every byte value of a stored object exactly" do
+    bytes = (0..255).map(&:chr).join.b * 4200
+    Dir.mktmpdir("three-heavens-binary-") do |root|
+      source = File.join(root, "source")
+      FileUtils.mkdir_p(File.join(source, "ab", "cd"))
+      File.binwrite(File.join(source, "ab", "cd", "abcdefghijklmnopqrstuvwxyz"), bytes)
+      archive = File.join(root, "storage.tar.gz")
+      Operations::Backup::StorageArchive.create(source: Pathname.new(source).realpath, destination: Pathname.new(archive))
+      destination = File.join(root, "restore")
+
+      result = Operations::Restore::StorageExtractor.call(archive_path: archive, destination: destination)
+
+      assert_equal bytes.bytesize, result.total_bytes
+      assert_operator bytes.bytesize, :>, 1024 * 1024
+      assert_equal bytes, File.binread(File.join(destination, "ab", "cd", "abcdefghijklmnopqrstuvwxyz"))
+    end
+  end
+
   test "rejects traversal absolute link and duplicate archive entries" do
     attacks = {
       traversal: ->(tar) { tar.add_file_simple("../escape", 0o600, 1) { |file| file.write("x") } },

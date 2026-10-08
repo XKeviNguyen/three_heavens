@@ -1,0 +1,43 @@
+<%# Illustrative only: generic models and example scores, rendered without inline styles (CSP style-src 'self'). %>
+<figure class="translation-flow" aria-labelledby="translation-flow-caption">
+  <figcaption id="translation-flow-caption" class="sr-only"><%= t("landing.flow.accessible_description") %></figcaption>
+  <div class="translation-flow-graphic" aria-hidden="true">
+    <div class="flow-card flow-source">
+      <span class="flow-icon"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20H7zM14 3.5V8h4M10 12h5M10 15h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg></span>
+      <span><strong><%= t("landing.flow.source.title") %></strong><small><%= t("landing.flow.source.preview") %></small></span>
+      <em><%= t("landing.flow.source.language") %></em>
+    </div>
+
+    <div class="flow-models">
+      <% { "a" => [92, 88, 85], "b" => [85, 91, 82], "c" => [78, 84, 90] }.each do |model, scores| %>
+        <div class="flow-card flow-model flow-model-<%= model %>">
+          <div class="flow-model-heading"><span class="flow-model-glyph"><%= model.upcase %></span><strong><%= t("landing.flow.models.#{model}.title") %></strong></div>
+          <p lang="<%= t("landing.flow.target_locale") %>"><%= t("landing.flow.models.#{model}.preview") %></p>
+          <dl>
+            <% %w[quality accuracy style].zip(scores).each do |metric, score| %>
+              <div>
+                <dt><%= t("landing.flow.metrics.#{metric}") %></dt>
+                <dd><svg class="flow-score" viewBox="0 0 100 4" preserveAspectRatio="none"><rect width="100" height="4" rx="2"/><rect class="flow-score-fill" width="<%= score %>" height="4" rx="2"/></svg><b><%= score %></b></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="flow-stack">
+      <div class="flow-card flow-winner">
+        <span class="flow-icon"><svg viewBox="0 0 24 24"><path d="M8 4h8v4c0 3.2-1.5 5.4-4 6.5C9.5 13.4 8 11.2 8 8V4Zm0 2H4c0 3 1.3 4.5 4.1 5M16 6h4c0 3-1.3 4.5-4.1 5M12 14.5V18M8.5 20h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg></span>
+        <span><strong><%= t("landing.flow.winner.title") %></strong><small><%= t("landing.flow.winner.description") %></small></span>
+      </div>
+      <div class="flow-card flow-human">
+        <span class="flow-avatar"><svg viewBox="0 0 32 32"><circle cx="16" cy="12" r="5.5" fill="currentColor" opacity=".7"/><path d="M6.5 28c.9-6 4-9 9.5-9s8.6 3 9.5 9" fill="currentColor"/></svg></span>
+        <span><strong><%= t("landing.flow.approval.title") %></strong><small><%= t("landing.flow.approval.description") %></small></span>
+      </div>
+      <div class="flow-card flow-final">
+        <span class="flow-final-check"><svg viewBox="0 0 20 20"><path d="m5.5 10.5 3 3 6-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg></span>
+        <span><strong><%= t("landing.flow.final.title") %></strong><small><%= t("landing.flow.final.description") %></small></span>
+      </div>
+    </div>
+  </div>
+</figure>

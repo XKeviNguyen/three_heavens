@@ -1,0 +1,14 @@
+<% content_for :title, t("landing.title") %>
+<% content_for :meta_description, t("landing.meta_description") %>
+
+<div class="landing-page">
+  <%= render "landing/header" %>
+  <main id="main-content" tabindex="-1">
+    <%= render "landing/hero" %>
+    <%= render "landing/value_points" %>
+    <%= render "landing/decision_flow" %>
+    <%= render "landing/trust_principles" %>
+    <%= render "landing/final_cta" %>
+  </main>
+  <%= render "landing/footer" %>
+</div>

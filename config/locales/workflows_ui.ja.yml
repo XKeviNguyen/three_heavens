@@ -1,0 +1,55 @@
+ja:
+  workflows_ui:
+    title: ワークフロー設定 · Three Heavens
+    edit_title: ワークフロー設定の編集 · Three Heavens
+    new_title: 新しいワークフロー設定 · Three Heavens
+    show_title: '%{name} · ワークフロー設定 · Three Heavens'
+    configuration: 設定内容
+    completion_mode: "停止するタイミング"
+    winner_help: "採用された翻訳から下書きを作り、あなたが編集できるよう停止します。"
+    refinement_help: "AIの修正案も作成しますが、自動で適用や確定はしません。"
+    select_range: '%{minimum}～%{maximum}件を選択'
+    finalizer_range: "選ばない場合は採用訳の下書きで停止します。修正案も作る場合は1～%{maximum}件選びます。"
+    role_order: "%{selection}。表示順にモデルを使います。"
+    role_models: '%{role}モデル'
+    role_hints:
+      translator: 独立した翻訳候補を作るモデルです。
+      reviewer: "各候補を項目ごとに評価するモデルです。"
+      judge: 評価済みの候補を独立して採点・順位付けするモデルです。
+      finalizer: "改善のための修正案を出すモデルです。自動では適用しません。"
+    roles:
+      translator: 翻訳
+      reviewer: レビュー
+      judge: 判定
+      finalizer: "修正案"
+    saving: 設定を保存中…
+    automation: 自動化
+    create_revision: "第%{version}版として保存"
+    edit_intro: "第%{version}版は変更されないため、この版を使ったワークフローを後から確認できます。"
+    heading: ワークフロー設定
+    singular: ワークフロー設定
+    index_intro: "自分だけの再利用できる自動ワークフローです。編集するたびに新しい版が保存されます。"
+    new: 新しいワークフロー設定
+    empty: ワークフロー設定はまだありません
+    empty_intro: "翻訳の開始時に、翻訳・レビュー・判定を自動で進めるための設定を作成します。"
+    updated: 更新 %{at}
+    revision: 版
+    mode: モード
+    view: 表示
+    edit: 編集
+    duplicate: 複製
+    deactivate: 無効にする
+    deactivate_confirm: "この設定を無効にしますか？実行済みのワークフローは変わりません。"
+    new_intro: "設定を保存してもAIには何も送信されません。この設定で翻訳を始めるたびに、費用を承認します。"
+    create: ワークフロー設定を作成
+    active_new: "有効 · 新しい翻訳で利用可能"
+    inactive_history: 無効 · 履歴のみ
+    all: 設定一覧
+    using: '設定の使い方：'
+    using_intro: この設定は
+    using_confirmation: "開始するたびに、AI費用の承認が必要です。"
+    eligible: 現在利用可能
+    ineligible: 現在利用不可
+    launched:
+      one: "この版を使った自動ワークフロー：1件"
+      other: "この版を使った自動ワークフロー：%{count}件"

@@ -1,8 +1,8 @@
 class SourceImport < ApplicationRecord
-  AVAILABILITY_MESSAGES = {
-    expired: "has expired; upload the source file again",
-    already_consumed: "was already used",
-    unavailable: "is no longer available; upload the source file again"
+  AVAILABILITY_ERROR_CODES = {
+    already_consumed: "already_consumed",
+    expired: "expired_import",
+    unavailable: "unavailable_import"
   }.freeze
 
   belongs_to :user
@@ -39,6 +39,7 @@ class SourceImport < ApplicationRecord
   validates :failure_code, :extraction_version, length: { maximum: 100 }, allow_nil: true
   validates :failure_message, length: { maximum: 500 }, allow_nil: true
   validates :expires_at, presence: true
+  validates :request_key, format: { with: SourceImports::Limits::REQUEST_KEY_FORMAT }, allow_nil: true
 
   scope :expired_abandoned, lambda { |cutoff = Time.current|
     where(status: %w[pending ready failed]).where(expires_at: ..cutoff)
@@ -56,9 +57,14 @@ class SourceImport < ApplicationRecord
     :unavailable
   end
 
-  def availability_message(at: Time.current)
+  def availability_error_code(at: Time.current)
     failure = availability_failure(at:)
-    AVAILABILITY_MESSAGES.fetch(failure) if failure
+    AVAILABILITY_ERROR_CODES.fetch(failure) if failure
+  end
+
+  def availability_message(at: Time.current)
+    code = availability_error_code(at:)
+    I18n.t("source_imports.errors.#{code}") if code
   end
 
   private
@@ -68,6 +74,6 @@ class SourceImport < ApplicationRecord
   end
 
   def purge_destroyed_source_file_blob
-    @destroyed_source_file_blob&.purge
+    ActiveStorageMaintenance::Purge.call(blob: @destroyed_source_file_blob) if @destroyed_source_file_blob
   end
 end

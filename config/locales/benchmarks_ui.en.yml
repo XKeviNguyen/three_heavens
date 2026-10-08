@@ -1,0 +1,67 @@
+en:
+  benchmarks_ui:
+    title: Model benchmarks · Three Heavens
+    show_title: '%{name} benchmark · Three Heavens'
+    heading: Model benchmarks
+    intro: Results are grouped by the model you chose, including inactive models that have translation history. Every average shows how many results it is based on; missing data shows as N/A.
+    sort_by: Sort by
+    sort_button: Sort
+    sort:
+      judge_samples: Judge score samples (high to low)
+      wins: Wins (high to low)
+      win_rate: Win rate (high to low)
+      review_score: Blind-review score (high to low)
+      judge_score: Judge score (high to low)
+      translation_cost: Average translation cost (low to high)
+      latency: Average response time (low to high)
+    empty: No benchmark history yet
+    empty_intro: Models appear here after they take part in a translation.
+    diagnostics: Reviewer and judge diagnostics
+    diagnostics_intro: Self-score difference is a reviewer’s average score for translations written by the same model, minus its average for translations written by other models. It is a warning sign, not proof of bias. Judge agreement shows how often a judge picked the overall winner, not whether that pick was objectively right.
+    model_role: Model role
+    self_scores: Self scores
+    other_scores: Other scores
+    self_difference: Self-score difference
+    agreement: Agrees with overall winner
+    metric_notes: Metric notes
+    metric_notes_intro: Win rate = judging rounds won ÷ finished judging rounds that included one of this model’s translations. Failed and unfinished rounds are left out. Translation counts and failure rates count each model’s whole-document translation once, even when the document was processed in parts. Quality averages use scores from finished reviews and judgments. Cost, tokens, and response time use finished translations only.
+    cost_note: Cost per judge-score point divides each finished translation’s cost by its average judge score, then averages the results. Free and unjudged translations are left out.
+    all: ← All benchmarks
+    summary: Summary
+    role_diagnostics: Role diagnostics
+    role_intro: Reviewer comparisons use the model you chose, not the model ID the AI service reported. Differences describe what happened and do not prove a cause. Judge agreement means agreeing with the overall winner, not being objectively right.
+    self_difference_heading: Does this reviewer favor its own translations?
+    self: Self
+    other: Other
+    difference: Difference
+    no_review_scores: N/A · no finished review scores.
+    agreement_heading: Agreement with the overall winner
+    agreement_detail: '%{agreements} agreement(s) across %{total} finished judgment(s)'
+    no_judge_runs: N/A · no finished judgments.
+    resolved_history: Models actually used
+    resolved_intro: OpenRouter can answer a request with a slightly different model ID than the one you chose. Unreported values are shown as unknown. Cost totals include finished translations that reported their cost.
+    resolved_identifier: Model ID used
+    runs: Translations
+    wins: Wins
+    judge_score: Judge score
+    known_cost: Known cost
+    unknown: Not reported
+    recent_history: Recent translation history
+    recent_intro: The 25 most recent translations by this model.
+    sample: Translation benchmark sample
+    official_winner: Winner
+    latency: Response time
+    review_score: Blind-review score
+    completed_translations: Finished translations
+    participation: '%{count} translation(s) · %{failed} failed · %{rate} failure rate'
+    official_wins: Wins
+    win_rate_detail: '%{rate} across %{count} finished judging round(s)'
+    score_samples: '%{count} score sample(s) · %{candidates} candidate(s)'
+    known_translation_cost: Known translation cost
+    total: '%{value} total'
+    average_samples: '%{value} average · based on %{count} finished translation(s)'
+    average_latency: Average response time
+    completed_samples: 'based on %{count} finished translation(s)'
+    average_total_tokens: Average total tokens
+    cost_per_point: Avg cost per judge-score point
+    cost_quality_samples: 'based on %{count} paid, judged translation(s) · lower is better'

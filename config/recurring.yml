@@ -26,10 +26,22 @@ production:
     class: SourceImportCleanupJob
     queue: operations
     schedule: every hour at minute 27
+  cleanup_expired_reference_creation_state:
+    class: TranslationReferenceCreationCleanupJob
+    queue: operations
+    schedule: every hour at minute 32
   cleanup_abandoned_workspace_submissions:
     class: TranslationWorkspaceSubmissionCleanupJob
     queue: operations
     schedule: every hour at minute 37
+  cleanup_expired_workspace_drafts:
+    class: TranslationWorkspaceDraftCleanupJob
+    queue: operations
+    schedule: every hour at minute 47
+  cleanup_expired_sessions:
+    class: SessionCleanupJob
+    queue: operations
+    schedule: every hour at minute 57
   cleanup_unattached_active_storage_blobs:
     class: ActiveStorageCleanupJob
     queue: operations

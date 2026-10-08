@@ -21,7 +21,7 @@ class PipelineRunsController < ApplicationController
   def stop
     reject_unexpected_parameters!
     Pipelines::Stop.call(pipeline_run: @pipeline_run)
-    redirect_to @pipeline_run, notice: "Future automatic advancement stopped. Already queued or running provider work was not cancelled."
+    redirect_to @pipeline_run, notice: t("flash_ui.pipeline.stopped")
   end
 
   private

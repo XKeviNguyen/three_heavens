@@ -1,0 +1,50 @@
+en:
+  projects_ui:
+    title: Projects · Three Heavens
+    workspaces: Translation workspaces
+    heading: Projects
+    intro: Keep related documents and their translations together. Each project uses
+      one language pair.
+    start_new: Start a new project translation
+    empty: No projects yet
+    empty_intro: Your first translation creates a private project and its first
+      document.
+    start_translation: Start a translation
+    documents: Documents
+    experiments: Translations
+    newest_activity: Newest activity
+    open_project: Open project
+    workspace: Project workspace
+    paste_start: Paste text / start translation
+    upload_source: Upload source file
+    no_documents: No source documents yet
+    no_documents_intro: Paste text or upload a source file to start this project's
+      first translation.
+    paste_source: Paste source text
+    project_documents: Project documents
+    uploaded_source: Uploaded source
+    pasted_source: Pasted source
+    download_original: Download original
+    translation_experiment: Translation
+    automatic_workflow: Automatic workflow
+    manual_workflow: Manual workflow
+    glossary: Glossary
+    methodology: Methodology
+    guidance_preference: "Guidance priority"
+    references: References
+    blind_review: Blind review
+    judge: Judging
+    final_translation: Final translation
+    not_started: Not started
+    not_created: Not created
+    experiment: Translation candidates
+    pipeline_progress: Automatic workflow progress
+    judge_results: Judging results
+    all_projects: ← All Projects
+    revision: version %{version}
+    document_count:
+      one: '%{count} document'
+      other: '%{count} documents'
+    experiment_count:
+      one: '%{count} translation'
+      other: '%{count} translations'

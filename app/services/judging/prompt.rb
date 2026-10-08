@@ -182,7 +182,7 @@ module Judging
     end
 
     def response_schema
-      labels = judge_run.judge_evaluations.map(&:anonymous_label)
+      labels = judge_run.judge_evaluations.order(:anonymous_label).pluck(:anonymous_label)
       count = labels.size
       {
         type: "object",

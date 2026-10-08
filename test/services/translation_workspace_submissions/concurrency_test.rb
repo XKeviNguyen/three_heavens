@@ -14,7 +14,9 @@ module TranslationWorkspaceSubmissions
         email: "workspace-race-#{suffix}@example.test",
         password: "workspace race password",
         role: :user,
-        status: :active
+        status: :active,
+        email_verified_at: Time.current,
+        managed_ai_access: true
       )
       @models = 2.times.map do |index|
         LlmModel.create!(
@@ -46,10 +48,10 @@ module TranslationWorkspaceSubmissions
     end
 
     test "two simultaneous automatic submissions with one token launch and schedule exactly once" do
-      submission = TranslationWorkspaceSubmission.issue!(user: @user)
+      token = TranslationWorkspaceSubmission.issue_token(user: @user)
       baseline = graph_counts
       results = concurrently(2) do
-        TranslationWorkspace.new(workspace_attributes(submission.public_token)).tap(&:submit)
+        TranslationWorkspace.new(workspace_attributes(token)).tap(&:submit)
       end
 
       assert_empty results.grep(Exception), results.grep(Exception).map(&:full_message).join("\n")
@@ -63,7 +65,7 @@ module TranslationWorkspaceSubmissions
 
     test "two concurrent reconcilers remain duplicate safe" do
       workspace = TranslationWorkspace.new(
-        workspace_attributes(TranslationWorkspaceSubmission.issue!(user: @user).public_token)
+        workspace_attributes(TranslationWorkspaceSubmission.issue_token(user: @user))
       )
       assert workspace.submit
       clear_enqueued_jobs

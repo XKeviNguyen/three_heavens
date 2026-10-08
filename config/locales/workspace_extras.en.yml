@@ -1,0 +1,19 @@
+en:
+  workspace_ui:
+    adding_to: Adding to
+    file_limits: TXT, Markdown, DOCX, or PDF · maximum %{maximum} MiB
+    references_selected: '%{count} of 5 references selected'
+    references_empty_suffix: to add approved examples.
+    models: 'Models:'
+    profile_summary: "%{mode} · Translators: %{translators} · Reviewers: %{reviewers} · Judges: %{judges} · Suggestion models: %{finalizers}"
+    paid_plan: 'The document is processed in %{segments} part(s): %{slots} AI requests to start, and at most %{maximum}
+      in total, counting automatic retries.'
+    paid_plan_role: '%{role}: %{runs} model(s) × %{segments} part(s) = %{requests} requests'
+    draft_import_detached: The original upload is no longer attached. Your reviewed source text remains.
+    draft_configuration_changed: Some saved configuration is no longer available. Review the remaining selections.
+    draft_unreadable: "Your saved draft could not be read, so it was not restored. Your next saved change replaces it, or choose Discard draft to remove it now."
+    repeat_profile_unavailable: The automatic workflow used last time is missing model details this document needs, so
+      a manual setup was filled in with its translation models that are still available. Check or replace them before you
+      start.
+    profile_unavailable: is not available
+    repeat_of: Repeat of %{name}

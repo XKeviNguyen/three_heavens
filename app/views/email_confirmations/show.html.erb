@@ -1,0 +1,11 @@
+<% content_for :title, t("email_confirmation.title") %>
+<section class="mx-auto max-w-md">
+  <h1 class="text-3xl font-semibold"><%= t("email_confirmation.title") %></h1>
+  <% if @user && !@user.email_verified? %>
+    <p class="mt-4 leading-7 text-slate-600"><%= t("email_confirmation.ready") %></p>
+    <%= button_to t("email_confirmation.confirm"), email_confirmation_path, method: :post, params: { token: @token }, class: "mt-7 w-full rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white" %>
+  <% else %>
+    <p class="mt-4 text-slate-600"><%= t("email_confirmation.invalid") %></p>
+    <%= link_to t("email_confirmation.resend"), new_confirmation_resend_path, class: "mt-5 inline-block font-semibold text-blue-700" %>
+  <% end %>
+</section>

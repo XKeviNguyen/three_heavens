@@ -1,0 +1,22 @@
+en:
+  retry_feedback:
+    translation:
+      none: No failed translations to retry.
+      queue_failed: The retry couldn't start. The failed translations are still there to retry later.
+      partial: Retrying %{queued} failed translation(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed translation(s).
+    reviewer:
+      none: No failed reviews to retry.
+      queue_failed: The retry couldn't start. The failed reviews are still there to retry later.
+      partial: Retrying %{queued} failed review(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed review(s).
+    judge:
+      none: No failed judgments to retry.
+      queue_failed: The retry couldn't start. The failed judgments are still there to retry later.
+      partial: Retrying %{queued} failed judgment(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed judgment(s).
+    refinement:
+      none: No failed suggestions to retry.
+      queue_failed: The retry couldn't start. The failed suggestions are still there to retry later.
+      partial: Retrying %{queued} failed suggestion(s); %{failed} couldn't start and can be retried later.
+      queued: Retrying %{count} failed suggestion(s).

@@ -122,6 +122,8 @@ module Operations
       def write_file!(entry, path)
         ensure_safe_parents!(path.parent)
         File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |output|
+          # Stored objects are arbitrary bytes; text mode would transcode them.
+          output.binmode
           while (chunk = entry.read(1024 * 1024)).present?
             output.write(chunk)
           end

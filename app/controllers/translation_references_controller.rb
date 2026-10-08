@@ -1,4 +1,5 @@
 class TranslationReferencesController < ApplicationController
+  include UploadBudgetAdmission
   SCALAR_KEYS = %w[
     title
     source_language
@@ -10,6 +11,9 @@ class TranslationReferencesController < ApplicationController
   FILE_KEYS = %w[source_file approved_translation_file].freeze
 
   before_action :set_translation_reference, only: %i[show edit update activate deactivate]
+  # Requests that carry files share the account's upload budget with source
+  # imports (SourceImports::Limits::UPLOADS_PER_WINDOW); text-only edits do not.
+  before_action :admit_upload, only: :update, if: :uploading_files?
 
   def index
     @translation_references = paginate(
@@ -23,13 +27,21 @@ class TranslationReferencesController < ApplicationController
   end
 
   def create
-    attributes = TranslationReferences::AuthoringAttributes.call(
-      exact_reference_parameters!(include_expected_version: false)
-    )
-    reference = TranslationReferences::Create.call(user: current_user, attributes: attributes)
-    redirect_to reference, notice: "Translation reference created."
+    submitted = exact_reference_parameters!(include_expected_version: false)
+    creation_key = submitted.delete("creation_key")
+    reference = TranslationReferences::Create.call(user: current_user, attributes: submitted, creation_key:)
+    redirect_to reference, notice: t("flash_ui.reference.created")
+  rescue SourceImports::Create::RateLimited
+    render_rate_limited
+  rescue TranslationReferences::Create::InProgress => error
+    @creation_key = creation_key
+    @form_values = safe_submitted_values
+    @form_errors = [ error.message ]
+    render :new, status: :service_unavailable
+  rescue TranslationReferences::AuthoringAttributes::Busy => error
+    render_busy(error)
   rescue TranslationReferences::AuthoringAttributes::Error, ActiveRecord::RecordInvalid => error
-    @form_values = safe_submitted_values.merge(attributes || {})
+    @form_values = safe_submitted_values
     @form_values.merge!(error.resolved_attributes) if error.is_a?(TranslationReferences::AuthoringAttributes::Error)
     @form_errors = error_messages(error)
     render :new, status: :unprocessable_content
@@ -54,7 +66,9 @@ class TranslationReferencesController < ApplicationController
       expected_version: expected_version,
       attributes: attributes
     )
-    redirect_to @translation_reference, notice: "Translation reference revision #{revision.version} created."
+    redirect_to @translation_reference, notice: t("flash_ui.reference.revision", version: revision.version)
+  rescue TranslationReferences::AuthoringAttributes::Busy => error
+    render_busy(error)
   rescue TranslationReferences::Revise::StaleRevisionError => error
     @current_revision = @translation_reference.reload.current_revision
     @form_values = attributes.merge(
@@ -72,17 +86,38 @@ class TranslationReferencesController < ApplicationController
   def activate
     reject_unexpected_parameters!
     TranslationReferences::ChangeStatus.activate(translation_reference: @translation_reference)
-    redirect_to @translation_reference, notice: "Translation reference activated."
+    redirect_to @translation_reference, notice: t("flash_ui.reference.activated")
   end
 
   def deactivate
     reject_unexpected_parameters!
     TranslationReferences::ChangeStatus.deactivate(translation_reference: @translation_reference)
     redirect_to @translation_reference,
-                notice: "Translation reference archived. Historical experiment snapshots remain available."
+                notice: t("flash_ui.reference.archived")
   end
 
   private
+
+  def render_busy(error)
+    refund_upload_budget if action_name == "update" && !error.work_consumed
+    response.set_header("Retry-After", SourceImports::Limits::BUSY_RETRY_AFTER_SECONDS.to_s)
+    @form_values = safe_submitted_values.merge(error.resolved_attributes)
+    @form_errors = [ t("source_imports.errors.#{error.code}", default: error.message) ]
+    render(action_name == "create" ? :new : :edit, status: :service_unavailable)
+  end
+
+  def render_rate_limited
+    response.set_header("Retry-After", SourceImports::Limits::UPLOAD_WINDOW.to_i.to_s)
+    @creation_key = params.dig(:translation_reference, :creation_key) if action_name == "create"
+    @form_values = safe_submitted_values
+    @form_errors = [ t("source_imports.errors.rate_limited") ]
+    render(action_name == "create" ? :new : :edit, status: :too_many_requests)
+  end
+
+  def uploading_files?
+    submitted = params[:translation_reference]
+    submitted.is_a?(ActionController::Parameters) && FILE_KEYS.any? { |key| submitted[key].present? }
+  end
 
   def set_translation_reference
     @translation_reference = current_user.translation_references.includes(:current_revision).find(params[:id])
@@ -95,6 +130,7 @@ class TranslationReferencesController < ApplicationController
     end
 
     scalar_keys = include_expected_version ? SCALAR_KEYS : SCALAR_KEYS - [ "expected_version" ]
+    scalar_keys += [ "creation_key" ] unless include_expected_version
     allowed = scalar_keys + FILE_KEYS
     raise ActionController::BadRequest, "Unexpected parameters" if (submitted.keys - allowed).any?
     scalar_keys.each do |key|
@@ -106,6 +142,13 @@ class TranslationReferencesController < ApplicationController
       next if value.nil? || value.is_a?(ActionDispatch::Http::UploadedFile)
 
       raise ActionController::BadRequest, "#{key} must be an uploaded file"
+    end
+
+    unless include_expected_version
+      key = submitted[:creation_key]
+      unless key.is_a?(String) && key.match?(SourceImports::Limits::REQUEST_KEY_FORMAT)
+        raise ActionController::BadRequest, "creation_key must identify one reference action"
+      end
     end
 
     submitted.permit(*scalar_keys, *FILE_KEYS).to_h

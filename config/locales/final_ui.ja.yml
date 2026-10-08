@@ -1,0 +1,104 @@
+ja:
+  final_ui:
+    title: 最終訳の編集 · Three Heavens
+    return_project: ← %{name}に戻る
+    heading: 最終訳の編集
+    seed_winner: "採用された翻訳の作成モデル："
+    finalized_at: 確定 %{at}
+    refinement_running: AIの修正案を作成中です。
+    no_auto_reload: 編集中の内容を守るため、このページは自動更新されません。
+    refresh: "新しい修正案を確認"
+    refresh_confirm: "新しい修正案を確認しますか？未保存の編集内容は失われます。"
+    related_pages: "これまでの段階"
+    reference: "参考訳"
+    glossary_snapshot: "使用した用語集"
+    reference_examples: "参考訳 · %{count}件を使用"
+    no_references: "この翻訳では参考訳を使用していません。"
+    evidence: "この翻訳が採用された理由"
+    evidence_intro: ブラインドレビューと判定結果を編集時の参考として保持しています。
+    original_winner: 採用候補の元の訳文を見る
+    review_score: レビュー%{number} · %{score}/10点
+    judge_score: 判定%{number} · 順位%{rank} · %{score}/100点
+    editor: 最終訳エディター
+    approved: 承認済みの最終訳
+    current_draft: 現在の下書き
+    version: 第%{number}版
+    origin_label: 作成方法：%{origin}
+    origins:
+      seed: "採用された翻訳"
+      manual: 手動編集
+      ai_applied: "AIの修正案を適用"
+      restored: 復元
+    finalized_read_only: 確定済み · 閲覧のみ
+    draft_editable: 下書き · 編集可能
+    persisted_for_reconciliation: "比較用の保存済みの版"
+    newer_version: 新しい保存版があります：第%{number}版
+    conflict_intro: 送信した文章は下の編集欄に残っています。保存済みの版と比較して変更を整理し、再度保存してください。
+    persisted_version: "保存済みの第%{number}版"
+    submitted_draft: "あなたの文章"
+    draft_label: 最終訳の下書き
+    save_help: "保存すると新しい版が作られ、以前の版も残ります。保存後は、現在の版に対するAIの修正案を適用できなくなります。"
+    change_note_optional: 変更メモ（任意）
+    change_note_placeholder: 変更内容を簡潔に記入
+    save_revision: 新しい版を保存
+    save_immutable: "保存すると新しい版が作られます。以前の版は変わりません。"
+    download_txt: TXTをダウンロード
+    download_docx: DOCXをダウンロード
+    proposals: AIの修正案
+    proposals_intro: "各モデルが現在の版の改善案を出します。あなたが適用するまで下書きは変わりません。"
+    segment_cost: "この文書は%{count}部分に分けて処理するため、選んだモデルごとに%{count}件のAIリクエストを送ります。自動再試行で少し増える場合があります。"
+    alignment_unavailable: "手動で編集したため、この下書きは原文の各部分と対応しなくなりました。AIの修正案は使えませんが、手動での編集と確定はできます。"
+    active_finalizers: "利用できるモデル（最大%{maximum}件）"
+    no_finalizers: "利用できる修正案モデルがありません。"
+    start_refinement: 修正案を作成
+    start_refinement_confirm: "選択したモデルに修正案を依頼しますか？AIリクエストが送信され、費用が発生する場合があります。修正案は自動では適用されません。"
+    starting_refinement: 修正案の作成を開始中…
+    no_proposals: 修正案はまだありません。AIを使わずに下書きを保存・確定できます。
+    round: "第%{version}版への修正案"
+    retry_intro: "%{count}件の修正案の作成に失敗しました。完了済みの修正案は変わりません。失敗したリクエストごとに最大%{attempts}回まで再試行するため、費用が発生する場合があります。"
+    retry: 失敗した修正案を再試行
+    retry_confirm: "失敗した修正案だけを再試行しますか？失敗したリクエストごとに最大%{attempts}回まで再試行し、費用が発生する場合があります。"
+    retry_old_version: "これらの修正案は以前の版に対するものなので、再試行できません。"
+    retry_unavailable: 確定済み、または過去のモデルが無効・非対応のため再試行できません。
+    exact_base: "対象の版"
+    already_applied: 適用済み
+    stale_proposal: "古い修正案"
+    applicable_proposal: "適用できる修正案"
+    segmented_progress: "部分ごとの進行状況"
+    proposed_translation: 提案された訳文
+    change_summary: 変更の要約
+    terminology_notes: 用語に関するメモ
+    warnings: 注意事項
+    none_reported: 報告なし。
+    apply_proposal: "修正案を適用"
+    apply_confirm: "この修正案を新しい版として適用しますか？現在の版は履歴に残ります。"
+    applying: "修正案を適用中…"
+    applied_as: '%{versions}として適用しました。'
+    stale_help: "この修正案は以前の版の下書きに対するものなので、適用できません。"
+    reopen_before_apply: "この修正案を適用する前に、翻訳を再編集できる状態にしてください。"
+    refinement_failed: 修正案の作成に失敗しました
+    proposal_running: "モデルが修正案を作成しています。"
+    proposal_queued: "開始待ちです。"
+    rounds: 修正案の履歴
+    history_intro: "以前の版は変わりません。復元すると新しい版が作られます。"
+    version_origin: 第%{number}版 · %{origin}
+    current_version: 現在の版
+    change_note: 変更メモ
+    none: なし
+    ai_source: 提案元のAI
+    restore: 新しい版として復元
+    restore_confirm: 第%{number}版を新しい最新版として復元しますか？履歴は削除されません。
+    restoring: 復元中…
+    view_history: "この版の内容を見る"
+    versions: 版の一覧
+    approve_heading: 最終訳を承認
+    approve_intro: 確定すると現在の版が承認済みの最終訳となり、閲覧専用になります。履歴を残したまま再編集できます。
+    finalize: 現在の版を確定
+    finalize_confirm: 第%{number}版を承認済みの最終訳として確定しますか？再編集可能にするまで編集と修正案の作成はできません。
+    finalizing: 確定中…
+    finalized_heading: 翻訳を確定しました
+    finalized_intro: 第%{number}版が承認済みの最終訳です。追加の編集や修正案が必要な場合のみ再編集してください。
+    reopen: 再編集する
+    reopen_confirm: 承認済みの訳文を再編集しますか？再確定するまでダウンロードは下書きとして扱われます。
+    reopening: 再編集の準備中…
+    version_inline: 第%{number}版

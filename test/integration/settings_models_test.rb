@@ -12,6 +12,36 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     sign_in_as @current_test_user
   end
 
+  test "admin can select an active saved outage model without catalog access or activation" do
+    model = llm_models(:openrouter_claude)
+    original_transport = OpenRouter::Catalog.transport
+    OpenRouter::Catalog.transport = -> { flunk "saved selection must not fetch the catalog" }
+    assert_no_difference -> { LlmModel.count } do
+      post catalog_settings_models_path, params: { model_id: model.id.to_s }
+    end
+    assert_redirected_to settings_models_path
+    assert model.reload.active?
+  ensure
+    OpenRouter::Catalog.transport = original_transport
+  end
+
+  test "saved admin catalog selections reject inactive IDs malformed IDs and mixed contracts" do
+    model = llm_models(:openrouter_claude)
+    model.update!(active: false)
+    post catalog_settings_models_path, params: { model_id: model.id.to_s }
+    assert_response :not_found
+    refute model.reload.active?
+    [ { model_id: "#{model.id}oops" }, { model_id: [ model.id.to_s ] },
+      { model_id: model.id.to_s, model_identifier: model.model_identifier } ].each do |selection|
+      post catalog_settings_models_path, params: selection
+      assert_response :bad_request
+    end
+    sign_out
+    sign_in_as users(:normal)
+    post catalog_settings_models_path, params: { model_id: llm_models(:openrouter_gpt).id.to_s }
+    assert_redirected_to root_path
+  end
+
   test "catalog lists model metadata usage actions and only valid benchmark links" do
     used_model = llm_models(:openrouter_claude)
     unused_model = create_model("unused-list")
@@ -24,7 +54,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", "OpenRouter model catalog"
-    assert_select "a[href='#{settings_models_path}']", "Settings / Models"
+    assert_select "a[href='#{settings_models_path}']", "Models"
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Translations:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Reviews as reviewer:\s*1/m
     assert_select "tr[data-model-id='#{used_model.id}']", text: /Judgments as judge:\s*1/m
@@ -63,6 +93,31 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
     assert_select "li", text: /Model identifier cannot be changed after the model has historical usage/
     assert_equal "test/finalizer-only-usage", finalizer.reload.model_identifier
+  end
+
+  test "catalog Add explicitly reactivates an inactive historical model without duplication" do
+    model = llm_models(:openrouter_claude)
+    model.update!(active: false)
+    entry = {
+      "id" => model.model_identifier,
+      "name" => model.display_name,
+      "context_length" => 128_000,
+      "architecture" => { "input_modalities" => [ "text" ], "output_modalities" => [ "text" ] },
+      "top_provider" => { "max_completion_tokens" => 8_192 },
+      "pricing" => { "prompt" => "0.000001", "completion" => "0.000002" },
+      "supported_parameters" => [ "max_tokens", "response_format" ]
+    }
+    OpenRouter::Catalog.transport = -> { JSON.generate("data" => [ entry ]) }
+
+    assert_no_difference -> { LlmModel.count } do
+      post catalog_settings_models_path, params: { model_identifier: model.model_identifier }
+    end
+
+    assert_redirected_to settings_models_path
+    assert model.reload.active?
+    assert_match(/activated/, flash[:notice])
+  ensure
+    OpenRouter::Catalog.transport = nil
   end
 
   test "creates a trimmed active OpenRouter model" do
@@ -218,7 +273,7 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_equal "Claude Test", model.display_name
     assert_equal translation_run_ids, model.translation_run_ids
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "input[type='checkbox'][value='#{model.id}']", count: 0
 
     patch activate_settings_model_path(model), params: { active: false }
@@ -288,15 +343,15 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     assert_redirected_to settings_models_path
     assert_not model.reload.active?
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
 
     get experiment_path(reviewer_experiment)
-    assert_select "h2", "Start blind cross-review"
+    assert_select "h2", "Start blind review"
     assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 0
 
     get review_round_path(judge_selection_review_round)
-    assert_select "h2", "Start judge selection"
+    assert_select "h2", "Start judging"
     assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 0
 
     assert_equal historical_ids[:translations], model.translation_run_ids.sort
@@ -341,15 +396,16 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
   end
 
   def assert_model_is_available_in_all_selectors(model, reviewer_experiment:, judge_review_round:)
-    get root_path
-    assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 1
+    get new_translation_workspace_path
+    assert_select "#workspace-manual-models input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
+    assert_select "#workspace-manual-models[data-available='true']", count: 1
 
     get experiment_path(reviewer_experiment)
-    assert_select "h2", "Start blind cross-review"
+    assert_select "h2", "Start blind review"
     assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 1
 
     get review_round_path(judge_review_round)
-    assert_select "h2", "Start judge selection"
+    assert_select "h2", "Start judging"
     assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 1
   end
 

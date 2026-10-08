@@ -1,0 +1,37 @@
+en:
+  model_browser:
+    selected: Selected
+    selected_models: Selected models
+    selected_one: "1 model selected"
+    selected_many: "%{count} models selected"
+    empty_selected: No models selected yet. Add from the catalog below.
+    search_placeholder: Search OpenRouter models…
+    provider: Provider
+    all_providers: All providers
+    free_only: Free only
+    sort: Sort
+    name: Name
+    price: Price
+    context: Context
+    results: OpenRouter model results
+    loading: Loading OpenRouter models…
+    searching: Searching OpenRouter…
+    saved_prefix: "Saved models · "
+    compatible_count: "%{count} compatible model(s)"
+    no_results: No compatible models match these filters.
+    unavailable: OpenRouter catalog is unavailable. Try again shortly.
+    live_unavailable: The live OpenRouter catalog is unavailable. Previously selected saved models remain available above.
+    free: Free
+    translator: Translator
+    structured: Structured
+    price_in: in
+    price_out: out
+    added: Added
+    add: Add
+    add_model: "Add %{name}"
+    is_selected: "%{name} is selected"
+    remove: Remove
+    remove_model: "Remove %{name}"
+    max_models: "You can select up to %{count} models."
+    model_added: "%{name} added."
+    model_removed: Model removed.

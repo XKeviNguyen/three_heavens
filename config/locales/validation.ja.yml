@@ -1,0 +1,67 @@
+ja:
+  activemodel:
+    attributes:
+      translation_workspace:
+        project_name: プロジェクト名
+        project_id: プロジェクト
+        source_language: 原文の言語
+        target_language: 訳文の言語
+        document_title: 文書のタイトル
+        source_text: 原文
+        source_import_id: アップロードしたファイル
+        source_import_project_token: アップロードしたファイル
+        experiment_name: 翻訳名
+        instruction_prompt: 翻訳への指示
+        model_ids: AIモデル
+        model_identifiers: AIモデル
+        workflow_mode: AIワークフロー
+        workflow_profile_revision_id: 保存済みのワークフロー
+        glossary_revision_id: 用語集
+        methodology_profile_revision_id: 翻訳方針
+        translation_reference_revision_ids: 参考訳
+        guidance_preference: 指針の優先順位
+        automatic_confirmation: AI費用の承認
+        submission_token: このフォーム
+    errors:
+      models:
+        translation_workspace:
+          too_many_submissions: 短時間に多くの翻訳が開始されました。少し待ってから、もう一度お試しください。
+          start_failed: 翻訳を開始できませんでした。入力内容を確認して、もう一度お試しください。
+          references_too_long: 選択した参考訳が長すぎて、モデルの文字数上限に収まりません。参考訳を減らすか、長い文章を扱えるモデルを選んでください。
+          unavailable: は利用できなくなりました
+          mixed_settings: では、手動で選んだモデルと自動ワークフローの設定を同時に使えません
+          models_required: を1つ以上選んでください
+          too_many_models: は最大%{count}件まで選べます
+          duplicate_models: に同じモデルが重複しています
+          model_unavailable: に利用できなくなったモデルが含まれています
+          stale_selection: はこのページを開いた後に変更されました。最新の版を選んで、もう一度お試しください。
+          inactive_workflow: は無効になっています
+          confirmation_required: は翻訳を開始するたびにチェックが必要です
+          workflow_models_unavailable: に利用できなくなったモデルが含まれています
+          language_mismatch: はこのプロジェクトの原文と訳文の言語に合わせてください
+          too_many_references: は最大%{count}件まで選べます
+          duplicate_references: に同じ参考訳が重複しています
+          reference_unavailable: に利用できなくなった参考訳が含まれています
+          expired: このフォームの有効期限が切れました。ページを再読み込みして、もう一度お試しください。
+          attributes:
+            source_import_id:
+              format: "%{message}"
+            submission_token:
+              format: "%{message}"
+  activerecord:
+    attributes:
+      user:
+        email: メールアドレス
+        password: パスワード
+        password_confirmation: パスワード（確認）
+        locale: 表示言語
+  errors:
+    format: "%{attribute}%{message}"
+    messages:
+      blank: を入力してください
+      too_short: "は短すぎます（%{count}文字以上）"
+      too_long: "は長すぎます（%{count}文字以内）"
+      confirmation: が%{attribute}と一致しません
+      taken: はすでに使用されています
+      invalid: が正しくありません
+      inclusion: は選択できません

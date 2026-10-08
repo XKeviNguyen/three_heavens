@@ -1,25 +1,39 @@
 class SessionsController < ApplicationController
+  layout "public"
   ALLOWED_SESSION_ATTRIBUTES = %w[email password].freeze
-  INVALID_CREDENTIALS_MESSAGE = "The email or password is incorrect."
   LOGIN_RATE_LIMIT = 10
   LOGIN_RATE_LIMIT_WINDOW = 3.minutes
 
   skip_before_action :require_authentication, only: %i[new create]
   rate_limit to: LOGIN_RATE_LIMIT,
              within: LOGIN_RATE_LIMIT_WINDOW,
+             by: :client_network,
              with: :render_rate_limited,
+             only: :create
+  rate_limit to: LOGIN_RATE_LIMIT,
+             within: LOGIN_RATE_LIMIT_WINDOW,
+             by: -> { SignInThrottle.account_key(cookies, submitted_email) },
+             with: :render_rate_limited,
+             name: "account",
              only: :create
 
   def new
     @email = ""
-    redirect_to root_path if authenticated?
+    google_notice = GoogleIdentity::Notice.take(cookies)
+    if authenticated?
+      # A signed-in visitor only reaches Google by linking; keep them signed in on Account.
+      return redirect_to settings_account_path, alert: t("google_identity.messages.link_failed") if google_notice
+      return redirect_to new_translation_workspace_path
+    end
+
+    flash.now[:alert] = t("google_identity.messages.#{google_notice}") if google_notice
   end
 
   def create
     credentials = session_params
     @email = redisplayable_email(credentials[:email])
 
-    unless credentials_within_size_limits?(credentials)
+    unless acceptable_credentials?(credentials)
       return render_invalid_credentials
     end
 
@@ -28,12 +42,18 @@ class SessionsController < ApplicationController
       password: credentials[:password]
     )
 
-    if user
-      destination = start_authenticated_session!(user)
-      redirect_to destination.presence || root_path, notice: "Signed in successfully."
-    else
-      render_invalid_credentials
+    if user && !user.email_verified?
+      flash.now[:alert] = t("authentication.confirm_email")
+      return render :new, status: :unprocessable_content
     end
+
+    return render_invalid_credentials unless user
+
+    destination = start_authenticated_session!(user)
+    return render_invalid_credentials if destination == false
+
+    redirect_to destination.presence || new_translation_workspace_path,
+                notice: I18n.with_locale(user.locale) { t("authentication.signed_in") }
   rescue ActionController::ParameterMissing, ActionController::BadRequest
     @email = ""
     render_invalid_credentials(status: :bad_request)
@@ -41,7 +61,7 @@ class SessionsController < ApplicationController
 
   def destroy
     end_authenticated_session!
-    redirect_to login_path, notice: "Signed out successfully."
+    redirect_to login_path, notice: t("authentication.signed_out")
   end
 
   private
@@ -67,7 +87,12 @@ class SessionsController < ApplicationController
     submitted.permit(*ALLOWED_SESSION_ATTRIBUTES)
   end
 
-  def credentials_within_size_limits?(credentials)
+  def submitted_email
+    submitted = params[:session]
+    submitted[:email] if submitted.is_a?(ActionController::Parameters)
+  end
+
+  def acceptable_credentials?(credentials)
     credentials[:email].to_s.length <= User::MAXIMUM_EMAIL_LENGTH &&
       credentials[:password].to_s.length <= User::MAXIMUM_PASSWORD_LENGTH
   end
@@ -77,14 +102,14 @@ class SessionsController < ApplicationController
   end
 
   def render_invalid_credentials(status: :unprocessable_content)
-    flash.now[:alert] = INVALID_CREDENTIALS_MESSAGE
+    flash.now[:alert] = t("authentication.invalid_credentials")
     render :new, status: status
   end
 
   def render_rate_limited
     response.set_header("Retry-After", LOGIN_RATE_LIMIT_WINDOW.to_i.to_s)
     @email = ""
-    flash.now[:alert] = "Too many sign-in attempts. Wait three minutes, then try again."
+    flash.now[:alert] = t("authentication.rate_limited")
     render :new, status: :too_many_requests
   end
 end

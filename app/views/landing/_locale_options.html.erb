@@ -1,0 +1,6 @@
+<div class="landing-locale-options" role="group" aria-label="<%= t("common.interface_language") %>">
+  <% interface_locale_names.each do |code, name| %>
+    <%= button_to name, locale_path, method: :patch, params: { locale_code: code, return_to: preference_return_path }.compact, lang: code,
+                  class: "landing-locale-option", aria: { current: (I18n.locale.to_s == code ? "true" : nil) } %>
+  <% end %>
+</div>

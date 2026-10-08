@@ -1,4 +1,5 @@
 class JudgeRoundsController < ApplicationController
+  before_action :require_managed_ai_access, only: %i[create retry_failed]
   def create
     review_round = current_user.review_rounds.find(params[:review_round_id])
     judge_round = Judging::Start.call(
@@ -6,7 +7,7 @@ class JudgeRoundsController < ApplicationController
       judge_ids: judge_round_params[:judge_ids]
     )
 
-    redirect_to judge_round, notice: "Judge selection started."
+    redirect_to judge_round, notice: t("flash_ui.judge.started")
   rescue Judging::Start::Error => error
     @review_round = review_round
     load_review_round_page
@@ -31,25 +32,12 @@ class JudgeRoundsController < ApplicationController
   def retry_failed
     judge_round = current_user.judge_rounds.find(params[:id])
     result = Judging::RetryFailed.call(judge_round)
-    redirect_to judge_round, notice: retry_notice(result)
+    redirect_to judge_round, notice: localized_retry_notice(result, kind: :judge)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to judge_round, alert: error.message
   end
 
   private
-
-  def retry_notice(result)
-    return "No failed judge runs need retrying." if result.retried_count.zero?
-    failed_count = result.retried_count - result.enqueued_count
-    if result.enqueued_count.zero?
-      return "Retry could not be queued. The failed judge runs remain available for another explicit retry."
-    end
-    if failed_count.positive?
-      return "Queued #{result.enqueued_count} failed judge run(s); #{failed_count} could not be queued and remain available for retry."
-    end
-
-    "Queued #{result.retried_count} failed judge run(s) for retry."
-  end
 
   def judge_round_params
     params.fetch(:judge_round, ActionController::Parameters.new).permit(

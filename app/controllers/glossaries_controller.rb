@@ -16,7 +16,7 @@ class GlossariesController < ApplicationController
 
   def create
     glossary = Glossaries::Create.call(user: current_user, attributes: exact_glossary_parameters!(include_expected_version: false))
-    redirect_to glossary, notice: "Glossary created."
+    redirect_to glossary, notice: t("flash_ui.glossary.created")
   rescue Glossaries::BuildRevision::Error, ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values
     @form_errors = error_messages(error)
@@ -35,7 +35,7 @@ class GlossariesController < ApplicationController
   def update
     attributes = exact_glossary_parameters!(include_expected_version: true)
     revision = Glossaries::Revise.call(glossary: @glossary, expected_version: attributes.delete("expected_version"), attributes: attributes)
-    redirect_to @glossary, notice: "Glossary revision #{revision.version} created."
+    redirect_to @glossary, notice: t("flash_ui.glossary.revision", version: revision.version)
   rescue Glossaries::Revise::StaleRevisionError => error
     @form_values = safe_submitted_values
     @form_errors = [ error.message ]
@@ -49,13 +49,13 @@ class GlossariesController < ApplicationController
   def activate
     reject_unexpected_parameters!
     Glossaries::ChangeStatus.activate(glossary: @glossary)
-    redirect_to @glossary, notice: "Glossary activated."
+    redirect_to @glossary, notice: t("flash_ui.glossary.activated")
   end
 
   def deactivate
     reject_unexpected_parameters!
     Glossaries::ChangeStatus.deactivate(glossary: @glossary)
-    redirect_to @glossary, notice: "Glossary archived. Historical revisions remain available."
+    redirect_to @glossary, notice: t("flash_ui.glossary.archived")
   end
 
   private

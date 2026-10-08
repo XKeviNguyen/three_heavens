@@ -1,42 +1,42 @@
-<% content_for :title, "Model benchmarks · Three Heavens" %>
+<% content_for :title, t("benchmarks_ui.title") %>
 
 <div class="space-y-10">
   <header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Analytics</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Model benchmark leaderboard</h1>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("history_ui.analytics") %></p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("benchmarks_ui.heading") %></h1>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-        Grouped by the requested catalog model, including inactive models with translation history. Every average and rate includes its sample count; missing telemetry remains N/A.
+        <%= t("benchmarks_ui.intro") %>
       </p>
     </div>
 
-    <%= form_with url: benchmarks_path, method: :get, class: "flex items-end gap-3" do |form| %>
-      <div>
-        <%= form.label :sort, "Sort by", class: "block text-xs font-semibold uppercase tracking-wide text-slate-500" %>
+    <%= form_with url: benchmarks_path, method: :get, class: "flex flex-wrap items-end gap-3" do |form| %>
+      <div class="min-w-0 max-w-full">
+        <%= form.label :sort, t("benchmarks_ui.sort_by"), class: "block text-xs font-semibold uppercase tracking-wide text-slate-500" %>
         <%= form.select :sort,
                         options_for_select([
-                          [ "Judge score samples (high to low)", "judged_samples" ],
-                          [ "Official wins (high to low)", "wins" ],
-                          [ "Official win rate (high to low)", "win_rate" ],
-                          [ "Blind-review score (high to low)", "review_score" ],
-                          [ "Judge score (high to low)", "judge_score" ],
-                          [ "Average translation cost (low to high)", "translation_cost" ],
-                          [ "Average latency (low to high)", "latency" ]
+                          [ t("benchmarks_ui.sort.judge_samples"), "judged_samples" ],
+                          [ t("benchmarks_ui.sort.wins"), "wins" ],
+                          [ t("benchmarks_ui.sort.win_rate"), "win_rate" ],
+                          [ t("benchmarks_ui.sort.review_score"), "review_score" ],
+                          [ t("benchmarks_ui.sort.judge_score"), "judge_score" ],
+                          [ t("benchmarks_ui.sort.translation_cost"), "translation_cost" ],
+                          [ t("benchmarks_ui.sort.latency"), "latency" ]
                         ], @sort),
                         {},
-                        class: "mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" %>
+                        class: "mt-1 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" %>
       </div>
-      <%= form.submit "Sort", class: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" %>
+      <%= form.submit t("benchmarks_ui.sort_button"), class: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" %>
     <% end %>
   </header>
 
   <% if @model_stats.empty? %>
     <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 class="text-lg font-semibold text-slate-950">No benchmark history yet</h2>
-      <p class="mt-2 text-sm text-slate-600">Models appear after they have participated in a translation experiment.</p>
+      <h2 class="text-lg font-semibold text-slate-950"><%= t("benchmarks_ui.empty") %></h2>
+      <p class="mt-2 text-sm text-slate-600"><%= t("benchmarks_ui.empty_intro") %></p>
     </section>
   <% else %>
-    <section class="space-y-5" aria-label="Translation model leaderboard">
+    <section class="space-y-5" aria-label="<%= t("benchmarks_ui.heading") %>">
       <% @model_stats.each_with_index do |stats, index| %>
         <% model = stats.model %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" data-model-id="<%= model.id %>">
@@ -49,7 +49,7 @@
                 <p class="mt-1 break-all font-mono text-xs text-slate-500"><%= model.model_identifier %></p>
               </div>
             </div>
-            <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= model.active? ? "Active" : "Inactive" %></span>
+            <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= model.active? ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700" %>"><%= localized_status(model.active? ? :active : :inactive) %></span>
           </div>
 
           <%= render "summary", stats: stats %>
@@ -58,15 +58,15 @@
     </section>
 
     <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-950">Reviewer and judge diagnostics</h2>
+      <h2 class="text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.diagnostics") %></h2>
       <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-        Self-score difference is the reviewer’s average score for candidates requested from the same catalog model minus its average for other requested models. It is a diagnostic, not proof of causation. Judge agreement measures agreement with the completed round’s aggregate winner, not objective correctness.
+        <%= t("benchmarks_ui.diagnostics_intro") %>
       </p>
 
       <div class="mt-5 overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
           <thead class="text-xs uppercase tracking-wide text-slate-500">
-            <tr><th scope="col" class="px-3 py-3">Model role</th><th scope="col" class="px-3 py-3">Self scores</th><th scope="col" class="px-3 py-3">Other scores</th><th scope="col" class="px-3 py-3">Self-score difference</th><th scope="col" class="px-3 py-3">Aggregate agreement</th></tr>
+            <tr><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.model_role") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.self_scores") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.other_scores") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.self_difference") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.agreement") %></th></tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
             <% @model_stats.each do |stats| %>
@@ -75,10 +75,10 @@
               <% next unless reviewer || judge %>
               <tr>
                 <th scope="row" class="px-3 py-4 font-semibold text-slate-950"><%= link_to stats.model.display_name, benchmark_model_path(stats.model), class: "hover:text-blue-700" %></th>
-                <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.self_average_score)} (n=#{reviewer.self_sample_count})" : "N/A" %></td>
-                <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.other_average_score)} (n=#{reviewer.other_sample_count})" : "N/A" %></td>
+                <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.self_average_score)} (n=#{reviewer.self_sample_count})" : t("common.not_available") %></td>
+                <td class="px-3 py-4 text-slate-700"><%= reviewer ? "#{analytics_number(reviewer.other_average_score)} (n=#{reviewer.other_sample_count})" : t("common.not_available") %></td>
                 <td class="px-3 py-4 font-semibold text-slate-950"><%= analytics_number(reviewer&.self_score_difference) %></td>
-                <td class="px-3 py-4 text-slate-700"><%= judge ? "#{analytics_percent(judge.agreement_rate)} (#{judge.agreement_count}/#{judge.eligible_run_count})" : "N/A" %></td>
+                <td class="px-3 py-4 text-slate-700"><%= judge ? "#{analytics_percent(judge.agreement_rate)} (#{judge.agreement_count}/#{judge.eligible_run_count})" : t("common.not_available") %></td>
               </tr>
             <% end %>
           </tbody>
@@ -88,8 +88,8 @@
   <% end %>
 
   <aside class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-slate-700">
-    <h2 class="font-semibold text-slate-950">Metric notes</h2>
-    <p class="mt-2">Official win rate = completed judge rounds won ÷ completed judge rounds where the model had an evaluated candidate. Failed and incomplete rounds are excluded. Translation participation and failure rate count logical translation runs, never physical segment calls. Quality averages use non-null scores from completed reviewer or judge runs. Cost, tokens, and latency use completed translation runs only; latency requires both timestamps and a nonnegative duration.</p>
-    <p class="mt-2">Cost per judge-score point is calculated per completed positive-cost translation run as cost ÷ that run’s mean completed judge score, then averaged across eligible runs. Zero-cost and unjudged runs are excluded.</p>
+    <h2 class="font-semibold text-slate-950"><%= t("benchmarks_ui.metric_notes") %></h2>
+    <p class="mt-2"><%= t("benchmarks_ui.metric_notes_intro") %></p>
+    <p class="mt-2"><%= t("benchmarks_ui.cost_note") %></p>
   </aside>
 </div>

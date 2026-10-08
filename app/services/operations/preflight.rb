@@ -12,7 +12,7 @@ module Operations
 
     REQUIRED_ENVIRONMENT_NAMES = %w[
       APP_HOST RAILS_MASTER_KEY DATABASE_URL CACHE_DATABASE_URL QUEUE_DATABASE_URL
-      CABLE_DATABASE_URL OPENROUTER_API_KEY
+      CABLE_DATABASE_URL OPENROUTER_API_KEY MAIL_FROM SMTP_HOST SMTP_USERNAME SMTP_PASSWORD
     ].freeze
 
     def self.call(**options)
@@ -36,6 +36,12 @@ module Operations
     def call
       checks = []
       checks << check("required_environment", critical: true) { required_environment_present? }
+      # Sign in with Google ships with V1.1, so a deployment needs a Google
+      # OAuth Web client ID. The application itself only hides Google sign-in
+      # without one, so this is checked before deploying rather than at boot.
+      checks << check("google_client_id", critical: true) do
+        environment["GOOGLE_CLIENT_ID"].to_s.match?(GoogleIdentity::CLIENT_ID_PATTERN)
+      end
       system_health.call.checks.each do |dependency|
         checks << Check.new(name: dependency.name, status: dependency.status, critical: true)
       end

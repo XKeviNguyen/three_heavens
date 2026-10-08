@@ -1,0 +1,72 @@
+en:
+  pipelines_ui:
+    title: Automatic workflow · Three Heavens
+    methodology_snapshot: Methodology used
+    started: '%{revision} · %{mode} · started %{at}'
+    blocked_at: Workflow paused at %{stage}
+    blocked_generic: This step needs attention. Open its page to see what happened.
+    blocked_help: Open the step's page to retry it or continue by hand.
+    ready_editor: Ready for you to edit
+    ready_help: The automatic steps are done. No suggestion was applied, your draft was not changed, and nothing was finalized. The final decision is yours.
+    stopped: Automation stopped
+    stopped_help: Finished results are kept, and you can continue by hand. AI requests that had already started will still finish.
+    progress: Progress
+    current_stage: 'Current step:'
+    plan: Approved AI usage
+    plan_intro: 'The document is processed in %{segments} part(s). You approved %{slots} AI requests to start, and at most %{maximum} in total, counting up to %{attempts} automatic tries per request. Any later retry needs your approval again.'
+    plan_role: '%{logical} model(s) × %{segments} part(s) = %{requests} requests'
+    execution_status: AI request status
+    logical_runs: AI tasks
+    physical_slots: AI requests
+    attempts_started: "AI attempts started, including retries"
+    pending_running_failed: Waiting · running · failed
+    known_tokens: Tokens used (known)
+    known_attempt_cost: Cost so far (known)
+    average_latency: Average response time
+    logical_progress: '%{completed} done of %{total}'
+    physical_progress: '%{completed} done of %{total} created'
+    token_coverage: "Partial total; %{known} of %{total} attempts reported tokens."
+    cost_coverage: Partial total; unknown costs are not counted as zero.
+    recent_failures: Recent failed AI requests
+    failure_intro: Only safe error codes are shown. Prompts, your text, and raw responses from the AI service are never displayed.
+    attempt_number: try %{number}
+    snapshots: Models used by this workflow
+    logical_coverage: Cost from earlier records
+    known_logical_total: Known total
+    logical_records: AI tasks
+    with_known_cost: With known cost
+    coverage_help: Request-level history covers %{tracked} of %{total} requests. This total comes from task-level records, which can overlap with the request totals above, so it is shown separately. Unknown costs are not counted as zero.
+    links: Steps in this workflow
+    final_translation: Final translation
+    stop_heading: Stop automation
+    stop_help: This stops the remaining automatic steps. AI requests that already started will still finish. Nothing is deleted, and you can continue by hand.
+    stop: Stop automation
+    stop_confirm: Stop the remaining automatic steps? AI requests that already started can't be cancelled.
+    blocked_reasons:
+      managed_ai_access_revoked: AI translation is not turned on for this account.
+      stage_failed: Some AI tasks failed. Open the step's page to retry them.
+      configuration_unavailable: A model this workflow needs for the next step is no longer available. Stop automation and continue by hand, or make the original model available again.
+      stage_conflict: This step was already started another way. Stop automation and continue from the step's page.
+      reference_context_budget: The selected references are too long for the model's text limit.
+    events:
+      pipeline_started: Workflow started
+      translation_started: Translation started
+      translation_completed: Translation finished
+      review_started: Review started
+      review_completed: Review finished
+      judge_started: Judging started
+      judge_completed: Judging finished
+      final_workspace_created: Final draft created
+      refinement_started: AI suggestions started
+      refinement_completed: AI suggestions finished
+      ready_for_editor: Ready for editing
+      automation_stopped: Automation stopped
+      configuration_blocked: Paused because a model is unavailable
+      translation_blocked: Translation paused
+      translation_retry_resumed: Translation resumed after retry
+      review_blocked: Review paused
+      review_retry_resumed: Review resumed after retry
+      judge_blocked: Judging paused
+      judge_retry_resumed: Judging resumed after retry
+      finalization_blocked: AI suggestions paused
+      finalization_retry_resumed: AI suggestions resumed after retry

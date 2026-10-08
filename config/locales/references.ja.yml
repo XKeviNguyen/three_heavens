@@ -1,0 +1,51 @@
+ja:
+  references_ui:
+    title: 参考訳 · Three Heavens
+    show_title: '%{title} · 参考訳 · Three Heavens'
+    new_title: 新しい参考訳 · Three Heavens
+    edit_title: 参考訳の編集 · Three Heavens
+    library: 参考訳ライブラリ
+    heading: 参考訳
+    singular: 参考訳
+    intro: 参考訳は、承認済みの訳例です。AIが既存の言葉遣いや文体に合わせる際の手がかりになります。
+    new: 参考訳を追加
+    empty: 参考訳はまだありません
+    empty_intro: 承認済みの対訳例を追加し、翻訳ワークスペースで選択できます。
+    create: 参考訳を作成
+    field_title: タイトル
+    languages: 言語
+    status: 状態
+    updated: 更新日
+    archive_confirm: "この参考訳をアーカイブしますか？使用済みの翻訳には影響しません。"
+    using: '参考訳の使い方：'
+    using_intro: 一致する参考訳を最大5件、
+    using_preserved: "各翻訳では、使用した版がそのまま保持されます。"
+    exact_source: 原文の全文
+    exact_translation: 承認済み訳文の全文
+    history: 版の履歴
+    current_digest: "現在のSHA-256フィンガープリント："
+    used_by:
+      one: "1件の翻訳で使用"
+      other: "%{count}件の翻訳で使用"
+    all: ← 参考訳一覧
+    create_heading: 参考訳を作成
+    edit_heading: "この参考訳の新しい版を保存"
+    edit_intro: "保存すると新しい版が作られます。編集していない側で新しいファイルを選ぶと、表示中の文章がファイルの内容に置き換わります。"
+    save_revision: 新しい版を保存
+    conflict: "新しい版が保存されています"
+    conflict_intro: 下の最新版と送信した内容を比較し、変更を確認してから保存してください。
+    current_title: 現在のタイトル
+    current_source_language: 現在の原語
+    current_target_language: 現在の訳語
+    current_revision_number: 現在の版番号
+    current_source_example: 現在の原文例（第%{version}版）
+    current_translation: 現在の承認済み訳文
+    source_example: 原文例
+    source_upload_help: テキストを貼り付けるか、TXT・MD・DOCX・PDFを1ファイルアップロードしてください。両方は使えません。
+    pasted_source: 貼り付けた原文
+    upload_source: または原文ファイルをアップロード
+    approved_translation: 承認済み訳文
+    translation_upload_help: 承認済みの訳文を貼り付けるか、TXT・MD・DOCX・PDFを1ファイルアップロードしてください。両方は使えません。
+    pasted_translation: 貼り付けた承認済み訳文
+    upload_translation: または承認済み訳文のファイルをアップロード
+    saving: 参考訳を保存中…

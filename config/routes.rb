@@ -1,5 +1,28 @@
 Rails.application.routes.draw do
-  root "translation_workspaces#new"
+  root "landing#show"
+
+  resource :registration, only: %i[new create]
+  resource :email_confirmation, only: %i[show create]
+  resource :confirmation_resend, only: %i[new create]
+  resource :locale, only: :update
+  resource :appearance, only: :update
+  # Sign in with Google (GIS redirect mode) posts the credential here.
+  post "auth/google/callback", to: "auth/google_callbacks#create", as: :google_identity_callback
+  post "auth/google/ceremony", to: "auth/google_ceremonies#create", as: :google_identity_ceremony
+  get "auth/google/complete", to: "auth/google_completions#show", as: :google_identity_completion
+  namespace :settings do
+    resource :account, only: :show do
+      resource :google_identity, only: %i[create destroy] do
+        delete :pending, action: :cancel_pending
+      end
+    end
+    resources :users, only: :index do
+      member do
+        patch :grant_managed_ai_access
+        patch :revoke_managed_ai_access
+      end
+    end
+  end
 
   resource :session, only: %i[new create destroy]
   get "login", to: "sessions#new", as: :login
@@ -44,6 +67,9 @@ Rails.application.routes.draw do
       post :reconcile_stale
     end
     resources :models, except: %i[show destroy] do
+      collection do
+        post :catalog, action: :create_from_catalog
+      end
       member do
         patch :activate
         patch :deactivate
@@ -52,7 +78,18 @@ Rails.application.routes.draw do
   end
 
   resource :translation_workspace, only: %i[new create]
+  resource :translation_workspace_draft, only: %i[create destroy]
   post "translation_workspace/options", to: "translation_workspaces#options", as: :translation_workspace_options
+
+  get "open_router_catalog", to: "open_router_catalog#index", as: :open_router_catalog
+
+  scope "workspace_terminology" do
+    get "panel", to: "workspace_terminology#panel", as: :workspace_terminology_panel
+    get "new", to: "workspace_terminology#new", as: :new_workspace_terminology
+    post "", to: "workspace_terminology#create"
+    get "edit", to: "workspace_terminology#edit", as: :edit_workspace_terminology
+    patch "", to: "workspace_terminology#update", as: :workspace_terminology
+  end
   get "experiments/:experiment_id/repeat", to: "translation_workspaces#repeat", as: :repeat_experiment
   resources :source_imports, only: %i[new create destroy]
   resources :documents, only: [] do

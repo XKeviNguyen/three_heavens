@@ -10,38 +10,38 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     visit new_workflow_profile_path
     fill_in "Name", with: "Browser winner profile"
     fill_in "Description", with: "Browser managed"
-    choose "Winner draft"
+    choose "Winner draft only"
     select_role_models
-    click_button "Create workflow profile"
+    click_button "Create workflow setup"
 
-    assert_text "Workflow profile created."
-    assert_text "Revision 1 · Current"
+    assert_text "Workflow setup created."
+    assert_text "Version 1 · Current"
     assert_text "Translators (2)"
     assert_text "Reviewers (1)"
     assert_text "Judges (1)"
-    assert_text "Finalizers (0)"
+    assert_text "Suggestion models (0)"
 
-    click_link "Create revision"
+    click_link "Edit", match: :first
     fill_in "Name", with: "Browser winner profile revised"
-    click_button "Create new revision"
-    assert_text "Workflow profile revision 2 created."
-    assert_text "Revision 2 · Current"
-    assert_text "Revision 1"
+    click_button "Save new version"
+    assert_text "Workflow setup saved as version 2."
+    assert_text "Version 2 · Current"
+    assert_text "Version 1"
 
     visit workflow_profiles_path
     click_button "Duplicate", match: :first
-    assert_text "Workflow profile duplicated."
+    assert_text "Workflow setup duplicated."
     assert_text "Copy of Browser winner profile revised"
 
     visit new_workflow_profile_path
     fill_in "Name", with: "Browser refinement profile"
-    choose "Refinement proposals"
+    choose "Winner draft + AI suggestions"
     select_role_models(finalizer: true)
-    click_button "Create workflow profile"
+    click_button "Create workflow setup"
 
-    assert_text "Workflow profile created."
-    assert_text "Refinement proposals"
-    assert_text "Finalizers (1)"
+    assert_text "Workflow setup created."
+    assert_text "Winner draft + AI suggestions"
+    assert_text "Suggestion models (1)"
   end
 
   test "automatic workspace requires confirmation starts a pipeline and lets owner stop" do
@@ -51,30 +51,30 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
     fill_workspace
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: false
-    choose "Automatic pipeline"
+    choose "Automatic"
     assert_selector "fieldset[data-workflow-mode-target='manual']", visible: false
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     choose "translation_workspace_workflow_profile_revision_id_#{profile.current_revision_id}"
 
-    click_button "Start translation runs"
-    assert_text "Automatic confirmation must be accepted for each launch"
-    assert_field "Automatic pipeline", checked: true
+    click_button "Start translation"
+    assert_text "Cost approval must be checked each time you start a translation"
+    assert_field "Automatic", checked: true
     assert_selector "fieldset[data-workflow-mode-target='automatic']", visible: true
     assert_equal 0, PipelineRun.count
 
     check "translation_workspace_automatic_confirmation"
     assert_enqueued_jobs 2, only: TranslationRunJob do
-      click_button "Start translation runs"
-      assert_text "Automatic translation pipeline started."
+      click_button "Start translation"
+      assert_text "Automatic workflow started."
     end
     pipeline = PipelineRun.order(:id).last
     assert_text profile.name
-    assert_text "Revision 1"
+    assert_text "Version 1"
     assert_text "Translation"
     assert_button "Stop automation"
 
     accept_confirm { click_button "Stop automation" }
-    assert_text "Future automatic advancement stopped"
+    assert_text "Automation stopped. AI requests that had already started will still finish."
     assert pipeline.reload.stopped?
   end
 
@@ -85,8 +85,8 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
 
     sign_in_in_browser(users(:normal), "correct horse battery staple")
     visit pipeline_run_path(pipeline)
-    assert_text "Ready for human editor"
-    assert_no_button "Apply proposal"
+    assert_text "Ready for you to edit"
+    assert_no_button "Apply suggestion"
     assert_no_button "Finalize translation"
     assert_no_button "Stop automation"
 
@@ -110,22 +110,29 @@ class AutomaticPipelinesTest < ApplicationSystemTestCase
   end
 
   def select_role_models(finalizer: false)
-    first = llm_models(:openrouter_claude)
-    second = llm_models(:openrouter_gpt)
-    check "workflow_profile_translator_ids_#{first.id}"
-    check "workflow_profile_translator_ids_#{second.id}"
-    check "workflow_profile_reviewer_ids_#{first.id}"
-    check "workflow_profile_judge_ids_#{second.id}"
-    check "workflow_profile_finalizer_ids_#{first.id}" if finalizer
+    add_catalog_models("Translators", 2)
+    add_catalog_models("Reviewers", 1)
+    add_catalog_models("Judges", 1)
+    add_catalog_models("Suggestion models", 1) if finalizer
+  end
+
+  def add_catalog_models(role_label, count)
+    within find("fieldset", text: role_label, match: :first) do
+      find("input[placeholder='Search OpenRouter models…']").click
+      count.times do
+        assert_selector "button", text: "Add", exact_text: true
+        first("button", text: "Add", exact_text: true).click
+      end
+    end
   end
 
   def fill_workspace
     fill_in "Project name", with: "Automatic system project"
-    fill_in "Source language", with: "Vietnamese"
-    fill_in "Target language", with: "Japanese"
+    choose_known_language "Source language", "Vietnamese"
+    choose_known_language "Target language", "Japanese"
     fill_in "Document title", with: "Automatic system source"
     fill_in "Source text", with: "Source for deterministic browser test"
-    fill_in "Experiment name", with: "Automatic system experiment"
-    fill_in "Translation instruction", with: "Translate faithfully."
+    fill_in "Translation name", with: "Automatic system experiment"
+    fill_in "Instructions for the translation", with: "Translate faithfully."
   end
 end

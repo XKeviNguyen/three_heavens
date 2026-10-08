@@ -1,0 +1,22 @@
+<%# Cost stays visible; token counts are technical detail behind a disclosure. %>
+<% cost = number_to_currency(run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless run.cost.nil? %>
+<% tokens = {
+     t("results_ui.telemetry.prompt_tokens") => run.prompt_tokens,
+     t("results_ui.telemetry.completion_tokens") => run.completion_tokens,
+     t("results_ui.telemetry.total_tokens") => run.total_tokens
+   }.compact %>
+<% if cost || tokens.any? %>
+  <div class="mt-5 border-t border-slate-100 pt-4 text-sm">
+    <% if cost %><p><span class="text-slate-500"><%= t("results_ui.telemetry.cost") %></span> <span class="font-medium text-slate-900"><%= cost %></span></p><% end %>
+    <% if tokens.any? %>
+      <details class="mt-2 text-slate-600">
+        <summary class="cursor-pointer text-xs font-semibold"><%= t("shared_ui.technical_details") %></summary>
+        <dl class="mt-2 grid gap-3 text-xs sm:grid-cols-3">
+          <% tokens.each do |label, value| %>
+            <div><dt class="text-slate-500"><%= label %></dt><dd class="font-medium text-slate-900"><%= value %></dd></div>
+          <% end %>
+        </dl>
+      </details>
+    <% end %>
+  </div>
+<% end %>

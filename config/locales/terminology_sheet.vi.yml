@@ -1,0 +1,43 @@
+vi:
+  terminology_sheet:
+    add_title: Thêm thuật ngữ
+    add_intro: "Tạo bảng thuật ngữ riêng để dùng lại mà không cần rời bản dịch này. Không có gì được gửi cho AI."
+    edit_title: Sửa thuật ngữ
+    edit_intro: "Mỗi lần lưu tạo một phiên bản mới. Các phiên bản cũ và bản dịch đã dùng chúng không thay đổi. Sửa thuật ngữ không gửi gì cho AI."
+    glossary_name: Tên bảng thuật ngữ
+    glossary_placeholder: Thuật ngữ bài giảng tiếng Nhật
+    description: Mô tả (không bắt buộc)
+    terms: Thuật ngữ
+    entry_count: "%{count}/%{max} mục"
+    mappings: Cặp thuật ngữ
+    term: Thuật ngữ
+    new_term: Thuật ngữ mới
+    source_term: Từ nguồn
+    preferred_term: Cách dịch ưu tiên
+    note: Ghi chú (không bắt buộc)
+    remove: Xóa
+    cancel: Hủy
+    add_another: Thêm thuật ngữ khác
+    add_term: Thêm thuật ngữ
+    create_select: Tạo và chọn
+    creating: Đang tạo bảng thuật ngữ…
+    save: Lưu thuật ngữ
+    saving: Đang lưu thuật ngữ…
+    revision: "Phiên bản %{version}"
+    terms_count:
+      one: "%{count} thuật ngữ"
+      other: "%{count} thuật ngữ"
+    more_terms: "+ %{count} thuật ngữ khác"
+    edit: Sửa
+    add_link_term: "+ Thêm thuật ngữ"
+    add_terminology: "+ Thêm thuật ngữ"
+    edit_terminology: Sửa thuật ngữ
+    source: Nguồn
+    preferred: Ưu tiên
+    none_selected: Chưa chọn thuật ngữ
+    panel_intro: "Thêm thuật ngữ ưu tiên tại đây hoặc chọn bảng thuật ngữ đã lưu. Thay đổi thuật ngữ không gửi gì cho AI."
+    choose_saved: Chọn bảng thuật ngữ đã lưu
+    no_terminology: Không dùng bảng thuật ngữ
+    continue_without: Tiếp tục mà không dùng bảng thuật ngữ.
+    open_library: Mở thư viện thuật ngữ
+    glossaries: Bảng thuật ngữ

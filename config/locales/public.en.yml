@@ -1,0 +1,260 @@
+en:
+  common:
+    cancel: Cancel
+    not_available: N/A
+    skip_to_content: Skip to main content
+    interface_language: Interface language
+    apply: Apply
+  authentication:
+    invalid_credentials: The email or password is incorrect.
+    signed_out: Signed out successfully.
+    rate_limited: Too many sign-in attempts. Wait three minutes, then try again.
+    sign_in_benefit: Continue your translation work.
+    no_account: New to Three Heavens?
+    sign_in: Sign in
+    sign_in_required: Please sign in to continue.
+    admin_required: You are not authorized to access administration settings.
+    confirm_email: Confirm your email before signing in.
+    signed_in: Signed in successfully.
+  landing:
+    title: Three Heavens · Compare AI translations
+    meta_description: Compare independent AI translations, inspect quality feedback, and keep human judgment in control of the final result.
+    navigation: Public navigation
+    footer_navigation: Footer navigation
+    eyebrow: Human-guided AI translation
+    headline_first: Compare AI translations.
+    headline_second_lead: "Keep the final "
+    headline_second_emphasis: word.
+    introduction: Prepare your source, terminology, and references. Generate independent translations with different AI models. Compare the results. You decide the final translation.
+    start_translation: Start a translation
+    see_how_it_works: See how it works
+    open_workspace: Open workspace
+    access_note: AI translation is turned on separately for approved accounts. Creating an account does not include AI usage.
+    nav:
+      product: Product
+      how_it_works: How it works
+      benchmarks: Benchmarks
+      menu: Open navigation menu
+    principles:
+      label: Product principles
+      models: Multiple AI models
+      transparent: Transparent process
+      approval: You approve the final result
+    flow:
+      target_locale: fr
+      accessible_description: One source produces three independent AI translation candidates. Quality feedback identifies the strongest candidate, then a human edits and approves the final translation.
+      source:
+        title: Source text
+        preview: Quarterly financial results show strong growth…
+        language: EN → FR
+      models:
+        a:
+          title: Model A
+          preview: "Les résultats financiers trimestriels montrent une forte croissance…"
+        b:
+          title: Model B
+          preview: "Les résultats du trimestre affichent une croissance solide…"
+        c:
+          title: Model C
+          preview: "Le trimestre enregistre une forte croissance financière…"
+      metrics:
+        quality: Quality
+        accuracy: Accuracy
+        style: Style
+      winner:
+        title: Strongest candidate
+        description: Best balance of quality, accuracy and style.
+      approval:
+        title: You edit and approve
+        description: Review, refine, and make it yours.
+      final:
+        title: Final translation
+        description: A high-quality translation, approved by you.
+    values:
+      heading: "Not one answer.\nA better decision."
+      introduction: "Multiple perspectives. Your expertise.\nA higher-quality result."
+      compare:
+        title: Compare
+        description: Get independent translations from multiple leading AI models.
+      guide:
+        title: Guide
+        description: Provide terminology, style preferences, methodology, and reference material.
+      review:
+        title: Review
+        description: Compare candidates using clear quality feedback.
+      finalize:
+        title: Finalize
+        description: Edit, refine, and approve the final translation. You remain in control.
+    decision:
+      heading: "Your input. Multiple perspectives.\nBetter translations."
+      introduction: Combine your knowledge with the strengths of independent AI models.
+      accessible_description: Source material, terminology, and trusted references inform the methodology and independent AI models, producing better translation decisions that remain under human control.
+      source:
+        title: Source material
+        description: Your documents and content.
+      terminology:
+        title: Terminology
+        description: Terms that must stay consistent.
+      references:
+        title: References
+        description: Translations you already trust.
+      methodology:
+        title: Methodology
+        description: How the translation should be produced.
+      models:
+        title: AI models
+        description: Independent translation candidates.
+      outcome:
+        title: Better translation decisions
+        description: Higher quality. More consistency. You decide.
+    trust:
+      heading: Human-centered product principles
+      explicit:
+        title: No hidden magic
+        description: AI work is explicit. You can see what happens.
+      inspect:
+        title: No forced winner
+        description: You can inspect every candidate and its feedback.
+      human:
+        title: No auto-finalize
+        description: AI may suggest. The human approves.
+    final_cta:
+      eyebrow: Ready to translate?
+      heading: "Bring your source.\nLet the models disagree."
+      description: Compare the options. Make the final decision yourself.
+    footer:
+      copyright: "© %{year} Three Heavens. All rights reserved."
+  registration:
+    create_account: Create account
+    benefit: Save your work across browsers and devices.
+    email: Email
+    password: Password
+    password_hint: At least 12 characters.
+    confirm_password: Confirm password
+    fix_errors: Please fix these fields.
+    already_account: Already have an account?
+    check_email: Check your email to confirm your account.
+    rate_limited: Too many attempts. Please wait an hour.
+  email_confirmation:
+    title: Confirm your email
+    subject: Confirm your Three Heavens email
+    ready: Confirm your email to finish creating your account.
+    confirm: Confirm email
+    confirmed: Email confirmed. You can now sign in.
+    invalid: This confirmation link is invalid or has expired.
+    resend: Resend confirmation email
+    resend_sent: If an unverified account exists for that email, a new confirmation email has been sent.
+    check_inbox: Check your inbox
+    pending: Use the confirmation link in your email to activate your account. AI access requires separate approval.
+    email_intro: You requested a Three Heavens account. Confirm your email using the link below.
+    expires: This link expires after 24 hours.
+    ignore: If you did not create an account, you can ignore this message.
+  language:
+    source: Source language
+    target: Target language
+    search_placeholder: Choose or search languages
+    suggestions: "%{label} suggestions"
+    show_suggestions: Show %{label} suggestions
+    use_custom: Use “%{value}” as a custom language
+    custom_saved: Custom language
+    names:
+      english: English
+      japanese: Japanese
+      vietnamese: Vietnamese
+  workspace:
+    saving: Saving…
+    saved: Saved
+    save_conflict: Could not save · newer draft in another tab
+    save_failed: Could not save
+    discard_confirm: Discard this saved draft and clear the workspace?
+    discard_conflict: Could not discard · newer draft in another tab
+    discard_failed: Could not discard
+    draft_restored: Draft restored · Saved moments ago
+    discard_draft: Discard draft
+  upload:
+    choose_file: Choose a TXT, Markdown, DOCX, or PDF file.
+    extracting: Extracting source text…
+    import_failed: The file could not be imported.
+    reviewed_source: Reviewed source text
+    imported: Source text extracted. Review it in the editor.
+    source_text: Source text
+    removed: Import removed. The reviewed text remains in the editor.
+    remove_failed: The import could not be removed. Try again.
+  source_imports:
+    imported_notice: Source text extracted. Review and edit it before starting translation.
+    invalid_request: The upload request is invalid. Choose one source file and try again.
+    cancel_unavailable: "This upload can no longer be removed."
+    canceled: "Upload removed."
+    errors:
+      already_consumed: This uploaded file was already used for a translation. Upload it again to start another one.
+      expired_import: This upload has expired. Upload the file again.
+      unavailable_import: This upload is no longer available. Upload the file again.
+      file_too_large: The source file is larger than the 10 MiB limit.
+      invalid_utf8: The source file must contain valid UTF-8 text.
+      binary_source: The file does not contain readable plain text.
+      docx_too_many_entries: The DOCX contains too many parts.
+      docx_uncompressed_too_large: The DOCX expands beyond safe limits.
+      docx_xml_too_large: The DOCX content exceeds safe limits.
+      empty_source: The file does not contain readable text.
+      encrypted_docx: Encrypted DOCX files are not supported.
+      import_in_progress: This upload is still being processed. Try again in a moment.
+      import_unavailable: This upload is no longer available. Upload the file again.
+      macro_docx: Macro-enabled Word documents are not supported.
+      malformed_docx: The DOCX could not be read safely.
+      malformed_pdf: The PDF could not be read safely.
+      mismatched_type: The file type does not match its extension.
+      missing_file: Choose a file to upload.
+      pdf_busy: The server is busy processing other PDFs. Try again in a moment.
+      rate_limited: You have uploaded many files in the last few minutes. Wait a few minutes, then try again.
+      pdf_encrypted: Encrypted or password-protected PDFs are not supported.
+      pdf_no_text: This PDF does not contain extractable text. Scanned PDFs need OCR, which is not supported yet.
+      pdf_timeout: This PDF took too long to process.
+      pdf_too_many_pages: This PDF has too many pages to process safely.
+      project_binding_invalid: "This upload belongs to a different project. Upload the file again here."
+      request_key_reused: This upload was already submitted with a different file. Choose the file again.
+      source_too_long: The extracted source exceeds the character limit.
+      storage_unavailable: The file could not be stored. Choose it again and retry.
+      suspicious_compression: The DOCX cannot be processed safely.
+      unsafe_docx: The DOCX cannot be processed safely.
+      unsupported_docx_feature: This DOCX contains unsupported embedded content.
+      unsupported_format: Choose a TXT, Markdown, DOCX, or PDF file.
+  navigation:
+    menu: Menu
+    subtitle: Translation workspace
+    primary: Primary navigation
+    close: Close navigation
+    log_out: Log out
+    sections:
+      work: Work
+      library: Library
+      insights: Insights
+      admin: Admin
+    items:
+      new_translation: New translation
+      projects: Projects
+      history: History
+      terminology: "Glossaries"
+      references: References
+      methodology: Methodology
+      workflows: "Workflow setups"
+      benchmarks: Benchmarks
+      users: Users
+      models: Models
+      operations: Operations
+  managed_ai:
+    unavailable: AI translation isn't turned on for this account yet. You can prepare documents and guidance now; an administrator must turn on AI access before translations can run.
+  admin_users:
+    title: Users
+    description: Choose who can use AI translation. Signing in and using AI are separate permissions.
+    status: Account status
+    verification: Email verification
+    managed_ai: AI access
+    action: Action
+    verified: Verified
+    unverified: Unverified
+    enabled: Enabled
+    disabled: Disabled
+    enable: Turn on AI access
+    disable: Turn off AI access
+    granted: AI access turned on.
+    revoked: AI access turned off.

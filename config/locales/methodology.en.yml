@@ -1,0 +1,25 @@
+en:
+  methodology_ui:
+    title: Methodologies · Three Heavens
+    edit_title: Revise methodology · Three Heavens
+    new_title: New methodology · Three Heavens
+    show_title: '%{name} · Methodology · Three Heavens'
+    configuration: Methodology configuration
+    guidance: Methodology guidance
+    guidance_help: Describe philosophy, literalness, tone, theological handling, citation, writing, and formatting conventions. Internal line breaks and spacing are preserved.
+    revise: Revise %{name}
+    edit_intro: Saving creates a new version. Translations that already used this methodology keep the version they used.
+    heading: Methodologies
+    singular: Methodology
+    index_intro: Your private, reusable guidance on how translations should be written. Methodologies are separate from glossaries (preferred terms) and workflow setups (which AI models to use).
+    new: New methodology
+    empty: No methodologies yet
+    empty_intro: Create reusable style and translation guidance, then select it in the workspace.
+    create: Create a methodology
+    archive_confirm: Archive this methodology? Translations that already used it keep the version they used.
+    new_heading: New methodology
+    new_intro: A methodology describes how the translation should be written. Use a glossary for fixed term pairs, and a workflow setup to choose AI models and steps.
+    show_intro: Earlier versions never change, and you can still view them after archiving.
+    all: All methodologies
+    using: 'Using methodologies:'
+    using_intro: Choose this methodology for a matching language pair in the

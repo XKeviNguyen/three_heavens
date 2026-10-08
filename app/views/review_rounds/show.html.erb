@@ -1,4 +1,4 @@
-<% content_for :title, "Blind review · Three Heavens" %>
+<% content_for :title, t("results_ui.review.title") %>
 <% unless @review_round.terminal? %>
   <% content_for :head do %>
     <meta http-equiv="refresh" content="5">
@@ -8,60 +8,60 @@
 <div class="space-y-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Blind cross-review</p>
+      <p class="text-sm font-semibold uppercase tracking-wide text-blue-700"><%= t("results_ui.review.heading") %></p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @review_round.experiment.name.presence || @review_round.experiment.document.title %></h1>
       <p class="mt-2 text-sm text-slate-600"><%= @review_round.experiment.document.project.name %> · <%= @review_round.experiment.document.project.source_language %> → <%= @review_round.experiment.document.project.target_language %></p>
     </div>
-    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@review_round.status) %>"><%= @review_round.status.humanize %></span>
+    <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold <%= status_badge_classes(@review_round.status) %>"><%= localized_status(@review_round.status) %></span>
   </header>
 
   <%= render "shared/workflow_progress", experiment: @review_round.experiment %>
 
   <% unless @review_round.terminal? %>
     <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
-      Reviewers are still evaluating the translations. This page refreshes automatically every 5 seconds.
+      <%= t("results_ui.review.running") %>
     </div>
   <% end %>
 
   <% failed_runs = @review_round.review_runs.select(&:failed?) %>
   <% if failed_runs.any? %>
     <section class="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-950">Recover failed reviewers</h2>
-      <p class="mt-2 text-sm text-slate-700"><%= pluralize(failed_runs.size, "failed reviewer") %> can be retried in this round. Completed reviews and anonymous candidate mappings stay unchanged. Each failed physical work item selected by this action authorizes up to <%= Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION %> new provider attempts and may incur additional cost.</p>
+      <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.review.recover") %></h2>
+      <p class="mt-2 text-sm text-slate-700"><%= t("results_ui.review.retry_intro", count: failed_runs.size, attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION) %></p>
       <% if failed_runs.all? { |run| run.reviewer_llm_model.active? && run.reviewer_llm_model.gateway == "openrouter" } %>
-        <%= button_to "Retry failed reviewers", retry_failed_review_round_path(@review_round), method: :post, data: { turbo_confirm: "Retry only the failed review work? Each failed physical item may make up to #{Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION} new provider attempts and incur additional cost.", turbo_submits_with: "Queueing retries…" }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
+        <%= button_to t("results_ui.review.retry"), retry_failed_review_round_path(@review_round), method: :post, data: { turbo_confirm: t("results_ui.review.retry_confirm", attempts: Ai::ProviderRetryPolicy::MAX_ATTEMPTS_PER_AUTHORIZATION), turbo_submits_with: t("results_ui.queueing_retries") }, class: "mt-4 rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white hover:bg-amber-800" %>
       <% else %>
-        <p class="mt-3 text-sm font-semibold text-amber-900">Retry is unavailable because a historical reviewer model is inactive or unsupported.</p>
+        <p class="mt-3 text-sm font-semibold text-amber-900"><%= t("results_ui.review.retry_unavailable") %></p>
       <% end %>
     </section>
   <% end %>
 
   <div class="flex">
-    <%= link_to "Back to Project", project_path(@review_round.experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
-    <%= link_to "Back to translation experiment", @review_round.experiment, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to t("results_ui.back_project"), project_path(@review_round.experiment.document.project), class: "text-sm font-semibold text-blue-700 hover:text-blue-900" %>
+    <%= link_to t("results_ui.back_translation"), @review_round.experiment, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
   </div>
 
   <section class="space-y-6">
-    <h2 class="text-xl font-semibold text-slate-950">Reviewer runs</h2>
+    <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.review.runs") %></h2>
 
     <% @review_round.review_runs.sort_by { |run| [run.reviewer_llm_model.display_name, run.id] }.each do |review_run| %>
       <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Reviewer</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= t("results_ui.review.reviewer") %></p>
             <h3 class="mt-1 text-lg font-semibold text-slate-950"><%= review_run.reviewer_llm_model.display_name %></h3>
             <p class="mt-1 break-all font-mono text-xs text-slate-600"><%= review_run.reviewer_llm_model.model_identifier %></p>
           </div>
-          <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(review_run.status) %>"><%= review_run.status.humanize %></span>
+          <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <%= status_badge_classes(review_run.status) %>"><%= localized_status(review_run.status) %></span>
         </div>
 
-        <% if review_run.review_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">Segmented execution: <strong><%= review_run.review_segment_runs.count(&:completed?) %> / <%= review_run.review_segment_runs.size %></strong> provider requests complete.</p><% end %>
+        <% if review_run.review_segment_runs.any? %><p class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900"><%= t("results_ui.segmented") %>: <strong><%= review_run.review_segment_runs.count(&:completed?) %> / <%= review_run.review_segment_runs.size %></strong> <%= t("results_ui.provider_requests_complete") %></p><% end %>
 
         <% if review_run.failed? %>
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p class="font-semibold">Reviewer failed</p>
+            <p class="font-semibold"><%= t("results_ui.review.failed") %></p>
             <% if review_run.error_code.present? %>
-              <p class="mt-1">Error code: <span class="font-mono"><%= safe_provider_error_code(review_run.error_code) %></span></p>
+              <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= safe_provider_error_code(review_run.error_code) %></span></p>
             <% end %>
             <% if review_run.error_message.present? %>
               <p class="mt-1 break-words"><%= safe_provider_error(review_run.error_message) %></p>
@@ -69,7 +69,7 @@
           </div>
         <% elsif !review_run.completed? %>
           <p class="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-            <%= review_run.running? ? "This reviewer is evaluating the anonymous candidates now." : "This review is queued and waiting to start." %>
+            <%= review_run.running? ? t("results_ui.review.run_running") : t("results_ui.review.run_pending") %>
           </p>
         <% end %>
 
@@ -81,19 +81,19 @@
                   <div>
                     <h4 class="font-semibold text-slate-950"><%= evaluation.anonymous_label %></h4>
                     <p class="mt-1 text-sm text-slate-600">
-                      Human-only mapping: <span class="font-semibold text-slate-800"><%= evaluation.translation_run.llm_model.display_name %></span>
+                      <%= t("results_ui.human_mapping") %>: <span class="font-semibold text-slate-800"><%= evaluation.translation_run.llm_model.display_name %></span>
                       · <span class="font-mono text-xs"><%= evaluation.translation_run.llm_model.model_identifier %></span>
                     </p>
                   </div>
-                  <span class="text-lg font-bold text-blue-800"><%= evaluation.overall_score %>/10 overall</span>
+                  <span class="text-lg font-bold text-blue-800"><%= evaluation.overall_score %>/10 <%= t("results_ui.overall") %></span>
                 </div>
 
                 <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <% {
-                       "Faithfulness" => evaluation.faithfulness_score,
-                       "Naturalness" => evaluation.naturalness_score,
-                       "Terminology" => evaluation.terminology_score,
-                       "Instruction adherence" => evaluation.instruction_adherence_score
+                       t("results_ui.review.faithfulness") => evaluation.faithfulness_score,
+                       t("results_ui.review.naturalness") => evaluation.naturalness_score,
+                       t("results_ui.review.terminology") => evaluation.terminology_score,
+                       t("results_ui.review.instruction_adherence") => evaluation.instruction_adherence_score
                      }.each do |label, score| %>
                     <div class="rounded-md bg-slate-50 px-3 py-2">
                       <dt class="text-slate-500"><%= label %></dt>
@@ -104,27 +104,27 @@
 
                 <div class="mt-5 grid gap-4 lg:grid-cols-3">
                   <div>
-                    <h5 class="text-sm font-semibold text-emerald-800">Strengths</h5>
+                    <h5 class="text-sm font-semibold text-emerald-800"><%= t("results_ui.strengths") %></h5>
                     <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.strengths %></p>
                   </div>
                   <div>
-                    <h5 class="text-sm font-semibold text-red-800">Issues</h5>
+                    <h5 class="text-sm font-semibold text-red-800"><%= t("results_ui.issues") %></h5>
                     <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.issues %></p>
                   </div>
                   <div>
-                    <h5 class="text-sm font-semibold text-blue-800">Recommended corrections</h5>
+                    <h5 class="text-sm font-semibold text-blue-800"><%= t("results_ui.corrections") %></h5>
                     <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"><%= evaluation.recommended_corrections %></p>
                   </div>
                 </div>
 
                 <details class="mt-5 rounded-lg bg-slate-50 p-4">
-                  <summary class="cursor-pointer text-sm font-semibold text-slate-800">Candidate translation</summary>
+                  <summary class="cursor-pointer text-sm font-semibold text-slate-800"><%= t("results_ui.candidate_translation") %></summary>
                   <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= evaluation.translation_run.translated_text %></div>
                 </details>
 
                 <% if evaluation.suggested_translation.present? %>
                   <details class="mt-3 rounded-lg bg-blue-50 p-4">
-                    <summary class="cursor-pointer text-sm font-semibold text-blue-900">Suggested improved translation</summary>
+                    <summary class="cursor-pointer text-sm font-semibold text-blue-900"><%= t("results_ui.suggested_translation") %></summary>
                     <div class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900"><%= evaluation.suggested_translation %></div>
                   </details>
                 <% end %>
@@ -133,22 +133,7 @@
           </div>
         <% end %>
 
-        <% telemetry = {
-             "Prompt tokens" => review_run.prompt_tokens,
-             "Completion tokens" => review_run.completion_tokens,
-             "Total tokens" => review_run.total_tokens,
-             "Cost" => (number_to_currency(review_run.cost, unit: "$", precision: 10, strip_insignificant_zeros: true) unless review_run.cost.nil?)
-           }.compact %>
-        <% if telemetry.any? %>
-          <dl class="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
-            <% telemetry.each do |label, value| %>
-              <div>
-                <dt class="text-slate-500"><%= label %></dt>
-                <dd class="font-medium text-slate-900"><%= value %></dd>
-              </div>
-            <% end %>
-          </dl>
-        <% end %>
+        <%= render "shared/ai_usage", run: review_run %>
       </article>
     <% end %>
   </section>
@@ -157,24 +142,24 @@
     <section class="rounded-xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-xl font-semibold text-slate-950">Judge selection</h2>
-          <p class="mt-2 text-sm text-slate-700">A judge round already exists for this blind review.</p>
+          <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.judge.heading") %></h2>
+          <p class="mt-2 text-sm text-slate-700"><%= t("results_ui.review.judge_exists") %></p>
         </div>
-        <%= link_to "View judge results", @review_round.judge_round, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+        <%= link_to t("results_ui.review.view_judge"), @review_round.judge_round, class: "inline-flex w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
       </div>
     </section>
   <% elsif @review_round.completed? %>
     <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-950">Start judge selection</h2>
+      <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.review.start_judge") %></h2>
       <p class="mt-2 max-w-3xl text-sm text-slate-600">
-        Select 1–<%= Ai::UsageLimits::MAX_JUDGES %> judge models. Judges receive anonymously labeled translations and anonymous blind-review feedback; candidate and reviewer model identities remain private from them.
+        <%= t("results_ui.review.judge_intro", maximum: Ai::UsageLimits::MAX_JUDGES) %>
       </p>
-      <% if @review_round.experiment.document_execution_plan %><p class="mt-2 text-sm font-semibold text-amber-800">This document has <%= @review_round.experiment.document_execution_plan.segment_count %> segments. Each selected judge authorizes <%= @review_round.experiment.document_execution_plan.segment_count %> initial segment provider requests; built-in retries may add calls.</p><% end %>
+      <% if @review_round.experiment.document_execution_plan %><p class="mt-2 text-sm font-semibold text-amber-800"><%= t("results_ui.review.segment_cost", count: @review_round.experiment.document_execution_plan.segment_count) %></p><% end %>
 
       <%= form_with url: review_round_judge_rounds_path(@review_round), scope: :judge_round, class: "mt-5 space-y-5" do |form| %>
         <% if @judge_models.any? %>
           <fieldset>
-            <legend class="text-sm font-semibold text-slate-800">Active OpenRouter judges</legend>
+            <legend class="text-sm font-semibold text-slate-800"><%= t("results_ui.review.active_judges") %></legend>
             <div class="mt-3 grid gap-3 md:grid-cols-2">
               <% @judge_models.each do |judge| %>
                 <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40">
@@ -188,10 +173,10 @@
             </div>
           </fieldset>
         <% else %>
-          <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">No active OpenRouter judge models are available.</p>
+          <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800"><%= t("results_ui.review.no_judges") %></p>
         <% end %>
 
-        <%= form.submit "Start judge selection", disabled: @judge_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: "Start judging with the selected models? This begins provider work and may incur cost.", turbo_submits_with: "Starting judging…" } %>
+        <%= form.submit t("results_ui.review.start_judge_button"), disabled: @judge_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: t("results_ui.review.start_judge_confirm"), turbo_submits_with: t("results_ui.review.starting_judge") } %>
       <% end %>
     </section>
   <% end %>

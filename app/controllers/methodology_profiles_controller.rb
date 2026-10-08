@@ -19,7 +19,7 @@ class MethodologyProfilesController < ApplicationController
       user: current_user,
       attributes: exact_profile_parameters!(include_expected_version: false)
     )
-    redirect_to profile, notice: "Methodology profile created."
+    redirect_to profile, notice: t("flash_ui.methodology.created")
   rescue ActiveRecord::RecordInvalid => error
     @form_values = safe_submitted_values
     @form_errors = error.record.errors.full_messages
@@ -42,7 +42,7 @@ class MethodologyProfilesController < ApplicationController
       expected_version: attributes.delete("expected_version"),
       attributes: attributes
     )
-    redirect_to @methodology_profile, notice: "Methodology revision #{revision.version} created."
+    redirect_to @methodology_profile, notice: t("flash_ui.methodology.revision", version: revision.version)
   rescue MethodologyProfiles::Revise::StaleRevisionError => error
     @form_values = safe_submitted_values
     @form_errors = [ error.message ]
@@ -56,13 +56,13 @@ class MethodologyProfilesController < ApplicationController
   def activate
     reject_unexpected_parameters!
     MethodologyProfiles::ChangeStatus.activate(methodology_profile: @methodology_profile)
-    redirect_to @methodology_profile, notice: "Methodology profile activated."
+    redirect_to @methodology_profile, notice: t("flash_ui.methodology.activated")
   end
 
   def deactivate
     reject_unexpected_parameters!
     MethodologyProfiles::ChangeStatus.deactivate(methodology_profile: @methodology_profile)
-    redirect_to @methodology_profile, notice: "Methodology profile archived. Historical revisions remain available."
+    redirect_to @methodology_profile, notice: t("flash_ui.methodology.archived")
   end
 
   private

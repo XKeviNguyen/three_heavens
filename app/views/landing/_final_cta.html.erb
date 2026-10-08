@@ -1,0 +1,15 @@
+<section class="landing-final-cta" aria-labelledby="final-cta-heading">
+  <div class="landing-final-wave landing-final-wave-one" aria-hidden="true"></div>
+  <div class="landing-final-wave landing-final-wave-two" aria-hidden="true"></div>
+  <div class="landing-shell landing-final-content">
+    <p class="landing-eyebrow"><%= t("landing.final_cta.eyebrow") %></p>
+    <h2 id="final-cta-heading"><%= t("landing.final_cta.heading") %></h2>
+    <p><%= t("landing.final_cta.description") %></p>
+    <div class="landing-final-actions">
+      <%= link_to authenticated? ? new_translation_workspace_path : new_registration_path, class: "landing-button landing-button-primary" do %>
+        <%= t("landing.start_translation") %><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 5l4 4-4 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+      <% end %>
+      <a href="#how-it-works" class="landing-button landing-button-secondary"><span class="landing-play" aria-hidden="true"><svg viewBox="0 0 10 10"><path d="M3 1.8v6.4L8.2 5 3 1.8Z" fill="currentColor"/></svg></span><%= t("landing.see_how_it_works") %></a>
+    </div>
+  </div>
+</section>

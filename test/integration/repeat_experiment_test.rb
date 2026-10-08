@@ -38,7 +38,7 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "input[name='translation_workspace[submission_token]']", count: 1
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Xin chào"
-    assert_select "input[name='translation_workspace[model_ids][]'][value='#{llm_models(:openrouter_claude).id}'][checked]"
+    assert_select "[data-model-card][data-identifier='#{llm_models(:openrouter_claude).model_identifier}'] input[type='hidden'][name='translation_workspace[model_ids][]'][value='#{llm_models(:openrouter_claude).id}']"
     token = css_select("input[name='translation_workspace[submission_token]']").first["value"]
 
     assert_difference -> { Experiment.count }, 1 do
@@ -87,10 +87,10 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_select "[role='status']", text: /no longer has the model capability data/
+    assert_select "[role='status']", text: /missing model details this document needs/
     assert_select "input[name='translation_workspace[workflow_mode]'][value='manual'][checked]"
     assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][checked]", count: 0
-    assert_select "input[name='translation_workspace[model_ids][]'][checked]", count: 2
+    assert_select "#workspace-manual-models [data-model-card] input[type='hidden'][name='translation_workspace[model_ids][]']", count: 2
   end
 
   test "repeat keeps selected current configurations outside bounded newest collections and can submit them" do
@@ -113,53 +113,79 @@ class RepeatExperimentTest < ActionDispatch::IntegrationTest
     end
 
     {
-      workflow_profile_page: [ "Workflow profiles", "translation_workspace[workflow_profile_revision_id]", selected_profile.current_revision_id ],
+      workflow_profile_page: [ "Workflow setups", "translation_workspace[workflow_profile_revision_id]", selected_profile.current_revision_id ],
       glossary_page: [ "Glossaries", "translation_workspace[glossary_revision_id]", selected_glossary.current_revision_id ],
-      methodology_profile_page: [ "Methodology profiles", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
+      methodology_profile_page: [ "Methodologies", "translation_workspace[methodology_profile_revision_id]", selected_methodology.current_revision_id ],
       translation_reference_page: [ "Translation references", "translation_workspace[translation_reference_revision_ids][]", selected_reference.current_revision_id ]
     }.each do |page_param, (label, input_name, revision_id)|
-      get root_path(page_param => 2)
+      get new_translation_workspace_path(page_param => 2)
       assert_response :success
       assert_select "nav[aria-label='#{label} pagination']", text: /Page 2 of 2/
       assert_select "input[name='#{input_name}'][value='#{revision_id}']", count: 1
     end
 
-    get root_path
+    get new_translation_workspace_path
     assert_select "button[formaction='#{translation_workspace_options_path}'][formmethod='post'][name='workflow_profile_page'][value='2'][formnovalidate]", count: 1
 
-    preserved_token = css_select("input[name='translation_workspace[submission_token]']").first["value"]
-    assert_no_difference [ -> { Experiment.count }, -> { enqueued_jobs.size } ] do
+    # The browser saves its draft before posting a page change, so the page
+    # restored after the redirect shows that draft.
+    paged_workspace = {
+      "document_title" => "Preserved while paging",
+      "source_text" => "Preserved source",
+      "experiment_name" => "Preserved experiment",
+      "instruction_prompt" => "Preserved instruction",
+      "glossary_revision_id" => selected_glossary.current_revision_id.to_s,
+      "methodology_profile_revision_id" => selected_methodology.current_revision_id.to_s,
+      "translation_reference_revision_ids" => [ selected_reference.current_revision_id.to_s ],
+      "guidance_preference" => "reference_examples",
+      "workflow_mode" => "automatic",
+      "workflow_profile_revision_id" => selected_profile.current_revision_id.to_s
+    }
+    context_key = TranslationWorkspaceDraft.context_key(@project)
+    TranslationWorkspaceDrafts::Save.call(
+      user: users(:normal), context_key:, payload: paged_workspace, draft_id: nil, version: nil,
+      editor_id: ReplayIdentity.issue(user: users(:normal), context_key:), sequence: 1
+    )
+    page_change = lambda do |confirmation:, digest:|
       post translation_workspace_options_path, params: {
         workflow_profile_page: "2",
-        translation_workspace: {
-          submission_token: preserved_token,
-          project_id: @project.id.to_s,
-          document_title: "Preserved while paging",
-          source_text: "Preserved source",
-          experiment_name: "Preserved experiment",
-          instruction_prompt: "Preserved instruction",
-          glossary_revision_id: selected_glossary.current_revision_id.to_s,
-          methodology_profile_revision_id: selected_methodology.current_revision_id.to_s,
-          translation_reference_revision_ids: [ selected_reference.current_revision_id.to_s ],
-          guidance_preference: "reference_examples",
-          workflow_mode: "automatic",
-          workflow_profile_revision_id: selected_profile.current_revision_id.to_s,
-          automatic_confirmation: "1",
-          automatic_plan_digest: "0" * 64
-        }
+        translation_workspace: paged_workspace.merge(
+          "submission_token" => css_select("input[name='translation_workspace[submission_token]']").first["value"],
+          "project_id" => @project.id.to_s,
+          "automatic_confirmation" => confirmation,
+          "automatic_plan_digest" => digest
+        )
       }
     end
+
+    assert_no_difference [ -> { Experiment.count }, -> { enqueued_jobs.size }, -> { TranslationWorkspaceSubmission.count } ] do
+      page_change.call(confirmation: "1", digest: "0" * 64)
+    end
+    assert_redirected_to new_translation_workspace_path(project_id: @project.id, workflow_profile_page: 2)
+    assert_no_match(/Preserved/, response.location)
+    follow_redirect!
     assert_response :success
+    assert_select "nav[aria-label='Workflow setups pagination']", text: /Page 2 of 2/
     assert_select "textarea[name='translation_workspace[source_text]']", text: "Preserved source"
     assert_select "input[name='translation_workspace[workflow_profile_revision_id]'][value='#{selected_profile.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[glossary_revision_id]'][value='#{selected_glossary.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[methodology_profile_revision_id]'][value='#{selected_methodology.current_revision_id}'][checked]", count: 1
     assert_select "input[name='translation_workspace[translation_reference_revision_ids][]'][value='#{selected_reference.current_revision_id}'][checked]", count: 1
-    assert_select "h3", text: "Exact provider-work authorization"
+    assert_select "h3", text: "Approve AI cost"
     assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])", count: 1
     rebuilt_digest = css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
     assert_match(/\A\h{64}\z/, rebuilt_digest)
     assert_not_equal "0" * 64, rebuilt_digest
+
+    # Confirming the plan shown survives a page change while the plan holds.
+    page_change.call(confirmation: "1", digest: rebuilt_digest)
+    follow_redirect!
+    assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox'][checked]", count: 1
+    assert_equal rebuilt_digest, css_select("input[name='translation_workspace[automatic_plan_digest]']").sole["value"]
+
+    # A plain visit never carries an earlier authorization.
+    get new_translation_workspace_path(project_id: @project.id)
+    assert_select "input[name='translation_workspace[automatic_confirmation]'][type='checkbox']:not([checked])", count: 1
 
     get repeat_experiment_path(historical)
 

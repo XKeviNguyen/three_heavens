@@ -9,6 +9,16 @@ module TranslationReferences
       end
     end
 
+    class Busy < SourceImports::Busy
+      attr_reader :resolved_attributes, :work_consumed
+
+      def initialize(error, resolved_attributes:, work_consumed:)
+        @resolved_attributes = resolved_attributes
+        @work_consumed = work_consumed
+        super(error.code, error.message)
+      end
+    end
+
     SIDES = {
       "source_text" => "source_file",
       "approved_translation" => "approved_translation_file"
@@ -23,7 +33,7 @@ module TranslationReferences
     end
 
     def call
-      resolved = attributes.slice("title", "source_language", "target_language")
+      resolved = attributes.slice("title", "source_language", "target_language", *SIDES.keys)
       errors = []
       SIDES.each do |text_key, file_key|
         resolved[text_key] = attributes[text_key].to_s
@@ -34,8 +44,10 @@ module TranslationReferences
           end
 
           resolved[text_key] = extract(upload) if upload.present?
+        rescue SourceImports::Busy => error
+          raise Busy.new(error, resolved_attributes: resolved, work_consumed: @work_consumed == true)
         rescue SourceImports::Error, Error => error
-          errors << error.message
+          errors << (error.is_a?(SourceImports::Error) ? I18n.t("source_imports.errors.#{error.code}", default: error.message) : error.message)
         end
       end
       raise Error.new(errors.join(" "), resolved_attributes: resolved) if errors.any?
@@ -53,10 +65,16 @@ module TranslationReferences
         missing_message: "Choose a reference file to upload.",
         filename_fallback: "reference"
       )
-      SourceImports::TextExtractor.call(
-        format: payload.detection.format,
-        bytes: payload.bytes
-      )
+      begin
+        text = SourceImports::TextExtractor.call(format: payload.detection.format, bytes: payload.bytes)
+      rescue SourceImports::Busy
+        raise
+      rescue SourceImports::Error
+        @work_consumed = true
+        raise
+      end
+      @work_consumed = true
+      text
     end
 
     def human_side(key)

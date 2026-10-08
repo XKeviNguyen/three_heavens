@@ -5,10 +5,7 @@
 # Puma starts a configurable number of processes (workers) and each process
 # serves each request in a thread from an internal thread pool.
 #
-# You can control the number of workers using ENV["WEB_CONCURRENCY"]. You
-# should only set this value when you want to run 2 or more workers. The
-# default is already 1. You can set it to `auto` to automatically start a worker
-# for each available processor.
+# This application runs one process (see the WEB_CONCURRENCY check below).
 #
 # The ideal number of threads per worker depends both on how much time the
 # application spends waiting for IO operations and on how much you wish to
@@ -28,11 +25,27 @@
 threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
 threads threads_count, threads_count
 
+# One process per container: SourceImports::PdfExtractor limits concurrent
+# PDF workers per process, sized for the container's whole memory budget.
+# Puma would otherwise start one process per WEB_CONCURRENCY on its own, and
+# WEB_CONCURRENCY=1 would still mean cluster mode: a control process plus one
+# worker. Single mode serves the same threads in one process.
+unless [ "", "0", "1" ].include?(ENV["WEB_CONCURRENCY"].to_s.strip)
+  raise "WEB_CONCURRENCY must be 1: PDF extraction is sized for one Puma process per container"
+end
+workers 0
+
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)
 
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
+
+# Puma reads a chunked request body completely before the application sees
+# it, so stop any body above the largest request the application accepts
+# with 413 here. RequestBodyLimit applies the smaller per-type limits.
+require_relative "../app/middleware/request_body_limit"
+http_content_length_limit RequestBodyLimit::MAX_BYTES
 
 # Run the Solid Queue supervisor inside of Puma for single-server deployments.
 plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"] == "true"

@@ -1,0 +1,22 @@
+vi:
+  retry_feedback:
+    translation:
+      none: Không có lượt dịch thất bại nào cần thử lại.
+      queue_failed: Chưa thể bắt đầu thử lại. Các lượt dịch thất bại vẫn còn đó để thử lại sau.
+      partial: Đang thử lại %{queued} lượt dịch thất bại; %{failed} lượt dịch chưa bắt đầu được và có thể thử lại sau.
+      queued: Đang thử lại %{count} lượt dịch thất bại.
+    reviewer:
+      none: Không có lượt nhận xét thất bại nào cần thử lại.
+      queue_failed: Chưa thể bắt đầu thử lại. Các lượt nhận xét thất bại vẫn còn đó để thử lại sau.
+      partial: Đang thử lại %{queued} lượt nhận xét thất bại; %{failed} lượt nhận xét chưa bắt đầu được và có thể thử lại sau.
+      queued: Đang thử lại %{count} lượt nhận xét thất bại.
+    judge:
+      none: Không có lượt chấm điểm thất bại nào cần thử lại.
+      queue_failed: Chưa thể bắt đầu thử lại. Các lượt chấm điểm thất bại vẫn còn đó để thử lại sau.
+      partial: Đang thử lại %{queued} lượt chấm điểm thất bại; %{failed} lượt chấm điểm chưa bắt đầu được và có thể thử lại sau.
+      queued: Đang thử lại %{count} lượt chấm điểm thất bại.
+    refinement:
+      none: Không có đề xuất thất bại nào cần thử lại.
+      queue_failed: Chưa thể bắt đầu thử lại. Các đề xuất thất bại vẫn còn đó để thử lại sau.
+      partial: Đang thử lại %{queued} đề xuất thất bại; %{failed} đề xuất chưa bắt đầu được và có thể thử lại sau.
+      queued: Đang thử lại %{count} đề xuất thất bại.

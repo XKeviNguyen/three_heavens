@@ -1,6 +1,6 @@
-<% content_for :title, "New methodology · Three Heavens" %>
+<% content_for :title, t("methodology_ui.new_title") %>
 <div class="mx-auto max-w-4xl">
-  <h1 class="mb-2 text-3xl font-bold">New methodology profile</h1>
-  <p class="mb-7 text-sm text-slate-600">Methodology controls how translation is produced. Use a glossary for literal term mappings and a workflow profile for model/stage selection.</p>
-  <%= render "form", form_url: methodology_profiles_path, form_method: :post, submit_label: "Create methodology" %>
+  <h1 class="mb-2 text-3xl font-bold"><%= t("methodology_ui.new_heading") %></h1>
+  <p class="mb-7 text-sm text-slate-600"><%= t("methodology_ui.new_intro") %></p>
+  <%= render "form", form_url: methodology_profiles_path, form_method: :post, submit_label: t("methodology_ui.create") %>
 </div>
