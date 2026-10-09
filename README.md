@@ -192,7 +192,7 @@ Controls, limits, and residual risks: [security](docs/security.md).
 
 ## Testing and release quality
 
-As of V1.1 (October 2026): **1,187 unit and integration tests** and **176 browser system tests** (headless Chrome).
+At the V1.1 release verification (October 2026): **1,209 Rails tests** (unit and integration) and **192 browser system tests** (headless Chrome), all passing in CI. These counts are taken from the dated [V1.1.0 release audit](docs/releases/v1.1.0-audit.md) and its CI runs; they are not from a new test run.
 
 - **Concurrency:** multi-process tests with barriers for upload budgets, launches, and reference creation; draft-save races.
 - **Replay and recovery:** lost responses, Back/Forward navigation, multiple tabs, cancelled uploads, duplicate and stale jobs.
@@ -257,7 +257,7 @@ bin/dev                              # Rails + Tailwind watcher on http://localh
 
 In development, jobs run inside the web process (Rails' async adapter), so no separate worker is needed.
 
-**Without an AI key** everything except the AI steps works: accounts, projects, uploads and text extraction, glossaries, references, methodologies, workflow setups, drafts, history, and the UI in all three languages. Running translations, reviews, judging, or suggestions needs a paid `OPENROUTER_API_KEY` and **AI access** turned on for the account under Admin → Users. Models are picked from the OpenRouter catalog right in the form; browsing the catalog is free. To see the full flow without paying, run `bin/capture-readme-screenshots`, which drives the real UI end to end with a fake AI client against the test database.
+**Without an AI key** everything except the AI steps works: accounts, projects, uploads and text extraction, glossaries, references, methodologies, workflow setups, drafts, history, and the UI in all three languages. Running translations, reviews, judging, or suggestions needs a paid `OPENROUTER_API_KEY` and **AI access** turned on for the account under Admin → Users. Models are picked from the OpenRouter catalog right in the form; browsing the catalog is free. To see the full flow without paying, run `bin/capture-readme-screenshots`, which drives the real UI end to end with a fake AI client against the Rails test database. The run wipes and resets that database (the same one `bin/rails test` uses), so run it only in a disposable checkout connected to an isolated, throwaway database.
 
 **Checks:**
 
@@ -297,12 +297,12 @@ Runbooks: [configuration](docs/operations/configuration.md) · [production deplo
 
 ## Status and limitations
 
-- **V1.1, release candidate.** The `develop` branch passes the CI gate above. Production deployment is a separate, human-controlled step; this README does not claim a live deployment, traffic, or uptime.
+- **V1.1.0, integrated into `main`.** [PR #79](https://github.com/XKeviNguyen/three_heavens/pull/79) merged V1.1.0 into `main` as `43b0184db56d499610b0186d71bf54265f3ac6cd`, and the post-merge CI run on `main` passed all five jobs. The `v1.1.0` tag and GitHub Release have not been published yet. Production deployment, uptime, traffic and operation with a real paid AI provider are not verified; this README does not claim any of them.
 - **One AI provider:** all AI calls go through OpenRouter.
 - **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
 - **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
 - **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
-- **License:** no open-source license has been chosen yet. You are welcome to read and evaluate the code; all other rights are reserved.
+- **License: Public Source — All Rights Reserved.** The code is visible so it can be read and evaluated. No open-source license has been granted, and public visibility does not grant permission to use, copy, modify, redistribute, or commercialize it.
 
 Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)
