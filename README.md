@@ -2,12 +2,14 @@
 
 **An AI-assisted translation workspace where several models translate the same text, other models review and judge the results without knowing who wrote them, and a human editor makes the final call.**
 
-[![CI](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml)
+[![CI](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/XKeviNguyen/three_heavens/actions/workflows/ci.yml)
 ![Ruby 3.4](https://img.shields.io/badge/Ruby-3.4-CC342D?logo=ruby&logoColor=white)
 ![Rails 8.1](https://img.shields.io/badge/Rails-8.1-D30001?logo=rubyonrails&logoColor=white)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![Hotwire](https://img.shields.io/badge/Hotwire-Turbo%20%2B%20Stimulus-5A2D82)
 ![Docker + Kamal](https://img.shields.io/badge/Deploy-Docker%20%2B%20Kamal-2496ED?logo=docker&logoColor=white)
+
+**Live application:** [threeheavens.win](https://threeheavens.win) · **Release:** [v1.1.0](https://github.com/XKeviNguyen/three_heavens/releases/tag/v1.1.0) · **Source:** public for technical review, [All Rights Reserved](LICENSE).
 
 It is built for translators of long-form texts — sermons, articles, books — who want more than one AI opinion, need terminology to stay consistent, and must stay responsible for the final wording. You paste or upload a document and add the terms that must not change. Several models translate it independently. Reviewer models score the anonymous candidates, judge models rank them, and you edit the winner, optionally with AI suggestions, before approving a final version. AI never finalizes anything on its own.
 
@@ -291,18 +293,19 @@ test/            unit, integration, system, concurrency, migration, and config t
 
 ## Deployment
 
-The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image behind kamal-proxy (TLS), Thruster in front of Puma, Solid Queue supervised inside Puma, four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
+Three Heavens is deployed to a single Ubuntu server with [Kamal](https://kamal-deploy.org/). Cloudflare terminates public HTTPS and a Cloudflare Tunnel routes requests to an internal, unpublished kamal-proxy; Thruster fronts Puma inside the non-root Rails container. Solid Queue is supervised inside Puma, while PostgreSQL serves four isolated databases (primary, queue, cache, cable). User uploads are kept in a persistent private volume. Production credentials and infrastructure-specific overrides stay outside Git; the tracked Kamal configuration is the versioned deployment template.
 
 Runbooks: [configuration](docs/operations/configuration.md) · [production deploy and rollback](docs/operations/production-deploy.md) · [backup and restore](docs/operations/backup-and-restore.md) · [disaster recovery](docs/operations/disaster-recovery.md).
 
 ## Status and limitations
 
-- **V1.1.0, integrated into `main`.** [PR #79](https://github.com/XKeviNguyen/three_heavens/pull/79) merged V1.1.0 into `main` as `43b0184db56d499610b0186d71bf54265f3ac6cd`, and the post-merge CI run on `main` passed all five jobs. The `v1.1.0` tag and GitHub Release have not been published yet. Production deployment, uptime, traffic and operation with a real paid AI provider are not verified; this README does not claim any of them.
+- **V1.1.0 released and deployed.** [GitHub Release v1.1.0](https://github.com/XKeviNguyen/three_heavens/releases/tag/v1.1.0) was published on October 9, 2026. The application runs at [threeheavens.win](https://threeheavens.win) from release commit `15459c2` on `main`. On October 9, 2026, HTTPS verification and public `/`, `/up`, and `/ready` checks passed, production preflight and database migration checks passed, and an administrator signed in successfully. These are point-in-time checks, not a claim of measured long-term uptime or verified paid-AI end-to-end traffic.
+- **Operational validation in progress:** production off-host backup and isolated restore verification, complete transactional email and Google sign-in journeys, and longer-term production monitoring are not yet documented as passing.
 - **One AI provider:** all AI calls go through OpenRouter.
 - **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
 - **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
 - **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
-- **License: Public Source — All Rights Reserved.** The code is visible so it can be read and evaluated. No open-source license has been granted, and public visibility does not grant permission to use, copy, modify, redistribute, or commercialize it.
+- **Copyright and license:** © 2026 **Nguyen Thai Hoang**. **All Rights Reserved.** The code is published for viewing and technical evaluation, including by prospective employers. It is **not open-source licensed**; see [LICENSE](LICENSE). Third-party components retain their own licenses.
 
 Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)
