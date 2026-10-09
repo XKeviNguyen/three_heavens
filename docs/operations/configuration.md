@@ -48,7 +48,7 @@ Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and needs no real secret
 
 ## TLS, hosts, and health checks
 
-Production assumes TLS terminates at the trusted kamal-proxy, forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
+Production assumes TLS terminates at the trusted kamal-proxy (or, in the deployed Cloudflare Tunnel topology, at Cloudflare, with the tunnel the only route to kamal-proxy; see step 11 of [production deploy](production-deploy.md)), forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
 
 ## Storage
 

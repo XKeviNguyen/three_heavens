@@ -31,6 +31,10 @@ servers:
         - net.ipv4.tcp_rmem=4096 65536 262144
         - net.ipv4.tcp_wmem=4096 65536 262144
 
+# This template has kamal-proxy terminate TLS for browsers that connect to it
+# directly. Behind a Cloudflare Tunnel, the deployed topology, the override
+# must set ssl: false and forward_headers: true instead, or every visitor
+# shares one sign-in rate limit (docs/operations/production-deploy.md, step 11).
 proxy:
   ssl: true
   host: <%= app_host %>
