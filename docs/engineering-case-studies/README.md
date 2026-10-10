@@ -20,9 +20,9 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 
 ## Where the failures live
 
-![Three Heavens architecture from top to bottom: browser (autosave, upload, Start translation, Back/Forward, session cookie, CI browser tests), an unreliable HTTPS network, kamal-proxy in front of the memory-limited web container (Thruster, Puma and Rails, services, Solid Queue jobs calling the external OpenRouter), PostgreSQL and Active Storage with no transaction spanning both, and the backup and restore drill. Numbered tags mark which case studied each boundary.](assets/architecture-overview.svg)
+![Three Heavens production topology and case-study failure boundaries: browser HTTPS to Cloudflare edge, encrypted Cloudflare Tunnel into Vultr, internal HTTP to separate kamal-proxy and the Rails web container, external OpenRouter, PostgreSQL, Active Storage and backup/restore. Numbered tags map cases to their boundaries.](assets/architecture-overview.svg)
 
-*Blue tags are case numbers. Most defects sit on a boundary: between browser and server, between two concurrent actors, or between PostgreSQL and storage.*
+*Blue tags are case numbers. The network path depicts the **deployed Vultr override**: Cloudflare terminates public HTTPS; cloudflared sends private HTTP to an unpublished kamal-proxy. The tracked [Kamal deployment template](../../config/deploy.yml) instead specifies `proxy.ssl: true` for direct TLS. These are different deployment topologies, not simultaneous TLS termination points. Client-IP and forwarded-header security for the deployed Tunnel path is a separate, still-open verification in [PR #87](https://github.com/XKeviNguyen/three_heavens/pull/87). Most case-study failures sit across state or service boundaries.*
 
 ## The cases
 
