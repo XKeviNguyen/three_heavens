@@ -17,7 +17,7 @@ The interface is available in English, Vietnamese, and Japanese. New to the app?
 
 > **About the screenshots.** They come from the real application running locally against a throwaway database. All names, texts, scores, token counts, and costs are **synthetic demo data** from a deterministic fake AI client ([`bin/capture-readme-screenshots`](bin/capture-readme-screenshots)). No AI service was called.
 
-**Contents** — Product: [What it does](#what-it-does) · [Product tour](#product-tour) · [Using the app](#using-the-app) — Engineering: [Key design decisions](#key-design-decisions) · [Architecture](#architecture) · [Translation workflow](#translation-workflow) · [Data model](#data-model) · [Reliability](#reliability) · [Security](#security) · [Testing](#testing-and-release-quality) · [Tech stack](#tech-stack) · [Run it locally](#run-it-locally) · [Project structure](#project-structure) · [Deployment](#deployment) · [Status](#status-and-limitations)
+**Contents** — Product: [What it does](#what-it-does) · [Product tour](#product-tour) · [Using the app](#using-the-app) — Engineering: [Key design decisions](#key-design-decisions) · [Architecture](#architecture) · [Translation workflow](#translation-workflow) · [Data model](#data-model) · [Reliability](#reliability) · [Security](#security) · [Testing](#testing-and-release-quality) · [Tech stack](#tech-stack) · [Run it locally](#run-it-locally) · [Project structure](#project-structure) · [Deployment](#deployment) · [Engineering case studies](docs/engineering-case-studies/README.md) · [Status](#status-and-limitations)
 
 ## What it does
 
