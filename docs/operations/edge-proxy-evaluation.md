@@ -77,11 +77,13 @@ Observations about kamal-proxy, neither a defect in this application:
   `proxy.host`, and a container deployed some other way can be put behind it
   with `kamal-proxy deploy <service> --target <container>:<port> --host
   <name>` on the `kamal` network. If another proxy must keep ports 80/443,
-  run kamal-proxy on other ports and forward to it; the client address then
-  needs care: the outer proxy must replace client-supplied
-  `X-Forwarded-For`, and kamal-proxy must then forward it
-  (`forward_headers: true`), or every client shares the outer proxy's
-  sign-in budget.
+  leave kamal-proxy unpublished (or on other ports) and forward to it; the
+  client address then needs care: the outer proxy must append the address it
+  received the connection from to `X-Forwarded-For` (or replace the header
+  with it) and be the only route to kamal-proxy, and kamal-proxy must forward
+  the header (`forward_headers: true`), or every client shares the outer
+  proxy's sign-in budget. Production does this with a Cloudflare Tunnel; see
+  step 11 of `production-deploy.md`.
 - **What Traefik adds.** Edge rate limiting (`rateLimit`, `inFlightReq`), IP
   allow-lists, TCP routing and a dashboard. None is needed by the current
   product; overload protection beyond what the application and container
