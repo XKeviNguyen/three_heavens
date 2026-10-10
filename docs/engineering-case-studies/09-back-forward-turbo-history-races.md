@@ -172,7 +172,7 @@ Recorded results: PR #72 ran a final `bin/ci` with 1,186 Rails tests and 176 sys
 - **The matrix covers named interleavings, not every ordering.** Rapid navigation is tested with four traversals. No claim is made about arbitrary sequences or counts of Back/Forward presses.
 - Testing ran in Chrome (PR #81 names Chrome 154). Behaviour in other browsers is not established. The capture-phase ordering relied on in `history_traversal.js` is documented in its own comment as Chrome behaviour.
 - Reloading after an acknowledged save costs a full page load. That trade buys certainty that the page shows server state.
-- One of PR #64's deferred items remains: a second navigation click during a flush is ignored.
+- PR #64 had deferred one item: a second navigation click during a flush was ignored. PR #72's guard resolves it: a newer link or Back/Forward replaces the pending destination (`onBeforeVisit` → `navigateAfterSave`), as the churn test at `#L204` checks.
 
 ## Lessons learned
 

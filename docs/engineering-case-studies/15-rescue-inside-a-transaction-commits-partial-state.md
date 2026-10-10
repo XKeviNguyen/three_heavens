@@ -125,7 +125,7 @@ PR #43 records that these regressions first reproduced the defects and passed af
 
 ## Trade-offs and remaining limitations
 
-- A savepoint costs one extra round trip per stage advance, which is negligible next to an AI call.
+- A savepoint adds two statements per stage advance (`SAVEPOINT`, then `RELEASE` or `ROLLBACK TO`), which is negligible next to an AI call.
 - The fix covers the exceptions `Advance` rescues. Any new rescue added *inside* a transaction elsewhere would need the same care. The pattern is a review checklist item, not something the framework enforces.
 - PR #43's overall audit verdict was conditional ("controlled smoke testing has not begun") and covered other findings. This case is only item 1 of that PR.
 - `Pipelines::Advance` still uses the savepoint on `develop` [`c39a15c`](https://github.com/XKeviNguyen/three_heavens/blob/c39a15c1dfdda7718658865ae00f4ce07d4eec01/app/services/pipelines/advance.rb).

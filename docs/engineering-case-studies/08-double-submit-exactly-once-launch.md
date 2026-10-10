@@ -115,7 +115,7 @@ flowchart TD
 | Layer | Guaranteed? | Mechanism |
 | --- | --- | --- |
 | One launch graph per user intent (token) | **Yes** | Row lock, consumed state, unique `experiment_id`, lifecycle `CHECK` |
-| Repeated deliveries return the same result | **Yes**, within the token's 24-hour lifetime | `replay!` |
+| Repeated deliveries return the same result | **Yes**, for as long as the consumed row exists | `replay!` |
 | HTTP delivered exactly once | **No** | Duplicates still arrive; they are deduplicated |
 | Each provider call made exactly once | **No** | One job per run, and a duplicate job for the same run is rejected by the execution claim. But provider calls retry on retryable errors (`retry_on Ai::OpenRouterClient::RetryableError` in `TranslationRunJob`). Provider-side idempotency is not established. |
 
@@ -148,7 +148,7 @@ Recorded results:
 
 ## Trade-offs and remaining limitations
 
-- The token lives 24 hours. After that a resubmit is refused, and the user reloads to get a new one.
+- An **unused** token expires after 24 hours; submitting it later is refused and the user reloads for a new one. A token that was already **consumed** keeps replaying its original launch even after that, because `claim!` returns the existing row and `submit` replays a consumed row before checking expiry.
 - Replays ignore changed parameters. A test submits a different project name on replay and asserts the original is kept. A user who wants a different launch needs a new page.
 - PR #72 later added a bounded per-account ceiling on resident submission rows (256). The lock-and-replay mechanism is unchanged.
 - The lost-launch-response UX gap remains a documented follow-up.

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 1030" width="560" height="1030" role="img" aria-labelledby="architecture-overview-title architecture-overview-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="architecture-overview-title">Three Heavens architecture and the failure boundaries studied in the case studies</title>
-  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; kamal-proxy, a separate proxy that terminates TLS and buffers and caps request bodies before they reach the app; the memory-capped web container with Thruster, Puma and Rails, application services and Solid Queue jobs that call the external OpenRouter service (dashed border); the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
+  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; kamal-proxy, a separate proxy that terminates TLS and buffers and caps request bodies before they reach the app; the memory-capped web container with Thruster, Puma and Rails, application services and Solid Queue jobs, which call OpenRouter, an external paid service drawn outside the container with a dashed border; the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
   <style>
     .bg{fill:#ffffff}
     .panel{fill:#f6f8fa;stroke:#57606a;stroke-width:1.5}
@@ -69,35 +69,37 @@
   <path class="arrow" d="M280 430 V454" marker-end="url(#a)"/>
 
   <!-- Web container -->
-  <rect class="panel" x="16" y="458" width="528" height="336" rx="10"/>
+  <rect class="panel" x="16" y="458" width="384" height="336" rx="10"/>
   <text class="h" x="32" y="488">Web container</text>
   <text class="s" x="32" y="510">memory limit · kernel TCP buffers</text>
-  <rect class="tag" x="490" y="472" width="32" height="24" rx="12"/><text class="tagt" x="506" y="489" text-anchor="middle">03</text>
+  <rect class="tag" x="346" y="472" width="32" height="24" rx="12"/><text class="tagt" x="362" y="489" text-anchor="middle">03</text>
 
-  <rect class="box" x="32" y="524" width="184" height="58" rx="6"/>
+  <rect class="box" x="32" y="524" width="140" height="58" rx="6"/>
   <text class="t" x="44" y="548">Thruster</text><text class="s" x="44" y="570">HTTP front</text>
-  <path class="arrow" d="M218 553 H236" marker-end="url(#a)"/>
-  <rect class="box" x="240" y="524" width="288" height="58" rx="6"/>
-  <text class="t" x="252" y="548">Puma · Rails 8.1</text><text class="s" x="252" y="570">Bundler boot</text>
-  <rect class="tag" x="490" y="554" width="32" height="24" rx="12"/><text class="tagt" x="506" y="571" text-anchor="middle">04</text>
+  <path class="arrow" d="M174 553 H190" marker-end="url(#a)"/>
+  <rect class="box" x="194" y="524" width="190" height="58" rx="6"/>
+  <text class="t" x="206" y="548">Puma · Rails 8.1</text><text class="s" x="206" y="570">Bundler boot</text>
+  <rect class="tag" x="346" y="554" width="32" height="24" rx="12"/><text class="tagt" x="362" y="571" text-anchor="middle">04</text>
 
-  <rect class="box" x="32" y="596" width="496" height="104" rx="6"/>
-  <text class="t" x="44" y="620">Controllers → services → models</text>
-  <rect class="tag" x="434" y="604" width="88" height="24" rx="12"/><text class="tagt" x="478" y="621" text-anchor="middle">06 08 10 12</text>
+  <rect class="box" x="32" y="596" width="352" height="104" rx="6"/>
+  <text class="t" x="44" y="620">Controllers → services</text>
+  <rect class="tag" x="290" y="604" width="88" height="24" rx="12"/><text class="tagt" x="334" y="621" text-anchor="middle">06 08 10 12</text>
   <text class="s" x="44" y="646">Sessions · draft Save / Discard</text>
   <text class="s" x="44" y="668">TranslationWorkspace#submit</text>
-  <text class="s" x="44" y="690">SourceImports::Create · upload budget</text>
+  <text class="s" x="44" y="690">SourceImports::Create · budget</text>
 
-  <rect class="box" x="32" y="714" width="300" height="64" rx="6"/>
-  <text class="t" x="44" y="740">Solid Queue jobs</text><rect class="tag" x="278" y="722" width="48" height="24" rx="12"/><text class="tagt" x="302" y="739" text-anchor="middle">14 15</text>
+  <rect class="box" x="32" y="714" width="352" height="64" rx="6"/>
+  <text class="t" x="44" y="740">Solid Queue jobs</text><rect class="tag" x="330" y="722" width="48" height="24" rx="12"/><text class="tagt" x="354" y="739" text-anchor="middle">14 15</text>
   <text class="s" x="44" y="762">enqueued after commit</text>
-  <path class="arrow" d="M334 746 H372" marker-end="url(#a)"/>
-  <rect class="ext" x="376" y="714" width="152" height="64" rx="6"/>
-  <text class="t" x="388" y="740">OpenRouter</text><text class="s" x="388" y="762">external, paid</text>
+  <path class="arrow" d="M386 746 H408" marker-end="url(#a)"/>
+
+  <!-- External provider, outside the container -->
+  <rect class="ext" x="412" y="714" width="132" height="64" rx="6"/>
+  <text class="t" x="424" y="740">OpenRouter</text><text class="s" x="424" y="762">external, paid</text>
 
   <!-- Authoritative state -->
   <path class="arrow" d="M140 796 V820" marker-end="url(#a)"/>
-  <path class="arrow" d="M420 796 V820" marker-end="url(#a)"/>
+  <path class="arrow" d="M360 796 V820" marker-end="url(#a)"/>
   <rect class="box" x="16" y="824" width="250" height="100" rx="10"/>
   <text class="h" x="30" y="854">PostgreSQL</text>
   <rect class="tag" x="166" y="836" width="88" height="24" rx="12"/><text class="tagt" x="210" y="853" text-anchor="middle">08 10 11 13</text>

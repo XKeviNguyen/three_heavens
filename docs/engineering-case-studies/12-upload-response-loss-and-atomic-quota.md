@@ -27,7 +27,9 @@ flowchart TD
     class S gap
 ```
 
-*No transaction spans the yellow step. A crash after the commit leaves a `pending` row, which a replay reports as unavailable, never as success. Expiry cleanup removes it later.*
+*The upload flow as fixed in PR #64. No transaction spans the yellow step. A crash after the commit leaves a `pending` row, which a replay reports as unavailable, never as success. Expiry cleanup removes it later.*
+
+*PR #72 later split the first commit in two: the budget charge and a `pending` import with no file commit together **before** extraction, and the extracted metadata plus blob and attachment records commit afterwards ([`create.rb#L53-L62` and `#L101-L111` at `0a82540`](https://github.com/XKeviNguyen/three_heavens/blob/0a82540f32e86f88883b4ef47275fee5c3a26131/app/services/source_imports/create.rb#L53-L111)). A worker that dies during extraction therefore leaves a pending import with no blob; replaying it costs nothing and starts no new work (see failures 4 and 5).*
 
 ## What went wrong
 
