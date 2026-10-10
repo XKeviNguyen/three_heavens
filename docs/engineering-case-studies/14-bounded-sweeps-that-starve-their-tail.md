@@ -114,8 +114,8 @@ A **fairness cursor**, `last_reconciled_at`, means every examined workflow moves
 | Scenario | Before | After |
 | --- | --- | --- |
 | 105 abandoned blobs, the oldest 100 always fail to delete | At `7d31de7`: the healthy 5 are never reached (reproduced in PR #72) | Run 1 claims the 100 failures; run 2 purges the healthy 5; the failures stay discoverable |
-| Next run within the hour | The same 100 failures | 0 candidates (deadlines hold) |
-| Storage recovers, at the first run after the deadline | — | The 100 are purged |
+| Manual/test invocation within the first hour (not a normal hourly schedule) | The same 100 failures | 0 candidates (deadlines hold) |
+| Storage recovers, at the first scheduled or manually invoked run after the deadline | — | The 100 are purged |
 | 3 blocked workflows + 1 recoverable, batch size 3 | The recoverable one waits behind the blocked ones (by `updated_at`) | Reached on the second run and advanced to review |
 
 ## Reproduction and regression tests
