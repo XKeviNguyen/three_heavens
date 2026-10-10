@@ -13,6 +13,15 @@ Real debugging and engineering decisions from the [Three Heavens](https://github
 | [05 — Turbo system-test races](05-turbo-system-test-races.md) | Post-merge system test intermittently navigated to the wrong page | Async UI, deterministic testing | [PR #70](https://github.com/XKeviNguyen/three_heavens/pull/70) |
 | [06 — Session invalidation](06-server-side-session-invalidation.md) | A copied cookie stayed usable after sign-out | Authentication, revocation | [PR #69](https://github.com/XKeviNguyen/three_heavens/pull/69) |
 | [07 — Stale source import responses](07-async-source-import-ownership.md) | Older import responses could supersede newer edits | Async ownership, ordering, data loss | [PR #77](https://github.com/XKeviNguyen/three_heavens/pull/77) |
+| [08 — Double-submit translation launch](08-double-submit-exactly-once-launch.md) | Rapid or repeated Start could schedule duplicate paid work without replay identity | Exactly-once, transactional launch | [PR #21](https://github.com/XKeviNguyen/three_heavens/pull/21), [#64](https://github.com/XKeviNguyen/three_heavens/pull/64) |
+| [09 — Back/Forward history races](09-back-forward-turbo-history-races.md) | Pending saves and browser history could restore stale editor state | Turbo, asynchronous navigation, autosave | [PR #64](https://github.com/XKeviNguyen/three_heavens/pull/64), [#72](https://github.com/XKeviNguyen/three_heavens/pull/72) |
+| [10 — Retry after discard](10-retry-after-discard-and-rejected-editor.md) | Retrying a rejected editor after the winner discarded could recreate a draft | Negative knowledge, replay state | [PR #72](https://github.com/XKeviNguyen/three_heavens/pull/72) |
+| [11 — First-save two-tab race](11-two-tab-first-save-uniqueness-race.md) | Competing first saves hit an unexpected uniqueness-validation exception | Concurrency, DB constraints | [PR #66](https://github.com/XKeviNguyen/three_heavens/pull/66) |
+| [12 — Upload replay and quota](12-upload-response-loss-and-atomic-quota.md) | Lost replies and concurrent delivery risked duplicate import or false-ready output | Idempotency, durable objects, atomic admission | [PR #64](https://github.com/XKeviNguyen/three_heavens/pull/64), [#71](https://github.com/XKeviNguyen/three_heavens/pull/71), [#72](https://github.com/XKeviNguyen/three_heavens/pull/72) |
+
+## Coverage and future cases
+
+The 12 studies are an **evidence-backed selection**, not an exhaustive accounting of every severity finding. Additional candidates to investigate include glossary ownership/digest constraints ([PR #30](https://github.com/XKeviNguyen/three_heavens/pull/30), [PR #31](https://github.com/XKeviNguyen/three_heavens/pull/31)), background reconciliation fairness ([PR #21](https://github.com/XKeviNguyen/three_heavens/pull/21), [PR #72](https://github.com/XKeviNguyen/three_heavens/pull/72)), and release hardening. Add a case only after independently checking the root cause, verified fix, and outcomes in its source evidence. Do not portray a test matrix as exhaustive proof of arbitrary browser event sequences.
 
 ## How to use these in an interview
 
