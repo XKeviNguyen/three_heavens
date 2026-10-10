@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 1030" width="560" height="1030" role="img" aria-labelledby="architecture-overview-title architecture-overview-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 1118" width="560" height="1118" role="img" aria-labelledby="architecture-overview-title architecture-overview-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="architecture-overview-title">Three Heavens architecture and the failure boundaries studied in the case studies</title>
-  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; kamal-proxy, a separate proxy that terminates TLS and buffers and caps request bodies before they reach the app; the memory-capped web container with Thruster, Puma and Rails, application services and Solid Queue jobs, which call OpenRouter, an external paid service drawn outside the container with a dashed border; the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
+  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; a Cloudflare edge terminating public TLS, followed by an encrypted Tunnel to cloudflared on the Vultr host, then internal HTTP to a separate kamal-proxy that buffers and caps request bodies before they reach the app; the memory-capped web container with Thruster, Puma and Rails, application services and Solid Queue jobs, which call OpenRouter, an external paid service drawn outside the container with a dashed border; the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
   <style>
     .bg{fill:#ffffff}
     .panel{fill:#f6f8fa;stroke:#57606a;stroke-width:1.5}
@@ -34,7 +34,7 @@
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0 0 10 5 0 10z"/></marker>
   </defs>
-  <rect class="bg" x="0" y="0" width="560" height="1030" rx="12"/>
+  <rect class="bg" x="0" y="0" width="560" height="1118" rx="12"/>
 
   <!-- Browser -->
   <rect class="panel" x="16" y="16" width="528" height="210" rx="10"/>
@@ -60,12 +60,24 @@
   <rect class="tag" x="412" y="270" width="116" height="24" rx="12"/><text class="tagt" x="470" y="287" text-anchor="middle">02 07 08 10 12</text>
   <text class="t" x="32" y="314">A response can be lost, duplicated,</text>
   <text class="t" x="32" y="333">delayed or reordered</text>
-  <path class="arrow" d="M280 342 V366" marker-end="url(#a)"/>
+  <path class="arrow" d="M142 342 V358" marker-end="url(#a)"/>
 
-  <!-- Edge proxy (separate from the web container) -->
+  <!-- Deployed Vultr topology: Cloudflare handles public TLS; cloudflared
+       connects over the encrypted Tunnel; Kamal receives private HTTP. -->
+  <rect class="box" x="16" y="362" width="248" height="64" rx="10"/>
+  <text class="t" x="32" y="386" font-weight="700">Cloudflare edge</text>
+  <text class="s" x="32" y="410">Public HTTPS / TLS termination</text>
+  <path class="arrow" d="M266 395 H280" marker-end="url(#a)"/>
+  <rect class="box" x="284" y="362" width="260" height="64" rx="10"/>
+  <text class="t" x="300" y="386" font-weight="700">cloudflared Tunnel</text>
+  <text class="s" x="300" y="410">encrypted connection to VPS</text>
+  <path class="arrow" d="M400 430 V454" marker-end="url(#a)"/>
+
+  <g transform="translate(0 88)">
+  <!-- Origin proxy (separate from the web container) -->
   <rect class="box" x="16" y="370" width="528" height="58" rx="10"/>
   <text class="t" x="32" y="394" font-weight="700">kamal-proxy</text>
-  <text class="s" x="32" y="416">separate proxy · TLS · buffers and caps request bodies</text>
+  <text class="s" x="32" y="416">private HTTP · buffers and caps request bodies</text>
   <path class="arrow" d="M280 430 V454" marker-end="url(#a)"/>
 
   <!-- Web container -->
@@ -117,4 +129,5 @@
   <rect class="panel" x="16" y="956" width="528" height="58" rx="10"/>
   <text class="t" x="32" y="990" font-weight="700">Backup → isolated restore drill</text>
   <rect class="tag" x="490" y="973" width="32" height="24" rx="12"/><text class="tagt" x="506" y="990" text-anchor="middle">01</text>
+  </g>
 </svg>
