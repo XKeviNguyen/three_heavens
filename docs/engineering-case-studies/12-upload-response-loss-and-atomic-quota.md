@@ -14,22 +14,27 @@
 
 ```mermaid
 flowchart TD
-    K["Acquire session advisory lock<br/>hash(user, request_key), wait ≤ 30 s"] --> E{"import with this key exists?"}
-    E -- yes --> RP["Replay its outcome<br/>(ready, failed, or unavailable if pending)"]
-    E -- no --> T1["PostgreSQL transaction:<br/>INSERT import status = pending<br/>+ blob and attachment records → COMMIT"]
-    T1 --> S["Active Storage writes the file<br/>(after commit; outside any transaction)"]
-    S -- ok --> T2["UPDATE status = ready"]
-    S -- error --> F["purge blob, UPDATE status = failed<br/>(storage_unavailable)"]
-    T2 --> U["Release the advisory lock"]
+    K["Acquire per-user/request-key advisory lock<br/>(payload already validated)"] --> E{"Action identity exists?"}
+    E -- yes --> RP["Replay previous outcome:<br/>ready, failed or unavailable if pending"]
+    E -- no --> T1["DB COMMIT 1: atomic budget receipt<br/>+ pending SourceImport (NO blob)"]
+    T1 --> X["Extract text / capture extraction error<br/>(outside DB transaction)"]
+    X --> T2["DB COMMIT 2: import metadata<br/>+ blob + attachment records"]
+    X -- worker unavailable / Busy --> B["Refund budget + remove pending row<br/>(separate transaction)"]
+    T2 --> S["Active Storage writes object bytes<br/>(outside PostgreSQL transaction)"]
+    S -- success --> R["Mark import ready<br/>(expires_at starts after storage)"]
+    S -- failure --> F["Mark import failed, detach blob<br/>and attempt object purge"]
+    R --> U["Release advisory lock"]
     F --> U
+    B --> U
     RP --> U
-    classDef gap fill:#fff8c5,stroke:#9a6700,color:#1f2328
-    class S gap
+    classDef boundary fill:#fff8c5,stroke:#9a6700,color:#1f2328
+    class X,S boundary
 ```
 
-*The upload flow as fixed in PR #64. No transaction spans the yellow step. A crash after the commit leaves a `pending` row, which a replay reports as unavailable, never as success. Expiry cleanup removes it later.*
+*This diagram follows the final PR #72 version in [`SourceImports::Create`](https://github.com/XKeviNguyen/three_heavens/blob/0a82540f32e86f88883b4ef47275fee5c3a26131/app/services/source_imports/create.rb#L38-L132). A crash after **commit 1** leaves a pending row **without** a blob; one after **commit 2** but before the storage write can leave blob metadata without durable bytes. A replay of incomplete pending work is unavailable, never falsely ready. The advisory lock spans the distinct operations during a live delivery, but no single transaction spans PostgreSQL and the object store. A terminal failure uses a separate cleanup path.*
 
-*PR #72 later split the first commit in two: the budget charge and a `pending` import with no file commit together **before** extraction, and the extracted metadata plus blob and attachment records commit afterwards ([`create.rb#L53-L62` and `#L101-L111` at `0a82540`](https://github.com/XKeviNguyen/three_heavens/blob/0a82540f32e86f88883b4ef47275fee5c3a26131/app/services/source_imports/create.rb#L53-L111)). A worker that dies during extraction therefore leaves a pending import with no blob; replaying it costs nothing and starts no new work (see failures 4 and 5).*
+*For historical comparison, PR #64 used an earlier flow in which pending import and blob/attachment metadata were committed together before the object write. PR #72 added budget admission and the pre-extraction pending commit. These are two different implementation stages, not interchangeable descriptions.*
+
 
 ## What went wrong
 
