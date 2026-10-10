@@ -303,6 +303,6 @@ Runbooks: [configuration](docs/operations/configuration.md) · [production deplo
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
 - **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
 - **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
-- **License: Public Source — All Rights Reserved.** The code is visible so it can be read and evaluated. No open-source license has been granted, and public visibility does not grant permission to use, copy, modify, redistribute, or commercialize it.
+- **License: [MIT](LICENSE).** Copyright © 2026 Nguyen Thai Hoang. Three Heavens is open source: reuse, modification, distribution and commercial use are permitted under the MIT License, provided its copyright and permission notices are retained. Third-party components remain subject to their own licenses.
 
 Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)
