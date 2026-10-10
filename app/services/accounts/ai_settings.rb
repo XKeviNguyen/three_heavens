@@ -21,7 +21,13 @@ module Accounts
       end
     end
 
+    # Read under a share lock so the source, key, denial, and token all come
+    # from one committed state, never from either side of a concurrent change.
     def self.state(user)
+      user.with_lock("FOR SHARE") { snapshot(user) }
+    end
+
+    def self.snapshot(user)
       credential = user.open_router_credentials.active.select(:id, :key_hint, :created_at).first
       {
         payment_source: user.ai_payment_source,
@@ -31,6 +37,7 @@ module Accounts
         state_token: token_for(user.ai_payment_source, credential&.id)
       }
     end
+    private_class_method :snapshot
 
     def self.select_source!(user, source:, state_token:)
       source = source.to_s
@@ -88,9 +95,9 @@ module Accounts
         end
 
         yield credential
+        user.association(:open_router_credentials).reset
+        snapshot(user)
       end
-      user.association(:open_router_credentials).reset
-      state(user)
     end
     private_class_method :change
 

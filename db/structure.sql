@@ -763,6 +763,39 @@ $$;
 
 
 --
+-- Name: enforce_provider_attempt_payer(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_provider_attempt_payer() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  run_billing_source character varying;
+  run_credential_id bigint;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.billing_source IS DISTINCT FROM NEW.billing_source OR
+       OLD.open_router_credential_id IS DISTINCT FROM NEW.open_router_credential_id THEN
+      RAISE EXCEPTION 'Provider attempt payers are immutable';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  EXECUTE format(
+    'SELECT billing_source, open_router_credential_id FROM %I WHERE id = $1',
+    CASE NEW.provider_run_type WHEN 'TranslationRun' THEN 'translation_runs' WHEN 'TranslationSegmentRun' THEN 'translation_segment_runs' WHEN 'ReviewRun' THEN 'review_runs' WHEN 'ReviewSegmentRun' THEN 'review_segment_runs' WHEN 'JudgeRun' THEN 'judge_runs' WHEN 'JudgeSegmentRun' THEN 'judge_segment_runs' WHEN 'FinalizationRun' THEN 'finalization_runs' WHEN 'FinalizationSegmentRun' THEN 'finalization_segment_runs' END
+  ) INTO run_billing_source, run_credential_id USING NEW.provider_run_id;
+  IF run_billing_source IS NULL OR
+     NEW.billing_source IS DISTINCT FROM run_billing_source OR
+     NEW.open_router_credential_id IS DISTINCT FROM run_credential_id THEN
+    RAISE EXCEPTION 'Provider attempt payer must match its run authorization';
+  END IF;
+  RETURN NEW;
+END;
+$_$;
+
+
+--
 -- Name: enforce_revision_sequence(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1963,7 +1996,7 @@ CREATE TABLE public.finalization_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT finalization_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT finalization_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
@@ -2044,7 +2077,7 @@ CREATE TABLE public.finalization_segment_runs (
     warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT finalization_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT finalization_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
@@ -2320,7 +2353,7 @@ CREATE TABLE public.judge_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT judge_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT judge_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
@@ -2396,7 +2429,7 @@ CREATE TABLE public.judge_segment_runs (
     judgment jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT judge_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT judge_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
@@ -2857,7 +2890,7 @@ CREATE TABLE public.review_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT review_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT review_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
@@ -2931,7 +2964,7 @@ CREATE TABLE public.review_segment_runs (
     evaluations jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT review_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT review_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
@@ -3252,7 +3285,7 @@ CREATE TABLE public.translation_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT translation_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT translation_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
@@ -3320,7 +3353,7 @@ CREATE TABLE public.translation_segment_runs (
     translated_text text,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    billing_source character varying NOT NULL,
     open_router_credential_id bigint,
     CONSTRAINT translation_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT translation_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
@@ -5715,6 +5748,13 @@ CREATE TRIGGER enforce_ai_provider_attempt_lineage BEFORE INSERT OR UPDATE OF pr
 
 
 --
+-- Name: ai_provider_attempts enforce_ai_provider_attempt_payer; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_ai_provider_attempt_payer BEFORE INSERT OR UPDATE ON public.ai_provider_attempts FOR EACH ROW EXECUTE FUNCTION public.enforce_provider_attempt_payer();
+
+
+--
 -- Name: documents enforce_document_glossary_owner_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -6973,6 +7013,8 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261010090300'),
+('20261010090200'),
 ('20261010090100'),
 ('20261010090000'),
 ('20261008090000'),

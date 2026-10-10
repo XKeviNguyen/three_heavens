@@ -198,6 +198,52 @@ class ByokJobBillingTest < ActiveSupport::TestCase
     assert_equal "personal_key_unavailable", run.reload.error_code
   end
 
+  test "the database refuses a provider attempt whose payer differs from its run, as a pre-BYOK worker would record" do
+    run = build_runs.first
+    use_personal_key
+    schedule!(run)
+
+    # The previous release's claim marks the run running and records an
+    # attempt without billing columns ('managed'); it must abort before any
+    # request can be sent on the platform key.
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      TranslationRun.transaction(requires_new: true) do
+        run.update!(status: :running, execution_attempt: 1, claimed_job_execution: 1, last_claimed_at: Time.current)
+        model = run.llm_model
+        AiProviderAttempt.create!(provider_run: run, attempt_number: 1, stage: "translation", status: :running,
+                                  gateway_snapshot: model.gateway, provider_snapshot: model.provider,
+                                  model_identifier_snapshot: model.model_identifier,
+                                  display_name_snapshot: model.display_name, started_at: Time.current)
+      end
+    end
+    assert_match "payer must match", error.message
+    assert run.reload.pending?
+
+    claim = Ai::ExecutionClaim.call(run.reload, active_job_id: run.scheduled_job_id, active_job_execution: 1)
+    assert_equal :claimed, claim.state
+    attempt = run.provider_attempts.sole
+    assert attempt.running?
+    assert_equal "personal", attempt.billing_source
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      AiProviderAttempt.transaction(requires_new: true) { attempt.update_columns(billing_source: "managed", open_router_credential_id: nil) }
+    end
+    assert_match "payers are immutable", error.message
+  end
+
+  test "code that does not name a payer cannot create AI runs" do
+    experiment = create_experiment
+    error = assert_raises(ActiveRecord::NotNullViolation) do
+      TranslationRun.transaction(requires_new: true) do
+        TranslationRun.connection.execute(<<~SQL)
+          INSERT INTO translation_runs (experiment_id, llm_model_id, status, created_at, updated_at)
+          VALUES (#{Integer(experiment.id)}, #{Integer(llm_models(:openrouter_claude).id)}, 'pending', now(), now())
+        SQL
+      end
+    end
+    assert_match "billing_source", error.message
+    assert_equal "managed", experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude)).billing_source
+  end
+
   test "job arguments, logs, and attempt records never contain the key" do
     run = build_runs.first
     use_personal_key

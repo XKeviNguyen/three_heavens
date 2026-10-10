@@ -60,6 +60,40 @@ class Ai::BillingConcurrencyTest < ActiveSupport::TestCase
     [ deleter, claimer ].compact.each(&:join)
   end
 
+  test "the settings state waits for an in-progress key change and reports one coherent state" do
+    @user.open_router_credentials.create!(api_key: KEY)
+    @user.update!(ai_payment_source: "personal")
+    locked, release, outcome = Queue.new, Queue.new, Queue.new
+
+    deleter = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        @user.with_lock do
+          @user.open_router_credentials.active.sole.revoke!(reason: "deleted")
+          locked << true
+          release.pop
+        end
+      end
+    end
+    Timeout.timeout(10) { locked.pop }
+    reader = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection { outcome << Accounts::AiSettings.state(User.find(@user.id)) }
+    rescue StandardError => error
+      outcome << error
+    end
+
+    assert_nil reader.join(0.5), "the state read must wait for the change to commit"
+    release << true
+    [ deleter, reader ].each { |thread| thread.join(10) || flunk("thread did not finish") }
+
+    state = outcome.pop
+    assert_equal({ configured: false }, state.fetch(:personal_key))
+    assert_equal "personal_key_unavailable", state.fetch(:denial_code)
+    assert_equal "personal.0", state.fetch(:state_token)
+  ensure
+    release&.push(true)
+    [ deleter, reader ].compact.each(&:join)
+  end
+
   test "concurrent key saves from the same form keep exactly one active key" do
     token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
     start = Queue.new
