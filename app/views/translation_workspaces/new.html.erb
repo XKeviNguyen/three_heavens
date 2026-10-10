@@ -20,8 +20,11 @@
   <% if @draft_unreadable %><p class="mb-3 text-sm text-amber-800" role="status"><%= t("workspace_ui.draft_unreadable") %></p><% end %>
   <% if @repeat_configuration_notice %><p class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status"><%= @repeat_configuration_notice %></p><% end %>
 
-  <% unless current_user.managed_ai_access? %>
-    <p class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950" role="status"><%= t("managed_ai.unavailable") %></p>
+  <% ai_billing_denial = Ai::BillingPolicy.denial_for(current_user) %>
+  <% if ai_billing_denial %>
+    <p class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950" role="status"><%= t("ai_billing.denied.#{ai_billing_denial.code}") %> <%= link_to t("ai_billing.open_settings"), settings_ai_settings_path, class: "font-semibold underline" %></p>
+  <% else %>
+    <p class="mb-5 text-sm text-slate-600" data-testid="ai-payer"><%= t("ai_settings.current.ready_#{current_user.ai_payment_source}") %> <%= link_to t("ai_billing.open_settings"), settings_ai_settings_path, class: "font-semibold text-blue-700 underline" %></p>
   <% end %>
 
   <%= form_with model: @translation_workspace, url: translation_workspace_path, id: "workspace-form", data: { workspace_guard_target: "form", workspace_summary_panel_url_value: workspace_terminology_panel_path, workspace_summary_messages_value: t("workspace_ui.summary").to_json, controller: "workflow-mode workspace-summary", action: "input->workspace-summary#update change->workspace-summary#changed combobox:change->workspace-summary#update workspace-source:changed->workspace-summary#update workspace-models:changed->workspace-summary#update turbo:frame-load->workspace-summary#update" } do |form| %>
@@ -147,7 +150,7 @@
           <span data-workspace-summary-target="workflow"><%= @translation_workspace.workflow_mode == "automatic" ? t("workspace_ui.automatic") : t("workspace_ui.manual") %></span>
         </p>
       </div>
-      <%= form.submit t("workspace_ui.start"), disabled: !current_user.managed_ai_access?, class: "shrink-0 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400", data: { workflow_mode_target: "submit", turbo_submits_with: t("workspace_ui.starting") } %>
+      <%= form.submit t("workspace_ui.start"), disabled: ai_billing_denial.present?, class: "shrink-0 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400", data: { workflow_mode_target: "submit", turbo_submits_with: t("workspace_ui.starting") } %>
     </section>
   <% end %>
   <dialog data-controller="terminology-sheet" data-action="click->terminology-sheet#closeFromButton turbo:submit-start->terminology-sheet#saving turbo:submit-end->terminology-sheet#submitted turbo:before-fetch-request->terminology-sheet#deferEditor change@document->terminology-sheet#selectionChanged turbo:before-stream-render@document->terminology-sheet#beforeStreamRender" aria-label="<%= t("workspace_ui.terminology_editor") %>" class="ml-auto mr-0 h-full max-h-full w-[min(30rem,100vw)] max-w-full overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-xl backdrop:bg-slate-950/35">

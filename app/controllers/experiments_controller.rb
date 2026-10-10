@@ -1,5 +1,5 @@
 class ExperimentsController < ApplicationController
-  before_action :require_managed_ai_access, only: :retry_failed
+  before_action :require_ai_billing_authorization, only: :retry_failed
   def show
     @experiment = current_user.experiments.includes(
       methodology_profile_revision: :methodology_profile,

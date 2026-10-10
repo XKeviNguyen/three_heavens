@@ -194,7 +194,7 @@ class FinalizationRunJobTest < ActiveJob::TestCase
 
   def with_client(client)
     original = FinalizationRunJob.client_factory
-    FinalizationRunJob.client_factory = -> { client }
+    FinalizationRunJob.client_factory = ->(_credential) { client }
     yield
   ensure
     FinalizationRunJob.client_factory = original

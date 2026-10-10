@@ -1,5 +1,5 @@
 class TranslationWorkspacesController < ApplicationController
-  before_action :require_managed_ai_access, only: :create
+  before_action :require_ai_billing_authorization, only: :create
   CONFIGURATION_OPTION_LIMIT = 100
   CONFIGURATION_PAGE_PARAMS = %i[workflow_profile_page glossary_page methodology_profile_page translation_reference_page].freeze
   SCALAR_ATTRIBUTES = %w[

@@ -16,6 +16,8 @@ Rails.application.routes.draw do
         delete :pending, action: :cancel_pending
       end
     end
+    resource :ai_settings, only: %i[show update], path: "ai"
+    resource :open_router_key, only: %i[update destroy], path: "ai/openrouter-key"
     resources :users, only: :index do
       member do
         patch :grant_managed_ai_access

@@ -77,7 +77,7 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
         }
       end
     end
-    assert_redirected_to new_translation_workspace_path
+    assert_redirected_to settings_ai_settings_path
   end
 
   test "repeat sign-in with the same Google subject reuses the account" do

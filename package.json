@@ -1,0 +1,22 @@
+{
+  "name": "three-heavens-islands",
+  "private": true,
+  "description": "Build-time toolchain for the React islands bundle; Node is never part of the production image.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "esbuild app/frontend/islands/application.tsx --bundle --format=esm --minify --target=es2022 --define:process.env.NODE_ENV=\\\"production\\\" --outfile=app/assets/builds/islands.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

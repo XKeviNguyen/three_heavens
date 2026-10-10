@@ -6,7 +6,7 @@ module AuthorizedAiJobHelper
     if job_id
       job.job_id = job_id
     elsif run.pending? && (run.scheduled_job_id.blank? || run.claimed_job_execution.positive?)
-      schedule = Ai::RunScheduler.prepare(run: run, job_class: job_class)
+      schedule = Ai::RunScheduler.prepare(run: run, job_class: job_class, billing: Ai::BillingPolicy::Authorization.from(run))
       job = schedule.job
     elsif run.scheduled_job_id.present?
       job.job_id = run.scheduled_job_id

@@ -51,22 +51,32 @@ module Ai
       JSON.generate(request)
     end
 
+    # The key is always injected (see Ai::BillingPolicy); the client never
+    # reads OPENROUTER_API_KEY itself, so a missing personal key can never
+    # turn into a request on the platform's key.
     def initialize(
+      api_key:,
       http_factory: nil,
       open_timeout: DEFAULT_OPEN_TIMEOUT,
       read_timeout: DEFAULT_READ_TIMEOUT,
       write_timeout: DEFAULT_WRITE_TIMEOUT
     )
-      @api_key = ENV.fetch("OPENROUTER_API_KEY")
+      if api_key.blank?
+        raise PermanentError.new(
+          "The OpenRouter API key is not configured",
+          code: "missing_api_key"
+        )
+      end
+
+      @api_key = api_key
       @http_factory = http_factory || ->(uri) { Net::HTTP.new(uri.host, uri.port) }
       @open_timeout = open_timeout
       @read_timeout = read_timeout
       @write_timeout = write_timeout
-    rescue KeyError
-      raise PermanentError.new(
-        "OPENROUTER_API_KEY is not configured",
-        code: "missing_api_key"
-      )
+    end
+
+    def inspect
+      "#<#{self.class.name} [FILTERED]>"
     end
 
     def chat_completion(model_identifier:, instruction_prompt:, source_text:, max_tokens: nil)

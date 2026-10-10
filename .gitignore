@@ -39,3 +39,4 @@
 !/app/assets/builds/.keep
 .env
 !/.env.example
+/node_modules/

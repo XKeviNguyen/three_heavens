@@ -1,5 +1,5 @@
 class JudgeRoundsController < ApplicationController
-  before_action :require_managed_ai_access, only: %i[create retry_failed]
+  before_action :require_ai_billing_authorization, only: %i[create retry_failed]
   def create
     review_round = current_user.review_rounds.find(params[:review_round_id])
     judge_round = Judging::Start.call(

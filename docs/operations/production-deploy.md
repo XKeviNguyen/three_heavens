@@ -59,3 +59,5 @@ bin/kamal rollback RELEASE_VERSION_PLACEHOLDER
 ```
 
 Kamal can select an earlier application image; it does not reverse migrations. Roll back code only when the earlier code is compatible with the current schema. Never automatically run `db:rollback` in production. If schema state is uncertain, stop, inspect `bin/rails db:migrate:status`, review the exact migration transaction outcome, and choose a forward fix or separately reviewed database recovery procedure. Restoring a backup is disaster recovery with potential data loss, not a routine code rollback.
+
+Code from before the OpenRouter bring-your-own-key release ignores the payer recorded on AI work. Rolling back past it could run queued or retrying work that a user authorized on their own key with the platform key instead, if that user also has platform-managed access. Before such a rollback, stop the job workers and fail or drain pending and running runs whose `billing_source` is `personal`.

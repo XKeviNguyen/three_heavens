@@ -18,7 +18,9 @@ class LocalizedApplicationPagesTest < ActionDispatch::IntegrationTest
         workflow_profiles_path,
         benchmarks_path,
         benchmark_model_path(llm_models(:openrouter_claude)),
-        experiment_path(experiments(:one))
+        experiment_path(experiments(:one)),
+        settings_account_path,
+        settings_ai_settings_path
       ].each do |path|
         get path
         assert_response :success, "#{locale} #{path}"

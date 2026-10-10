@@ -10,7 +10,7 @@ class ManagedAiAccessTest < ActionDispatch::IntegrationTest
 
     get new_translation_workspace_path
     assert_response :success
-    assert_select "[role='status']", text: /AI translation isn't turned on/
+    assert_select "[role='status']", text: /Platform-managed AI isn't enabled for this account/
 
     %w[manual automatic].each do |mode|
       assert_no_difference "AiProviderAttempt.count" do
@@ -32,7 +32,7 @@ class ManagedAiAccessTest < ActionDispatch::IntegrationTest
           end
         end
       end
-      assert_redirected_to new_translation_workspace_path
+      assert_redirected_to settings_ai_settings_path
     end
   end
 
@@ -59,7 +59,7 @@ class ManagedAiAccessTest < ActionDispatch::IntegrationTest
           end
         end
       end
-      assert_redirected_to new_translation_workspace_path
+      assert_redirected_to settings_ai_settings_path
     end
   end
 

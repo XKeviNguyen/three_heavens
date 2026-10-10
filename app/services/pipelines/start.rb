@@ -33,6 +33,9 @@ module Pipelines
     def call
       raise ConfirmationRequiredError, "Confirm the authorized automatic provider work for this launch" unless confirmation == CONFIRMATION_VALUE
 
+      # Every stage of this automatic workflow is paid by the source (and key
+      # version) selected at launch, even if the owner's selection changes.
+      billing = Ai::BillingPolicy.authorize!(user)
       PipelineRun.transaction do
         profile.lock!
         validate_profile!
@@ -45,7 +48,9 @@ module Pipelines
         )
         validate_provider_authorization!(execution_plan, provider_work_plan)
         now = clock.call
-        pipeline_run = experiment.create_pipeline_run!(audit_attributes(role_models, provider_work_plan, now))
+        pipeline_run = experiment.create_pipeline_run!(
+          **audit_attributes(role_models, provider_work_plan, now), **billing.attributes
+        )
         pipeline_run.append_event!(
           event_key: "pipeline_started",
           event_type: "pipeline_started",
@@ -63,7 +68,8 @@ module Pipelines
           capability_snapshots: LongDocuments::ProviderWorkPlan.capability_snapshots(
             provider_work_plan,
             "translator"
-          )
+          ),
+          billing: billing
         )
         pipeline_run
       end

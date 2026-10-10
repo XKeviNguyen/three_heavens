@@ -8,6 +8,7 @@ Development and test read these names (through `dotenv-rails` from an untracked 
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, optional `DB_HOST`
 - `OPENROUTER_API_KEY` — only when a person explicitly starts real AI work; tests never need it
+- Node 22 and `npm ci --ignore-scripts` (run by `bin/setup`) — build-time only, for the React islands bundle (`npm run build`; `bin/rails test` rebuilds it). Production images build it in the Dockerfile's `javascript` stage and contain no Node.
 - optional `GOOGLE_CLIENT_ID` — public OAuth client ID for Sign in with Google (no client secret); see [Google sign-in](../identity/google-sign-in.md)
 
 The `compose.yml` PostgreSQL service binds to the loopback interface. Its volume holds persistent development data; never run `docker compose down -v` unless you intend to delete that database.
@@ -22,7 +23,7 @@ Secrets:
 
 - `RAILS_MASTER_KEY`
 - `DATABASE_URL`, `CACHE_DATABASE_URL`, `QUEUE_DATABASE_URL`, `CABLE_DATABASE_URL`
-- `OPENROUTER_API_KEY`
+- `OPENROUTER_API_KEY` — the platform-managed key, used only for work authorized under platform-managed AI (`users.managed_ai_access`). Users' own OpenRouter keys (Account → AI settings) are stored with Active Record Encryption, whose keys derive from `secret_key_base` (`config/initializers/active_record_encryption.rb`); re-encrypt before rotating it, or affected users' AI work fails closed until they replace their key.
 - `SMTP_USERNAME`, `SMTP_PASSWORD`
 
 Non-secret:
@@ -100,4 +101,4 @@ RuboCop caches and setup-ruby gem caches must not contain secrets. GitHub's cach
 
 ## Validation gate
 
-`bin/ci` (defined in `config/ci.rb`) runs RuboCop, whitespace (`git diff --check` against the empty tree), bundler-audit, importmap audit, Brakeman (`--ensure-latest`), Zeitwerk, migration status with a pending-migration check, and the unit, integration, and system tests. Run `bin/rails db:migrate` first when a branch adds a migration. GitHub Actions runs the same checks, except the local-only migration-status steps, as `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`; `test/config/ci_gate_test.rb` fails if `config/ci.rb` gains a check no CI job runs.
+`bin/ci` (defined in `config/ci.rb`) runs `npm ci --ignore-scripts`, `npm audit`, the TypeScript check and islands build, RuboCop, whitespace (`git diff --check` against the empty tree), bundler-audit, importmap audit, Brakeman (`--ensure-latest`), Zeitwerk, migration status with a pending-migration check, and the unit, integration, and system tests. Run `bin/rails db:migrate` first when a branch adds a migration. GitHub Actions runs the same checks, except the local-only migration-status steps, as `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`; `test/config/ci_gate_test.rb` fails if `config/ci.rb` gains a check no CI job runs.

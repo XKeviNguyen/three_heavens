@@ -3,6 +3,8 @@ module Ai
     extend ActiveSupport::Concern
 
     included do
+      include Ai::BillingIdentity
+
       has_many :provider_attempts,
                as: :provider_run,
                class_name: "AiProviderAttempt",

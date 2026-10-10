@@ -35,7 +35,7 @@ class ExperimentGlossaryIntegrityTest < ActiveSupport::TestCase
     model = llm_models(:openrouter_claude)
     client = RequestCountingClient.new
     original_factory = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
 
     experiment.glossary_revision = foreign_glossary.current_revision
 

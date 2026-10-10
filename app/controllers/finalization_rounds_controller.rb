@@ -1,5 +1,5 @@
 class FinalizationRoundsController < ApplicationController
-  before_action :require_managed_ai_access, only: :retry_failed
+  before_action :require_ai_billing_authorization, only: :retry_failed
   def retry_failed
     final_translation = current_user.final_translations.find(params[:final_translation_id])
     round = final_translation.finalization_rounds.find(params[:id])
