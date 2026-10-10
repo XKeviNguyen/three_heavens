@@ -23,7 +23,7 @@ flowchart LR
     subgraph After["After: claim + retry deadline"]
         direction TB
         a1["run 1: claim oldest 100,<br/>stamp retry_at = now + 1 h"] --> a2["run 2: those 100 are not eligible;<br/>claim rows 101–105 → purged ✓"]
-        a2 --> a3["after 1 h: failures eligible again"]
+        a2 --> a3["after 1 h: failures eligible again<br/>(retried on the next scheduled run)"]
     end
     Before ~~~ After
 ```
@@ -115,7 +115,7 @@ A **fairness cursor**, `last_reconciled_at`, means every examined workflow moves
 | --- | --- | --- |
 | 105 abandoned blobs, the oldest 100 always fail to delete | At `7d31de7`: the healthy 5 are never reached (reproduced in PR #72) | Run 1 claims the 100 failures; run 2 purges the healthy 5; the failures stay discoverable |
 | Next run within the hour | The same 100 failures | 0 candidates (deadlines hold) |
-| Storage recovers, 1 hour later | — | The 100 are purged |
+| Storage recovers, at the first run after the deadline | — | The 100 are purged |
 | 3 blocked workflows + 1 recoverable, batch size 3 | The recoverable one waits behind the blocked ones (by `updated_at`) | Reached on the second run and advanced to review |
 
 ## Reproduction and regression tests
@@ -135,7 +135,7 @@ PR #72's failure-mode audit records the blob starvation as reproduced at `7d31de
 ## Trade-offs and remaining limitations
 
 - PR #72: "Healthy drainage requires service capacity above arrivals; worker/scheduler outages and permanently unavailable storage remain documented limits." Fairness doesn't help if the job never runs or storage never recovers.
-- A permanently failing blob is retried hourly forever. It stays *discoverable*, which is intentional, but is never deleted until storage works.
+- A permanently failing blob becomes eligible again one hour after each attempt, but it is only retried when the job next runs. `ActiveStorageCleanupJob` is scheduled daily (2:47am in `config/recurring.yml`), and follow-up runs are enqueued only after a full batch, so in practice a failing blob is retried about once a day. It stays *discoverable*, which is intentional, but is never deleted until storage works.
 - The one-hour delay is a fixed constant, not exponential backoff.
 - [`docs/pr72_failure_modes.md`](../pr72_failure_modes.md) gives an analytic bound for draining a finite snapshot of N candidates: at most `floor(N/100)+1` runs. That is analysis, not a measurement.
 

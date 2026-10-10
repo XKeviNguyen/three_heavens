@@ -20,7 +20,7 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 
 ## Where the failures live
 
-![Three Heavens architecture from top to bottom: browser (autosave, upload, Start translation, Back/Forward, session cookie, CI browser tests), an unreliable HTTPS network, the memory-limited production container (kamal-proxy, Thruster, Puma and Rails, services, Solid Queue jobs calling OpenRouter), PostgreSQL and Active Storage with no transaction spanning both, and the backup and restore drill. Numbered tags mark which case studied each boundary.](assets/architecture-overview.svg)
+![Three Heavens architecture from top to bottom: browser (autosave, upload, Start translation, Back/Forward, session cookie, CI browser tests), an unreliable HTTPS network, kamal-proxy in front of the memory-limited web container (Thruster, Puma and Rails, services, Solid Queue jobs calling the external OpenRouter), PostgreSQL and Active Storage with no transaction spanning both, and the backup and restore drill. Numbered tags mark which case studied each boundary.](assets/architecture-overview.svg)
 
 *Blue tags are case numbers. Most defects sit on a boundary: between browser and server, between two concurrent actors, or between PostgreSQL and storage.*
 

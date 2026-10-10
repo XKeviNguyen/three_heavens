@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 960" width="560" height="960" role="img" aria-labelledby="architecture-overview-title architecture-overview-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 1030" width="560" height="1030" role="img" aria-labelledby="architecture-overview-title architecture-overview-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="architecture-overview-title">Three Heavens architecture and the failure boundaries studied in the case studies</title>
-  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward and the Turbo cache, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; the memory-capped production container with kamal-proxy, Thruster, Puma and Rails, application services and Solid Queue jobs that call the external OpenRouter service (dashed border); the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
+  <desc id="architecture-overview-desc">Top to bottom: the browser (draft autosave, source upload, Start translation, Back/Forward, the session cookie, and the CI browser tests that drive this UI); an unreliable HTTPS network where a response can be lost, duplicated, delayed or reordered; kamal-proxy, a separate proxy that terminates TLS and buffers and caps request bodies before they reach the app; the memory-capped web container with Thruster, Puma and Rails, application services and Solid Queue jobs that call the external OpenRouter service (dashed border); the authoritative state in PostgreSQL and in the Active Storage volume, which share no transaction; and the backup and isolated restore drill. Blue tags give the numbers of the case studies (01 to 15) that investigated each boundary.</desc>
   <style>
     .bg{fill:#ffffff}
     .panel{fill:#f6f8fa;stroke:#57606a;stroke-width:1.5}
@@ -34,7 +34,7 @@
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0 0 10 5 0 10z"/></marker>
   </defs>
-  <rect class="bg" x="0" y="0" width="560" height="960" rx="12"/>
+  <rect class="bg" x="0" y="0" width="560" height="1030" rx="12"/>
 
   <!-- Browser -->
   <rect class="panel" x="16" y="16" width="528" height="210" rx="10"/>
@@ -62,53 +62,57 @@
   <text class="t" x="32" y="333">delayed or reordered</text>
   <path class="arrow" d="M280 342 V366" marker-end="url(#a)"/>
 
-  <!-- Container -->
-  <rect class="panel" x="16" y="370" width="528" height="356" rx="10"/>
-  <text class="h" x="32" y="400">Production container</text>
-  <text class="s" x="32" y="422">memory limit · kernel TCP buffers</text>
-  <rect class="tag" x="490" y="384" width="32" height="24" rx="12"/><text class="tagt" x="506" y="401" text-anchor="middle">03</text>
+  <!-- Edge proxy (separate from the web container) -->
+  <rect class="box" x="16" y="370" width="528" height="58" rx="10"/>
+  <text class="t" x="32" y="394" font-weight="700">kamal-proxy</text>
+  <text class="s" x="32" y="416">separate proxy · TLS · buffers and caps request bodies</text>
+  <path class="arrow" d="M280 430 V454" marker-end="url(#a)"/>
 
-  <rect class="box" x="32" y="436" width="152" height="58" rx="6"/>
-  <text class="t" x="42" y="460">kamal-proxy</text><text class="s" x="42" y="482">TLS · body cap</text>
-  <path class="arrow" d="M186 465 H200" marker-end="url(#a)"/>
-  <rect class="box" x="204" y="436" width="112" height="58" rx="6"/>
-  <text class="t" x="214" y="460">Thruster</text><text class="s" x="214" y="482">HTTP front</text>
-  <path class="arrow" d="M318 465 H332" marker-end="url(#a)"/>
-  <rect class="box" x="336" y="436" width="192" height="58" rx="6"/>
-  <text class="t" x="346" y="460">Puma · Rails 8.1</text><text class="s" x="346" y="482">Bundler boot</text>
-  <rect class="tag" x="490" y="466" width="32" height="24" rx="12"/><text class="tagt" x="506" y="483" text-anchor="middle">04</text>
+  <!-- Web container -->
+  <rect class="panel" x="16" y="458" width="528" height="336" rx="10"/>
+  <text class="h" x="32" y="488">Web container</text>
+  <text class="s" x="32" y="510">memory limit · kernel TCP buffers</text>
+  <rect class="tag" x="490" y="472" width="32" height="24" rx="12"/><text class="tagt" x="506" y="489" text-anchor="middle">03</text>
 
-  <rect class="box" x="32" y="508" width="496" height="120" rx="6"/>
-  <text class="t" x="44" y="532">Controllers → services → models</text>
-  <rect class="tag" x="434" y="516" width="88" height="24" rx="12"/><text class="tagt" x="478" y="533" text-anchor="middle">06 08 10 12</text>
-  <text class="s" x="44" y="558">Sessions · draft Save / Discard</text>
-  <text class="s" x="44" y="580">TranslationWorkspace#submit</text>
-  <text class="s" x="44" y="602">SourceImports::Create · upload budget</text>
+  <rect class="box" x="32" y="524" width="184" height="58" rx="6"/>
+  <text class="t" x="44" y="548">Thruster</text><text class="s" x="44" y="570">HTTP front</text>
+  <path class="arrow" d="M218 553 H236" marker-end="url(#a)"/>
+  <rect class="box" x="240" y="524" width="288" height="58" rx="6"/>
+  <text class="t" x="252" y="548">Puma · Rails 8.1</text><text class="s" x="252" y="570">Bundler boot</text>
+  <rect class="tag" x="490" y="554" width="32" height="24" rx="12"/><text class="tagt" x="506" y="571" text-anchor="middle">04</text>
 
-  <rect class="box" x="32" y="642" width="300" height="64" rx="6"/>
-  <text class="t" x="44" y="668">Solid Queue jobs</text><rect class="tag" x="278" y="650" width="48" height="24" rx="12"/><text class="tagt" x="302" y="667" text-anchor="middle">14 15</text><text class="s" x="44" y="690">enqueued after commit</text>
-  <path class="arrow" d="M334 674 H372" marker-end="url(#a)"/>
-  <rect class="ext" x="376" y="642" width="152" height="64" rx="6"/>
-  <text class="t" x="388" y="668">OpenRouter</text><text class="s" x="388" y="690">external, paid</text>
+  <rect class="box" x="32" y="596" width="496" height="104" rx="6"/>
+  <text class="t" x="44" y="620">Controllers → services → models</text>
+  <rect class="tag" x="434" y="604" width="88" height="24" rx="12"/><text class="tagt" x="478" y="621" text-anchor="middle">06 08 10 12</text>
+  <text class="s" x="44" y="646">Sessions · draft Save / Discard</text>
+  <text class="s" x="44" y="668">TranslationWorkspace#submit</text>
+  <text class="s" x="44" y="690">SourceImports::Create · upload budget</text>
+
+  <rect class="box" x="32" y="714" width="300" height="64" rx="6"/>
+  <text class="t" x="44" y="740">Solid Queue jobs</text><rect class="tag" x="278" y="722" width="48" height="24" rx="12"/><text class="tagt" x="302" y="739" text-anchor="middle">14 15</text>
+  <text class="s" x="44" y="762">enqueued after commit</text>
+  <path class="arrow" d="M334 746 H372" marker-end="url(#a)"/>
+  <rect class="ext" x="376" y="714" width="152" height="64" rx="6"/>
+  <text class="t" x="388" y="740">OpenRouter</text><text class="s" x="388" y="762">external, paid</text>
 
   <!-- Authoritative state -->
-  <path class="arrow" d="M140 728 V752" marker-end="url(#a)"/>
-  <path class="arrow" d="M420 728 V752" marker-end="url(#a)"/>
-  <rect class="box" x="16" y="756" width="250" height="100" rx="10"/>
-  <text class="h" x="30" y="786">PostgreSQL</text>
-  <rect class="tag" x="166" y="768" width="88" height="24" rx="12"/><text class="tagt" x="210" y="785" text-anchor="middle">08 10 11 13</text>
-  <text class="s" x="30" y="812">row + advisory locks</text>
-  <text class="s" x="30" y="834">unique indexes · CHECKs</text>
-  <path class="gapl" d="M280 760 V852"/>
-  <rect class="box" x="294" y="756" width="250" height="100" rx="10"/>
-  <text class="h" x="308" y="786">Active Storage</text>
-  <rect class="tag" x="500" y="768" width="32" height="24" rx="12"/><text class="tagt" x="516" y="785" text-anchor="middle">12</text>
-  <text class="s" x="308" y="812">uploaded file bytes</text>
-  <text class="s" x="308" y="834">on a private volume</text>
-  <text class="gapt" x="280" y="876" text-anchor="middle">no transaction spans both stores</text>
+  <path class="arrow" d="M140 796 V820" marker-end="url(#a)"/>
+  <path class="arrow" d="M420 796 V820" marker-end="url(#a)"/>
+  <rect class="box" x="16" y="824" width="250" height="100" rx="10"/>
+  <text class="h" x="30" y="854">PostgreSQL</text>
+  <rect class="tag" x="166" y="836" width="88" height="24" rx="12"/><text class="tagt" x="210" y="853" text-anchor="middle">08 10 11 13</text>
+  <text class="s" x="30" y="880">row + advisory locks</text>
+  <text class="s" x="30" y="902">unique indexes · CHECKs</text>
+  <path class="gapl" d="M280 828 V920"/>
+  <rect class="box" x="294" y="824" width="250" height="100" rx="10"/>
+  <text class="h" x="308" y="854">Active Storage</text>
+  <rect class="tag" x="500" y="836" width="32" height="24" rx="12"/><text class="tagt" x="516" y="853" text-anchor="middle">12</text>
+  <text class="s" x="308" y="880">uploaded file bytes</text>
+  <text class="s" x="308" y="902">on a private volume</text>
+  <text class="gapt" x="280" y="944" text-anchor="middle">no transaction spans both stores</text>
 
   <!-- Backup -->
-  <rect class="panel" x="16" y="888" width="528" height="58" rx="10"/>
-  <text class="t" x="32" y="922" font-weight="700">Backup → isolated restore drill</text>
-  <rect class="tag" x="490" y="905" width="32" height="24" rx="12"/><text class="tagt" x="506" y="922" text-anchor="middle">01</text>
+  <rect class="panel" x="16" y="956" width="528" height="58" rx="10"/>
+  <text class="t" x="32" y="990" font-weight="700">Backup → isolated restore drill</text>
+  <rect class="tag" x="490" y="973" width="32" height="24" rx="12"/><text class="tagt" x="506" y="990" text-anchor="middle">01</text>
 </svg>
