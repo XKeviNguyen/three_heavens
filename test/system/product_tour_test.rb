@@ -35,7 +35,8 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     click_tour_button "Finish"
     assert_no_selector "[data-testid='product-tour']", visible: :all
     assert_equal "Help", active_element_text, "focus returns to Help"
-    assert_equal [ ProductTour::VERSION, "completed" ], [ @user.reload.product_tour_version, @user.product_tour_outcome ]
+    # The outcome is written by an asynchronous request.
+    assert_until { [ @user.reload.product_tour_version, @user.product_tour_outcome ] == [ ProductTour::VERSION, "completed" ] }
 
     visit history_path
     assert_selector "h1", text: "Translation history"
@@ -52,7 +53,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     find("[data-testid='product-tour']").send_keys(:escape)
 
     assert_no_selector "[data-testid='product-tour']", visible: :all
-    assert_equal "dismissed", @user.reload.product_tour_outcome
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
     within("#app-sidebar") { click_link "History" }
     assert_selector "h1", text: "Translation history"
     assert_no_selector "[data-testid='product-tour-invite']"
@@ -67,13 +68,53 @@ class ProductTourSystemTest < ApplicationSystemTestCase
 
     assert_no_selector "[data-testid='product-tour-invite']"
     assert_no_selector "[data-testid='product-tour']", visible: :all
-    assert_equal "dismissed", @user.reload.product_tour_outcome
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
     # A Turbo restoration of the earlier page must not invite again.
     within("#app-sidebar") { click_link "History" }
     assert_selector "h1", text: "Translation history"
     page.go_back
     assert_selector "h1", text: "Projects"
     assert_no_selector "[data-testid='product-tour-invite']"
+  end
+
+  # The invitation hides at once, but the next page offers it again until the
+  # server has actually recorded the answer.
+  test "a dismissal the server never received is offered again on the next page" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil)
+    sign_in_in_browser
+    visit projects_path
+    assert_selector "[data-testid='product-tour-invite']"
+    page.driver.browser.execute_cdp("Network.setBlockedURLs", urls: [ "*accounts.google.com*", "*/product_tour" ])
+
+    within("[data-testid='product-tour-invite']") { click_button "Not now" }
+    assert_no_selector "[data-testid='product-tour-invite']"
+    within("#app-sidebar") { click_link "History" }
+    assert_selector "h1", text: "Translation history"
+    assert_selector "[data-testid='product-tour-invite']"
+    assert_nil @user.reload.product_tour_outcome
+
+    page.driver.browser.execute_cdp("Network.setBlockedURLs", urls: [ "*accounts.google.com*" ])
+    within("[data-testid='product-tour-invite']") { click_button "Not now" }
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
+    within("#app-sidebar") { click_link "Projects" }
+    assert_selector "h1", text: "Projects"
+    assert_no_selector "[data-testid='product-tour-invite']"
+  end
+
+  test "double clicking Not now dismisses without clicking the page behind it" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil)
+    sign_in_in_browser
+    visit projects_path
+    page.execute_script(<<~JS)
+      window.clicksBehindInvite = 0
+      document.addEventListener("click", (event) => { if (!event.target.closest("[data-testid='product-tour-invite']")) window.clicksBehindInvite++ })
+    JS
+
+    find("[data-testid='product-tour-invite'] button", text: "Not now").double_click
+
+    assert_no_selector "[data-testid='product-tour-invite']"
+    assert_equal 0, page.evaluate_script("window.clicksBehindInvite")
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
   end
 
   test "an established account is never interrupted and can replay the tour from Help" do
@@ -284,6 +325,14 @@ class ProductTourSystemTest < ApplicationSystemTestCase
       (() => { const r = document.querySelector("[data-testid='product-tour-card']").getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight })()
     JS
     assert inside, "the tour card and its controls are inside the viewport"
+  end
+
+  def assert_until(timeout: 5)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    until yield
+      flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.05
+    end
   end
 
   # The accessible name of the focused element.

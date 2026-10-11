@@ -14,16 +14,26 @@ import { parseProductTourProps, resolveSteps, type ProductTourProps, type Resolv
 
 type Session = { phase: "idle" } | { phase: "running"; kind: TourKind; steps: ResolvedStep[] }
 
-// Outcomes resolved in this document. A Turbo restoration visit can render a
-// cached page whose props still say "offer"; this keeps it from inviting again.
+// The version the server has accepted an outcome for in this document. A
+// Turbo restoration visit can render a cached page whose props still say
+// "offer"; this keeps it from inviting again. It is set only after the server
+// answers 2xx, so a failed request lets the next page offer the tour again.
 // Signed-out pages have no tour island, so signing out (the only way to switch
-// accounts) forgets it and the next account's props are trusted again.
+// accounts) forgets it, and a response for the previous account (a different
+// session) is ignored.
+// sendingVersion covers the time the request is in flight, so a page reached
+// right away (or prefetched before the write committed) does not invite again;
+// it is cleared if the request fails.
 let resolvedVersion = 0
+let sendingVersion = 0
 let inviteAnnounced = false
+let signedInSession = 0
 document.addEventListener("turbo:load", () => {
   if (!document.querySelector("[data-react-island='product-tour']")) {
     resolvedVersion = 0
+    sendingVersion = 0
     inviteAnnounced = false
+    signedInSession += 1
   }
 })
 
@@ -72,7 +82,7 @@ export function ProductTour(rawProps: Record<string, unknown>) {
 
 function ProductTourIsland({ version, offer, urls, messages, tours }: ProductTourProps) {
   const [session, setSession] = useState<Session>({ phase: "idle" })
-  const [offerPending, setOfferPending] = useState(() => offer && resolvedVersion < version)
+  const [offerPending, setOfferPending] = useState(() => offer && Math.max(resolvedVersion, sendingVersion) < version)
   const [refreshing] = useState(pageAutoRefreshes)
   const [menuOpen, setMenuOpen] = useState(false)
   const [announcement, setAnnouncement] = useState("")
@@ -83,11 +93,12 @@ function ProductTourIsland({ version, offer, urls, messages, tours }: ProductTou
 
   function recordOutcome(outcome: TourOutcome) {
     if (!offerPending) return
+    // Hidden on this page at once; remembered across pages only once the
+    // server has recorded it (see resolvedVersion).
     setOfferPending(false)
-    resolvedVersion = version
+    const sentIn = signedInSession
+    sendingVersion = Math.max(sendingVersion, version)
     // keepalive lets the write finish if the user follows a link right away.
-    // A failure only means the invitation can appear again on a later page;
-    // the server decides, so nothing is stored in the browser.
     void fetch(urls.outcome, {
       method: "PATCH",
       keepalive: true,
@@ -95,7 +106,18 @@ function ProductTourIsland({ version, offer, urls, messages, tours }: ProductTou
       redirect: "manual",
       headers: { Accept: "application/json", "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
       body: JSON.stringify({ product_tour: { outcome, version } })
-    }).catch(() => undefined)
+    })
+      .then((response) => response.ok)
+      // Not recorded (offline, signed out, refused): the next page offers it again.
+      .catch(() => false)
+      .then((recorded) => {
+        if (sentIn !== signedInSession) return
+        if (recorded) resolvedVersion = Math.max(resolvedVersion, version)
+        else {
+          sendingVersion = 0
+          inviteAnnounced = false
+        }
+      })
   }
 
   function start(kind: TourKind) {
@@ -225,7 +247,12 @@ function ProductTourIsland({ version, offer, urls, messages, tours }: ProductTou
                 </button>
                 <button
                   type="button"
-                  onClick={() => recordOutcome("dismissed")}
+                  onClick={() => {
+                    recordOutcome("dismissed")
+                    // The card disappears on the first click; like the tour's
+                    // own buttons, a double click must not reach the page.
+                    swallowSecondClick()
+                  }}
                   className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
                 >
                   {messages.invite.later}
