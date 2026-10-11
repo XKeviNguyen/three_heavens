@@ -108,7 +108,8 @@ Most of the engineering is in making paid, slow, failure-prone AI calls behave l
 
 ```mermaid
 flowchart LR
-  B["Browser<br/>Turbo + Stimulus<br/>+ React islands"] -->|HTTPS| KP["kamal-proxy (TLS)"]
+  B["Browser<br/>Turbo + Stimulus<br/>+ React islands"] -->|HTTPS| CF["Cloudflare (TLS)<br/>+ Tunnel"]
+  CF -->|HTTP, private network| KP["kamal-proxy"]
   KP --> PU["Puma · Rails 8.1<br/>controllers → forms/services"]
   PU --> PG[("PostgreSQL 17<br/>app data")]
   PU -->|enqueue after commit| Q[("Solid Queue<br/>(PostgreSQL)")]
@@ -295,7 +296,7 @@ test/            unit, integration, system, concurrency, migration, and config t
 
 ## Deployment
 
-The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image behind kamal-proxy (TLS), Thruster in front of Puma, Solid Queue supervised inside Puma, four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
+The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image reached only through a Cloudflare Tunnel (Cloudflare terminates TLS) and an unpublished kamal-proxy, Thruster in front of Puma, Solid Queue supervised inside Puma, four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
 
 Runbooks: [configuration](docs/operations/configuration.md) · [production deploy and rollback](docs/operations/production-deploy.md) · [backup and restore](docs/operations/backup-and-restore.md) · [disaster recovery](docs/operations/disaster-recovery.md).
 

@@ -6,7 +6,8 @@ Three Heavens is one Rails 8.1 application. PostgreSQL 17 is the source of truth
 
 ```mermaid
 flowchart TB
-  B["Browser<br/>Turbo · Stimulus · importmap"] -->|HTTPS| KP["kamal-proxy<br/>TLS termination · 21 MiB request cap · /up health check"]
+  B["Browser<br/>Turbo · Stimulus · importmap"] -->|HTTPS| CF["Cloudflare<br/>TLS termination · Tunnel (cloudflared)"]
+  CF -->|"HTTP on the kamal network"| KP["kamal-proxy<br/>no published port · forwards X-Forwarded-For · 21 MiB request cap · /up health check"]
   KP --> TH["Thruster (HTTP/asset front)"]
   TH --> PU["Puma · Rails 8.1"]
 
