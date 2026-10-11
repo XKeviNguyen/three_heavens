@@ -5,8 +5,14 @@ module Accounts
   # key change either entirely or not at all.
   #
   # Each mutation carries the state token the form was rendered with. A token
-  # that no longer matches (another tab, a double submit, a stale page) is
-  # rejected rather than applied over a state the user did not see.
+  # that no longer matches (another tab, a stale page) is rejected rather than
+  # applied over a state the user did not see, unless the current state is
+  # already exactly what the request asks for: then it is a repeat of a change
+  # that took effect (a double submit, or Back and resubmit without
+  # JavaScript), so nothing is applied and nothing is reported as a conflict.
+  # A key save is never treated that way: telling a repeat apart would mean
+  # decrypting the stored key in a web request, and keys are decrypted only
+  # for a claimed provider run (OpenRouterCredential).
   class AiSettings
     class Error < StandardError; end
 
@@ -45,7 +51,9 @@ module Accounts
         raise InvalidError.new(:payment_source, I18n.t("ai_settings.errors.source_invalid"))
       end
 
-      change(user, state_token) do |credential|
+      usable = ->(credential) { source == "managed" ? Ai::ManagedAccess.allowed?(user) : credential.present? }
+      already_selected = ->(credential) { user.ai_payment_source == source && usable.call(credential) }
+      change(user, state_token, already_applied: already_selected) do |credential|
         if source == "managed" && !Ai::ManagedAccess.allowed?(user)
           raise InvalidError.new(:payment_source, I18n.t("ai_settings.errors.managed_unavailable"))
         end
@@ -69,7 +77,7 @@ module Accounts
         raise InvalidError.new(:api_key, I18n.t("ai_settings.errors.key_format"))
       end
 
-      change(user, state_token) do |credential|
+      change(user, state_token, already_applied: ->(_credential) { false }) do |credential|
         credential&.revoke!(reason: "replaced")
         user.open_router_credentials.create!(api_key: api_key)
         Operations::EventLogger.emit("open_router_key_changed", user_id: user.id, outcome: credential ? "replaced" : "added")
@@ -77,7 +85,7 @@ module Accounts
     end
 
     def self.delete_key!(user, state_token:)
-      change(user, state_token) do |credential|
+      change(user, state_token, already_applied: ->(credential) { credential.nil? }) do |credential|
         next unless credential
 
         credential.revoke!(reason: "deleted")
@@ -85,17 +93,17 @@ module Accounts
       end
     end
 
-    def self.change(user, state_token)
+    def self.change(user, state_token, already_applied:)
       user.with_lock do
         credential = user.open_router_credentials.active.first
         expected = token_for(user.ai_payment_source, credential&.id)
         supplied = state_token.to_s
-        unless supplied.length == expected.length && ActiveSupport::SecurityUtils.secure_compare(supplied, expected)
+        if supplied.length == expected.length && ActiveSupport::SecurityUtils.secure_compare(supplied, expected)
+          yield credential
+          user.association(:open_router_credentials).reset
+        elsif !already_applied.call(credential)
           raise StaleError
         end
-
-        yield credential
-        user.association(:open_router_credentials).reset
         snapshot(user)
       end
     end

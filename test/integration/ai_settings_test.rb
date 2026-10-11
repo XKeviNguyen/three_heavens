@@ -105,6 +105,49 @@ class AiSettingsTest < ActionDispatch::IntegrationTest
     assert_equal 1, @user.open_router_credentials.active.count
   end
 
+  # Without JavaScript the forms have no in-flight guard: a double click, or
+  # Back and submitting the same choice again, sends a second request with the
+  # token the first one already used. When the user's change is in place, that
+  # request must not report that the settings changed in another window.
+  test "repeating an already applied form submission reports success, not a conflict" do
+    sign_in_as @user
+    store_key(KEY)
+
+    rendered = token
+    2.times { patch settings_ai_settings_path, params: { ai_settings: { payment_source: "personal", state_token: rendered } } }
+    assert_lands_on_notice I18n.t("ai_settings.flash.source_saved")
+    assert_equal "personal", @user.reload.ai_payment_source
+
+    rendered = token
+    2.times { delete settings_open_router_key_path, params: { open_router_key: { state_token: rendered } } }
+    assert_lands_on_notice I18n.t("ai_settings.flash.key_deleted")
+    assert_equal 0, @user.open_router_credentials.active.count
+
+    # The same choice is no longer usable (the key is gone), and a different
+    # choice is a real conflict: both are still refused.
+    [ "personal", "managed" ].each do |source|
+      patch settings_ai_settings_path, params: { ai_settings: { payment_source: source, state_token: rendered } }
+      follow_redirect!
+      assert_select "[role='alert']", text: I18n.t("ai_settings.errors.stale")
+    end
+    assert_equal "personal", @user.reload.ai_payment_source
+  end
+
+  # Recognizing a repeated key save would need the stored key decrypted in a
+  # web request, which only a claimed provider run may do; the repeat stays a
+  # conflict, and the first save is kept exactly once.
+  test "a repeated key save keeps one key and is reported as a conflict" do
+    sign_in_as @user
+    rendered = token
+
+    2.times { put settings_open_router_key_path, params: { open_router_key: { api_key: KEY, state_token: rendered } } }
+
+    assert_equal 1, @user.open_router_credentials.count
+    follow_redirect!
+    assert_select "[role='alert']", text: I18n.t("ai_settings.errors.stale")
+    assert_includes response.body, "…#{KEY.last(4)}"
+  end
+
   test "tampered, oversized, or malformed parameters are rejected" do
     sign_in_as @user
     [
@@ -220,6 +263,14 @@ class AiSettingsTest < ActionDispatch::IntegrationTest
 
   def token
     Accounts::AiSettings.state(@user.reload).fetch(:state_token)
+  end
+
+  # The page the browser shows after the last of the repeated submissions.
+  def assert_lands_on_notice(notice)
+    assert_redirected_to settings_ai_settings_path
+    follow_redirect!
+    assert_select "[role='alert']", { text: I18n.t("ai_settings.errors.stale"), count: 0 }, "no false conflict"
+    assert_includes response.body, notice
   end
 
   def store_key(key)
