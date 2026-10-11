@@ -94,6 +94,40 @@ class Ai::BillingConcurrencyTest < ActiveSupport::TestCase
     [ deleter, reader ].compact.each(&:join)
   end
 
+  test "authorizing new work waits for an in-progress payment change and reads it, not a stale user" do
+    @user.open_router_credentials.create!(api_key: KEY)
+    stale_user = User.find(@user.id)
+    assert_equal "managed", stale_user.ai_payment_source
+    locked, release, outcome = Queue.new, Queue.new, Queue.new
+
+    switcher = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        @user.with_lock do
+          @user.update!(ai_payment_source: "personal")
+          locked << true
+          release.pop
+        end
+      end
+    end
+    Timeout.timeout(10) { locked.pop }
+    authorizer = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection { outcome << Ai::BillingPolicy.authorize!(stale_user) }
+    rescue StandardError => error
+      outcome << error
+    end
+
+    assert_nil authorizer.join(0.5), "authorization must wait for the payment change to commit"
+    release << true
+    [ switcher, authorizer ].each { |thread| thread.join(10) || flunk("thread did not finish") }
+
+    authorization = outcome.pop
+    assert_equal "personal", authorization.billing_source
+    assert_equal @user.open_router_credentials.active.sole.id, authorization.open_router_credential_id
+  ensure
+    release&.push(true)
+    [ switcher, authorizer ].compact.each(&:join)
+  end
+
   test "concurrent key saves from the same form keep exactly one active key" do
     token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
     start = Queue.new

@@ -54,18 +54,25 @@ module Ai
     end
 
     # What the owner's current explicit selection authorizes for new work.
+    # The owner is re-read under a share lock, never taken from the caller's
+    # possibly stale instance: a payment or key change in progress (which
+    # holds the row lock) commits first, and the source, managed access, and
+    # active key all come from one committed state.
     def self.authorize!(user)
-      raise Denied, "ai_account_ineligible" unless eligible?(user)
+      User.transaction do
+        owner = User.lock("FOR SHARE").find(user.id)
+        raise Denied, "ai_account_ineligible" unless eligible?(owner)
 
-      if user.ai_paid_by_personal?
-        credential = user.open_router_credentials.active.pick(:id)
-        raise Denied, "personal_key_unavailable" unless credential
+        if owner.ai_paid_by_personal?
+          credential = owner.open_router_credentials.active.pick(:id)
+          raise Denied, "personal_key_unavailable" unless credential
 
-        Authorization.new(billing_source: "personal", open_router_credential_id: credential)
-      else
-        raise Denied, "managed_ai_access_revoked" unless ManagedAccess.allowed?(user)
+          Authorization.new(billing_source: "personal", open_router_credential_id: credential)
+        else
+          raise Denied, "managed_ai_access_revoked" unless ManagedAccess.allowed?(owner)
 
-        Authorization.new(billing_source: "managed", open_router_credential_id: nil)
+          Authorization.new(billing_source: "managed", open_router_credential_id: nil)
+        end
       end
     end
 
