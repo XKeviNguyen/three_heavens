@@ -49,7 +49,7 @@ Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and needs no real secret
 
 ## TLS, hosts, and health checks
 
-Production assumes TLS terminates at the trusted kamal-proxy, forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
+Production assumes TLS terminates at Cloudflare and that the Cloudflare Tunnel is the only route to kamal-proxy, which `config/deploy.yml` runs on plain HTTP with no published host port (step 11 of [production deploy](production-deploy.md)). The application forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
 
 ## Storage
 
@@ -68,7 +68,7 @@ With `SOLID_QUEUE_IN_PUMA=true` (set in `config/deploy.yml`), Puma supervises So
 - `MAIL_FROM`, `SMTP_HOST`, `GOOGLE_CLIENT_ID`, optional `SMTP_PORT` (passed as clear environment)
 - every runtime secret above (passed as secret environment)
 
-Populate secrets through an approved secret manager or the local Kamal secret mechanism; never commit values. A `$NAME` reference to an unset shell variable silently becomes empty, which production then refuses to boot with, so confirm each one resolves before deploying. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
+Populate secrets through an approved secret manager or the local Kamal secret mechanism; never commit values. A `$NAME` reference to an unset shell variable silently becomes empty, which production then refuses to boot with, so confirm each one resolves before deploying. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. Confirm the Cloudflare Tunnel route and DNS, firewall rules, database backups, and all four database URLs before the first deploy.
 
 Run `bin/ops/preflight` before a deploy and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. None of the health, preflight, restore, or smoke commands calls OpenRouter.
 

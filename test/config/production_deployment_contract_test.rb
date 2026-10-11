@@ -47,8 +47,11 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     raw[:secrets_path] = secrets.path
     config = Kamal::Configuration.new(raw, version: "contract")
     role = config.role(:web)
-    puts JSON.generate(secret_names: raw.fetch(:env).fetch("secret"), env: role.env(config.primary_host).to_h,
-                       docker_options: role.option_args)
+    host = config.primary_host
+    puts JSON.generate(secret_names: raw.fetch(:env).fetch("secret"), env: role.env(host).to_h,
+                       docker_options: role.option_args,
+                       proxy_deploy: Kamal::Commands::App.new(config, role:, host:).deploy(target: "contract").flatten.map(&:to_s),
+                       proxy_run: Kamal::Commands::Proxy.new(config, host:).run.flatten.map(&:to_s))
   RUBY
 
   BOOT_SCRIPT = <<~'RUBY'
@@ -148,6 +151,24 @@ class ProductionDeploymentContractTest < ActiveSupport::TestCase
     # Form fields that are not files stay in memory while Rack parses them,
     # before authentication; legitimate forms carry at most about 1 MiB.
     assert_match(/RACK_MULTIPART_BUFFERED_UPLOAD_BYTESIZE_LIMIT="2097152"/, dockerfile)
+  end
+
+  # Browsers reach kamal-proxy only through the Cloudflare Tunnel, so it must
+  # publish no host port, leave TLS to Cloudflare, and forward Cloudflare's
+  # X-Forwarded-For; see step 11 of docs/operations/production-deploy.md.
+  test "kamal-proxy is reachable only through the tunnel and forwards the visitor's address" do
+    rendered = render_deploy_configuration
+    run = rendered.fetch("proxy_run")
+    deploy = rendered.fetch("proxy_deploy")
+
+    assert_equal %w[docker run], run.first(2), "Kamal would boot kamal-proxy from host-side options, which publish 80 and 443"
+    # Kamal renders all publish flags as one argument, so match the command.
+    assert_no_match(/(\A|\s)(-p|--publish)(\s|=|\z)/, run.join(" "), "kamal-proxy publishes a host port")
+    assert_includes deploy, "--forward-headers"
+    assert_empty deploy.grep(/\A--tls/)
+    # The tunnel evaluation ran this version; re-run
+    # script/evaluations/cloudflare_tunnel/run.sh before changing it.
+    assert_includes run, "basecamp/kamal-proxy:v0.9.2"
   end
 
   test "deploy.yml keeps credential-bearing mail settings out of clear environment" do
