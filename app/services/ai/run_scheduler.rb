@@ -29,23 +29,28 @@ module Ai
       )
     end
 
+    # Whether one job was enqueued. Inside a transaction the job is enqueued
+    # by the outermost commit callback, so the outcome reads as accepted until
+    # that callback reports; read after the commit, it is the actual result.
+    # With no open transaction, Rails runs the callback at once.
+    EnqueueOutcome = Struct.new(:accepted) do
+      alias_method :accepted?, :accepted
+    end
+
     def self.enqueue_all(schedules)
-      schedules.count { |schedule| enqueue(schedule) }
+      enqueue_outcomes(schedules).count(&:accepted?)
+    end
+
+    def self.enqueue_outcomes(schedules)
+      schedules.map do |schedule|
+        outcome = EnqueueOutcome.new(true)
+        ActiveRecord.after_all_transactions_commit { outcome.accepted = enqueue_now(schedule) }
+        outcome
+      end
     end
 
     def self.enqueue(schedule)
-      completed = false
-      succeeded = true
-
-      ActiveRecord.after_all_transactions_commit do
-        succeeded = enqueue_now(schedule)
-        completed = true
-      end
-
-      # A deferred enqueue has been accepted for the outermost commit callback.
-      # With no open transaction, Rails runs the callback immediately and the
-      # caller receives the actual enqueue result.
-      completed ? succeeded : true
+      enqueue_outcomes([ schedule ]).first.accepted?
     end
 
     def self.enqueue_now(schedule)

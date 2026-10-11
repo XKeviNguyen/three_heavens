@@ -55,6 +55,10 @@ vi:
       key_deleted: Đã xóa khóa OpenRouter.
   ai_billing:
     open_settings: Mở cài đặt AI
+    retry_payer:
+      personal: "Lần thử lại này dùng khóa OpenRouter của bạn (kết thúc bằng %{hint}); tài khoản OpenRouter của bạn sẽ bị tính phí."
+      managed: "Lần thử lại này dùng AI do nền tảng quản lý; nền tảng chi trả."
+    retry_payer_changed: "Người chi trả cho công việc AI đã thay đổi sau khi trang này hiển thị. Hãy kiểm tra người chi trả hiển thị cạnh nút thử lại rồi thử lại."
     denied:
       ai_account_ineligible: Công việc AI cần một tài khoản đang hoạt động và đã xác nhận email.
       managed_ai_access_revoked: AI do nền tảng quản lý chưa được bật cho tài khoản này. Hãy thêm khóa OpenRouter của riêng bạn trong Cài đặt AI, hoặc hỏi quản trị viên.

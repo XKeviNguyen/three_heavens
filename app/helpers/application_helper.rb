@@ -17,22 +17,25 @@ module ApplicationHelper
     { heading: t("appearance.label") }.merge(User::APPEARANCES.to_h { |appearance| [ appearance, t("appearance.options.#{appearance}") ] })
   end
 
+  # tour: the data-tour-target the product tour points at (ProductTour).
   SIDEBAR_SECTIONS = [
     {
       label: "Work",
+      tour: "nav-work",
       items: [
-        { label: "New translation", path: :new_translation_workspace_path, controllers: %w[translation_workspaces source_imports workspace_terminology] },
+        { label: "New translation", path: :new_translation_workspace_path, controllers: %w[translation_workspaces source_imports workspace_terminology], tour: "nav-new-translation" },
         { label: "Projects", path: :projects_path, controllers: %w[projects documents experiments review_rounds judge_rounds final_translations pipeline_runs] },
         { label: "History", path: :history_path, controllers: %w[history] }
       ]
     },
     {
       label: "Library",
+      tour: "nav-library",
       items: [
         { label: "Terminology", path: :glossaries_path, controllers: %w[glossaries] },
         { label: "References", path: :translation_references_path, controllers: %w[translation_references] },
         { label: "Methodology", path: :methodology_profiles_path, controllers: %w[methodology_profiles] },
-        { label: "Workflows", path: :workflow_profiles_path, controllers: %w[workflow_profiles] }
+        { label: "Workflows", path: :workflow_profiles_path, controllers: %w[workflow_profiles], tour: "nav-workflows" }
       ]
     },
     {
@@ -74,7 +77,7 @@ module ApplicationHelper
       "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
     end
 
-    link_to t("navigation.items.#{item[:label].parameterize(separator: "_")}"), public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {})
+    link_to t("navigation.items.#{item[:label].parameterize(separator: "_")}"), public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {}), data: { tour_target: item[:tour] }.compact
   end
 
   def status_badge_classes(status)

@@ -128,6 +128,61 @@ class Ai::BillingConcurrencyTest < ActiveSupport::TestCase
     [ switcher, authorizer ].compact.each(&:join)
   end
 
+  # A retry confirmed for the payer its page showed must stamp that payer
+  # only if it is still current when the runs are stamped. A payment change
+  # arriving after the comparison waits until the retry has committed, so it
+  # can never slip between the comparison and the stamp.
+  test "a payment change cannot land between a confirmed retry's payer check and its stamp" do
+    @user.open_router_credentials.create!(api_key: KEY)
+    @user.update!(ai_payment_source: "personal")
+    credential_id = @user.open_router_credentials.active.sole.id
+    run = @project.documents.create!(title: "Source", source_text: "Source text")
+                  .experiments.create!(instruction_prompt: "Translate.", status: :running)
+                  .translation_runs.create!(llm_model: llm_models(:openrouter_claude))
+    token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
+    checked, release, outcome = Queue.new, Queue.new, Queue.new
+
+    retrier = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Ai::BillingPolicy.authorize_confirmed!(User.find(@user.id), shown_source: "personal", shown_credential_id: credential_id) do |billing|
+          checked << true
+          release.pop
+          Ai::RunScheduler.prepare(run: TranslationRun.find(run.id), job_class: TranslationRunJob, billing: billing)
+        end
+      end
+    end
+    Timeout.timeout(10) { checked.pop }
+    switcher = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        outcome << Accounts::AiSettings.select_source!(User.find(@user.id), source: "managed", state_token: token).fetch(:payment_source)
+      end
+    rescue StandardError => error
+      outcome << error
+    end
+
+    assert_waiting_on_a_lock
+    assert_nil switcher.join(0.5), "the payment change must wait for the confirmed retry to commit"
+    release << true
+    [ retrier, switcher ].each { |thread| thread.join(10) || flunk("thread did not finish") }
+
+    assert_equal "managed", outcome.pop
+    assert_equal [ "personal", credential_id ], run.reload.attributes.values_at("billing_source", "open_router_credential_id")
+  ensure
+    release&.push(true)
+    [ retrier, switcher ].compact.each(&:join)
+  end
+
+  test "a confirmed retry for a payer that changed first is refused without stamping" do
+    @user.open_router_credentials.create!(api_key: KEY)
+    credential_id = @user.open_router_credentials.active.sole.id
+    stamped = false
+
+    assert_raises(Ai::BillingPolicy::PayerChanged) do
+      Ai::BillingPolicy.authorize_confirmed!(@user, shown_source: "personal", shown_credential_id: credential_id) { stamped = true }
+    end
+    assert_not stamped
+  end
+
   test "concurrent key saves from the same form keep exactly one active key" do
     token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
     start = Queue.new
@@ -154,6 +209,18 @@ class Ai::BillingConcurrencyTest < ActiveSupport::TestCase
   end
 
   private
+
+  # Another session of this database is blocked on a lock (the switcher on
+  # the owner row), not merely not started yet.
+  def assert_waiting_on_a_lock
+    sql = <<~SQL
+      SELECT count(*) FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+    SQL
+    Timeout.timeout(10) do
+      sleep 0.02 until ActiveRecord::Base.uncached { ActiveRecord::Base.connection.select_value(sql) }.positive?
+    end
+  end
 
   def scheduled_personal_run
     @user.open_router_credentials.create!(api_key: KEY)

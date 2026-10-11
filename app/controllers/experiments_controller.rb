@@ -14,7 +14,9 @@ class ExperimentsController < ApplicationController
 
   def retry_failed
     experiment = current_user.experiments.find(params[:id])
-    result = TranslationExperiments::RetryFailed.call(experiment)
+    result = retry_under_shown_payer(experiment) { |billing| TranslationExperiments::RetryFailed.call(experiment, billing: billing) }
+    return unless result
+
     redirect_to experiment, notice: localized_retry_notice(result, kind: :translation)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to experiment, alert: error.message

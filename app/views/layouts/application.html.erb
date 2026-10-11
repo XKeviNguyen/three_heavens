@@ -10,6 +10,9 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <%# The product tour island in the sidebar renders after this point, so its
+        bundle is requested here for every signed-in page. %>
+    <% react_islands_javascript_tag if authenticated? %>
     <%= yield :head %>
 
     <link rel="icon" href="/icon.png" type="image/png">
@@ -24,9 +27,9 @@
     <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white transition focus:translate-y-0"><%= t("common.skip_to_content") %></a>
 
     <% if authenticated? %>
-      <div data-controller="sidebar" class="min-h-screen">
+      <div data-controller="sidebar" data-action="product-tour:start@document->sidebar#collapse" class="min-h-screen">
         <header id="app-header" class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-          <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+          <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" data-tour-target="nav-menu" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
             <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>
             <%= t("navigation.menu") %>
           </button>
@@ -53,14 +56,14 @@
 
           <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="<%= t("navigation.primary") %>">
             <% sidebar_sections.each do |section| %>
-              <div>
+              <%= tag.div data: { tour_target: section[:tour] }.compact do %>
                 <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500"><%= section[:label] %></p>
                 <ul class="space-y-0.5">
                   <% section[:items].each do |item| %>
                     <li><%= sidebar_link(item, compact: true) %></li>
                   <% end %>
                 </ul>
-              </div>
+              <% end %>
             <% end %>
           </nav>
 
@@ -72,9 +75,10 @@
                 <span class="block text-xs font-medium text-slate-700"><%= t("account.title") %></span>
               </span>
             <% end %>
-            <%= link_to t("ai_settings.navigation"), settings_ai_settings_path, class: "block rounded-lg px-3 py-2 text-sm font-medium #{controller_path == "settings/ai_settings" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}", aria: { current: (controller_path == "settings/ai_settings" ? "page" : nil) } %>
+            <%= link_to t("ai_settings.navigation"), settings_ai_settings_path, class: "block rounded-lg px-3 py-2 text-sm font-medium #{controller_path == "settings/ai_settings" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}", aria: { current: (controller_path == "settings/ai_settings" ? "page" : nil) }, data: { tour_target: "nav-ai-settings" } %>
             <div class="flex min-w-0 items-end gap-2">
               <div class="min-w-0 flex-1"><%= render "shared/locale_selector" %></div>
+              <%= product_tour_island %>
               <%= render "shared/appearance_menu" %>
             </div>
             <%= button_to t("navigation.log_out"), session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>

@@ -76,6 +76,27 @@ module Ai
       end
     end
 
+    # The payer shown with an explicit retry is no longer the owner's current one.
+    class PayerChanged < StandardError; end
+
+    # Authorizes an explicit retry for the payer its page showed (source and,
+    # for a personal key, the exact key) and yields the authorization to the
+    # caller, which stamps it onto the runs inside the block. The owner's share
+    # lock from authorize! is held until the block's work commits, so a payment
+    # source, key, or managed-access change (which takes the row lock) commits
+    # entirely before the comparison or after the runs are stamped; it can
+    # never slip between them. Enqueuing is deferred to after the commit
+    # (RunScheduler), so no job starts while the lock is held.
+    def self.authorize_confirmed!(user, shown_source:, shown_credential_id:)
+      User.transaction do
+        authorization = authorize!(user)
+        current = [ authorization.billing_source, authorization.open_router_credential_id.to_s ]
+        raise PayerChanged unless current == [ shown_source.to_s, shown_credential_id.to_s ]
+
+        yield authorization
+      end
+    end
+
     def self.denial_for(user)
       authorize!(user)
       nil

@@ -22,7 +22,7 @@
   <aside class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950"><span class="font-semibold"><%= t("methodology_ui.using") %></span> <%= t("methodology_ui.using_intro") %> <%= link_to t("glossaries_ui.translation_workspace"), new_translation_workspace_path, class: "font-semibold underline" %>.</aside>
 
   <% @revisions.each do |revision| %>
-    <section class="rounded-xl border <%= revision.id == @methodology_profile.current_revision_id ? "border-blue-300" : "border-slate-200" %> bg-white p-6 shadow-sm">
+    <section data-tour-target="library-revisions" class="rounded-xl border <%= revision.id == @methodology_profile.current_revision_id ? "border-blue-300" : "border-slate-200" %> bg-white p-6 shadow-sm">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-xl font-semibold"><%= t("glossaries_ui.revision", version: revision.version) %><% if revision.id == @methodology_profile.current_revision_id %> · <%= t("glossaries_ui.current") %><% end %></h2>
         <span class="text-sm"><%= revision.source_language %> → <%= revision.target_language %></span>

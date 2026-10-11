@@ -30,7 +30,9 @@ class ReviewRoundsController < ApplicationController
 
   def retry_failed
     review_round = current_user.review_rounds.find(params[:id])
-    result = BlindReviews::RetryFailed.call(review_round)
+    result = retry_under_shown_payer(review_round) { |billing| BlindReviews::RetryFailed.call(review_round, billing: billing) }
+    return unless result
+
     redirect_to review_round, notice: localized_retry_notice(result, kind: :reviewer)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to review_round, alert: error.message
