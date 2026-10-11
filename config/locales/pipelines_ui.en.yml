@@ -44,6 +44,8 @@ en:
     stop_confirm: Stop the remaining automatic steps? AI requests that already started can't be cancelled.
     blocked_reasons:
       managed_ai_access_revoked: AI translation is not turned on for this account.
+      personal_key_unavailable: The OpenRouter key this workflow was launched with was replaced or deleted. Stop automation and continue manually; manual steps use your current AI settings.
+      ai_account_ineligible: AI work needs an active account with a confirmed email address.
       stage_failed: Some AI tasks failed. Open the step's page to retry them.
       configuration_unavailable: A model this workflow needs for the next step is no longer available. Stop automation and continue by hand, or make the original model available again.
       stage_conflict: This step was already started another way. Stop automation and continue from the step's page.

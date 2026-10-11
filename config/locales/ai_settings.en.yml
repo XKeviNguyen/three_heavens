@@ -1,0 +1,61 @@
+en:
+  ai_settings:
+    title: AI settings
+    navigation: AI settings
+    description: Choose who pays for the AI translation work you start.
+    account_link: Manage who pays for AI work
+    source_legend: Payment source
+    sources:
+      personal:
+        label: My OpenRouter API key
+        description: You pay OpenRouter directly for every request made with your key. No administrator approval is needed.
+      managed:
+        label: Platform-managed AI
+        description: Three Heavens pays with its own OpenRouter key. An administrator decides who may use it.
+        enabled: Enabled for your account by an administrator.
+        disabled: Not enabled for your account. Ask an administrator, or use your own key.
+    save_source: Use this payment source
+    current:
+      ready_personal: New AI work is paid with your OpenRouter key.
+      ready_managed: New AI work is paid by the platform.
+      blocked: New AI work can't start yet.
+    key:
+      heading: Your OpenRouter key
+      configured: Saved key ending %{hint}, added %{date}.
+      missing: No key saved.
+      label: OpenRouter API key
+      hint: Starts with sk-or-. It is encrypted and never shown again; you can only replace or delete it.
+      save: Save key
+      replace: Replace key
+      delete: Delete key
+      delete_confirm: Delete your OpenRouter key? Work waiting to run with it will fail and won't switch to another payer.
+      cancel: Cancel
+    billing:
+      heading: How billing works
+      items:
+        - Work is charged to the source selected when you start it. Changing this setting never moves queued or running work to another payer.
+        - An automatic workflow keeps the source selected at launch for every stage.
+        - If your key is replaced, deleted, rejected by OpenRouter, or out of credit, work that needs it stops and is marked failed. It never falls back to the platform's key.
+        - A request already sent to OpenRouter finishes and is billed to the key it was sent with. Retrying failed work is a new request and uses your current selection.
+    working: Saving…
+    errors:
+      source_invalid: Choose a payment source.
+      managed_unavailable: Platform-managed AI isn't enabled for your account. Ask an administrator, or use your own key.
+      key_required: Save your OpenRouter key before choosing it.
+      key_blank: Enter your OpenRouter API key.
+      key_format: That doesn't look like an OpenRouter API key. Keys start with sk-or- and contain no spaces.
+      stale: These settings changed in another window. The current settings are shown; review them and try again.
+      rate_limited: Too many changes in a short time. Wait a minute, then try again.
+      network: Three Heavens couldn't be reached, so the result is unknown. Check your connection, then reload to see the current settings.
+      session: Your session has ended. Reload the page and sign in again.
+      unexpected: Something went wrong. Reload the page to see the current settings.
+    flash:
+      source_saved: Payment source saved.
+      key_saved: OpenRouter key saved.
+      key_deleted: OpenRouter key deleted.
+  ai_billing:
+    open_settings: Open AI settings
+    denied:
+      ai_account_ineligible: AI work needs an active account with a confirmed email address.
+      managed_ai_access_revoked: Platform-managed AI isn't enabled for this account. Add your own OpenRouter key in AI settings, or ask an administrator.
+      personal_key_unavailable: Your selected OpenRouter key is missing. Add a key in AI settings, or choose another payment source.

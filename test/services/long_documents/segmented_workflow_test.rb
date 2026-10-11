@@ -136,7 +136,7 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
       JudgeSegmentRunJob, FinalizationSegmentRunJob
     ]
     @original_factories = @job_classes.to_h { |job_class| [ job_class, job_class.client_factory ] }
-    @job_classes.each { |job_class| job_class.client_factory = -> { @client } }
+    @job_classes.each { |job_class| job_class.client_factory = ->(_credential) { @client } }
 
     project = users(:normal).projects.create!(
       name: "Long document",
@@ -267,9 +267,50 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert_equal BigDecimal("0.001") * @client.calls.size, summary.known_cost
   end
 
+  test "every segmented stage bills the owner's personal key with managed access disabled" do
+    user = users(:normal)
+    key = "sk-or-v1-#{"c3" * 32}"
+    token = -> { Accounts::AiSettings.state(user.reload).fetch(:state_token) }
+    Accounts::AiSettings.store_key!(user, api_key: key, state_token: token.call)
+    Accounts::AiSettings.select_source!(user, source: "personal", state_token: token.call)
+    user.update!(managed_ai_access: false)
+    credential = user.active_open_router_credential
+    keys = []
+    @job_classes.each do |job_class|
+      job_class.client_factory = lambda do |provider_credential|
+        keys << provider_credential.api_key
+        @client
+      end
+    end
+
+    perform_enqueued_jobs(only: TranslationSegmentRunJob) do
+      TranslationExperiments::Start.call(experiment: @experiment, llm_models: @models)
+    end
+    perform_enqueued_jobs(only: ReviewSegmentRunJob) do
+      @review_round = BlindReviews::Start.call(experiment: @experiment.reload, reviewer_ids: [ @models.first.id ])
+    end
+    perform_enqueued_jobs(only: JudgeSegmentRunJob) do
+      @judge_round = Judging::Start.call(review_round: @review_round, judge_ids: [ @models.last.id ])
+    end
+    final_translation = FinalTranslations::Create.call(judge_round: @judge_round.reload)
+    perform_enqueued_jobs(only: FinalizationSegmentRunJob) do
+      Finalizations::Start.call(final_translation: final_translation, finalizer_ids: [ @models.first.id ])
+    end
+
+    segment_classes = [ TranslationSegmentRun, ReviewSegmentRun, JudgeSegmentRun, FinalizationSegmentRun ]
+    segment_classes.each do |run_class|
+      assert run_class.exists?, "#{run_class.name} ran"
+      assert_equal [ [ "personal", credential.id ] ], run_class.distinct.pluck(:billing_source, :open_router_credential_id)
+    end
+    assert_equal @client.calls.size, keys.size
+    assert_equal [ key ], keys.uniq
+    assert_equal [ [ "personal", credential.id ] ], AiProviderAttempt.distinct.pluck(:billing_source, :open_router_credential_id)
+    assert_equal @client.calls.size, AiProviderAttempt.where(status: "completed").count
+  end
+
   test "retry schedules only failed physical work and preserves completed segment lineage" do
     flaky_client = OneFailureClient.new
-    TranslationSegmentRunJob.client_factory = -> { flaky_client }
+    TranslationSegmentRunJob.client_factory = ->(_credential) { flaky_client }
 
     perform_enqueued_jobs(only: TranslationSegmentRunJob) do
       TranslationExperiments::Start.call(experiment: @experiment, llm_models: @models)
@@ -459,6 +500,72 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert_equal final_translation.experiment.document_execution_plan.segment_count, restored.segments.count
   end
 
+  test "automatic pipeline keeps the launch-time personal key for every stage after the owner switches to managed" do
+    user = users(:normal)
+    credential = select_personal_key(user, "sk-or-v1-#{"d4" * 32}")
+    user.update!(managed_ai_access: false)
+    keys = record_provider_keys
+
+    pipeline = launch_automatic_pipeline(user)
+    assert_equal [ "personal", credential.id ], [ pipeline.billing_source, pipeline.open_router_credential_id ]
+    user.update!(managed_ai_access: true)
+    Accounts::AiSettings.select_source!(user, source: "managed", state_token: ai_settings_token(user))
+    advance_through_every_stage(pipeline)
+
+    assert pipeline.reload.ready_for_editor?
+    assert_equal [ "sk-or-v1-#{"d4" * 32}" ], keys.uniq
+    assert_equal [ [ "personal", credential.id ] ], AiProviderAttempt.distinct.pluck(:billing_source, :open_router_credential_id)
+  end
+
+  test "automatic pipeline blocks without scheduling work when its launch-time key was replaced" do
+    user = users(:normal)
+    select_personal_key(user, "sk-or-v1-#{"e5" * 32}")
+    keys = record_provider_keys
+    pipeline = launch_automatic_pipeline(user)
+    Accounts::AiSettings.store_key!(user, api_key: "sk-or-v1-#{"f6" * 32}", state_token: ai_settings_token(user))
+
+    assert_no_difference [ "ReviewRun.count", "ReviewSegmentRun.count", "AiProviderAttempt.count" ] do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+
+    assert pipeline.reload.blocked?
+    assert_equal "personal_key_unavailable", pipeline.blocked_reason_code
+    assert_equal [ "sk-or-v1-#{"e5" * 32}" ], keys.uniq
+  end
+
+  test "automatic pipeline launched on the platform key blocks before review when managed access is withdrawn" do
+    user = users(:normal)
+    pipeline = launch_automatic_pipeline(user)
+    assert_equal [ "managed", nil ], [ pipeline.billing_source, pipeline.open_router_credential_id ]
+    select_personal_key(user, "sk-or-v1-#{"c9" * 32}")
+    user.update!(managed_ai_access: false)
+
+    assert_no_difference [ "ReviewRun.count", "AiProviderAttempt.count" ] do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+
+    assert pipeline.reload.blocked?
+    assert_equal "managed_ai_access_revoked", pipeline.blocked_reason_code
+  end
+
+  test "rotating the launch-time key after the paid stages finish does not block the editor checkpoint" do
+    user = users(:normal)
+    select_personal_key(user, "sk-or-v1-#{"a7" * 32}")
+    record_provider_keys
+    pipeline = launch_automatic_pipeline(user)
+    [ ReviewSegmentRunJob, JudgeSegmentRunJob, FinalizationSegmentRunJob ].each do |job_class|
+      perform_enqueued_jobs(only: job_class) { Pipelines::Advance.call(pipeline_run: pipeline) }
+      clear_enqueued_jobs
+    end
+    Accounts::AiSettings.store_key!(user, api_key: "sk-or-v1-#{"b8" * 32}", state_token: ai_settings_token(user))
+
+    assert_no_difference "AiProviderAttempt.count" do
+      Pipelines::Advance.call(pipeline_run: pipeline)
+    end
+
+    assert pipeline.reload.ready_for_editor?
+  end
+
   test "automatic pipeline preserves initial capabilities through every segmented stage" do
     selected_methodology = @methodology.current_revision
     profile = create_workflow_profile(completion_mode: "refinement_proposals")
@@ -577,6 +684,56 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
   end
 
   private
+
+  def select_personal_key(user, key)
+    Accounts::AiSettings.store_key!(user, api_key: key, state_token: ai_settings_token(user))
+    Accounts::AiSettings.select_source!(user, source: "personal", state_token: ai_settings_token(user))
+    user.reload.active_open_router_credential
+  end
+
+  def ai_settings_token(user)
+    Accounts::AiSettings.state(user.reload).fetch(:state_token)
+  end
+
+  def record_provider_keys
+    keys = []
+    @job_classes.each do |job_class|
+      job_class.client_factory = lambda do |provider_credential|
+        keys << provider_credential.api_key
+        @client
+      end
+    end
+    keys
+  end
+
+  def launch_automatic_pipeline(user)
+    revision = create_workflow_profile(completion_mode: "refinement_proposals").current_revision
+    role_models = WorkflowProfileModelSelection::ROLES.to_h { |role| [ role, revision.selections_for(role).map(&:llm_model) ] }
+    preview = LongDocuments::ProviderWorkPlan.call(
+      execution_plan: LongDocuments::ProviderWorkPlan::Preview.new(
+        segment_count: LongDocuments::Segmenter.call(@experiment.document.source_text).size
+      ),
+      role_models: role_models,
+      source_character_count: @experiment.document.source_text.length
+    )
+    pipeline = nil
+    perform_enqueued_jobs(only: TranslationSegmentRunJob) do
+      pipeline = Pipelines::Start.call(
+        experiment: @experiment, user: user, workflow_profile_revision: revision, confirmation: "1",
+        expected_provider_work_plan_digest: LongDocuments::ProviderWorkPlan.digest(preview)
+      )
+    end
+    clear_enqueued_jobs
+    pipeline
+  end
+
+  def advance_through_every_stage(pipeline)
+    [ ReviewSegmentRunJob, JudgeSegmentRunJob, FinalizationSegmentRunJob ].each do |job_class|
+      perform_enqueued_jobs(only: job_class) { Pipelines::Advance.call(pipeline_run: pipeline) }
+      clear_enqueued_jobs
+    end
+    Pipelines::Advance.call(pipeline_run: pipeline)
+  end
 
   def assert_all_segment_prompts_use_methodology(segments, builder, bounded: true)
     assert_all_segment_prompts_use_guidance(

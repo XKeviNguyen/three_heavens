@@ -5,14 +5,20 @@ module Ai
 
     Schedule = Data.define(:job, :run_class, :run_id, :job_id)
 
-    def self.prepare(run:, job_class:, now: Time.current)
+    # billing is the Ai::BillingPolicy::Authorization this work runs under.
+    # It is stamped here, the only path into pending, and never re-resolved
+    # from the owner's later preferences.
+    def self.prepare(run:, job_class:, billing:, now: Time.current)
+      raise ArgumentError, "billing authorization is required" unless billing.is_a?(BillingPolicy::Authorization)
+
       job = job_class.new(run.id)
       run.update!(
         status: :pending,
         scheduled_job_id: job.job_id,
         claimed_job_execution: 0,
         pending_since: now,
-        last_claimed_at: nil
+        last_claimed_at: nil,
+        **billing.attributes
       )
 
       Schedule.new(

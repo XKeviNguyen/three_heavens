@@ -17,7 +17,7 @@ module Operations
       workspace_submission_cleanup_completed active_storage_cleanup_completed
       source_import_retirement_cleanup_completed workspace_draft_cleanup_completed
       workspace_editor_cleanup_completed reference_recovery_cleanup_completed reference_identity_cleanup_completed
-      managed_ai_access_changed backup_started backup_completed
+      managed_ai_access_changed ai_payment_source_changed open_router_key_changed backup_started backup_completed
       backup_failed restore_verification_started restore_verification_completed
       restore_verification_failed operations_preflight_completed
     ].index_with { COMMON_FIELDS }.freeze
@@ -28,6 +28,7 @@ module Operations
       enqueue_failed invalid_response malformed_json missing_api_key
       model_unavailable network_error provider_failure stale_execution
       stale_pending managed_ai_access_revoked configuration_unavailable stage_failed stage_conflict reference_context_budget
+      ai_account_ineligible personal_key_unavailable
     ].freeze
     INTEGER_FIELDS = %i[execution_attempt run_id experiment_id pipeline_run_id duration_ms count user_id actor_id].freeze
     TOKEN_FIELDS = %i[run_type pipeline_stage status error_code outcome].freeze

@@ -94,6 +94,9 @@ class TranslationWorkspace
   rescue ReplayIdentity::AdmissionExceeded
     errors.add(:base, :too_many_submissions)
     false
+  rescue Ai::BillingPolicy::Denied => denial
+    errors.add(:base, I18n.t("ai_billing.denied.#{denial.code}"))
+    false
   rescue ActiveRecord::RecordInvalid,
          TranslationExperiments::Start::Error,
          Pipelines::Start::Error,

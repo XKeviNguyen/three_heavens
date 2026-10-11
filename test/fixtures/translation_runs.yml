@@ -1,11 +1,13 @@
 one:
   experiment: one
   llm_model: openrouter_claude
+  billing_source: managed
   status: pending
   translated_text:
 
 two:
   experiment: two
   llm_model: openrouter_gpt
+  billing_source: managed
   status: completed
   translated_text: Test translation

@@ -18,7 +18,7 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
 
     runs.each do |run|
       schedule = run.class.transaction do
-        Ai::RunScheduler.prepare(run: run, job_class: failing_job_class)
+        Ai::RunScheduler.prepare(run: run, job_class: failing_job_class, billing: Ai::BillingPolicy::Authorization.from(run))
       end
 
       assert_not Ai::RunScheduler.enqueue(schedule)
@@ -38,8 +38,8 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
     failed = experiment.translation_runs.create!(llm_model: llm_models(:openrouter_gpt))
     schedules = TranslationRun.transaction do
       [
-        Ai::RunScheduler.prepare(run: queued, job_class: TranslationRunJob),
-        Ai::RunScheduler.prepare(run: failed, job_class: failing_job_class)
+        Ai::RunScheduler.prepare(run: queued, job_class: TranslationRunJob, billing: Ai::BillingPolicy::Authorization.from(queued)),
+        Ai::RunScheduler.prepare(run: failed, job_class: failing_job_class, billing: Ai::BillingPolicy::Authorization.from(failed))
       ]
     end
 
@@ -70,7 +70,7 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
     end
 
     original = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
     begin
       job.perform_now
     ensure
@@ -88,7 +88,7 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
     experiment = create_experiment
     run = experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude))
     schedule = TranslationRun.transaction do
-      Ai::RunScheduler.prepare(run: run, job_class: unexpected_failure_job_class)
+      Ai::RunScheduler.prepare(run: run, job_class: unexpected_failure_job_class, billing: Ai::BillingPolicy::Authorization.from(run))
     end
 
     error = assert_raises ArgumentError do
@@ -118,7 +118,7 @@ class Ai::RunSchedulerTest < ActiveSupport::TestCase
     end
 
     original = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
     begin
       error = assert_raises ArgumentError do
         job.perform_now

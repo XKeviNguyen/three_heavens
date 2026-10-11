@@ -44,6 +44,8 @@ vi:
     stop_confirm: "Dừng các bước tự động còn lại? Không thể hủy các yêu cầu AI đã bắt đầu."
     blocked_reasons:
       managed_ai_access_revoked: "Tài khoản này chưa được bật quyền dùng AI để dịch."
+      personal_key_unavailable: "Khóa OpenRouter dùng khi khởi chạy quy trình này đã bị thay hoặc bị xóa. Hãy dừng tự động hóa và tiếp tục thủ công; các bước thủ công dùng cài đặt AI hiện tại của bạn."
+      ai_account_ineligible: "Công việc AI cần một tài khoản đang hoạt động và đã xác nhận email."
       stage_failed: "Một số tác vụ AI thất bại. Mở trang của bước đó để thử lại."
       configuration_unavailable: "Một mô hình mà quy trình cần cho bước tiếp theo không còn khả dụng. Hãy dừng tự động hóa và tự tiếp tục, hoặc bật lại mô hình ban đầu."
       stage_conflict: "Bước này đã được bắt đầu theo cách khác. Hãy dừng tự động hóa và tiếp tục từ trang của bước đó."

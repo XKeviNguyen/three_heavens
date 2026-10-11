@@ -2,6 +2,7 @@ class ApplicationController < ActionController::Base
   DEFAULT_PAGE_SIZE = 25
 
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+  rescue_from Ai::BillingPolicy::Denied, with: :redirect_ai_billing_denied
 
   # The locale wraps every other callback, so messages produced before an
   # action (such as the sign-in redirect) use the visitor's language rather
@@ -150,10 +151,15 @@ class ApplicationController < ActionController::Base
     redirect_to login_path, alert: I18n.t("authentication.sign_in_required")
   end
 
-  def require_managed_ai_access
-    return if Ai::ManagedAccess.allowed?(current_user)
+  # New paid AI work needs the owner's selected payment source to be usable:
+  # their own OpenRouter key, or the administrator-granted managed access.
+  def require_ai_billing_authorization
+    denial = Ai::BillingPolicy.denial_for(current_user)
+    redirect_ai_billing_denied(denial) if denial
+  end
 
-    redirect_to new_translation_workspace_path, alert: I18n.t("managed_ai.unavailable")
+  def redirect_ai_billing_denied(denial)
+    redirect_to settings_ai_settings_path, alert: I18n.t("ai_billing.denied.#{denial.code}"), status: :see_other
   end
 
   def require_admin

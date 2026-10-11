@@ -2,6 +2,9 @@ module Pipelines
   class Advance
     BLOCKED_MESSAGES = {
       "managed_ai_access_revoked" => Ai::ManagedAccess::DENIED_MESSAGE,
+      "personal_key_unavailable" => "The OpenRouter key this workflow was launched with was replaced or deleted. " \
+                                    "Stop automation and continue manually, which uses your current AI settings.",
+      "ai_account_ineligible" => Ai::BillingPolicy::MESSAGES.fetch("ai_account_ineligible"),
       "stage_failed" => "One or more runs failed. Use the existing explicit retry action on the linked stage page.",
       "configuration_unavailable" => "The next stage's authorized model configuration is unavailable. Stop automation and continue manually, or restore the original model configuration.",
       "stage_conflict" => "Existing workflow state conflicts with this automatic stage. Stop automation and continue from the linked stage page.",
@@ -20,16 +23,14 @@ module Pipelines
       pipeline_run.with_lock do
         return pipeline_run if pipeline_run.stopped? || pipeline_run.ready_for_editor?
 
-        unless Ai::ManagedAccess.allowed?(pipeline_run.experiment.document.project.user.reload)
-          block!(reason: "managed_ai_access_revoked")
-          next
-        end
-
         # A failed stage must roll back its graph and commit callbacks before
         # the outer transaction records the recoverable pipeline block.
         PipelineRun.transaction(requires_new: true) do
           send("advance_#{pipeline_run.current_stage}")
         end
+      rescue Ai::BillingPolicy::Denied => denial
+        pipeline_run.reload
+        block!(reason: denial.code)
       rescue WorkflowProfiles::RoutingModels::ConfigurationUnavailableError
         pipeline_run.reload
         block!(reason: "configuration_unavailable")
@@ -59,6 +60,15 @@ module Pipelines
       pipeline_run.experiment
     end
 
+    # Checked only right before a stage that starts paid work, so free steps
+    # (a completed stage reaching the editor) never block on a rotated key.
+    def billing
+      Ai::BillingPolicy.verify!(
+        Ai::BillingPolicy::Authorization.from(pipeline_run),
+        experiment.document.project.user.reload
+      )
+    end
+
     def advance_translation
       experiment.reload
       return block!(reason: "stage_failed") if experiment.failed?
@@ -68,7 +78,8 @@ module Pipelines
       review_round = BlindReviews::Start.call(
         experiment: experiment,
         reviewer_ids: models.map(&:id),
-        capability_snapshots: capability_snapshots("reviewer")
+        capability_snapshots: capability_snapshots("reviewer"),
+        billing: billing
       )
       transition!(
         from: "translation",
@@ -91,7 +102,8 @@ module Pipelines
       Judging::Start.call(
         review_round: round,
         judge_ids: models.map(&:id),
-        capability_snapshots: capability_snapshots("judge")
+        capability_snapshots: capability_snapshots("judge"),
+        billing: billing
       )
       transition!(
         from: "review",
@@ -130,7 +142,8 @@ module Pipelines
         finalization_round = Finalizations::Start.call(
           final_translation: final_translation,
           finalizer_ids: models.map(&:id),
-          capability_snapshots: capability_snapshots("finalizer")
+          capability_snapshots: capability_snapshots("finalizer"),
+          billing: billing
         )
         pipeline_run.update!(
           status: :running,

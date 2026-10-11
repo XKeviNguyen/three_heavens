@@ -1,5 +1,5 @@
 class ReviewRoundsController < ApplicationController
-  before_action :require_managed_ai_access, only: %i[create retry_failed]
+  before_action :require_ai_billing_authorization, only: %i[create retry_failed]
   def create
     experiment = current_user.experiments.find(params[:experiment_id])
     review_round = BlindReviews::Start.call(

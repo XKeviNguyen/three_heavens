@@ -5,8 +5,10 @@ module Ai
 
     Result = Data.define(:retried_count, :enqueued_count)
 
-    def self.call(parent:, runs_association:, model_association:, job_class:, prepare_parent:, prepare_run: nil,
-                  lock_before: nil)
+    # billing: the authorization for this explicit retry, which may differ from
+    # the one the failed attempt ran under (Ai::BillingPolicy).
+    def self.call(parent:, runs_association:, model_association:, job_class:, prepare_parent:, billing:,
+                  prepare_run: nil, lock_before: nil)
       retried_runs = []
       schedules = []
 
@@ -22,7 +24,7 @@ module Ai
         retried_runs.each do |run|
           prepare_run&.call(run)
           run.update!(retry_attributes(run))
-          schedules << RunScheduler.prepare(run: run, job_class: job_class)
+          schedules << RunScheduler.prepare(run: run, job_class: job_class, billing: billing)
         end
       end
       enqueued_count = RunScheduler.enqueue_all(schedules)

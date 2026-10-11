@@ -1,6 +1,9 @@
 module Finalizations
   class RetryFailed
-    def self.call(finalization_round)
+    # An explicit retry is new paid work: it runs under the owner's current
+    # payment selection unless a caller passes an earlier authorization.
+    def self.call(finalization_round, billing: nil)
+      billing ||= Ai::BillingPolicy.authorize!(finalization_round.final_translation.experiment.document.project.user)
       if finalization_round.finalization_runs.failed.any?(&:segmented?)
         return Ai::RetryFailedSegmentRuns.call(
           parent: finalization_round,
@@ -8,6 +11,7 @@ module Finalizations
           child_runs_association: :finalization_segment_runs,
           model_association: :finalizer_llm_model,
           job_class: FinalizationSegmentRunJob,
+          billing: billing,
           prepare_parent: method(:prepare_parent!),
           prepare_logical: lambda do |run|
             run.assign_attributes(proposed_translation: nil, change_summary: [], terminology_notes: [], warnings: [])
@@ -24,6 +28,7 @@ module Finalizations
         runs_association: :finalization_runs,
         model_association: :finalizer_llm_model,
         job_class: FinalizationRunJob,
+        billing: billing,
         prepare_parent: method(:prepare_parent!),
         lock_before: finalization_round.final_translation
       )

@@ -171,7 +171,7 @@ class Ai::StaleExecutionReconcilerTest < ActiveSupport::TestCase
       raise "Provider must not be called"
     end
     original = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
     begin
       build_authorized_ai_job(
         TranslationRunJob,
