@@ -1,5 +1,5 @@
-# Evaluation: the production edge (kamal-proxy, as config/deploy.yml renders
-# it) versus Traefik v3 in front of the same image (Thruster -> Puma ->
+# Evaluation: the edge (kamal-proxy, as config/deploy.yml rendered it before
+# the Cloudflare Tunnel topology) versus Traefik v3 in front of the same image (Thruster -> Puma ->
 # Rails), on one machine. It measures behaviour the deployment depends on and
 # writes JSON. It is a local test bench only: nothing here is production
 # configuration, and the Traefik settings exist only inside this script.
@@ -125,8 +125,9 @@ def start_kamal_proxy(certificates)
   kamal_proxy_deploy("edge-app")
 end
 
-# The options Kamal renders from config/deploy.yml (ssl, buffering with
-# max_request_body, /up health check), with the local certificate.
+# The options Kamal rendered from config/deploy.yml's earlier direct-TLS
+# configuration (ssl, buffering with max_request_body, /up health check), with
+# the local certificate. script/evaluations/cloudflare_tunnel runs the current one.
 def kamal_proxy_deploy(target)
   docker("exec", PROXIES.dig("kamal-proxy", :container), "kamal-proxy", "deploy", "three_heavens",
          "--target=#{target}:80", "--host=#{APP_HOST}", "--tls", "--tls-certificate-path=/certs/cert.pem",

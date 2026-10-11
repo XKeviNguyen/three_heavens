@@ -31,17 +31,24 @@ servers:
         - net.ipv4.tcp_rmem=4096 65536 262144
         - net.ipv4.tcp_wmem=4096 65536 262144
 
-# This template has kamal-proxy terminate TLS for browsers that connect to it
-# directly. Behind a Cloudflare Tunnel, the deployed topology, the override
-# must set ssl: false and forward_headers: true instead, or every visitor
-# shares one sign-in rate limit (docs/operations/production-deploy.md, step 11).
+# Browsers reach kamal-proxy only through a Cloudflare Tunnel: Cloudflare
+# terminates TLS and cloudflared, on the kamal Docker network, connects to
+# kamal-proxy's port 80. kamal-proxy therefore publishes no host port, and
+# forwards Cloudflare's X-Forwarded-For so each visitor keeps their own
+# rate-limit budget. Forwarding is safe only while nothing else can reach
+# kamal-proxy; never publish its ports with these settings. `run` applies
+# when the proxy container is created, not on every deploy
+# (docs/operations/production-deploy.md, step 11).
 proxy:
-  ssl: true
+  ssl: false
+  forward_headers: true
   host: <%= app_host %>
   buffering:
     max_request_body: 22_020_096
   healthcheck:
     path: /up
+  run:
+    publish: false
 
 registry:
   server: <%= registry_server %>

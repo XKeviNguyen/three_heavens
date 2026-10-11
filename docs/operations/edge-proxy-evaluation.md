@@ -13,7 +13,7 @@ the same production-like image (Thruster → Puma → Rails, 768 MiB limit), wit
 TLS from a throwaway local CA that the client verified (verification was never
 disabled):
 
-- **kamal-proxy v0.9.2**, deployed with the options Kamal renders from
+- **kamal-proxy v0.9.2**, deployed with the options Kamal then rendered from
   `config/deploy.yml` that affect requests: `--tls`, `--health-check-path=/up`,
   `--buffer-requests`, `--buffer-responses`, `--max-request-body=22020096`.
   Kamal also passes 30-second deploy and drain timeouts (kamal-proxy's
@@ -24,6 +24,13 @@ disabled):
   the host, the `buffering` middleware with `maxRequestBodyBytes: 22020096`,
   and a `/up` health check on the service. This configuration exists only
   inside the evaluation script; nothing in production configuration changed.
+
+`config/deploy.yml` then had kamal-proxy terminate TLS for browsers that
+connect to it directly. It now encodes the Cloudflare Tunnel topology
+(kamal-proxy without TLS, forwarding Cloudflare's `X-Forwarded-For`, no
+published port), which `script/evaluations/cloudflare_tunnel/run.sh`
+evaluates; see step 11 of `production-deploy.md`. The HTTPS redirect and
+client-address rows below describe the earlier configuration.
 
 No production host, credential or paid provider was involved. Run it again
 with `IMAGE=<local image> bin/rails runner script/evaluations/edge_proxy.rb
