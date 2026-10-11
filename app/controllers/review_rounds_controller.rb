@@ -1,6 +1,5 @@
 class ReviewRoundsController < ApplicationController
-  before_action :require_ai_billing_authorization, only: :create
-  before_action :authorize_retry_payer, only: :retry_failed
+  before_action :require_ai_billing_authorization, only: %i[create retry_failed]
   def create
     experiment = current_user.experiments.find(params[:experiment_id])
     review_round = BlindReviews::Start.call(
@@ -31,9 +30,9 @@ class ReviewRoundsController < ApplicationController
 
   def retry_failed
     review_round = current_user.review_rounds.find(params[:id])
-    return unless retry_payer_confirmed?(review_round)
+    result = retry_under_shown_payer(review_round) { |billing| BlindReviews::RetryFailed.call(review_round, billing: billing) }
+    return unless result
 
-    result = BlindReviews::RetryFailed.call(review_round, billing: @retry_billing)
     redirect_to review_round, notice: localized_retry_notice(result, kind: :reviewer)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to review_round, alert: error.message

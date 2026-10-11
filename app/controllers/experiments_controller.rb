@@ -1,5 +1,5 @@
 class ExperimentsController < ApplicationController
-  before_action :authorize_retry_payer, only: :retry_failed
+  before_action :require_ai_billing_authorization, only: :retry_failed
   def show
     @experiment = current_user.experiments.includes(
       methodology_profile_revision: :methodology_profile,
@@ -14,9 +14,9 @@ class ExperimentsController < ApplicationController
 
   def retry_failed
     experiment = current_user.experiments.find(params[:id])
-    return unless retry_payer_confirmed?(experiment)
+    result = retry_under_shown_payer(experiment) { |billing| TranslationExperiments::RetryFailed.call(experiment, billing: billing) }
+    return unless result
 
-    result = TranslationExperiments::RetryFailed.call(experiment, billing: @retry_billing)
     redirect_to experiment, notice: localized_retry_notice(result, kind: :translation)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to experiment, alert: error.message

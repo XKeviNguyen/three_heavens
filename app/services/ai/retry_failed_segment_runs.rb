@@ -28,8 +28,7 @@ module Ai
         end
       end
 
-      enqueued_count = RunScheduler.enqueue_all(schedules)
-      RetryFailedRuns::Result.new(retried_count: child_runs.size, enqueued_count: enqueued_count)
+      RetryFailedRuns::Result.new(retried_count: child_runs.size, enqueue_outcomes: RunScheduler.enqueue_outcomes(schedules))
     end
   end
 end

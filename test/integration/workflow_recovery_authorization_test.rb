@@ -35,6 +35,25 @@ class WorkflowRecoveryAuthorizationTest < ActionDispatch::IntegrationTest
     assert @own_experiment.reload.running?
   end
 
+  # The retry runs inside the transaction that holds the owner's lock, so its
+  # jobs are enqueued at that commit; the notice must report what happened then.
+  test "a retry whose job cannot be enqueued says so" do
+    failed = @own_experiment.translation_runs.failed.first
+    real_new = TranslationRunJob.method(:new)
+    TranslationRunJob.define_singleton_method(:new) do |*args|
+      real_new.call(*args).tap { |job| job.define_singleton_method(:enqueue) { |*| false } }
+    end
+
+    post retry_failed_experiment_path(@own_experiment), params: { billing_source: "managed" }
+
+    assert_redirected_to @own_experiment
+    follow_redirect!
+    assert_select "[role=status]", text: I18n.t("retry_feedback.translation.queue_failed")
+    assert_equal "enqueue_failed", failed.reload.error_code
+  ensure
+    TranslationRunJob.singleton_class.remove_method(:new)
+  end
+
   test "the retry shows the personal payer and stamps exactly that key" do
     @current_test_user.update!(managed_ai_access: false)
     credential = @current_test_user.open_router_credentials.create!(api_key: "sk-or-v1-#{"5d" * 32}")

@@ -3,7 +3,13 @@ module Ai
     class Error < StandardError; end
     class UnsupportedModelError < Error; end
 
-    Result = Data.define(:retried_count, :enqueued_count)
+    # enqueued_count is read from the enqueue outcomes when asked, so a caller
+    # that ran the retry inside its own transaction (to hold the owner's lock
+    # while stamping, Ai::BillingPolicy.authorize_confirmed!) sees the actual
+    # result once that transaction has committed.
+    Result = Data.define(:retried_count, :enqueue_outcomes) do
+      def enqueued_count = enqueue_outcomes.count(&:accepted?)
+    end
 
     # billing: the authorization for this explicit retry, which may differ from
     # the one the failed attempt ran under (Ai::BillingPolicy).
@@ -27,9 +33,7 @@ module Ai
           schedules << RunScheduler.prepare(run: run, job_class: job_class, billing: billing)
         end
       end
-      enqueued_count = RunScheduler.enqueue_all(schedules)
-
-      Result.new(retried_count: retried_runs.size, enqueued_count: enqueued_count)
+      Result.new(retried_count: retried_runs.size, enqueue_outcomes: RunScheduler.enqueue_outcomes(schedules))
     end
 
     def self.validate_models!(runs, model_association)
