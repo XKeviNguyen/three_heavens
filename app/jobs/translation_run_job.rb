@@ -7,7 +7,8 @@ class TranslationRunJob < ApplicationJob
 
   class_attribute :client_factory,
                   instance_writer: false,
-                  default: -> { Ai::OpenRouterClient.new }
+                  # Receives the claim's in-memory Ai::ProviderCredential.
+                  default: ->(credential) { Ai::OpenRouterClient.new(api_key: credential.api_key) }
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
@@ -29,6 +30,8 @@ class TranslationRunJob < ApplicationJob
     return unless claim.state == :claimed
 
     @claimed_attempt = claim.attempt
+
+    @claimed_credential = claim.credential
 
     prompt = TranslationSegments::Prompt.build(
       experiment: translation_run.experiment,
@@ -78,7 +81,7 @@ class TranslationRunJob < ApplicationJob
       )
     end
 
-    client_factory.call
+    client_factory.call(@claimed_credential)
   end
 
   def persist_success(translation_run, result, attempt)

@@ -2,23 +2,27 @@ require "digest"
 
 module Finalizations
   class Start
-    def self.call(final_translation:, finalizer_ids:, capability_snapshots: {})
+    def self.call(final_translation:, finalizer_ids:, capability_snapshots: {}, billing: nil)
       new(
         final_translation: final_translation,
         finalizer_ids: finalizer_ids,
-        capability_snapshots: capability_snapshots
+        capability_snapshots: capability_snapshots,
+        billing: billing
       ).call
     end
 
-    def initialize(final_translation:, finalizer_ids:, job_class: FinalizationRunJob, capability_snapshots: {})
+    def initialize(final_translation:, finalizer_ids:, job_class: FinalizationRunJob, capability_snapshots: {},
+                   billing: nil)
       @final_translation = final_translation
       @finalizer_ids = finalizer_ids
       @job_class = job_class
       @capability_snapshots = capability_snapshots
+      @billing = billing
     end
 
     def call
       raise ActiveRecord::RecordNotSaved, "Final translation must be persisted" unless final_translation.persisted?
+      @billing ||= Ai::BillingPolicy.authorize!(final_translation.experiment.document.project.user)
       submitted_ids = normalized_ids!
       plan = LongDocuments::Planner.call(final_translation.experiment, create: false)
 
@@ -50,7 +54,7 @@ module Finalizations
 
     private
 
-    attr_reader :capability_snapshots, :final_translation, :finalizer_ids, :job_class
+    attr_reader :billing, :capability_snapshots, :final_translation, :finalizer_ids, :job_class
 
     def normalized_ids!
       Ai::UsageLimits.normalize_model_ids(
@@ -89,7 +93,7 @@ module Finalizations
       finalizers.each do |finalizer|
         run = round.finalization_runs.create!(finalizer_llm_model: finalizer)
         if plan
-          run.update!(status: :running, started_at: Time.current)
+          run.update!(status: :running, started_at: Time.current, **billing.attributes)
           plan.segments.each do |segment|
             prompt = Finalizations::Prompt.build(run, experiment_segment: segment)
             budget = TranslationReferences::ContextBudget.call(
@@ -104,7 +108,7 @@ module Finalizations
               experiment_segment: segment,
               **budget.snapshot_attributes
             )
-            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: FinalizationSegmentRunJob)
+            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: FinalizationSegmentRunJob, billing: billing)
           end
         else
           prompt = Finalizations::Prompt.build(run)
@@ -117,7 +121,7 @@ module Finalizations
             prompt: prompt
           ) { Finalizations::Prompt.build(run, reference_examples: []) }
           run.assign_attributes(**budget.snapshot_attributes)
-          schedules << Ai::RunScheduler.prepare(run: run, job_class: job_class)
+          schedules << Ai::RunScheduler.prepare(run: run, job_class: job_class, billing: billing)
         end
       end
       [ round, schedules ]

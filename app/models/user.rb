@@ -5,6 +5,7 @@ class User < ApplicationRecord
   MAXIMUM_PASSWORD_LENGTH = 128
   SUPPORTED_LOCALES = %w[en vi ja].freeze
   APPEARANCES = %w[system light dark].freeze
+  AI_PAYMENT_SOURCES = %w[managed personal].freeze
 
   generates_token_for :email_confirmation, expires_in: 24.hours do
     [ email, email_verified_at, confirmation_sent_at ].join(":")
@@ -33,9 +34,14 @@ class User < ApplicationRecord
   has_many :translation_workspace_draft_editors, dependent: :delete_all
   has_many :federated_identities, dependent: :delete_all
   has_many :sessions, dependent: :delete_all
+  has_many :open_router_credentials, dependent: :delete_all
+  has_one :active_open_router_credential, -> { active }, class_name: "OpenRouterCredential", inverse_of: :user
 
   enum :role, { user: "user", admin: "admin" }, validate: true
   enum :status, { active: "active", disabled: "disabled" }, validate: true
+  # Who pays for new AI work: the platform's key (requires managed_ai_access)
+  # or the user's own OpenRouter key. Only an explicit user choice changes it.
+  enum :ai_payment_source, AI_PAYMENT_SOURCES.index_with(&:itself), prefix: :ai_paid_by, validate: true
 
   normalizes :email, with: ->(email) { email.to_s.strip.downcase }
 

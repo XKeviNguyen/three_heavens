@@ -304,7 +304,7 @@ class ReviewRunJobTest < ActiveJob::TestCase
 
   def with_client(client)
     original_factory = ReviewRunJob.client_factory
-    ReviewRunJob.client_factory = -> { client }
+    ReviewRunJob.client_factory = ->(_credential) { client }
     yield
   ensure
     ReviewRunJob.client_factory = original_factory

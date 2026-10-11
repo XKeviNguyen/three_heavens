@@ -1,7 +1,7 @@
 module Ai
   class RetryFailedSegmentRuns
     def self.call(parent:, logical_runs_association:, child_runs_association:, model_association:, job_class:,
-                  prepare_parent:, prepare_logical:, prepare_child:, lock_before: nil)
+                  prepare_parent:, prepare_logical:, prepare_child:, billing:, lock_before: nil)
       logical_runs = []
       child_runs = []
       schedules = []
@@ -19,17 +19,16 @@ module Ai
         prepare_parent.call(parent, logical_runs)
         logical_runs.each do |logical_run|
           prepare_logical.call(logical_run)
-          logical_run.update!(RetryFailedRuns.retry_attributes(logical_run).merge(status: :running))
+          logical_run.update!(RetryFailedRuns.retry_attributes(logical_run).merge(status: :running, **billing.attributes))
         end
         child_runs.each do |child_run|
           prepare_child.call(child_run)
           child_run.update!(RetryFailedRuns.retry_attributes(child_run))
-          schedules << RunScheduler.prepare(run: child_run, job_class: job_class)
+          schedules << RunScheduler.prepare(run: child_run, job_class: job_class, billing: billing)
         end
       end
 
-      enqueued_count = RunScheduler.enqueue_all(schedules)
-      RetryFailedRuns::Result.new(retried_count: child_runs.size, enqueued_count: enqueued_count)
+      RetryFailedRuns::Result.new(retried_count: child_runs.size, enqueue_outcomes: RunScheduler.enqueue_outcomes(schedules))
     end
   end
 end

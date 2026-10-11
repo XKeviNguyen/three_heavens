@@ -14,6 +14,7 @@ module Operations
     FAILURE_WINDOW = 7.days
     FAILURE_LIMIT = 20
     SAFE_FAILURE_CODES = %w[
+      ai_account_ineligible managed_ai_access_revoked personal_key_unavailable
       context_budget_exceeded enqueue_failed invalid_response malformed_json missing_api_key
       model_capability_unconfigured model_unavailable network_error provider_failure
       response_too_large segment_execution_failed stale_execution stale_pending

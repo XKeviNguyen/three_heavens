@@ -5,14 +5,20 @@ module Ai
 
     Schedule = Data.define(:job, :run_class, :run_id, :job_id)
 
-    def self.prepare(run:, job_class:, now: Time.current)
+    # billing is the Ai::BillingPolicy::Authorization this work runs under.
+    # It is stamped here, the only path into pending, and never re-resolved
+    # from the owner's later preferences.
+    def self.prepare(run:, job_class:, billing:, now: Time.current)
+      raise ArgumentError, "billing authorization is required" unless billing.is_a?(BillingPolicy::Authorization)
+
       job = job_class.new(run.id)
       run.update!(
         status: :pending,
         scheduled_job_id: job.job_id,
         claimed_job_execution: 0,
         pending_since: now,
-        last_claimed_at: nil
+        last_claimed_at: nil,
+        **billing.attributes
       )
 
       Schedule.new(
@@ -23,23 +29,28 @@ module Ai
       )
     end
 
+    # Whether one job was enqueued. Inside a transaction the job is enqueued
+    # by the outermost commit callback, so the outcome reads as accepted until
+    # that callback reports; read after the commit, it is the actual result.
+    # With no open transaction, Rails runs the callback at once.
+    EnqueueOutcome = Struct.new(:accepted) do
+      alias_method :accepted?, :accepted
+    end
+
     def self.enqueue_all(schedules)
-      schedules.count { |schedule| enqueue(schedule) }
+      enqueue_outcomes(schedules).count(&:accepted?)
+    end
+
+    def self.enqueue_outcomes(schedules)
+      schedules.map do |schedule|
+        outcome = EnqueueOutcome.new(true)
+        ActiveRecord.after_all_transactions_commit { outcome.accepted = enqueue_now(schedule) }
+        outcome
+      end
     end
 
     def self.enqueue(schedule)
-      completed = false
-      succeeded = true
-
-      ActiveRecord.after_all_transactions_commit do
-        succeeded = enqueue_now(schedule)
-        completed = true
-      end
-
-      # A deferred enqueue has been accepted for the outermost commit callback.
-      # With no open transaction, Rails runs the callback immediately and the
-      # caller receives the actual enqueue result.
-      completed ? succeeded : true
+      enqueue_outcomes([ schedule ]).first.accepted?
     end
 
     def self.enqueue_now(schedule)

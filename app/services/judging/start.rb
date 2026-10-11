@@ -8,19 +8,22 @@ module Judging
     class AlreadyStartedError < Error; end
     class ContextBudgetError < Error; end
 
-    def self.call(review_round:, judge_ids:, capability_snapshots: {})
-      new(review_round: review_round, judge_ids: judge_ids, capability_snapshots: capability_snapshots).call
+    def self.call(review_round:, judge_ids:, capability_snapshots: {}, billing: nil)
+      new(review_round: review_round, judge_ids: judge_ids, capability_snapshots: capability_snapshots,
+          billing: billing).call
     end
 
-    def initialize(review_round:, judge_ids:, randomizer: nil, capability_snapshots: {})
+    def initialize(review_round:, judge_ids:, randomizer: nil, capability_snapshots: {}, billing: nil)
       @review_round = review_round
       @judge_ids = judge_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
       @capability_snapshots = capability_snapshots
+      @billing = billing
     end
 
     def call
       validate_review_round!
+      @billing ||= Ai::BillingPolicy.authorize!(review_round.experiment.document.project.user)
       judges = resolve_judges!
       plan = LongDocuments::Planner.call(review_round.experiment, create: false)
 
@@ -49,7 +52,7 @@ module Judging
 
     private
 
-    attr_reader :capability_snapshots, :judge_ids, :randomizer, :review_round
+    attr_reader :billing, :capability_snapshots, :judge_ids, :randomizer, :review_round
 
     def validate_review_round!
       unless review_round.persisted? && review_round.experiment.persisted?
@@ -135,7 +138,7 @@ module Judging
           )
         end
         if plan
-          judge_run.update!(status: :running, started_at: Time.current)
+          judge_run.update!(status: :running, started_at: Time.current, **billing.attributes)
           plan.segments.each do |segment|
             prompt = Judging::Prompt.build(judge_run, experiment_segment: segment)
             budget = TranslationReferences::ContextBudget.call(
@@ -150,7 +153,7 @@ module Judging
               experiment_segment: segment,
               **budget.snapshot_attributes
             )
-            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: JudgeSegmentRunJob)
+            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: JudgeSegmentRunJob, billing: billing)
           end
         else
           prompt = Judging::Prompt.build(judge_run)
@@ -163,7 +166,7 @@ module Judging
             prompt: prompt
           ) { Judging::Prompt.build(judge_run, reference_examples: []) }
           judge_run.assign_attributes(**budget.snapshot_attributes)
-          schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob)
+          schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob, billing: billing)
         end
       end
 

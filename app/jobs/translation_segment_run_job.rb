@@ -7,7 +7,8 @@ class TranslationSegmentRunJob < ApplicationJob
 
   class_attribute :client_factory,
                   instance_writer: false,
-                  default: -> { Ai::OpenRouterClient.new }
+                  # Receives the claim's in-memory Ai::ProviderCredential.
+                  default: ->(credential) { Ai::OpenRouterClient.new(api_key: credential.api_key) }
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
@@ -25,6 +26,8 @@ class TranslationSegmentRunJob < ApplicationJob
     return unless claim.state == :claimed
 
     @claimed_attempt = claim.attempt
+
+    @claimed_credential = claim.credential
     translation_run = segment_run.translation_run
     prompt = TranslationSegments::Prompt.build(
       experiment: translation_run.experiment,
@@ -64,7 +67,7 @@ class TranslationSegmentRunJob < ApplicationJob
         code: "model_unavailable"
       )
     end
-    client_factory.call
+    client_factory.call(@claimed_credential)
   end
 
   def validate_output!(content)

@@ -2,6 +2,8 @@ class PipelineRun < ApplicationRecord
   STATUSES = %w[running blocked ready_for_editor stopped].freeze
   STAGES = %w[translation review judge finalization editor].freeze
 
+  include Ai::BillingIdentity
+
   belongs_to :experiment
   belongs_to :workflow_profile_revision
   belongs_to :finalization_round, optional: true

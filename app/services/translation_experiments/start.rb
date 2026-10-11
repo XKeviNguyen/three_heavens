@@ -6,18 +6,22 @@ module TranslationExperiments
     class InvalidExperimentStateError < Error; end
     class ContextBudgetError < Error; end
 
-    def self.call(experiment:, llm_models:, capability_snapshots: {})
-      new(experiment: experiment, llm_models: llm_models, capability_snapshots: capability_snapshots).call
+    # billing: the payment authorization to stamp on the new runs; defaults to
+    # the owner's current explicit selection (Ai::BillingPolicy).
+    def self.call(experiment:, llm_models:, capability_snapshots: {}, billing: nil)
+      new(experiment: experiment, llm_models: llm_models, capability_snapshots: capability_snapshots, billing: billing).call
     end
 
-    def initialize(experiment:, llm_models:, capability_snapshots: {})
+    def initialize(experiment:, llm_models:, capability_snapshots: {}, billing: nil)
       @experiment = experiment
       @llm_models = llm_models
       @capability_snapshots = capability_snapshots
+      @billing = billing
     end
 
     def call
       validate_request!
+      @billing ||= Ai::BillingPolicy.authorize!(experiment.document.project.user)
       plan = LongDocuments::Planner.call(experiment)
       budgets = preflight_budgets(plan)
 
@@ -32,7 +36,7 @@ module TranslationExperiments
 
     private
 
-    attr_reader :capability_snapshots, :experiment, :llm_models
+    attr_reader :billing, :capability_snapshots, :experiment, :llm_models
 
     def validate_request!
       raise ActiveRecord::RecordNotSaved, "Experiment must be persisted" unless experiment.persisted?
@@ -95,17 +99,17 @@ module TranslationExperiments
           runs << run
           if run.previously_new_record?
             if plan
-              run.update!(status: :running, started_at: Time.current)
+              run.update!(status: :running, started_at: Time.current, **billing.attributes)
               plan.segments.each do |segment|
                 segment_run = run.translation_segment_runs.create!(
                   experiment_segment: segment,
                   **budgets.fetch(llm_model.id).fetch(segment.id).snapshot_attributes
                 )
-                schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: TranslationSegmentRunJob)
+                schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: TranslationSegmentRunJob, billing: billing)
               end
             else
               run.assign_attributes(**budgets.fetch(llm_model.id).fetch(experiment.document.id).snapshot_attributes)
-              schedules << Ai::RunScheduler.prepare(run: run, job_class: TranslationRunJob)
+              schedules << Ai::RunScheduler.prepare(run: run, job_class: TranslationRunJob, billing: billing)
             end
           end
         end

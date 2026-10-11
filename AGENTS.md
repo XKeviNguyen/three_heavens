@@ -113,8 +113,9 @@ At handoff, report the current branch and complete `git status --short`.
 
 ## Integration and release branch safety
 
-`develop` is the GitHub default and normal integration branch. All ordinary
-Codex task branches and Pull Requests target `develop`.
+`main` is the GitHub default and stable/release branch. `develop` is the
+normal integration branch. All ordinary Codex task branches and Pull Requests
+target `develop`.
 
 `main` is the protected conceptual release/stable branch. Codex must never:
 
@@ -137,9 +138,23 @@ explicit approval.
 - Use the smallest sufficient investigation and context. Start with targeted
   files and searches; do not broadly scan the repository, Git history, session
   archives, or unrelated task history when focused evidence is enough.
-- Do not launch subagents unless the user explicitly authorizes them. Avoid
-  duplicate searches, repeated verification, unnecessary retries, and rereading
-  large context unless new evidence requires it.
+- The user has granted standing authorization for automatic, risk-aware
+  subagent delegation. Do not request approval for each ordinary delegation.
+  Do trivial work directly; delegate only when independent work, specialized
+  review, context isolation, speed, or total usage efficiency warrants it.
+- Use the smallest sufficient team. Give each subagent a focused scope, relevant
+  paths and commit SHA, constraints, acceptance criteria, and expected output.
+  Keep reviewer, breaker, and investigative subagents read-only by default.
+  The lead owns implementation and integration; avoid overlapping code writers
+  unless their file ownership is explicitly disjoint.
+- Respect supported model/effort controls and preserve the selected lead model.
+  Escalate reasoning only when task risk warrants it. Avoid duplicate searches,
+  repeated verification, unnecessary retries, and rereading large context
+  unless new evidence requires it. After two meaningful failed fixes to the
+  same gate, challenge the shared premise before trying another patch.
+- Permission to delegate does not confer additional authority to merge, deploy,
+  change production, perform paid external actions, or make irreversible changes.
+  Existing task-specific approvals and security/CI/release gates still apply.
 - Poll CI and GitHub at reasonable intervals. Do not request another Codex
   review for a commit SHA that already has a valid review; after a corrective
   commit, request review only for the new exact final SHA.

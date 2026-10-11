@@ -91,7 +91,7 @@ class AiJobLineageTest < ActiveJob::TestCase
 
   def with_client(client)
     original = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
     yield
   ensure
     TranslationRunJob.client_factory = original

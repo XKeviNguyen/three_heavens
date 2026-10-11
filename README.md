@@ -17,7 +17,7 @@ The interface is available in English, Vietnamese, and Japanese. New to the app?
 
 > **About the screenshots.** They come from the real application running locally against a throwaway database. All names, texts, scores, token counts, and costs are **synthetic demo data** from a deterministic fake AI client ([`bin/capture-readme-screenshots`](bin/capture-readme-screenshots)). No AI service was called.
 
-**Contents** — Product: [What it does](#what-it-does) · [Product tour](#product-tour) · [Using the app](#using-the-app) — Engineering: [Key design decisions](#key-design-decisions) · [Architecture](#architecture) · [Translation workflow](#translation-workflow) · [Data model](#data-model) · [Reliability](#reliability) · [Security](#security) · [Testing](#testing-and-release-quality) · [Tech stack](#tech-stack) · [Run it locally](#run-it-locally) · [Project structure](#project-structure) · [Deployment](#deployment) · [Status](#status-and-limitations)
+**Contents** — Product: [What it does](#what-it-does) · [Product tour](#product-tour) · [Using the app](#using-the-app) — Engineering: [Key design decisions](#key-design-decisions) · [Architecture](#architecture) · [Translation workflow](#translation-workflow) · [Data model](#data-model) · [Reliability](#reliability) · [Security](#security) · [Testing](#testing-and-release-quality) · [Tech stack](#tech-stack) · [Run it locally](#run-it-locally) · [Project structure](#project-structure) · [Deployment](#deployment) · [Engineering case studies](docs/engineering-case-studies/README.md) · [Status](#status-and-limitations)
 
 ## What it does
 
@@ -81,10 +81,12 @@ Also captured: [glossary](docs/images/readme/10-glossary.png) and [the editor on
 
 ## Using the app
 
-1. Sign in, and ask an administrator to turn on **AI access** for your account (Admin → Users).
+1. Sign in, then choose who pays for AI work under **AI settings**: your own OpenRouter key, or platform-managed AI once an administrator allows it (Admin → Users).
 2. **New translation:** choose languages, paste or upload the source, add guidance, pick models or a workflow setup, and start.
 3. Follow the steps: candidates → blind review → judging → **Edit the winning translation**.
 4. Save versions, request AI suggestions, then **Finalize current version** and download TXT or DOCX.
+
+New accounts are offered a seven-step guided tour once; **Help** (the **?** button in the sidebar) replays it and offers a shorter tour of the current page. Tours only highlight the interface: they never click, submit, upload, or start AI work.
 
 The [user guide](docs/user-guide.md) covers every screen and lists the key terms in English, Vietnamese, and Japanese.
 
@@ -94,6 +96,7 @@ Most of the engineering is in making paid, slow, failure-prone AI calls behave l
 
 - **The human checkpoint is a domain invariant.** Only the explicit finalize action finalizes a translation, and AI suggestions become versions only when a person applies them. Automatic workflows always end at "Ready for you to edit". — [`Finalizations::ApplyProposal`](app/services/finalizations/apply_proposal.rb), [`Pipelines::Advance`](app/services/pipelines/advance.rb); [automatic pipeline tests](test/system/automatic_pipelines_test.rb)
 - **Paid AI work needs explicit, bounded approval.** An automatic launch stores the approved plan (models × document parts × retry limit) on the workflow run; for multi-part documents the plan's digest is rechecked at submit and the launch is refused if it changed. Actual spend is recorded per request and shown as known or partial; a later retry is a separate action with its own cost warning. — [`Pipelines::Start`](app/services/pipelines/start.rb); [submission tests](test/integration/translation_workspace_submission_test.rb)
+- **Who pays is decided once and recorded.** New work is paid by the owner's own OpenRouter key or by platform-managed AI, as the owner selects; each run records its payer and exact key version, there is never a fallback between the two, and an explicit retry shows its payer and is refused if that payer changed after the page was shown. — [`Ai::BillingPolicy`](app/services/ai/billing_policy.rb); [retry payer tests](test/integration/workflow_recovery_authorization_test.rb)
 - **Every launch is idempotent.** Each form carries a signed, single-use submission identity consumed under a row lock, so a double click or a replayed POST returns the existing translation instead of starting a second paid run. — [`TranslationWorkspace`](app/forms/translation_workspace.rb), [`ReplayIdentity`](app/services/replay_identity.rb); [replay tests](test/integration/replay_adversarial_test.rb)
 - **AI jobs tolerate duplicates, late arrivals, and crashes.** Runs are committed before their jobs are enqueued; a job claims its run under a row lock by job ID and execution number, and a late result can only update the attempt that claimed it. A watchdog fails stuck work without calling a provider. — [`Ai::ExecutionClaim`](app/services/ai/execution_claim.rb), [`Ai::StaleExecutionReconciler`](app/services/ai/stale_execution_reconciler.rb); [job lineage tests](test/jobs/ai_job_lineage_test.rb)
 - **Drafts live on the server, not in localStorage.** An encrypted server draft, a per-tab editor identity, and a monotonically increasing sequence number resolve lost responses and late duplicates deterministically, report another tab's newer draft as a conflict, and work across devices. — [`TranslationWorkspaceDrafts::Save`](app/services/translation_workspace_drafts/save.rb); [draft tests](test/integration/translation_workspace_draft_test.rb), [browser history tests](test/system/translation_workspace_history_test.rb)
@@ -105,7 +108,7 @@ Most of the engineering is in making paid, slow, failure-prone AI calls behave l
 
 ```mermaid
 flowchart LR
-  B["Browser<br/>Turbo + Stimulus"] -->|HTTPS| KP["kamal-proxy (TLS)"]
+  B["Browser<br/>Turbo + Stimulus<br/>+ React islands"] -->|HTTPS| KP["kamal-proxy (TLS)"]
   KP --> PU["Puma · Rails 8.1<br/>controllers → forms/services"]
   PU --> PG[("PostgreSQL 17<br/>app data")]
   PU -->|enqueue after commit| Q[("Solid Queue<br/>(PostgreSQL)")]
@@ -116,7 +119,7 @@ flowchart LR
   PU --> PDF["Resource-limited PDF worker"]
 ```
 
-A single Rails monolith. Controllers handle HTTP and ownership checks; a form object and namespaced services (`TranslationExperiments::`, `BlindReviews::`, `Judging::`, `Finalizations::`, `Pipelines::`, `SourceImports::`) own the workflows; jobs make every AI call through one provider client (`Ai::OpenRouterClient`). There is no Redis: in production Solid Queue, Solid Cache, and Solid Cable each use their own PostgreSQL database. Full topology, request path, and recurring jobs: [architecture overview](docs/architecture/overview.md).
+A single Rails monolith. Pages are server-rendered; a few interactive parts (AI settings, the guided tours, reference file uploads) are React/TypeScript islands mounted into that HTML, with Rails still validating and persisting everything. Controllers handle HTTP and ownership checks; a form object and namespaced services (`TranslationExperiments::`, `BlindReviews::`, `Judging::`, `Finalizations::`, `Pipelines::`, `SourceImports::`) own the workflows; jobs make every AI call through one provider client (`Ai::OpenRouterClient`). There is no Redis: in production Solid Queue, Solid Cache, and Solid Cable each use their own PostgreSQL database. Full topology, request path, and recurring jobs: [architecture overview](docs/architecture/overview.md).
 
 ## Translation workflow
 
@@ -218,7 +221,7 @@ Every change is reviewed along the same dimensions:
 | Layer | Choice |
 | --- | --- |
 | Backend | Ruby 3.4, Rails 8.1, Puma |
-| Frontend | Hotwire (Turbo, Stimulus) via importmap — no JavaScript build step; Tailwind CSS 4 |
+| Frontend | Hotwire (Turbo, Stimulus) via importmap; React 19 + TypeScript islands bundled by esbuild at image build (Node never ships in the production image); Tailwind CSS 4 |
 | Database | PostgreSQL 17 with `structure.sql`, CHECK constraints, triggers, advisory locks |
 | Jobs, cache, cable | Solid Queue, Solid Cache, Solid Cable (all PostgreSQL; no Redis) |
 | AI gateway | OpenRouter behind `Ai::OpenRouterClient` (timeouts, 1 MiB response cap) |
@@ -280,6 +283,7 @@ app/
                  source_imports/, translation_workspace_drafts/, ai/, operations/
   jobs/          AI runs, automatic-workflow advancement, reconciliation, cleanup
   javascript/    Stimulus controllers: autosave and navigation guard, uploads, model browser
+  frontend/      React/TypeScript islands: AI settings, product tours, file inputs
   views/         server-rendered ERB with Turbo
 config/          routes, CI gate (ci.rb), recurring jobs, Kamal deploy.yml, locales (en/vi/ja)
 db/              migrations and structure.sql (PostgreSQL's own dump)
@@ -298,11 +302,12 @@ Runbooks: [configuration](docs/operations/configuration.md) · [production deplo
 ## Status and limitations
 
 - **V1.1.0, integrated into `main`.** [PR #79](https://github.com/XKeviNguyen/three_heavens/pull/79) merged V1.1.0 into `main` as `43b0184db56d499610b0186d71bf54265f3ac6cd`, and the post-merge CI run on `main` passed all five jobs. The `v1.1.0` tag and GitHub Release have not been published yet. Production deployment, uptime, traffic and operation with a real paid AI provider are not verified; this README does not claim any of them.
+- **Next release, not yet released or deployed.** `develop` adds OpenRouter bring-your-own-key billing and the React islands foundation ([PR #90](https://github.com/XKeviNguyen/three_heavens/pull/90)); guided product tours, the reference upload experience, and retry payer labels are in review. Release readiness, open blockers, and the human approval steps are tracked in [the readiness record](docs/releases/v1-final-readiness.md).
 - **One AI provider:** all AI calls go through OpenRouter.
 - **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
 - **Single host:** horizontal scaling would need a dedicated job role and shared file storage.
 - **Approximate token budgets:** context planning uses a conservative byte-based estimate, not each provider's tokenizer.
-- **License: Public Source — All Rights Reserved.** The code is visible so it can be read and evaluated. No open-source license has been granted, and public visibility does not grant permission to use, copy, modify, redistribute, or commercialize it.
+- **License: [MIT](LICENSE).** Copyright © 2026 Nguyen Thai Hoang. Three Heavens is open source: reuse, modification, distribution and commercial use are permitted under the MIT License, provided its copyright and permission notices are retained. Third-party components remain subject to their own licenses.
 
-Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md)
+Deep dives: [architecture](docs/architecture/overview.md) · [workflow](docs/architecture/workflow.md) · [database](docs/architecture/database.md) · [data dictionary](docs/architecture/data-dictionary.md) · [reliability](docs/architecture/reliability.md) · [documents](docs/architecture/documents.md) · [security](docs/security.md) · [user guide](docs/user-guide.md) · [engineering case studies](docs/engineering-case-studies/README.md)

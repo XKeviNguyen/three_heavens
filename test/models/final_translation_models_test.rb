@@ -127,6 +127,7 @@ class FinalTranslationModelsTest < ActiveSupport::TestCase
         round.finalization_runs.insert_all!([ {
           finalizer_llm_model_id: finalizer.id,
           status: "pending",
+          billing_source: "managed",
           created_at: Time.current,
           updated_at: Time.current
         } ])

@@ -69,3 +69,13 @@ bin/kamal rollback RELEASE_VERSION_PLACEHOLDER
 ```
 
 Kamal can select an earlier application image; it does not reverse migrations. Roll back code only when the earlier code is compatible with the current schema. Never automatically run `db:rollback` in production. If schema state is uncertain, stop, inspect `bin/rails db:migrate:status`, review the exact migration transaction outcome, and choose a forward fix or separately reviewed database recovery procedure. Restoring a backup is disaster recovery with potential data loss, not a routine code rollback.
+
+Code from before the OpenRouter bring-your-own-key release does not know who pays for AI work, so the database fences it out (migration `20261010090100`):
+
+- The AI run tables have no `billing_source` default, so that code cannot create runs. Starting AI work, or an automatic workflow advancing to its next stage, fails before anything is scheduled.
+- `enforce_ai_provider_attempt_payer` refuses a provider attempt whose payer differs from its run's. That code therefore cannot claim personal-key work; its claim fails before any provider request, and the run is failed later by stale-work reconciliation (`stale_pending`, or `stale_execution` for a retry) so its owner can retry explicitly.
+
+Consequences:
+
+- During the deploy that applies this migration, the old container fails AI starts from the moment the migration commits until traffic switches to the new container. Deploy at a quiet time.
+- An image rollback past that release leaves AI starts failing closed. Roll forward instead; a database rollback of these migrations would also discard users' saved keys and payment choices.

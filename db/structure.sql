@@ -763,6 +763,39 @@ $$;
 
 
 --
+-- Name: enforce_provider_attempt_payer(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_provider_attempt_payer() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  run_billing_source character varying;
+  run_credential_id bigint;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.billing_source IS DISTINCT FROM NEW.billing_source OR
+       OLD.open_router_credential_id IS DISTINCT FROM NEW.open_router_credential_id THEN
+      RAISE EXCEPTION 'Provider attempt payers are immutable';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  EXECUTE format(
+    'SELECT billing_source, open_router_credential_id FROM %I WHERE id = $1',
+    CASE NEW.provider_run_type WHEN 'TranslationRun' THEN 'translation_runs' WHEN 'TranslationSegmentRun' THEN 'translation_segment_runs' WHEN 'ReviewRun' THEN 'review_runs' WHEN 'ReviewSegmentRun' THEN 'review_segment_runs' WHEN 'JudgeRun' THEN 'judge_runs' WHEN 'JudgeSegmentRun' THEN 'judge_segment_runs' WHEN 'FinalizationRun' THEN 'finalization_runs' WHEN 'FinalizationSegmentRun' THEN 'finalization_segment_runs' END
+  ) INTO run_billing_source, run_credential_id USING NEW.provider_run_id;
+  IF run_billing_source IS NULL OR
+     NEW.billing_source IS DISTINCT FROM run_billing_source OR
+     NEW.open_router_credential_id IS DISTINCT FROM run_credential_id THEN
+    RAISE EXCEPTION 'Provider attempt payer must match its run authorization';
+  END IF;
+  RETURN NEW;
+END;
+$_$;
+
+
+--
 -- Name: enforce_revision_sequence(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1457,7 +1490,10 @@ CREATE TABLE public.ai_provider_attempts (
     cost numeric(20,10),
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    open_router_credential_id bigint,
     CONSTRAINT ai_provider_attempts_attempt_number_check CHECK ((attempt_number > 0)),
+    CONSTRAINT ai_provider_attempts_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT ai_provider_attempts_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT ai_provider_attempts_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT ai_provider_attempts_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -1960,6 +1996,9 @@ CREATE TABLE public.finalization_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT finalization_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT finalization_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT finalization_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
     CONSTRAINT finalization_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -2038,6 +2077,9 @@ CREATE TABLE public.finalization_segment_runs (
     warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT finalization_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT finalization_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
     CONSTRAINT finalization_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT finalization_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -2311,6 +2353,9 @@ CREATE TABLE public.judge_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT judge_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT judge_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT judge_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
     CONSTRAINT judge_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -2384,6 +2429,9 @@ CREATE TABLE public.judge_segment_runs (
     judgment jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT judge_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT judge_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
     CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -2541,6 +2589,44 @@ ALTER SEQUENCE public.methodology_profiles_id_seq OWNED BY public.methodology_pr
 
 
 --
+-- Name: open_router_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.open_router_credentials (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    api_key text,
+    key_hint character varying,
+    revoked_at timestamp(6) without time zone,
+    revocation_reason character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT open_router_credentials_ciphertext_length_check CHECK (((api_key IS NULL) OR (char_length(api_key) <= 4096))),
+    CONSTRAINT open_router_credentials_key_hint_length_check CHECK (((key_hint IS NULL) OR (char_length((key_hint)::text) <= 16))),
+    CONSTRAINT open_router_credentials_lifecycle_check CHECK ((((revoked_at IS NULL) AND (api_key IS NOT NULL) AND (revocation_reason IS NULL)) OR ((revoked_at IS NOT NULL) AND (api_key IS NULL) AND (revocation_reason IS NOT NULL) AND (((revocation_reason)::text = 'replaced'::text) OR ((revocation_reason)::text = 'deleted'::text)))))
+);
+
+
+--
+-- Name: open_router_credentials_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.open_router_credentials_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: open_router_credentials_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.open_router_credentials_id_seq OWNED BY public.open_router_credentials.id;
+
+
+--
 -- Name: pipeline_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2613,7 +2699,10 @@ CREATE TABLE public.pipeline_runs (
     updated_at timestamp(6) without time zone NOT NULL,
     last_reconciled_at timestamp(6) without time zone,
     provider_work_plan jsonb DEFAULT '{}'::jsonb NOT NULL,
+    billing_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    open_router_credential_id bigint,
     CONSTRAINT pipeline_runs_authorized_count_check CHECK ((((provider_work_plan = '{}'::jsonb) AND (authorized_initial_provider_run_count = (((translator_count + reviewer_count) + judge_count) + finalizer_count))) OR ((provider_work_plan <> '{}'::jsonb) AND (jsonb_typeof((provider_work_plan -> 'roles'::text)) = 'object'::text) AND (((provider_work_plan ->> 'authorized_initial_provider_request_slots'::text))::integer = authorized_initial_provider_run_count) AND (authorized_initial_provider_run_count >= (((translator_count + reviewer_count) + judge_count) + finalizer_count))))),
+    CONSTRAINT pipeline_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT pipeline_runs_blocked_message_check CHECK (((blocked_message IS NULL) OR (char_length((blocked_message)::text) <= 500))),
     CONSTRAINT pipeline_runs_blocked_reason_check CHECK (((blocked_reason_code IS NULL) OR (char_length((blocked_reason_code)::text) <= 80))),
     CONSTRAINT pipeline_runs_blocked_stage_check CHECK (((blocked_stage IS NULL) OR ((blocked_stage)::text = ANY (ARRAY[('translation'::character varying)::text, ('review'::character varying)::text, ('judge'::character varying)::text, ('finalization'::character varying)::text])))),
@@ -2801,6 +2890,9 @@ CREATE TABLE public.review_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT review_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT review_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT review_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
     CONSTRAINT review_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -2872,6 +2964,9 @@ CREATE TABLE public.review_segment_runs (
     evaluations jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT review_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT review_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
     CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -3190,6 +3285,9 @@ CREATE TABLE public.translation_runs (
     budget_policy_version character varying,
     telemetry_complete boolean DEFAULT true NOT NULL,
     cost_complete boolean DEFAULT false NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT translation_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT translation_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT translation_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
     CONSTRAINT translation_runs_claimed_job_execution_check CHECK ((claimed_job_execution >= 0)),
@@ -3255,6 +3353,9 @@ CREATE TABLE public.translation_segment_runs (
     translated_text text,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    billing_source character varying NOT NULL,
+    open_router_credential_id bigint,
+    CONSTRAINT translation_segment_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT translation_segment_runs_budget_numbers_check CHECK (((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0))),
     CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
@@ -3465,9 +3566,14 @@ CREATE TABLE public.users (
     locale character varying DEFAULT 'en'::character varying NOT NULL,
     managed_ai_access boolean DEFAULT false NOT NULL,
     appearance character varying DEFAULT 'system'::character varying NOT NULL,
+    ai_payment_source character varying DEFAULT 'managed'::character varying NOT NULL,
+    product_tour_version integer,
+    product_tour_outcome character varying,
+    CONSTRAINT users_ai_payment_source_check CHECK ((((ai_payment_source)::text = 'managed'::text) OR ((ai_payment_source)::text = 'personal'::text))),
     CONSTRAINT users_appearance_check CHECK (((appearance)::text = ANY (ARRAY[('system'::character varying)::text, ('light'::character varying)::text, ('dark'::character varying)::text]))),
     CONSTRAINT users_locale_check CHECK (((locale)::text = ANY (ARRAY[('en'::character varying)::text, ('vi'::character varying)::text, ('ja'::character varying)::text]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
+    CONSTRAINT users_product_tour_check CHECK ((((product_tour_version IS NULL) AND (product_tour_outcome IS NULL)) OR ((product_tour_version IS NOT NULL) AND (product_tour_version > 0) AND (product_tour_outcome IS NOT NULL) AND (((product_tour_outcome)::text = 'completed'::text) OR ((product_tour_outcome)::text = 'dismissed'::text) OR ((product_tour_outcome)::text = 'preexisting'::text))))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
     CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
 );
@@ -3797,6 +3903,13 @@ ALTER TABLE ONLY public.methodology_profile_revisions ALTER COLUMN id SET DEFAUL
 --
 
 ALTER TABLE ONLY public.methodology_profiles ALTER COLUMN id SET DEFAULT nextval('public.methodology_profiles_id_seq'::regclass);
+
+
+--
+-- Name: open_router_credentials id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.open_router_credentials ALTER COLUMN id SET DEFAULT nextval('public.open_router_credentials_id_seq'::regclass);
 
 
 --
@@ -4185,6 +4298,14 @@ ALTER TABLE ONLY public.methodology_profiles
 
 
 --
+-- Name: open_router_credentials open_router_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.open_router_credentials
+    ADD CONSTRAINT open_router_credentials_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: pipeline_events pipeline_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4447,6 +4568,13 @@ CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.ac
 
 
 --
+-- Name: index_ai_provider_attempts_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_provider_attempts_on_open_router_credential_id ON public.ai_provider_attempts USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
+
+
+--
 -- Name: index_ai_provider_attempts_on_run_and_attempt; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4678,6 +4806,13 @@ CREATE INDEX index_finalization_runs_on_finalizer_llm_model_id ON public.finaliz
 
 
 --
+-- Name: index_finalization_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_finalization_runs_on_open_router_credential_id ON public.finalization_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
+
+
+--
 -- Name: index_finalization_runs_on_pending_since; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4703,6 +4838,13 @@ CREATE UNIQUE INDEX index_finalization_runs_on_round_and_model ON public.finaliz
 --
 
 CREATE INDEX index_finalization_runs_on_running_last_claimed_at ON public.finalization_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_finalization_segment_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_finalization_segment_runs_on_open_router_credential_id ON public.finalization_segment_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
 
 
 --
@@ -4881,6 +5023,13 @@ CREATE UNIQUE INDEX index_judge_runs_on_judge_round_id_and_judge_llm_model_id ON
 
 
 --
+-- Name: index_judge_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_judge_runs_on_open_router_credential_id ON public.judge_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
+
+
+--
 -- Name: index_judge_runs_on_pending_since; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4906,6 +5055,13 @@ CREATE INDEX index_judge_runs_on_running_last_claimed_at ON public.judge_runs US
 --
 
 CREATE INDEX index_judge_runs_on_winner_translation_run_id ON public.judge_runs USING btree (winner_translation_run_id);
+
+
+--
+-- Name: index_judge_segment_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_judge_segment_runs_on_open_router_credential_id ON public.judge_segment_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
 
 
 --
@@ -4979,6 +5135,20 @@ CREATE INDEX index_methodology_profiles_on_user_id ON public.methodology_profile
 
 
 --
+-- Name: index_open_router_credentials_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_open_router_credentials_on_user_id ON public.open_router_credentials USING btree (user_id);
+
+
+--
+-- Name: index_open_router_credentials_one_active_per_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_open_router_credentials_one_active_per_user ON public.open_router_credentials USING btree (user_id) WHERE (revoked_at IS NULL);
+
+
+--
 -- Name: index_pipeline_events_on_pipeline_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5032,6 +5202,13 @@ CREATE UNIQUE INDEX index_pipeline_runs_on_experiment_id ON public.pipeline_runs
 --
 
 CREATE UNIQUE INDEX index_pipeline_runs_on_finalization_round_id ON public.pipeline_runs USING btree (finalization_round_id) WHERE (finalization_round_id IS NOT NULL);
+
+
+--
+-- Name: index_pipeline_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_pipeline_runs_on_open_router_credential_id ON public.pipeline_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
 
 
 --
@@ -5119,6 +5296,13 @@ CREATE UNIQUE INDEX index_review_rounds_on_experiment_id ON public.review_rounds
 
 
 --
+-- Name: index_review_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_review_runs_on_open_router_credential_id ON public.review_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
+
+
+--
 -- Name: index_review_runs_on_pending_since; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5158,6 +5342,13 @@ CREATE INDEX index_review_runs_on_reviewer_llm_model_id ON public.review_runs US
 --
 
 CREATE INDEX index_review_runs_on_running_last_claimed_at ON public.review_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_review_segment_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_review_segment_runs_on_open_router_credential_id ON public.review_segment_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
 
 
 --
@@ -5336,6 +5527,13 @@ CREATE INDEX index_translation_runs_on_llm_model_id ON public.translation_runs U
 
 
 --
+-- Name: index_translation_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_runs_on_open_router_credential_id ON public.translation_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
+
+
+--
 -- Name: index_translation_runs_on_pending_since; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5354,6 +5552,13 @@ CREATE INDEX index_translation_runs_on_recent_failures ON public.translation_run
 --
 
 CREATE INDEX index_translation_runs_on_running_last_claimed_at ON public.translation_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_translation_segment_runs_on_open_router_credential_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_translation_segment_runs_on_open_router_credential_id ON public.translation_segment_runs USING btree (open_router_credential_id) WHERE (open_router_credential_id IS NOT NULL);
 
 
 --
@@ -5543,6 +5748,13 @@ CREATE INDEX index_workspace_submissions_for_cleanup ON public.translation_works
 --
 
 CREATE TRIGGER enforce_ai_provider_attempt_lineage BEFORE INSERT OR UPDATE OF provider_run_type, provider_run_id, stage ON public.ai_provider_attempts FOR EACH ROW EXECUTE FUNCTION public.enforce_provider_attempt_lineage();
+
+
+--
+-- Name: ai_provider_attempts enforce_ai_provider_attempt_payer; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER enforce_ai_provider_attempt_payer BEFORE INSERT OR UPDATE ON public.ai_provider_attempts FOR EACH ROW EXECUTE FUNCTION public.enforce_provider_attempt_payer();
 
 
 --
@@ -6134,11 +6346,27 @@ ALTER TABLE ONLY public.pipeline_runs
 
 
 --
+-- Name: judge_runs fk_rails_02f4cbd4be; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.judge_runs
+    ADD CONSTRAINT fk_rails_02f4cbd4be FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
 -- Name: final_translations fk_rails_11477c9323; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.final_translations
     ADD CONSTRAINT fk_rails_11477c9323 FOREIGN KEY (source_winner_translation_run_id) REFERENCES public.translation_runs(id);
+
+
+--
+-- Name: open_router_credentials fk_rails_116f96ae82; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.open_router_credentials
+    ADD CONSTRAINT fk_rails_116f96ae82 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -6158,11 +6386,27 @@ ALTER TABLE ONLY public.pipeline_runs
 
 
 --
+-- Name: review_segment_runs fk_rails_19158dd1ac; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_segment_runs
+    ADD CONSTRAINT fk_rails_19158dd1ac FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
 -- Name: experiment_reference_revisions fk_rails_1fc4e85b1c; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.experiment_reference_revisions
     ADD CONSTRAINT fk_rails_1fc4e85b1c FOREIGN KEY (translation_reference_revision_id) REFERENCES public.translation_reference_revisions(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: finalization_segment_runs fk_rails_205fb15199; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finalization_segment_runs
+    ADD CONSTRAINT fk_rails_205fb15199 FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
 
 
 --
@@ -6302,6 +6546,14 @@ ALTER TABLE ONLY public.source_imports
 
 
 --
+-- Name: judge_segment_runs fk_rails_4808c28f4d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.judge_segment_runs
+    ADD CONSTRAINT fk_rails_4808c28f4d FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
 -- Name: experiment_reference_revisions fk_rails_4c5edad130; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6315,6 +6567,14 @@ ALTER TABLE ONLY public.experiment_reference_revisions
 
 ALTER TABLE ONLY public.translation_runs
     ADD CONSTRAINT fk_rails_4f7b20a5c6 FOREIGN KEY (llm_model_id) REFERENCES public.llm_models(id);
+
+
+--
+-- Name: translation_segment_runs fk_rails_4fc5a14b1c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_segment_runs
+    ADD CONSTRAINT fk_rails_4fc5a14b1c FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
 
 
 --
@@ -6550,6 +6810,22 @@ ALTER TABLE ONLY public.final_translation_version_segments
 
 
 --
+-- Name: review_runs fk_rails_ae34ffa89f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_runs
+    ADD CONSTRAINT fk_rails_ae34ffa89f FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
+-- Name: translation_runs fk_rails_b248116b78; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.translation_runs
+    ADD CONSTRAINT fk_rails_b248116b78 FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
 -- Name: review_evaluations fk_rails_b26ead8ac6; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6654,6 +6930,22 @@ ALTER TABLE ONLY public.translation_references
 
 
 --
+-- Name: pipeline_runs fk_rails_d6af86b812; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_runs
+    ADD CONSTRAINT fk_rails_d6af86b812 FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
+-- Name: ai_provider_attempts fk_rails_de6fd893ed; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_provider_attempts
+    ADD CONSTRAINT fk_rails_de6fd893ed FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
+
+
+--
 -- Name: review_rounds fk_rails_e4d2c9843a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6667,6 +6959,14 @@ ALTER TABLE ONLY public.review_rounds
 
 ALTER TABLE ONLY public.finalization_segment_runs
     ADD CONSTRAINT fk_rails_ee050b2119 FOREIGN KEY (experiment_segment_id) REFERENCES public.experiment_segments(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: finalization_runs fk_rails_f5259f6192; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finalization_runs
+    ADD CONSTRAINT fk_rails_f5259f6192 FOREIGN KEY (open_router_credential_id) REFERENCES public.open_router_credentials(id);
 
 
 --
@@ -6716,6 +7016,11 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261011090000'),
+('20261010090300'),
+('20261010090200'),
+('20261010090100'),
+('20261010090000'),
 ('20261008090000'),
 ('20261005120000'),
 ('20261005110000'),

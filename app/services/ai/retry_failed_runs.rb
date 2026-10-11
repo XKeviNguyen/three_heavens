@@ -3,10 +3,18 @@ module Ai
     class Error < StandardError; end
     class UnsupportedModelError < Error; end
 
-    Result = Data.define(:retried_count, :enqueued_count)
+    # enqueued_count is read from the enqueue outcomes when asked, so a caller
+    # that ran the retry inside its own transaction (to hold the owner's lock
+    # while stamping, Ai::BillingPolicy.authorize_confirmed!) sees the actual
+    # result once that transaction has committed.
+    Result = Data.define(:retried_count, :enqueue_outcomes) do
+      def enqueued_count = enqueue_outcomes.count(&:accepted?)
+    end
 
-    def self.call(parent:, runs_association:, model_association:, job_class:, prepare_parent:, prepare_run: nil,
-                  lock_before: nil)
+    # billing: the authorization for this explicit retry, which may differ from
+    # the one the failed attempt ran under (Ai::BillingPolicy).
+    def self.call(parent:, runs_association:, model_association:, job_class:, prepare_parent:, billing:,
+                  prepare_run: nil, lock_before: nil)
       retried_runs = []
       schedules = []
 
@@ -22,12 +30,10 @@ module Ai
         retried_runs.each do |run|
           prepare_run&.call(run)
           run.update!(retry_attributes(run))
-          schedules << RunScheduler.prepare(run: run, job_class: job_class)
+          schedules << RunScheduler.prepare(run: run, job_class: job_class, billing: billing)
         end
       end
-      enqueued_count = RunScheduler.enqueue_all(schedules)
-
-      Result.new(retried_count: retried_runs.size, enqueued_count: enqueued_count)
+      Result.new(retried_count: retried_runs.size, enqueue_outcomes: RunScheduler.enqueue_outcomes(schedules))
     end
 
     def self.validate_models!(runs, model_association)

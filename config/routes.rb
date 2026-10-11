@@ -6,6 +6,7 @@ Rails.application.routes.draw do
   resource :confirmation_resend, only: %i[new create]
   resource :locale, only: :update
   resource :appearance, only: :update
+  resource :product_tour, only: :update
   # Sign in with Google (GIS redirect mode) posts the credential here.
   post "auth/google/callback", to: "auth/google_callbacks#create", as: :google_identity_callback
   post "auth/google/ceremony", to: "auth/google_ceremonies#create", as: :google_identity_ceremony
@@ -16,6 +17,8 @@ Rails.application.routes.draw do
         delete :pending, action: :cancel_pending
       end
     end
+    resource :ai_settings, only: %i[show update], path: "ai"
+    resource :open_router_key, only: %i[update destroy], path: "ai/openrouter-key"
     resources :users, only: :index do
       member do
         patch :grant_managed_ai_access

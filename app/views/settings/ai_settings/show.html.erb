@@ -1,0 +1,80 @@
+<% content_for :title, t("ai_settings.title") %>
+<% content_for :head, tag.meta(name: "turbo-cache-control", content: "no-cache") %>
+<% state = @ai_settings %>
+<% key = state[:personal_key] %>
+<section class="max-w-2xl space-y-6">
+  <header>
+    <h1 class="text-3xl font-semibold"><%= t("ai_settings.title") %></h1>
+    <p class="mt-2 text-slate-600"><%= t("ai_settings.description") %></p>
+  </header>
+
+  <%# The island replaces this server-rendered form, which is also the
+      no-JavaScript version of the page. Props hold state and labels only;
+      the key itself is never rendered. %>
+  <%= react_island_tag "ai-settings",
+        props: {
+          state: state,
+          locale: I18n.locale,
+          urls: { source: settings_ai_settings_path, key: settings_open_router_key_path },
+          messages: t("ai_settings").except(:navigation, :account_link, :flash),
+          denials: t("ai_billing.denied")
+        },
+        id: "ai-settings",
+        class: "space-y-6" do %>
+    <p data-tour-target="ai-status" class="rounded-xl border p-4 text-sm <%= state[:denial_code] ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900" %>" role="status">
+      <% if state[:denial_code] %>
+        <%= t("ai_settings.current.blocked") %> <%= t("ai_billing.denied.#{state[:denial_code]}") %>
+      <% else %>
+        <%= t("ai_settings.current.ready_#{state[:payment_source]}") %>
+      <% end %>
+    </p>
+
+    <%= form_with url: settings_ai_settings_path, method: :patch, scope: :ai_settings, class: "rounded-xl border border-slate-200 bg-white p-5", data: { tour_target: "ai-source" } do |form| %>
+      <%= form.hidden_field :state_token, value: state[:state_token] %>
+      <fieldset>
+        <legend class="text-lg font-semibold text-slate-950"><%= t("ai_settings.source_legend") %></legend>
+        <% %w[personal managed].each do |source| %>
+          <label class="mt-4 flex gap-3">
+            <%= form.radio_button :payment_source, source, checked: state[:payment_source] == source, class: "mt-1 size-4" %>
+            <span>
+              <span class="block font-medium text-slate-950"><%= t("ai_settings.sources.#{source}.label") %></span>
+              <span class="block text-sm text-slate-600"><%= t("ai_settings.sources.#{source}.description") %></span>
+              <% if source == "managed" %>
+                <span class="block text-sm text-slate-600"><%= t("ai_settings.sources.managed.#{state[:managed_access] ? "enabled" : "disabled"}") %></span>
+              <% end %>
+            </span>
+          </label>
+        <% end %>
+      </fieldset>
+      <%= form.submit t("ai_settings.save_source"), class: "mt-5 min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" %>
+    <% end %>
+
+    <section data-tour-target="ai-key" class="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="ai-settings-key-heading">
+      <h2 id="ai-settings-key-heading" class="text-lg font-semibold text-slate-950"><%= t("ai_settings.key.heading") %></h2>
+      <p class="mt-1 text-sm text-slate-600">
+        <%= key[:configured] ? t("ai_settings.key.configured", hint: key[:hint], date: l(Time.iso8601(key[:added_at]).to_date, format: :long)) : t("ai_settings.key.missing") %>
+      </p>
+      <%= form_with url: settings_open_router_key_path, method: :put, scope: :open_router_key, class: "mt-4" do |form| %>
+        <%= form.hidden_field :state_token, value: state[:state_token] %>
+        <%= form.label :api_key, t("ai_settings.key.label"), class: "block text-sm font-medium text-slate-800" %>
+        <%# Hints to password managers that this is an API key, not a sign-in password. %>
+        <%= form.password_field :api_key, autocomplete: "off", autocapitalize: "off", autocorrect: "off", spellcheck: false, data: { "1p-ignore": "", lpignore: "true", bwignore: "", form_type: "other" }, maxlength: OpenRouterCredential::MAXIMUM_KEY_LENGTH, aria: { describedby: "ai-settings-key-hint" }, class: "mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" %>
+        <p id="ai-settings-key-hint" class="mt-1 text-xs text-slate-500"><%= t("ai_settings.key.hint") %></p>
+        <%= form.submit t(key[:configured] ? "ai_settings.key.replace" : "ai_settings.key.save"), class: "mt-3 min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" %>
+      <% end %>
+      <% if key[:configured] %>
+        <%= form_with url: settings_open_router_key_path, method: :delete, scope: :open_router_key, class: "mt-3" do |form| %>
+          <%= form.hidden_field :state_token, value: state[:state_token] %>
+          <%= form.submit t("ai_settings.key.delete"), data: { turbo_confirm: t("ai_settings.key.delete_confirm") }, class: "min-h-11 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" %>
+        <% end %>
+      <% end %>
+    </section>
+
+    <section data-tour-target="ai-billing" class="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="ai-settings-billing-heading">
+      <h2 id="ai-settings-billing-heading" class="text-lg font-semibold text-slate-950"><%= t("ai_settings.billing.heading") %></h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+        <% t("ai_settings.billing.items").each do |item| %><li><%= item %></li><% end %>
+      </ul>
+    </section>
+  <% end %>
+</section>

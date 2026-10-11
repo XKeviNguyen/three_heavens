@@ -43,6 +43,23 @@ In production all four databases are separate (`DATABASE_URL`, `QUEUE_DATABASE_U
 | Provider client | The only code that talks to OpenRouter: request building, timeouts, streamed size cap, error classification | `Ai::OpenRouterClient`, `OpenRouter::Catalog` |
 | Operations services | Backup, restore verification, preflight, structured operational events | `Operations::Backup::BundleCreator`, `Operations::Restore::Verification`, `Operations::EventLogger` |
 
+## Browser: Turbo, Stimulus, and React islands
+
+Pages are server-rendered ERB navigated by Turbo; small behaviors are Stimulus controllers. Where a page needs richer client state, a **React island** owns one element and nothing else:
+
+- The server renders `<div data-react-island="NAME" data-react-props="{…}">` around a working server-rendered fallback (`ReactIslandsHelper#react_island_tag`). Without JavaScript, or if the island fails, the fallback is what the user gets.
+- `app/frontend/islands/mount.tsx` is the only mounting system. It mounts islands on `turbo:load`, restores the fallback before Turbo caches a page (so a restored page never shows stale React state), and unmounts islands that a Turbo render removes. State is kept on `window`, so one registry and one set of listeners exist per document.
+- The bundle is TypeScript in strict mode, built by esbuild at image build time; Node never ships in the production image. Props carry labels, URLs, and state the page already shows, never secrets.
+- Rails stays authoritative: islands submit ordinary forms or call JSON endpoints that validate, authorize, and persist exactly as the HTML forms do.
+
+Current islands:
+
+| Island | Where | Notes |
+| --- | --- | --- |
+| `ai-settings` | Account → AI settings | Payment source and the user's OpenRouter key; each change carries a state token |
+| `product-tour` | Sidebar of every signed-in page | Help menu, the one-time invitation, and the guided tours. Steps point at elements marked `data-tour-target`; the registry and text are server-side (`ProductTour`, `config/locales/product_tour.*.yml`). A tour is a native modal `<dialog>`, so the page behind it is inert. The account's outcome is two `users` columns written once by `PATCH /product_tour` |
+| `file-field` | Translation reference form | Wraps each native file input; the Rails form still submits the file and the server validates it |
+
 ## Request path for a translation launch
 
 1. The browser submits the workspace form with a signed, single-use submission identity.

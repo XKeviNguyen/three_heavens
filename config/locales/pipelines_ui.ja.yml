@@ -44,6 +44,8 @@ ja:
     stop_confirm: "残りの自動段階を停止しますか？すでに始まったAIリクエストは取り消せません。"
     blocked_reasons:
       managed_ai_access_revoked: "このアカウントではAI翻訳が有効になっていません。"
+      personal_key_unavailable: "このワークフローの開始時に使ったOpenRouterキーが置き換えまたは削除されました。自動化を停止して手動で続けてください。手動の手順では現在のAI設定が使われます。"
+      ai_account_ineligible: "AI処理には、有効でメールアドレスが確認済みのアカウントが必要です。"
       stage_failed: "一部のAI処理に失敗しました。該当する段階のページから再試行してください。"
       configuration_unavailable: "次の段階で使うモデルが利用できなくなりました。自動処理を停止して手動で続けるか、元のモデルを再び利用できるようにしてください。"
       stage_conflict: "この段階は別の方法ですでに開始されています。自動処理を停止し、該当ページから続けてください。"

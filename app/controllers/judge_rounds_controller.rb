@@ -1,5 +1,5 @@
 class JudgeRoundsController < ApplicationController
-  before_action :require_managed_ai_access, only: %i[create retry_failed]
+  before_action :require_ai_billing_authorization, only: %i[create retry_failed]
   def create
     review_round = current_user.review_rounds.find(params[:review_round_id])
     judge_round = Judging::Start.call(
@@ -31,7 +31,9 @@ class JudgeRoundsController < ApplicationController
 
   def retry_failed
     judge_round = current_user.judge_rounds.find(params[:id])
-    result = Judging::RetryFailed.call(judge_round)
+    result = retry_under_shown_payer(judge_round) { |billing| Judging::RetryFailed.call(judge_round, billing: billing) }
+    return unless result
+
     redirect_to judge_round, notice: localized_retry_notice(result, kind: :judge)
   rescue Ai::RetryFailedRuns::Error => error
     redirect_to judge_round, alert: error.message
