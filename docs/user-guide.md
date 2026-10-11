@@ -21,7 +21,27 @@ A walkthrough of Three Heavens from sign-in to an approved translation. Screensh
 
 Create an account with your email and a password of at least 12 characters, then confirm your email from the message you receive. If the server has Google sign-in configured you can also continue with Google, or connect Google later under **Account**.
 
-Translation itself needs **AI access**, which an administrator turns on under **Admin → Users**. Without it you can still prepare documents, glossaries, references, methodologies, and workflow setups.
+Translation itself needs a way to pay for AI work; see [AI settings and who pays](#ai-settings-and-who-pays). Without one you can still prepare documents, glossaries, references, methodologies, and workflow setups.
+
+### Guided tours
+
+The first time you sign in, a small card offers a seven-step tour of the product. **Take the tour** walks through the workspace, your translation knowledge, workflow setups, AI settings, starting a translation, and how candidates become a final translation. **Not now**, **Skip tour**, or Escape closes it, and you are not asked again.
+
+Open **Help** (the **?** button beside the language selector) at any time:
+
+- **Full product tour** replays the seven steps.
+- **Tour this page** explains the page you are on, such as New translation, References, Blind review, or the final editor. Steps for parts the page does not show (an empty list, a section you cannot use) are skipped.
+
+Tours only highlight parts of the page. They never click, submit, upload, save a key, or start AI work, and leaving the page ends them. While a page is refreshing itself to show running AI work, tours wait until the work finishes.
+
+### AI settings and who pays
+
+Open **AI settings** in the sidebar to choose who pays for new AI work:
+
+- **Your own OpenRouter key.** Paste a key from your OpenRouter account and select it; your OpenRouter account is charged for your AI work. You do not need an administrator's permission. The key is stored encrypted and never shown again (only its last characters), and replacing or deleting it never moves your work to the platform.
+- **Platform-managed AI.** Paid by the platform; available only after an administrator allows it for your account.
+
+Each translation, review, judging, and suggestion run records who paid when it started. Changing the setting affects new work only. A failed run whose key was removed or replaced is never retried with the platform's key. Your browser or password manager may still offer to save the key field; the page asks them not to, but cannot force it.
 
 ## 2. Start a translation
 
@@ -39,7 +59,7 @@ The form saves itself as you type. If you close the tab or your browser crashes,
 ## 3. Add guidance (optional)
 
 - **Terminology.** Choose a saved glossary, or add terms directly with **+ Add terminology**. A glossary is a list of source terms and the exact target terms to use (for example *Grace → 恵み*). Editing it saves a new version; translations that already used it keep their version.
-- **References.** Pick up to five approved bilingual examples that show the wording and style you want.
+- **References.** Pick up to five approved bilingual examples that show the wording and style you want. When you create a reference, paste each side or choose one TXT, Markdown, DOCX, or PDF file per side (up to 10 MiB; drop a file on the box or use **Choose file**). The chosen file's name and size are shown, and you can replace or remove it before saving; choosing a file never saves the form. Use pasted text or a file for each side, not both.
 - **Methodology.** A reusable style guide describing how the translation should be written.
 - **Guidance priority.** If the guidance disagrees, choose which source wins.
 
@@ -62,7 +82,7 @@ Click **Start translation**. Clicking twice, or retrying after a network error, 
 
 ![Translation candidates page with each model's Japanese translation](images/readme/02-translation-candidates.png)
 
-The page refreshes every 5 seconds while models are working. Each card shows the translation, the model you chose, the model actually used, and the cost when the AI service reports it. Token counts (how much text the AI processed) are under **Technical details**. If a model fails, **Retry failed translations** redoes only the failed work after a cost warning.
+The page refreshes every 5 seconds while models are working. Each card shows the translation, the model you chose, the model actually used, and the cost when the AI service reports it. Token counts (how much text the AI processed) are under **Technical details**. If a model fails, **Retry failed translations** redoes only the failed work after a cost warning. A retry is new AI work: the panel says who will pay for it under your current AI settings: the platform, or your OpenRouter key with its last characters. If that changes before you click (for example in another tab, or by replacing the key), nothing is retried and the page shows the new payer first. Review, judging, and suggestion retries work the same way.
 
 ## 6. Blind review
 

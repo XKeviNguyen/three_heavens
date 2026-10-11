@@ -8,7 +8,7 @@ Delete rules not shown are PostgreSQL's default `NO ACTION`, which also refuses 
 
 ### `users`
 
-An account: email, optional password digest (Google-only accounts have none), role, status, interface language and appearance, and the per-account AI access switch.
+An account: email, optional password digest (Google-only accounts have none), role, status, interface language and appearance, and the per-account AI access switch. `product_tour_version` and `product_tour_outcome` record which guided-tour version the account resolved and how (`completed`, `dismissed`, or `preexisting` for accounts that existed when tours shipped); both are NULL until then, and a CHECK constraint keeps them set or unset together.
 
 - **Lifecycle:** Durable. Disabling an account deletes its sessions; the application has no account-deletion feature.
 - **Keys:** PK `id` · UK `(lower((email)::text))`
