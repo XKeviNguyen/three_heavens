@@ -31,6 +31,18 @@ ENV RAILS_ENV="production" \
     MALLOC_CONF="dirty_decay_ms:0,muzzy_decay_ms:0" \
     RACK_MULTIPART_BUFFERED_UPLOAD_BYTESIZE_LIMIT="2097152"
 
+# Build-only stage for the React islands bundle: Node and node_modules never reach the final image.
+# Keep the major aligned with .github/workflows/ci.yml (node-version) and package.json engines; refresh the multi-architecture index per docs/operations/configuration.md.
+FROM docker.io/library/node:22.23.3-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS javascript
+
+WORKDIR /rails
+
+COPY package.json package-lock.json tsconfig.json ./
+RUN npm ci --ignore-scripts
+
+COPY app/frontend/islands ./app/frontend/islands
+RUN npm run typecheck && npm run build
+
 # Throw-away build stage to reduce size of final image
 FROM base AS build
 
@@ -54,6 +66,10 @@ COPY . .
 # Precompile bootsnap code for faster boot times.
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
+
+# The islands bundle is built in the javascript stage; copy it after COPY . .
+# so it is present for assets:precompile.
+COPY --from=javascript /rails/app/assets/builds/islands.js ./app/assets/builds/islands.js
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile

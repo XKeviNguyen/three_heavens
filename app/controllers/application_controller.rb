@@ -2,6 +2,7 @@ class ApplicationController < ActionController::Base
   DEFAULT_PAGE_SIZE = 25
 
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+  rescue_from Ai::BillingPolicy::Denied, with: :redirect_ai_billing_denied
 
   # The locale wraps every other callback, so messages produced before an
   # action (such as the sign-in redirect) use the visitor's language rather
@@ -150,10 +151,31 @@ class ApplicationController < ActionController::Base
     redirect_to login_path, alert: I18n.t("authentication.sign_in_required")
   end
 
-  def require_managed_ai_access
-    return if Ai::ManagedAccess.allowed?(current_user)
+  # New paid AI work needs the owner's selected payment source to be usable:
+  # their own OpenRouter key, or the administrator-granted managed access.
+  def require_ai_billing_authorization
+    denial = Ai::BillingPolicy.denial_for(current_user)
+    redirect_ai_billing_denied(denial) if denial
+  end
 
-    redirect_to new_translation_workspace_path, alert: I18n.t("managed_ai.unavailable")
+  # An explicit retry is new paid work, authorized under the owner's current
+  # payment source rather than the failed run's. The retry button shows that
+  # payer, including which of the owner's keys (AiBillingHelper#retry_payer),
+  # and posts it back. Ai::BillingPolicy.authorize_confirmed! compares it with
+  # the current payer under the owner's row lock and the block stamps the runs
+  # before that lock is released; if the payer changed after the page was
+  # rendered, nothing is queued and the page shows the new payer first.
+  def retry_under_shown_payer(page, &schedule)
+    Ai::BillingPolicy.authorize_confirmed!(
+      current_user, shown_source: params[:billing_source], shown_credential_id: params[:billing_key], &schedule
+    )
+  rescue Ai::BillingPolicy::PayerChanged
+    redirect_to page, alert: I18n.t("ai_billing.retry_payer_changed"), status: :see_other
+    nil
+  end
+
+  def redirect_ai_billing_denied(denial)
+    redirect_to settings_ai_settings_path, alert: I18n.t("ai_billing.denied.#{denial.code}"), status: :see_other
   end
 
   def require_admin

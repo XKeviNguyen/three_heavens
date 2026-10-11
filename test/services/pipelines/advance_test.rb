@@ -343,6 +343,32 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     assert_equal 1, pipeline.experiment.final_translation.versions.count
   end
 
+  test "later paid stages bill the launch payer and block, never using the platform key, once its key is replaced" do
+    owner = users(:normal)
+    state = -> { Accounts::AiSettings.state(owner.reload).fetch(:state_token) }
+    Accounts::AiSettings.store_key!(owner, api_key: "sk-or-v1-#{"c3" * 32}", state_token: state.call)
+    Accounts::AiSettings.select_source!(owner, source: "personal", state_token: state.call)
+    launch = Ai::BillingPolicy.authorize!(owner)
+    owner.update!(ai_payment_source: "managed")
+    pipelines = Array.new(2) do
+      create_pipeline_run(experiment: create_completed_experiment).tap { |pipeline| pipeline.update_columns(launch.attributes) }
+    end
+
+    Pipelines::Advance.call(pipeline_run: pipelines.first)
+    review_runs = pipelines.first.experiment.review_round.review_runs
+    assert review_runs.any?
+    assert_equal [ launch.attributes.values ], review_runs.pluck(:billing_source, :open_router_credential_id).uniq
+
+    Accounts::AiSettings.store_key!(owner, api_key: "sk-or-v1-#{"d4" * 32}", state_token: state.call)
+    assert_no_difference -> { ReviewRound.count } do
+      assert_no_enqueued_jobs only: ReviewRunJob do
+        Pipelines::Advance.call(pipeline_run: pipelines.second)
+      end
+    end
+    assert pipelines.second.reload.blocked?
+    assert_equal "personal_key_unavailable", pipelines.second.blocked_reason_code
+  end
+
   test "later model routing identity change blocks before starting paid stage" do
     review_round = create_completed_review_round
     judge = LlmModel.create!(

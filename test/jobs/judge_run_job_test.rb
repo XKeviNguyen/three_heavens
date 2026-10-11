@@ -224,7 +224,7 @@ class JudgeRunJobTest < ActiveJob::TestCase
 
   def with_client(client)
     original = JudgeRunJob.client_factory
-    JudgeRunJob.client_factory = -> { client }
+    JudgeRunJob.client_factory = ->(_credential) { client }
     yield
   ensure
     JudgeRunJob.client_factory = original

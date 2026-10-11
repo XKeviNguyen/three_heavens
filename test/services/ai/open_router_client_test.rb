@@ -459,13 +459,33 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
   end
 
   test "fails permanently when the API key is missing" do
-    ENV.delete("OPENROUTER_API_KEY")
+    [ nil, "" ].each do |api_key|
+      error = assert_raises Ai::OpenRouterClient::PermanentError do
+        Ai::OpenRouterClient.new(api_key: api_key)
+      end
 
-    error = assert_raises Ai::OpenRouterClient::PermanentError do
-      Ai::OpenRouterClient.new
+      assert_equal "missing_api_key", error.code
     end
+  end
 
-    assert_equal "missing_api_key", error.code
+  test "never reads the platform key itself and keeps the injected key out of inspect" do
+    http = fake_http(status: 200, body: { choices: [ { message: { content: "ok" } } ] })
+    client = Ai::OpenRouterClient.new(api_key: "sk-or-v1-personal-test-key", http_factory: ->(_uri) { http })
+
+    client.chat_completion(**request_attributes)
+
+    assert_equal "Bearer sk-or-v1-personal-test-key", http.last_request["Authorization"]
+    assert_not_includes client.inspect, "personal-test-key"
+    assert_not_includes client.inspect, "test-openrouter-key"
+  end
+
+  test "the managed credential reads the platform key and redacts it" do
+    credential = Ai::ProviderCredential.managed
+
+    assert_equal "test-openrouter-key", credential.api_key
+    assert_equal "managed", credential.billing_source
+    assert_not_includes credential.inspect, "test-openrouter-key"
+    assert_not_includes credential.to_s, "test-openrouter-key"
   end
 
   private
@@ -483,7 +503,7 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
   end
 
   def build_client(http)
-    Ai::OpenRouterClient.new(http_factory: ->(_uri) { http })
+    Ai::OpenRouterClient.new(api_key: ENV["OPENROUTER_API_KEY"], http_factory: ->(_uri) { http })
   end
 
   def request_attributes

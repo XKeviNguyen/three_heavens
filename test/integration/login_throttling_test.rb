@@ -3,10 +3,17 @@ require "test_helper"
 # Production requests reach Puma through kamal-proxy and then Thruster in the
 # app container, so REMOTE_ADDR is Thruster's loopback address and each proxy
 # appends its peer to X-Forwarded-For. These examples replay that header shape
-# with documentation addresses; the proxies themselves are not exercised here.
+# with documentation addresses; the proxies themselves are not exercised here
+# (script/evaluations/cloudflare_tunnel runs them).
+#
+# Two topologies are covered: browsers connecting to kamal-proxy directly, and
+# the deployed Cloudflare Tunnel, where Cloudflare appends the visitor to any
+# client-supplied X-Forwarded-For and kamal-proxy (forward_headers: true) then
+# appends cloudflared's container address.
 class LoginThrottlingTest < ActionDispatch::IntegrationTest
   THRUSTER_ADDRESS = "127.0.0.1"
   KAMAL_PROXY_ADDRESS = "172.18.0.2"
+  CLOUDFLARED_ADDRESS = "172.18.0.3"
 
   test "rotating spoofed X-Forwarded-For entries behind the proxies does not reset the client's budget" do
     client = "198.51.100.7"
@@ -205,6 +212,47 @@ class LoginThrottlingTest < ActionDispatch::IntegrationTest
     assert_nil signed_in_user_id
   end
 
+  test "visitors behind the Cloudflare Tunnel keep independent budgets" do
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      attempt_tunnel_login "unknown-#{attempt}@example.test", from: "198.51.100.61"
+      assert_response :unprocessable_content
+      assert_equal "198.51.100.61", request.remote_ip
+    end
+    attempt_tunnel_login "unknown-a@example.test", from: "198.51.100.61"
+    assert_response :too_many_requests
+
+    attempt_tunnel_login "unknown-b@example.test", from: "198.51.100.62"
+    assert_response :unprocessable_content
+    assert_equal "198.51.100.62", request.remote_ip
+  end
+
+  test "headers a visitor sends through the Cloudflare Tunnel do not reset their budget" do
+    client = "198.51.100.63"
+
+    SessionsController::LOGIN_RATE_LIMIT.times do |attempt|
+      attempt_tunnel_login "unknown-#{attempt}@example.test", from: client, spoofed: "203.0.113.#{attempt + 1}"
+      assert_response :unprocessable_content
+      assert_equal client, request.remote_ip
+    end
+
+    attempt_tunnel_login "unknown-final@example.test", from: client, spoofed: "10.0.0.1, 127.0.0.1"
+    assert_response :too_many_requests
+    assert_equal client, request.remote_ip
+  end
+
+  test "a visitor cannot spend another visitor's budget by claiming their address through the Cloudflare Tunnel" do
+    victim = "198.51.100.65"
+
+    (SessionsController::LOGIN_RATE_LIMIT + 1).times do |attempt|
+      attempt_tunnel_login "unknown-#{attempt}@example.test", from: "198.51.100.64", spoofed: victim
+    end
+    assert_response :too_many_requests
+
+    attempt_tunnel_login "unknown-victim@example.test", from: victim
+    assert_response :unprocessable_content
+    assert_equal victim, request.remote_ip
+  end
+
   private
 
   def attempt_login(email, from:, spoofed: nil)
@@ -212,5 +260,21 @@ class LoginThrottlingTest < ActionDispatch::IntegrationTest
     post session_path,
          params: { session: { email: email, password: "incorrect password value" } },
          headers: { "REMOTE_ADDR" => THRUSTER_ADDRESS, "X-Forwarded-For" => forwarded_for }
+  end
+
+  # The request Rails receives for a visitor at `from` through Cloudflare, the
+  # tunnel and kamal-proxy. A spoofed value stays where Cloudflare leaves the
+  # client's own X-Forwarded-For, and is also claimed in every other client-IP
+  # header: Cloudflare overwrites CF-Connecting-IP, but nothing here relies on
+  # it, and a Client-Ip or True-Client-IP header may pass through unchanged.
+  def attempt_tunnel_login(email, from:, spoofed: nil)
+    claimed = spoofed || from
+    post session_path,
+         params: { session: { email: email, password: "incorrect password value" } },
+         headers: {
+           "REMOTE_ADDR" => THRUSTER_ADDRESS,
+           "X-Forwarded-For" => [ spoofed, from, CLOUDFLARED_ADDRESS, KAMAL_PROXY_ADDRESS ].compact.join(", "),
+           "CF-Connecting-IP" => claimed, "True-Client-IP" => claimed, "Client-Ip" => claimed
+         }
   end
 end

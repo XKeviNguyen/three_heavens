@@ -4,6 +4,14 @@
 
 The authoritative Three Heavens recovery set is the primary PostgreSQL database plus the complete Active Storage Disk tree mounted at `/rails/storage`. The primary database contains user and workflow records, durable provider-run lineage, Pipeline Events, and Active Storage attachment metadata. The storage tree contains the bytes for private uploaded sources.
 
+### Encryption root secrets
+
+A bundle alone is not recoverable. Users' OpenRouter keys, workspace drafts, and reference recovery failures are stored with Active Record Encryption, whose keys derive from the application's effective `secret_key_base` (`config/initializers/active_record_encryption.rb`). Rails uses the `SECRET_KEY_BASE` environment variable when the container has one and otherwise the `secret_key_base` in `config/credentials.yml.enc`, which `RAILS_MASTER_KEY` decrypts; `config/deploy.yml` passes only `RAILS_MASTER_KEY`. Restoring with a different effective `secret_key_base` leaves every encrypted value unreadable: users' AI work fails closed until they replace their key (it never falls back to the platform key), and drafts are lost.
+
+- Keep `RAILS_MASTER_KEY`, and `SECRET_KEY_BASE` if one is ever set, in the organization's secret manager, protected and backed up separately from the bundles. Never put either in a bundle, its manifest, the backup root, or the off-host copy of a bundle.
+- Keep the `config/credentials.yml.enc` that matches each bundle's release, and the `RAILS_MASTER_KEY` that decrypts it. The file is versioned in Git; supply `RELEASE_SHA` or `KAMAL_VERSION` when backing up so the manifest records the release. Rotating the master key, the credentials file, or `secret_key_base` without re-encrypting makes older bundles unreadable unless the earlier generation is kept with them.
+- `restore-verify` checks bytes and schema, not decryption. A restore is proven only when the restored release, booted quiescent (see [disaster-recovery.md](disaster-recovery.md)) with the recovered secrets, decrypts existing data. Have an operator-owned test account save a New translation draft just before the backup, then open New translation in the restored environment within seven days of that save (drafts expire after seven days and then open empty, which proves nothing): "Draft restored" passes, and "Your saved draft could not be read" means the secret differs. Repeat this for each bundle you rely on. The OpenRouter keys use the same derived keys. Never print, log, or compare secret or key values to check this.
+
 Solid Cache and Solid Cable contain derived or transient state and are rebuilt from their schemas. Solid Queue is special operational state and is deliberately excluded from the default bundle; restoring an old queue snapshot could replay jobs that no longer agree with primary state. Queue recovery is covered in [disaster-recovery.md](disaster-recovery.md).
 
 ## Bundle format version 1

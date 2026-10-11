@@ -1,0 +1,65 @@
+vi:
+  ai_settings:
+    title: Cài đặt AI
+    navigation: Cài đặt AI
+    description: Chọn bên trả tiền cho công việc dịch bằng AI mà bạn bắt đầu.
+    account_link: Quản lý bên trả tiền cho công việc AI
+    source_legend: Nguồn thanh toán
+    sources:
+      personal:
+        label: Khóa API OpenRouter của tôi
+        description: Bạn trả tiền trực tiếp cho OpenRouter cho mọi yêu cầu dùng khóa của bạn. Không cần quản trị viên phê duyệt.
+      managed:
+        label: AI do nền tảng quản lý
+        description: Three Heavens trả tiền bằng khóa OpenRouter của nền tảng. Quản trị viên quyết định ai được dùng.
+        enabled: Quản trị viên đã bật cho tài khoản của bạn.
+        disabled: Chưa được bật cho tài khoản của bạn. Hãy hỏi quản trị viên hoặc dùng khóa của riêng bạn.
+    save_source: Dùng nguồn thanh toán này
+    current:
+      ready_personal: Công việc AI mới được trả bằng khóa OpenRouter của bạn.
+      ready_managed: Công việc AI mới do nền tảng chi trả.
+      blocked: Chưa thể bắt đầu công việc AI mới.
+    key:
+      heading: Khóa OpenRouter của bạn
+      configured: Đã lưu khóa kết thúc bằng %{hint}, thêm ngày %{date}.
+      missing: Chưa lưu khóa nào.
+      label: Khóa API OpenRouter
+      hint: Bắt đầu bằng sk-or-. Khóa được mã hóa và sẽ không bao giờ hiển thị lại; bạn chỉ có thể thay thế hoặc xóa.
+      save: Lưu khóa
+      replace: Thay khóa
+      delete: Xóa khóa
+      delete_confirm: Xóa khóa OpenRouter của bạn? Công việc đang chờ chạy bằng khóa này sẽ thất bại và không chuyển sang bên trả tiền khác.
+      cancel: Hủy
+    billing:
+      heading: Cách tính phí
+      items:
+        - Công việc được tính phí cho nguồn đang được chọn khi bạn bắt đầu. Thay đổi cài đặt này không bao giờ chuyển công việc đang chờ hoặc đang chạy sang bên trả tiền khác.
+        - Quy trình tự động giữ nguồn đã chọn lúc khởi chạy cho mọi giai đoạn.
+        - Nếu khóa của bạn bị thay, bị xóa, bị OpenRouter từ chối hoặc hết tín dụng, công việc cần khóa đó sẽ dừng và được đánh dấu thất bại. Hệ thống không bao giờ chuyển sang khóa của nền tảng.
+        - Yêu cầu đã gửi tới OpenRouter sẽ hoàn tất và được tính cho khóa đã dùng để gửi. Chạy lại công việc thất bại là một yêu cầu mới và dùng lựa chọn hiện tại của bạn.
+    working: Đang lưu…
+    errors:
+      source_invalid: Hãy chọn một nguồn thanh toán.
+      managed_unavailable: AI do nền tảng quản lý chưa được bật cho tài khoản của bạn. Hãy hỏi quản trị viên hoặc dùng khóa của riêng bạn.
+      key_required: Hãy lưu khóa OpenRouter trước khi chọn nguồn này.
+      key_blank: Hãy nhập khóa API OpenRouter.
+      key_format: Đây có vẻ không phải khóa API OpenRouter. Khóa bắt đầu bằng sk-or- và không có khoảng trắng.
+      stale: Cài đặt đã thay đổi ở một cửa sổ khác. Cài đặt hiện tại đang được hiển thị; hãy xem lại rồi thử lại.
+      rate_limited: Bạn thay đổi quá nhiều lần trong thời gian ngắn. Hãy đợi một phút rồi thử lại.
+      network: Không kết nối được tới Three Heavens nên chưa rõ kết quả. Hãy kiểm tra kết nối, rồi tải lại trang để xem cài đặt hiện tại.
+      session: Phiên đăng nhập đã kết thúc. Hãy tải lại trang và đăng nhập lại.
+      unexpected: Đã xảy ra lỗi. Hãy tải lại trang để xem cài đặt hiện tại.
+    flash:
+      source_saved: Đã lưu nguồn thanh toán.
+      key_saved: Đã lưu khóa OpenRouter.
+      key_deleted: Đã xóa khóa OpenRouter.
+  ai_billing:
+    open_settings: Mở cài đặt AI
+    retry_payer:
+      personal: "Lần thử lại này dùng khóa OpenRouter của bạn (kết thúc bằng %{hint}); tài khoản OpenRouter của bạn sẽ bị tính phí."
+      managed: "Lần thử lại này dùng AI do nền tảng quản lý; nền tảng chi trả."
+    retry_payer_changed: "Người chi trả cho công việc AI đã thay đổi sau khi trang này hiển thị. Hãy kiểm tra người chi trả hiển thị cạnh nút thử lại rồi thử lại."
+    denied:
+      ai_account_ineligible: Công việc AI cần một tài khoản đang hoạt động và đã xác nhận email.
+      managed_ai_access_revoked: AI do nền tảng quản lý chưa được bật cho tài khoản này. Hãy thêm khóa OpenRouter của riêng bạn trong Cài đặt AI, hoặc hỏi quản trị viên.
+      personal_key_unavailable: Chưa có khóa OpenRouter cho nguồn bạn đã chọn. Hãy thêm khóa trong Cài đặt AI hoặc chọn nguồn thanh toán khác.

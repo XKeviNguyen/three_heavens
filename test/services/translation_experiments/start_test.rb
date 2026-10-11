@@ -116,7 +116,7 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
     model.update!(context_window_tokens: 64_000, max_output_tokens: 4_095)
     client = RequestCountingClient.new
     original_factory = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
 
     assert_no_enqueued_jobs do
       error = assert_raises(TranslationExperiments::Start::ContextBudgetError) do
@@ -154,7 +154,7 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
     model.update!(context_window_tokens: 16_384, max_output_tokens: 4_096)
     client = RequestCountingClient.new
     original_factory = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
 
     assert_no_enqueued_jobs do
       assert_raises TranslationExperiments::Start::ContextBudgetError do
@@ -185,7 +185,7 @@ class TranslationExperiments::StartTest < ActiveSupport::TestCase
     model.update!(context_window_tokens: 8_000, max_output_tokens: 4_096)
     client = RequestCountingClient.new
     original_factory = TranslationRunJob.client_factory
-    TranslationRunJob.client_factory = -> { client }
+    TranslationRunJob.client_factory = ->(_credential) { client }
 
     baseline = TranslationSegments::Prompt.build(
       experiment: experiment.dup.tap { |copy| copy.methodology_profile_revision = nil },

@@ -9,7 +9,12 @@ CI.run do
   step "Style: Ruby", "bin/rubocop"
   step "Style: Whitespace", "git diff --check $(git hash-object -t tree /dev/null)"
 
+  step "JavaScript: Install packages", "npm ci --ignore-scripts"
+  step "Code: TypeScript", "npm run typecheck"
+  step "Build: JavaScript islands", "npm run build"
+
   step "Security: Gem audit", "bin/bundler-audit"
+  step "Security: npm audit", "npm audit"
   step "Security: Importmap vulnerability audit", "bin/importmap audit"
   step "Security: Brakeman code analysis", "bin/brakeman --no-pager"
 

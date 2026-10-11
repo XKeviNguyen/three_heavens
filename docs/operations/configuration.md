@@ -8,6 +8,7 @@ Development and test read these names (through `dotenv-rails` from an untracked 
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, optional `DB_HOST`
 - `OPENROUTER_API_KEY` — only when a person explicitly starts real AI work; tests never need it
+- Node 22 and `npm ci --ignore-scripts` (run by `bin/setup`) — build-time only, for the React islands bundle (`npm run build`; `bin/rails test` rebuilds it). Production images build it in the Dockerfile's `javascript` stage and contain no Node.
 - optional `GOOGLE_CLIENT_ID` — public OAuth client ID for Sign in with Google (no client secret); see [Google sign-in](../identity/google-sign-in.md)
 
 The `compose.yml` PostgreSQL service binds to the loopback interface. Its volume holds persistent development data; never run `docker compose down -v` unless you intend to delete that database.
@@ -22,7 +23,7 @@ Secrets:
 
 - `RAILS_MASTER_KEY`
 - `DATABASE_URL`, `CACHE_DATABASE_URL`, `QUEUE_DATABASE_URL`, `CABLE_DATABASE_URL`
-- `OPENROUTER_API_KEY`
+- `OPENROUTER_API_KEY` — the platform-managed key, used only for work authorized under platform-managed AI (`users.managed_ai_access`). Users' own OpenRouter keys (Account → AI settings) are stored with Active Record Encryption, whose keys derive from `secret_key_base` (`config/initializers/active_record_encryption.rb`); re-encrypt before rotating it, or affected users' AI work fails closed until they replace their key.
 - `SMTP_USERNAME`, `SMTP_PASSWORD`
 
 Non-secret:
@@ -48,7 +49,7 @@ Asset precompilation supports `SECRET_KEY_BASE_DUMMY=1` and needs no real secret
 
 ## TLS, hosts, and health checks
 
-Production assumes TLS terminates at the trusted kamal-proxy, forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
+Production assumes TLS terminates at Cloudflare and that the Cloudflare Tunnel is the only route to kamal-proxy, which `config/deploy.yml` runs on plain HTTP with no published host port (step 11 of [production deploy](production-deploy.md)). The application forces HTTPS, uses secure cookies and HSTS, and authorizes only `APP_HOST`. kamal-proxy checks the container with its internal Host, so only `/up` is excluded from Host Authorization. `/ready` stays Host-authorized: it answers through the proxy with Host `APP_HOST`, or inside the container on Puma's port 3000 over loopback with Host `localhost`, `127.0.0.1`, or `[::1]` (through Thruster's port 80 it returns 403). Neither endpoint redirects to HTTPS. Never expose PostgreSQL publicly.
 
 ## Storage
 
@@ -67,7 +68,7 @@ With `SOLID_QUEUE_IN_PUMA=true` (set in `config/deploy.yml`), Puma supervises So
 - `MAIL_FROM`, `SMTP_HOST`, `GOOGLE_CLIENT_ID`, optional `SMTP_PORT` (passed as clear environment)
 - every runtime secret above (passed as secret environment)
 
-Populate secrets through an approved secret manager or the local Kamal secret mechanism; never commit values. A `$NAME` reference to an unset shell variable silently becomes empty, which production then refuses to boot with, so confirm each one resolves before deploying. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. Confirm DNS, firewall rules, TLS issuance, database backups, and all four database URLs before the first deploy.
+Populate secrets through an approved secret manager or the local Kamal secret mechanism; never commit values. A `$NAME` reference to an unset shell variable silently becomes empty, which production then refuses to boot with, so confirm each one resolves before deploying. `test/config/production_deployment_contract_test.rb` renders `config/deploy.yml` with dummy values and proves production boots from exactly that environment and refuses to boot without each required variable. Confirm the Cloudflare Tunnel route and DNS, firewall rules, database backups, and all four database URLs before the first deploy.
 
 Run `bin/ops/preflight` before a deploy and `bin/ops/post-deploy-smoke https://APP_HOST_PLACEHOLDER` afterward. None of the health, preflight, restore, or smoke commands calls OpenRouter.
 
@@ -100,4 +101,4 @@ RuboCop caches and setup-ruby gem caches must not contain secrets. GitHub's cach
 
 ## Validation gate
 
-`bin/ci` (defined in `config/ci.rb`) runs RuboCop, whitespace (`git diff --check` against the empty tree), bundler-audit, importmap audit, Brakeman (`--ensure-latest`), Zeitwerk, migration status with a pending-migration check, and the unit, integration, and system tests. Run `bin/rails db:migrate` first when a branch adds a migration. GitHub Actions runs the same checks, except the local-only migration-status steps, as `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`; `test/config/ci_gate_test.rb` fails if `config/ci.rb` gains a check no CI job runs.
+`bin/ci` (defined in `config/ci.rb`) runs `npm ci --ignore-scripts`, `npm audit`, the TypeScript check and islands build, RuboCop, whitespace (`git diff --check` against the empty tree), bundler-audit, importmap audit, Brakeman (`--ensure-latest`), Zeitwerk, migration status with a pending-migration check, and the unit, integration, and system tests. Run `bin/rails db:migrate` first when a branch adds a migration. GitHub Actions runs the same checks, except the local-only migration-status steps, as `scan_ruby`, `scan_js`, `lint`, `test`, and `system-test`; `test/config/ci_gate_test.rb` fails if `config/ci.rb` gains a check no CI job runs.

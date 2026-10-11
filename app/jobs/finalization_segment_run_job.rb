@@ -7,7 +7,8 @@ class FinalizationSegmentRunJob < ApplicationJob
 
   class_attribute :client_factory,
                   instance_writer: false,
-                  default: -> { Ai::OpenRouterClient.new }
+                  # Receives the claim's in-memory Ai::ProviderCredential.
+                  default: ->(credential) { Ai::OpenRouterClient.new(api_key: credential.api_key) }
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
@@ -25,6 +26,8 @@ class FinalizationSegmentRunJob < ApplicationJob
     return unless claim.state == :claimed
 
     @claimed_attempt = claim.attempt
+
+    @claimed_credential = claim.credential
     finalization_run = segment_run.finalization_run
     prompt = Finalizations::Prompt.build(finalization_run, experiment_segment: segment_run.experiment_segment)
     Ai::RunContextBudget.call(
@@ -63,7 +66,7 @@ class FinalizationSegmentRunJob < ApplicationJob
         code: "model_unavailable"
       )
     end
-    client_factory.call
+    client_factory.call(@claimed_credential)
   end
 
   def persist_success(segment_run, result, proposal, attempt)

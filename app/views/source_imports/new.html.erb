@@ -1,7 +1,7 @@
 <% content_for :title, t("shared_ui.upload.title") %>
 
 <%= turbo_frame_tag "source-import-upload" do %>
-  <div data-controller="file-drop"
+  <div data-controller="file-drop" data-tour-target="source-import-file"
        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center"
        data-file-drop-target="dropzone"
        data-action="dragover->file-drop#dragover dragleave->file-drop#dragleave drop->file-drop#drop">

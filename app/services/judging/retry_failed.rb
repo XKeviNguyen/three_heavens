@@ -2,7 +2,10 @@ module Judging
   class RetryFailed
     JUDGE_OUTPUT_ATTRIBUTES = %i[rank overall_score rationale strengths risks].freeze
 
-    def self.call(judge_round)
+    # An explicit retry is new paid work: it runs under the owner's current
+    # payment selection unless a caller passes an earlier authorization.
+    def self.call(judge_round, billing: nil)
+      billing ||= Ai::BillingPolicy.authorize!(judge_round.review_round.experiment.document.project.user)
       if judge_round.judge_runs.failed.any?(&:segmented?)
         return Ai::RetryFailedSegmentRuns.call(
           parent: judge_round,
@@ -10,6 +13,7 @@ module Judging
           child_runs_association: :judge_segment_runs,
           model_association: :judge_llm_model,
           job_class: JudgeSegmentRunJob,
+          billing: billing,
           prepare_parent: lambda do |parent, _|
             parent.update!(status: :running, winner_translation_run: nil, aggregate_rankings: [], aggregation_explanation: nil)
           end,
@@ -26,6 +30,7 @@ module Judging
         runs_association: :judge_runs,
         model_association: :judge_llm_model,
         job_class: JudgeRunJob,
+        billing: billing,
         prepare_parent: lambda do |parent, _|
           parent.update!(
             status: :running,

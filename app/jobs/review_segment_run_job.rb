@@ -7,7 +7,8 @@ class ReviewSegmentRunJob < ApplicationJob
 
   class_attribute :client_factory,
                   instance_writer: false,
-                  default: -> { Ai::OpenRouterClient.new }
+                  # Receives the claim's in-memory Ai::ProviderCredential.
+                  default: ->(credential) { Ai::OpenRouterClient.new(api_key: credential.api_key) }
 
   retry_on Ai::OpenRouterClient::RetryableError,
            wait: :polynomially_longer,
@@ -25,6 +26,8 @@ class ReviewSegmentRunJob < ApplicationJob
     return unless claim.state == :claimed
 
     @claimed_attempt = claim.attempt
+
+    @claimed_credential = claim.credential
     review_run = segment_run.review_run
     prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment_run.experiment_segment)
     Ai::RunContextBudget.call(
@@ -64,7 +67,7 @@ class ReviewSegmentRunJob < ApplicationJob
         code: "model_unavailable"
       )
     end
-    client_factory.call
+    client_factory.call(@claimed_credential)
   end
 
   def persist_success(segment_run, result, evaluations, attempt)

@@ -19,6 +19,8 @@ class AiProviderAttempt < ApplicationRecord
   STATUSES = %w[running completed failed].freeze
   TOKEN_FIELDS = %i[prompt_tokens completion_tokens total_tokens cached_tokens reasoning_tokens].freeze
 
+  include Ai::BillingIdentity
+
   belongs_to :provider_run, polymorphic: true
 
   enum :status, STATUSES.index_with(&:itself), validate: true

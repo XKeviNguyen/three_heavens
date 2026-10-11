@@ -7,7 +7,7 @@
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= t("workflows_ui.heading") %></h1>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600"><%= t("workflows_ui.index_intro") %></p>
     </div>
-    <%= link_to t("workflows_ui.new"), new_workflow_profile_path, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
+    <%= link_to t("workflows_ui.new"), new_workflow_profile_path, data: { tour_target: "library-new" }, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
   </header>
 
   <% if @workflow_profiles.empty? %>
@@ -16,7 +16,7 @@
       <p class="mt-2 text-sm text-slate-600"><%= t("workflows_ui.empty_intro") %></p>
     </section>
   <% else %>
-    <section class="space-y-4" aria-label="<%= t("workflows_ui.heading") %>">
+    <section class="space-y-4" data-tour-target="record-list" aria-label="<%= t("workflows_ui.heading") %>">
       <% @workflow_profiles.each do |profile| %>
         <% revision = profile.current_revision %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

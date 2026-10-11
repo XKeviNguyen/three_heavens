@@ -1,5 +1,5 @@
 class FinalTranslationsController < ApplicationController
-  before_action :require_managed_ai_access, only: :refine
+  before_action :require_ai_billing_authorization, only: :refine
   HISTORY_PAGE_SIZE = 25
   before_action :set_final_translation, except: :create
 

@@ -26,14 +26,6 @@ module TruncatedOpenRouterClientHelper
         ]
       )
     )
-    original_api_key = ENV["OPENROUTER_API_KEY"]
-    ENV["OPENROUTER_API_KEY"] = "test-truncated-output-key"
-    Ai::OpenRouterClient.new(http_factory: ->(_uri) { Http.new(response) })
-  ensure
-    if original_api_key
-      ENV["OPENROUTER_API_KEY"] = original_api_key
-    else
-      ENV.delete("OPENROUTER_API_KEY")
-    end
+    Ai::OpenRouterClient.new(api_key: "test-truncated-output-key", http_factory: ->(_uri) { Http.new(response) })
   end
 end

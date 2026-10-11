@@ -1,0 +1,65 @@
+ja:
+  ai_settings:
+    title: AI設定
+    navigation: AI設定
+    description: 開始するAI翻訳の費用を誰が支払うかを選択します。
+    account_link: AI利用の支払い元を管理
+    source_legend: 支払い元
+    sources:
+      personal:
+        label: 自分のOpenRouter APIキー
+        description: キーを使ったすべてのリクエストの料金を、あなたがOpenRouterに直接支払います。管理者の承認は不要です。
+      managed:
+        label: プラットフォーム管理のAI
+        description: Three HeavensがプラットフォームのOpenRouterキーで支払います。利用できるユーザーは管理者が決めます。
+        enabled: 管理者があなたのアカウントで有効にしています。
+        disabled: あなたのアカウントでは有効になっていません。管理者に依頼するか、自分のキーを使ってください。
+    save_source: この支払い元を使う
+    current:
+      ready_personal: 新しいAI処理はあなたのOpenRouterキーで支払われます。
+      ready_managed: 新しいAI処理はプラットフォームが支払います。
+      blocked: 新しいAI処理はまだ開始できません。
+    key:
+      heading: あなたのOpenRouterキー
+      configured: 末尾が%{hint}のキーを保存済み（%{date}に追加）。
+      missing: キーは保存されていません。
+      label: OpenRouter APIキー
+      hint: sk-or-で始まります。暗号化して保存され、二度と表示されません。置き換えまたは削除のみできます。
+      save: キーを保存
+      replace: キーを置き換える
+      delete: キーを削除
+      delete_confirm: OpenRouterキーを削除しますか？このキーで実行を待っている処理は失敗し、別の支払い元には切り替わりません。
+      cancel: キャンセル
+    billing:
+      heading: 課金のしくみ
+      items:
+        - 処理の費用は、開始した時点で選択されている支払い元に請求されます。この設定を変更しても、待機中・実行中の処理が別の支払い元に移ることはありません。
+        - 自動ワークフローは、開始時に選択されていた支払い元をすべての段階で使い続けます。
+        - キーが置き換え・削除された場合、OpenRouterに拒否された場合、またはクレジットが不足した場合、そのキーを必要とする処理は停止し、失敗として記録されます。プラットフォームのキーに切り替わることはありません。
+        - すでにOpenRouterへ送信されたリクエストは完了し、送信に使ったキーに請求されます。失敗した処理の再試行は新しいリクエストとなり、現在の選択が使われます。
+    working: 保存しています…
+    errors:
+      source_invalid: 支払い元を選択してください。
+      managed_unavailable: あなたのアカウントではプラットフォーム管理のAIが有効になっていません。管理者に依頼するか、自分のキーを使ってください。
+      key_required: この支払い元を選ぶ前に、OpenRouterキーを保存してください。
+      key_blank: OpenRouter APIキーを入力してください。
+      key_format: OpenRouter APIキーの形式ではないようです。キーはsk-or-で始まり、空白を含みません。
+      stale: 別のウィンドウで設定が変更されました。現在の設定を表示しています。確認してから、もう一度お試しください。
+      rate_limited: 短時間に変更が多すぎます。1分ほど待ってから、もう一度お試しください。
+      network: Three Heavensに接続できなかったため、結果は不明です。接続を確認してから、ページを再読み込みして現在の設定を確認してください。
+      session: セッションが終了しました。ページを再読み込みして、もう一度ログインしてください。
+      unexpected: 問題が発生しました。ページを再読み込みして現在の設定を確認してください。
+    flash:
+      source_saved: 支払い元を保存しました。
+      key_saved: OpenRouterキーを保存しました。
+      key_deleted: OpenRouterキーを削除しました。
+  ai_billing:
+    open_settings: AI設定を開く
+    retry_payer:
+      personal: "この再試行はあなたのOpenRouterキー（末尾 %{hint}）で実行され、あなたのOpenRouterアカウントに請求されます。"
+      managed: "この再試行はプラットフォーム管理のAIで実行され、プラットフォームが支払います。"
+    retry_payer_changed: "このページの表示後に、AI処理の支払い元が変更されました。再試行の横に表示される支払い元を確認してから、もう一度再試行してください。"
+    denied:
+      ai_account_ineligible: AI処理には、有効でメールアドレスが確認済みのアカウントが必要です。
+      managed_ai_access_revoked: このアカウントではプラットフォーム管理のAIが有効になっていません。AI設定で自分のOpenRouterキーを追加するか、管理者に依頼してください。
+      personal_key_unavailable: 選択したOpenRouterキーがありません。AI設定でキーを追加するか、別の支払い元を選んでください。

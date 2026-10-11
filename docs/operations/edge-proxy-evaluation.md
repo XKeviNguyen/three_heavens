@@ -13,7 +13,7 @@ the same production-like image (Thruster → Puma → Rails, 768 MiB limit), wit
 TLS from a throwaway local CA that the client verified (verification was never
 disabled):
 
-- **kamal-proxy v0.9.2**, deployed with the options Kamal renders from
+- **kamal-proxy v0.9.2**, deployed with the options Kamal then rendered from
   `config/deploy.yml` that affect requests: `--tls`, `--health-check-path=/up`,
   `--buffer-requests`, `--buffer-responses`, `--max-request-body=22020096`.
   Kamal also passes 30-second deploy and drain timeouts (kamal-proxy's
@@ -24,6 +24,13 @@ disabled):
   the host, the `buffering` middleware with `maxRequestBodyBytes: 22020096`,
   and a `/up` health check on the service. This configuration exists only
   inside the evaluation script; nothing in production configuration changed.
+
+`config/deploy.yml` then had kamal-proxy terminate TLS for browsers that
+connect to it directly. It now encodes the Cloudflare Tunnel topology
+(kamal-proxy without TLS, forwarding Cloudflare's `X-Forwarded-For`, no
+published port), which `script/evaluations/cloudflare_tunnel/run.sh`
+evaluates; see step 11 of `production-deploy.md`. The HTTPS redirect and
+client-address rows below describe the earlier configuration.
 
 No production host, credential or paid provider was involved. Run it again
 with `IMAGE=<local image> bin/rails runner script/evaluations/edge_proxy.rb
@@ -77,11 +84,13 @@ Observations about kamal-proxy, neither a defect in this application:
   `proxy.host`, and a container deployed some other way can be put behind it
   with `kamal-proxy deploy <service> --target <container>:<port> --host
   <name>` on the `kamal` network. If another proxy must keep ports 80/443,
-  run kamal-proxy on other ports and forward to it; the client address then
-  needs care: the outer proxy must replace client-supplied
-  `X-Forwarded-For`, and kamal-proxy must then forward it
-  (`forward_headers: true`), or every client shares the outer proxy's
-  sign-in budget.
+  leave kamal-proxy unpublished (or on other ports) and forward to it; the
+  client address then needs care: the outer proxy must append the address it
+  received the connection from to `X-Forwarded-For` (or replace the header
+  with it) and be the only route to kamal-proxy, and kamal-proxy must forward
+  the header (`forward_headers: true`), or every client shares the outer
+  proxy's sign-in budget. Production does this with a Cloudflare Tunnel; see
+  step 11 of `production-deploy.md`.
 - **What Traefik adds.** Edge rate limiting (`rateLimit`, `inFlightReq`), IP
   allow-lists, TCP routing and a dashboard. None is needed by the current
   product; overload protection beyond what the application and container

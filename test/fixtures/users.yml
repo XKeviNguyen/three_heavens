@@ -5,6 +5,9 @@ normal:
   status: active
   email_verified_at: 2026-09-01 00:00:00
   managed_ai_access: true
+  # Established accounts, as the product tour migration backfills them.
+  product_tour_version: 1
+  product_tour_outcome: preexisting
 
 other:
   email: other@example.test
@@ -13,6 +16,9 @@ other:
   status: active
   email_verified_at: 2026-09-01 00:00:00
   managed_ai_access: true
+  # Established accounts, as the product tour migration backfills them.
+  product_tour_version: 1
+  product_tour_outcome: preexisting
 
 admin:
   email: admin@example.test
@@ -21,3 +27,6 @@ admin:
   status: active
   email_verified_at: 2026-09-01 00:00:00
   managed_ai_access: true
+  # Established accounts, as the product tour migration backfills them.
+  product_tour_version: 1
+  product_tour_outcome: preexisting

@@ -105,7 +105,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
 
     with_translation_job_boundaries(
       adapter: adapter,
-      client_factory: -> { provider_factory_calls += 1 }
+      client_factory: ->(_credential) { provider_factory_calls += 1 }
     ) do
       assert workspace.submit
     end
@@ -122,7 +122,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     assert_equal 0, provider_factory_calls
 
     replay = TranslationWorkspace.new(valid_attributes.merge(submission_token: workspace.submission_token))
-    with_translation_job_boundaries(adapter: adapter, client_factory: -> { provider_factory_calls += 1 }) do
+    with_translation_job_boundaries(adapter: adapter, client_factory: ->(_credential) { provider_factory_calls += 1 }) do
       assert replay.submit
     end
     assert replay.replayed?
@@ -140,7 +140,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
 
     with_translation_job_boundaries(
       adapter: adapter,
-      client_factory: -> { provider_factory_calls += 1 }
+      client_factory: ->(_credential) { provider_factory_calls += 1 }
     ) do
       assert workspace.submit
     end

@@ -22,7 +22,10 @@ module Ai
         provider_snapshot: model.provider,
         model_identifier_snapshot: model.model_identifier,
         display_name_snapshot: model.display_name,
-        started_at: run.last_claimed_at || Time.current
+        started_at: run.last_claimed_at || Time.current,
+        # The payer of this provider request, fixed when it starts; a later
+        # explicit retry may be authorized under a different source.
+        **BillingPolicy::Authorization.from(run).attributes
       )
     end
 

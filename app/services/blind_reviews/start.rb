@@ -7,19 +7,22 @@ module BlindReviews
     class AlreadyStartedError < Error; end
     class ContextBudgetError < Error; end
 
-    def self.call(experiment:, reviewer_ids:, capability_snapshots: {})
-      new(experiment: experiment, reviewer_ids: reviewer_ids, capability_snapshots: capability_snapshots).call
+    def self.call(experiment:, reviewer_ids:, capability_snapshots: {}, billing: nil)
+      new(experiment: experiment, reviewer_ids: reviewer_ids, capability_snapshots: capability_snapshots,
+          billing: billing).call
     end
 
-    def initialize(experiment:, reviewer_ids:, randomizer: nil, capability_snapshots: {})
+    def initialize(experiment:, reviewer_ids:, randomizer: nil, capability_snapshots: {}, billing: nil)
       @experiment = experiment
       @reviewer_ids = reviewer_ids
       @randomizer = randomizer || ->(candidates) { candidates.shuffle }
       @capability_snapshots = capability_snapshots
+      @billing = billing
     end
 
     def call
       validate_experiment!
+      @billing ||= Ai::BillingPolicy.authorize!(experiment.document.project.user)
       reviewers = resolve_reviewers!
       plan = LongDocuments::Planner.call(experiment, create: false)
 
@@ -46,7 +49,7 @@ module BlindReviews
 
     private
 
-    attr_reader :capability_snapshots, :experiment, :reviewer_ids, :randomizer
+    attr_reader :billing, :capability_snapshots, :experiment, :reviewer_ids, :randomizer
 
     def validate_experiment!
       raise ActiveRecord::RecordNotSaved, "Experiment must be persisted" unless experiment.persisted?
@@ -113,7 +116,7 @@ module BlindReviews
           )
         end
         if plan
-          review_run.update!(status: :running, started_at: Time.current)
+          review_run.update!(status: :running, started_at: Time.current, **billing.attributes)
           plan.segments.each do |segment|
             prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment)
             budget = TranslationReferences::ContextBudget.call(
@@ -128,7 +131,7 @@ module BlindReviews
               experiment_segment: segment,
               **budget.snapshot_attributes
             )
-            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: ReviewSegmentRunJob)
+            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: ReviewSegmentRunJob, billing: billing)
           end
         else
           prompt = BlindReviews::Prompt.build(review_run)
@@ -141,7 +144,7 @@ module BlindReviews
             prompt: prompt
           ) { BlindReviews::Prompt.build(review_run, reference_examples: []) }
           review_run.assign_attributes(**budget.snapshot_attributes)
-          schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob)
+          schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob, billing: billing)
         end
       end
 
