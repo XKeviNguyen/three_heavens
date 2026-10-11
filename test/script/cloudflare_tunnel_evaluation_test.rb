@@ -1,5 +1,4 @@
 require "test_helper"
-require "open3"
 require "tmpdir"
 require Rails.root.join("script/evaluations/cloudflare_tunnel/edge").to_s
 
@@ -87,10 +86,19 @@ class CloudflareTunnelEvaluationTest < ActiveSupport::TestCase
         esac
       SH
       environment = { "PATH" => "#{directory}:#{ENV.fetch("PATH")}", "IMAGE" => "evaluation:never-started", "READY_TIMEOUT" => timeout.to_s }
+      stderr = File.join(directory, "stderr")
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      # timeout keeps an unbounded wait from hanging the suite.
-      _, stderr, status = Open3.capture3(environment, "timeout", "60", "bash", RUN_SCRIPT)
-      [ stderr, status, Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, File.readlines(log, chomp: true) ]
+      pid = Process.spawn(environment, "bash", RUN_SCRIPT, in: File::NULL, out: File::NULL, err: stderr, pgroup: true)
+      # A deadline of our own keeps an unbounded wait from hanging the suite.
+      until (_, status = Process.wait2(pid, Process::WNOHANG))
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) - started > 60
+          Process.kill("KILL", -pid)
+          Process.wait(pid)
+          flunk "run.sh was still waiting after 60 s"
+        end
+        sleep 0.1
+      end
+      [ File.read(stderr), status, Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, File.readlines(log, chomp: true) ]
     end
   end
 
