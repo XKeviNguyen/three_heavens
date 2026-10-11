@@ -31,6 +31,9 @@ interface FileFieldProps {
   maxBytes: number
   locale: string
   pairedTextId: string | null
+  // The paired text was prefilled from the saved revision; the server replaces
+  // it with an uploaded file while it is unchanged.
+  pairedTextPrefilled: boolean
   messages: Messages
 }
 
@@ -39,12 +42,13 @@ const MESSAGE_KEYS: (keyof Messages)[] = [
 ]
 
 function parseProps(raw: Record<string, unknown>): FileFieldProps | null {
-  const { id, name, label, accept, extensions, maxBytes, locale, pairedTextId, messages } = raw
+  const { id, name, label, accept, extensions, maxBytes, locale, pairedTextId, pairedTextPrefilled, messages } = raw
   const strings = [id, name, label, accept, locale]
   if (!strings.every((value) => typeof value === "string" && value !== "")) return null
   if (!Array.isArray(extensions) || !extensions.every((value) => typeof value === "string")) return null
   if (typeof maxBytes !== "number" || maxBytes <= 0) return null
   if (pairedTextId !== null && typeof pairedTextId !== "string") return null
+  if (typeof pairedTextPrefilled !== "boolean") return null
   if (messages === null || typeof messages !== "object") return null
   const record = messages as Record<string, unknown>
   if (!MESSAGE_KEYS.every((key) => typeof record[key] === "string")) return null
@@ -81,7 +85,7 @@ export function FileField(rawProps: Record<string, unknown>) {
   return <FileFieldControl {...props} />
 }
 
-function FileFieldControl({ id, name, label, accept, extensions, maxBytes, locale, pairedTextId, messages }: FileFieldProps) {
+function FileFieldControl({ id, name, label, accept, extensions, maxBytes, locale, pairedTextId, pairedTextPrefilled, messages }: FileFieldProps) {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState("")
@@ -93,14 +97,19 @@ function FileFieldControl({ id, name, label, accept, extensions, maxBytes, local
 
   // The paired text area belongs to the Rails form; this only reads it to
   // warn early that the server accepts pasted text or a file, not both.
+  // Unchanged prefilled text is not a conflict: an upload replaces it.
   useEffect(() => {
     const field = pairedTextId ? document.getElementById(pairedTextId) : null
     if (!(field instanceof HTMLTextAreaElement)) return
-    const update = () => setPairedHasText(field.value.trim() !== "")
+    const prefilled = field.defaultValue
+    const update = () => {
+      const unchanged = pairedTextPrefilled && field.value === prefilled
+      setPairedHasText(field.value.trim() !== "" && !unchanged)
+    }
     update()
     field.addEventListener("input", update)
     return () => field.removeEventListener("input", update)
-  }, [pairedTextId])
+  }, [pairedTextId, pairedTextPrefilled])
 
   // Puts the input back to the last accepted file after a rejected choice.
   function restoreInput(previous: File | null) {

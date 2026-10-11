@@ -179,15 +179,12 @@ class TranslationReferencesController < ApplicationController
   end
 
   def replace_prefilled_text_with_upload!(submitted, expected_version:)
-    revision = @translation_reference.revisions.find_by(version: Integer(expected_version, exception: false))
-    return unless revision
-
     {
       "source_text" => "source_file",
       "approved_translation" => "approved_translation_file"
     }.each do |text_key, file_key|
       next unless submitted[file_key].present?
-      next unless submitted[text_key] == revision.public_send(text_key)
+      next unless @translation_reference.prefilled_text?(expected_version, text_key, submitted[text_key])
 
       submitted[text_key] = ""
     end

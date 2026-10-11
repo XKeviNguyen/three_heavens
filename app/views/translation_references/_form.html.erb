@@ -50,7 +50,8 @@
     <p class="mt-1 text-sm text-slate-600"><%= t("references_ui.source_upload_help") %></p>
     <%= form.label :source_text, t("references_ui.pasted_source"), class: "mt-4 block text-sm font-medium text-slate-700" %>
     <%= form.text_area :source_text, value: values["source_text"], maxlength: TranslationReferenceRevision::MAXIMUM_SOURCE_CHARACTERS, rows: 12, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" %>
-    <%= upload_field form, :source_file, label: t("references_ui.upload_source"), paired_text: :source_text %>
+    <%= upload_field form, :source_file, label: t("references_ui.upload_source"), paired_text: :source_text,
+          paired_text_prefilled: !!@translation_reference&.persisted? && @translation_reference.prefilled_text?(values["expected_version"], "source_text", values["source_text"]) %>
   </section>
 
   <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" data-tour-target="reference-translation">
@@ -58,7 +59,8 @@
     <p class="mt-1 text-sm text-slate-600"><%= t("references_ui.translation_upload_help") %></p>
     <%= form.label :approved_translation, t("references_ui.pasted_translation"), class: "mt-4 block text-sm font-medium text-slate-700" %>
     <%= form.text_area :approved_translation, value: values["approved_translation"], maxlength: TranslationReferenceRevision::MAXIMUM_TRANSLATION_CHARACTERS, rows: 12, class: "mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" %>
-    <%= upload_field form, :approved_translation_file, label: t("references_ui.upload_translation"), paired_text: :approved_translation %>
+    <%= upload_field form, :approved_translation_file, label: t("references_ui.upload_translation"), paired_text: :approved_translation,
+          paired_text_prefilled: !!@translation_reference&.persisted? && @translation_reference.prefilled_text?(values["expected_version"], "approved_translation", values["approved_translation"]) %>
   </section>
 
   <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("references_ui.saving") } %></div>

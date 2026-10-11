@@ -77,6 +77,34 @@ class TranslationReferenceUploadTest < ApplicationSystemTestCase
     assert_equal 0, TranslationReference.count, "dropping a file never creates a reference"
   end
 
+  # The edit form prefills both texts from the saved revision; the server
+  # replaces unchanged prefilled text with an uploaded file, so that is not a
+  # conflict. Text the user changed is.
+  test "replacing an existing reference's text with a file is not flagged, and saves" do
+    reference = TranslationReferences::Create.call(user: @user, attributes: {
+      title: "Existing", source_language: "Vietnamese", target_language: "Japanese",
+      source_text: "Dòng một.\nDòng hai.", approved_translation: "一行目。\n二行目。"
+    })
+    visit edit_translation_reference_path(reference)
+    assert_selector "[data-react-island='file-field'][data-react-mounted='true']", count: 2
+
+    attach_file "Or upload source file", file("replacement.txt", "Nguồn mới.")
+    within(source_field) do
+      assert_selection "replacement.txt", "14 B"
+      assert_no_text "You also pasted text above."
+    end
+
+    fill_in "Pasted source text", with: "Edited by hand"
+    within(source_field) { assert_text "You also pasted text above." }
+    fill_in "Pasted source text", with: "Dòng một.\nDòng hai."
+    within(source_field) { assert_no_text "You also pasted text above." }
+
+    click_button "Save new version"
+    assert_text "Nguồn mới."
+    assert_equal "Nguồn mới.", reference.reload.source_text
+    assert_equal "一行目。\n二行目。", reference.approved_translation.gsub("\r\n", "\n"), "the untouched side keeps its text"
+  end
+
   test "pasting text and choosing a file for the same side is flagged before saving" do
     attach_file "Or upload source file", file("source.txt", "Source")
     within(source_field) { assert_no_text "You also pasted text above." }
