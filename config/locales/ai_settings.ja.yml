@@ -55,6 +55,10 @@ ja:
       key_deleted: OpenRouterキーを削除しました。
   ai_billing:
     open_settings: AI設定を開く
+    retry_payer:
+      personal: "この再試行はあなたのOpenRouterキー（末尾 %{hint}）で実行され、あなたのOpenRouterアカウントに請求されます。"
+      managed: "この再試行はプラットフォーム管理のAIで実行され、プラットフォームが支払います。"
+    retry_payer_changed: "このページの表示後に、AI処理の支払い元が変更されました。再試行の横に表示される支払い元を確認してから、もう一度再試行してください。"
     denied:
       ai_account_ineligible: AI処理には、有効でメールアドレスが確認済みのアカウントが必要です。
       managed_ai_access_revoked: このアカウントではプラットフォーム管理のAIが有効になっていません。AI設定で自分のOpenRouterキーを追加するか、管理者に依頼してください。

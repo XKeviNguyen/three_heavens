@@ -17,7 +17,7 @@
       <%= link_to t("projects_ui.start_translation"), new_translation_workspace_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
     </section>
   <% else %>
-    <section class="grid gap-5 lg:grid-cols-2" aria-label="<%= t("projects_ui.heading") %>">
+    <section class="grid gap-5 lg:grid-cols-2" data-tour-target="record-list" aria-label="<%= t("projects_ui.heading") %>">
       <% @projects.each do |project| %>
         <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 class="text-xl font-semibold text-slate-950"><%= project.name %></h2>

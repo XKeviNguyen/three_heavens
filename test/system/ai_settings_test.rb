@@ -48,23 +48,24 @@ class AiSettingsSystemTest < ApplicationSystemTestCase
   end
 
   test "Turbo visits, Back and Forward mount exactly one island and unmount it on other pages" do
+    # Signing in is a Turbo visit, so the bundle (loaded on every signed-in
+    # page for the product tour) is first inserted after turbo:load fired.
     sign_in_in_browser
     visit projects_path
-    assert_equal false, page.evaluate_script("Boolean(window.ThreeHeavensIslands)")
+    assert_tour_island_mounted
 
-    # The bundle is first inserted by a Turbo visit, after turbo:load fired.
     within("#app-sidebar") { click_link "AI settings" }
     assert_island_mounted
 
     3.times do
       within("#app-sidebar") { click_link "Projects" }
       assert_selector "h1", text: "Projects"
-      assert_equal 0, mounted_count
+      assert_tour_island_mounted
       page.go_back
       assert_island_mounted
       page.go_forward
       assert_selector "h1", text: "Projects"
-      assert_equal 0, mounted_count
+      assert_tour_island_mounted
       within("#app-sidebar") { click_link "AI settings" }
       assert_island_mounted
     end
@@ -146,10 +147,20 @@ class AiSettingsSystemTest < ApplicationSystemTestCase
     page.evaluate_script("document.activeElement.textContent.trim()")
   end
 
-  def assert_island_mounted
-    assert_selector "[data-react-island='ai-settings'][data-react-mounted='true']", count: 1
+  # Every signed-in page mounts the product tour island in the sidebar; the
+  # restored page mounts it on turbo:load, after its heading is visible.
+  def assert_tour_island_mounted
+    assert_selector "[data-react-island='product-tour'][data-react-mounted='true']", count: 1
+    assert_no_selector "[data-react-island='ai-settings']"
     assert_equal 1, mounted_count
   end
+
+  # The settings island plus the product tour island in the sidebar.
+  def assert_island_mounted
+    assert_selector "[data-react-island='ai-settings'][data-react-mounted='true']", count: 1
+    assert_equal 2, mounted_count
+  end
+
 
   def mounted_count
     page.evaluate_script("window.ThreeHeavensIslands ? window.ThreeHeavensIslands.mountedCount() : 0")

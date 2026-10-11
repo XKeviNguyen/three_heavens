@@ -45,7 +45,7 @@
 
     <div id="workspace-layout" class="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       <div class="min-w-0 overflow-visible rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <section id="workspace-project" class="p-5 sm:p-6 lg:p-7">
+        <section id="workspace-project" class="p-5 sm:p-6 lg:p-7" data-tour-target="workspace-languages">
           <% if @translation_workspace.existing_project? %>
             <div id="workspace-source-languages" class="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm"><span class="font-semibold text-slate-900"><%= @translation_workspace.project.source_language %></span><span class="text-slate-400" aria-hidden="true">→</span><span class="font-semibold text-slate-900"><%= @translation_workspace.project.target_language %></span><span class="text-xs text-slate-500"><%= t("workspace_ui.fixed_languages") %></span></div>
           <% else %>
@@ -60,7 +60,7 @@
             </div>
           <% end %>
 
-          <section id="workspace-source" class="mt-6 border-t border-slate-100 pt-5" data-controller="source-mode workspace-upload" data-action="input->workspace-upload#changed change->workspace-upload#changed workspace-source:changed->workspace-upload#invalidateSource" data-workspace-upload-replay-lease-value="<%= ReplayIdentity.lease %>" data-workspace-upload-project-id-value="<%= @translation_workspace.project_id %>" data-workspace-upload-create-url-value="<%= source_imports_path(format: :json) %>" data-workspace-upload-messages-value="<%= { chooseFile: t("upload.choose_file"), extracting: t("upload.extracting"), importFailed: t("upload.import_failed"), reviewedSource: t("upload.reviewed_source"), imported: t("upload.imported"), sourceText: t("upload.source_text"), removed: t("upload.removed"), removeFailed: t("upload.remove_failed") }.to_json %>">
+          <section id="workspace-source" class="mt-6 border-t border-slate-100 pt-5" data-tour-target="workspace-source" data-controller="source-mode workspace-upload" data-action="input->workspace-upload#changed change->workspace-upload#changed workspace-source:changed->workspace-upload#invalidateSource" data-workspace-upload-replay-lease-value="<%= ReplayIdentity.lease %>" data-workspace-upload-project-id-value="<%= @translation_workspace.project_id %>" data-workspace-upload-create-url-value="<%= source_imports_path(format: :json) %>" data-workspace-upload-messages-value="<%= { chooseFile: t("upload.choose_file"), extracting: t("upload.extracting"), importFailed: t("upload.import_failed"), reviewedSource: t("upload.reviewed_source"), imported: t("upload.imported"), sourceText: t("upload.source_text"), removed: t("upload.removed"), removeFailed: t("upload.remove_failed") }.to_json %>">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-1.5"><h2 class="text-sm font-semibold text-slate-900"><%= t("workspace_ui.source_document") %></h2><%= render "shared/hint", text: t("workspace_ui.source_document_hint"), label: t("workspace_ui.source_document") %></div>
               <div class="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="<%= t("workspace_ui.source_input_method") %>">
@@ -101,7 +101,7 @@
           </div>
         </section>
 
-        <section class="border-t border-slate-200 p-5 sm:p-6 lg:p-7">
+        <section class="border-t border-slate-200 p-5 sm:p-6 lg:p-7" data-tour-target="workspace-knowledge">
           <div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-slate-950"><%= t("workspace_ui.guidance") %></h2><p class="mt-1 text-sm text-slate-500"><%= t("workspace_ui.guidance_intro") %></p></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><%= t("workspace_ui.optional") %></span></div>
           <fieldset id="workspace-glossary" class="mt-5 min-w-0">
             <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><%= t("workspace_ui.terminology") %> <%= render "shared/hint", text: t("workspace_ui.terminology_hint"), label: t("workspace_ui.terminology") %></legend>
@@ -137,7 +137,7 @@
         <%= render "translation_workspaces/ai_workflow", form: form %>
       </aside>
     </div>
-    <section id="workspace-launch" aria-label="<%= t("workspace_ui.review_start") %>" class="flex items-center gap-4">
+    <section id="workspace-launch" data-tour-target="workspace-launch" aria-label="<%= t("workspace_ui.review_start") %>" class="flex items-center gap-4">
       <div class="min-w-0 flex-1">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= t("workspace_ui.review_start") %></p>
         <p data-workspace-guard-target="status" class="mt-1 text-xs text-slate-500" role="status" aria-live="polite"><%= @draft_restored ? t("workspace.draft_restored") : "" %></p>

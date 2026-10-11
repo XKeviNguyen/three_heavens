@@ -158,6 +158,26 @@ class ApplicationController < ActionController::Base
     redirect_ai_billing_denied(denial) if denial
   end
 
+  # An explicit retry is new paid work, authorized under the owner's current
+  # payment source rather than the failed run's. The retry button shows that
+  # payer (AiBillingHelper#retry_payer), including which of the owner's keys,
+  # and posts it back; once the action has found the owner's record,
+  # retry_payer_confirmed? refuses the retry if either changed after the page
+  # was rendered (another tab switched source or replaced the key), so nothing
+  # is queued and the page shows the new payer first. This authorization is the one passed to
+  # the retry, so it is exactly what is stamped on the runs.
+  def authorize_retry_payer
+    @retry_billing = Ai::BillingPolicy.authorize!(current_user)
+  end
+
+  def retry_payer_confirmed?(page)
+    shown = [ params[:billing_source].to_s, params[:billing_key].to_s ]
+    return true if shown == [ @retry_billing.billing_source, @retry_billing.open_router_credential_id.to_s ]
+
+    redirect_to page, alert: I18n.t("ai_billing.retry_payer_changed"), status: :see_other
+    false
+  end
+
   def redirect_ai_billing_denied(denial)
     redirect_to settings_ai_settings_path, alert: I18n.t("ai_billing.denied.#{denial.code}"), status: :see_other
   end

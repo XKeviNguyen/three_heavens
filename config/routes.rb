@@ -6,6 +6,7 @@ Rails.application.routes.draw do
   resource :confirmation_resend, only: %i[new create]
   resource :locale, only: :update
   resource :appearance, only: :update
+  resource :product_tour, only: :update
   # Sign in with Google (GIS redirect mode) posts the credential here.
   post "auth/google/callback", to: "auth/google_callbacks#create", as: :google_identity_callback
   post "auth/google/ceremony", to: "auth/google_ceremonies#create", as: :google_identity_ceremony

@@ -192,6 +192,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
       <p
         className={`rounded-xl border p-4 text-sm ${state.denial_code ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
         data-testid="ai-settings-status"
+        data-tour-target="ai-status"
       >
         {state.denial_code
           ? `${messages.current.blocked} ${denials[state.denial_code] ?? ""}`
@@ -210,7 +211,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
         </p>
       ) : null}
 
-      <form onSubmit={submitSource} className="rounded-xl border border-slate-200 bg-white p-5" noValidate>
+      <form onSubmit={submitSource} className="rounded-xl border border-slate-200 bg-white p-5" data-tour-target="ai-source" noValidate>
         <fieldset aria-describedby={sourceError ? `${ids}-source-error` : undefined}>
           <legend className="text-lg font-semibold text-slate-950">{messages.source_legend}</legend>
           {options.map(({ source, available, detail }) => (
@@ -242,7 +243,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
         </button>
       </form>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby={`${ids}-key-heading`}>
+      <section className="rounded-xl border border-slate-200 bg-white p-5" data-tour-target="ai-key" aria-labelledby={`${ids}-key-heading`}>
         <h2 id={`${ids}-key-heading`} ref={keyHeading} tabIndex={-1} className="text-lg font-semibold text-slate-950">
           {messages.key.heading}
         </h2>
@@ -258,7 +259,15 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
             type="password"
             name="api_key"
             autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
             spellCheck={false}
+            // An API key is not a sign-in password. These are hints to password
+            // managers not to offer saving or filling it; none can be enforced.
+            data-1p-ignore=""
+            data-lpignore="true"
+            data-bwignore=""
+            data-form-type="other"
             maxLength={256}
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
@@ -320,7 +329,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
         ) : null}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby={`${ids}-billing-heading`}>
+      <section className="rounded-xl border border-slate-200 bg-white p-5" data-tour-target="ai-billing" aria-labelledby={`${ids}-billing-heading`}>
         <h2 id={`${ids}-billing-heading`} className="text-lg font-semibold text-slate-950">
           {messages.billing.heading}
         </h2>

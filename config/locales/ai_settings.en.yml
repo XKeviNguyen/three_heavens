@@ -55,6 +55,10 @@ en:
       key_deleted: OpenRouter key deleted.
   ai_billing:
     open_settings: Open AI settings
+    retry_payer:
+      personal: "This retry is paid with your own OpenRouter key ending %{hint}; your OpenRouter account is charged."
+      managed: "This retry uses platform-managed AI; the platform pays."
+    retry_payer_changed: "Who pays for AI work changed after this page was shown. Check the payer shown with the retry, then retry again."
     denied:
       ai_account_ineligible: AI work needs an active account with a confirmed email address.
       managed_ai_access_revoked: Platform-managed AI isn't enabled for this account. Add your own OpenRouter key in AI settings, or ask an administrator.
