@@ -20,6 +20,8 @@ Nothing here is released, tagged, or deployed. Merging, releasing, tagging, and 
 
 Deliberately unchanged: billing authorization and retry semantics (a retry is still authorized under the owner's current selection), accepted file types and size limits, server-side extraction, automatic OpenRouter key verification (not added), deletion of revoked credential rows (not done), the TypeScript toolchain, and the New translation upload, whose Stimulus upload/ownership flow is already covered by its own replay tests and was not replaced.
 
+New AI work is authorized once, when it starts (an automatic workflow at launch, and each later stage re-checks that launch authorization). The New translation form authorizes and stamps under one lock. Starting review, judging, or finalization authorizes just before stamping, so a payment change committing in between applies to the next start; that matches "records who paid when it started" in the [user guide](../user-guide.md#ai-settings-and-who-pays), and a key or managed permission withdrawn meanwhile fails the work closed at its claim, never on the platform key. `test/jobs/byok_job_billing_test.rb` covers that outcome, and `test/services/pipelines/advance_test.rb` covers later automatic stages keeping, or blocking on, the launch payer. Accepted difference from retries: the New translation page shows the current payment source but does not post it back, so a page left open while the source is changed in another tab starts work under the newer choice instead of refusing; confirming the shown payer there, as retries do, is a possible follow-up.
+
 ## Evidence levels
 
 | Level | Status |
@@ -32,26 +34,40 @@ Deliberately unchanged: billing authorization and retry semantics (a retry is st
 
 ## Open items that remain release concerns
 
-- **[PR #87](https://github.com/XKeviNguyen/three_heavens/pull/87) — Cloudflare Tunnel client IP trust and throttling.** Open and separately reviewed. Green CI on this milestone does not resolve it. Rate limits that key on client IP depend on its outcome in the deployed topology.
+- **[PR #87](https://github.com/XKeviNguyen/three_heavens/pull/87) — Cloudflare Tunnel client IP trust and throttling.** Merged into `develop` at `75b3253`, whose post-merge CI passed all five jobs. It changes the deployment proxy configuration: `config/deploy.yml` now sets `ssl: false`, `forward_headers: true`, and `proxy.run.publish: false`, so kamal-proxy trusts X-Forwarded-For. That is safe only while cloudflared is the only route to kamal-proxy, which the production host must prove (gate B).
 - **[PR #86](https://github.com/XKeviNguyen/three_heavens/pull/86) — obsolete proprietary licensing language.** Open and stale. The repository is MIT licensed; PR #86 must not be merged as it is.
-- **BYOK production cutover.** PR #90's billing migrations fence out pre-BYOK code (see [production deploy and rollback](../operations/production-deploy.md#rollback)). The first deploy fails AI starts on the old container until traffic switches, and an image rollback past that release leaves AI starts failing closed; roll forward instead. CI does not prove migration timing or live billing behavior on production data.
-- **Production configuration.** Proxy, tunnel, TLS, host networking, databases, and secrets were not changed by this milestone and are not verified by it.
+- **BYOK production cutover.** PR #90's billing migrations fence out pre-BYOK code (see [production deploy and rollback](../operations/production-deploy.md#rollback)). The first deploy fails AI starts on the old container until traffic switches. An image rollback past that release leaves AI starts failing closed and stalls automatic workflow reconciliation, so roll forward only. CI does not prove migration timing or live billing behavior on production data.
+- **Production network, firewall, and secrets.** Unverified. `proxy.run.publish: false` applies only when the kamal-proxy container is created, so a proxy created from v1.1.0's configuration (`ssl: true`, default port publishing) still publishes ports 80 and 443 after this deploy unless it is rebooted. The host firewall rule, cloudflared's route, Cloudflare's header settings, and the recoverability of the encryption root secrets can be verified only on the production host.
 - **Tours on refreshing pages.** Pages that reload every 5 seconds while AI work runs (results, blind review, judging, automatic workflow progress) do not start tours or show the invitation until the work finishes.
 - **No-JavaScript language selection.** The language combobox on reference and workspace forms needs JavaScript to submit a language (a pre-existing limitation, not introduced here). The reference file inputs themselves work without JavaScript.
 
 ## Operational notes for this milestone
 
-- Migration `20261011090000` adds two nullable `users` columns, backfills every existing row as `preexisting`, and adds a CHECK constraint, under `lock_timeout = 1s`. `users` holds one row per account, so this is brief. Code from before this milestone ignores the columns; an account it creates during the deploy starts unresolved and is offered the tour, which is correct for a new account.
+- Migration `20261011090000` adds two nullable `users` columns, backfills every existing row as `preexisting`, and adds a CHECK constraint, under `lock_timeout = 1s`. `users` holds one row per account, so this is brief at the expected size; it holds an ACCESS EXCLUSIVE lock on `users` for the backfill, measured at about 17 seconds per million rows (see pre-deploy step 8 in [production deploy](../operations/production-deploy.md#pre-deploy)). Code from before this milestone ignores the columns; an account it creates during the deploy starts unresolved and is offered the tour, which is correct for a new account.
 - Rolling the code back leaves the columns unused and harmless. Do not roll the migration back in production; it would discard recorded tour outcomes.
 - The islands bundle now loads on every signed-in page: 245.7 KiB minified and 76.0 KiB gzipped, up from 227.0 KiB and 70.4 KiB (+18.7 KiB, +5.6 KiB gzipped). No dependency was added. It is an ES module served by Propshaft with a digest, so browsers cache it.
 - The tour sends at most one request per offered version (`PATCH /product_tour`, rate limited per user). Tooltip steps send nothing. If that request fails (offline, signed out, refused), the invitation hides on the current page only and is offered again on the next one.
 
-## Recommended release approach
+## Release gates
 
-1. Human: audit the milestone pull request at its exact head SHA, then decide whether to merge into `develop`.
-2. After a merge: verify the post-merge `develop` CI run (all five jobs) on its exact SHA.
-3. Resolve or explicitly defer PR #87 with a documented decision; close PR #86 without merging.
-4. Human: approve the `develop` → `main` release pull request after its own CI and audit.
-5. Human: approve the production deploy at a quiet time, following the BYOK cutover notes; back up first ([backup and restore](../operations/backup-and-restore.md)).
-6. After deploy: run the post-deploy smoke test, confirm `/ready`, check that an existing account sees no invitation and a new account sees one, and confirm one AI start per payment source with a deliberately authorized request.
-7. Human: tag and publish the release only after step 6 passes.
+Each gate needs explicit human approval, and passing one never implies the next. Green CI covers gate A only.
+
+**A. Code release approval (repository only).**
+
+1. Merge the release-stabilization pull request (these documents and tests) after its five CI jobs pass on its exact head SHA, then verify the `develop` head's post-merge CI (all five jobs) on its exact SHA.
+2. Close PR #86 without merging; it is not part of the release.
+3. Human: audit and approve the `develop` → `main` release pull request after its own CI on its exact head SHA.
+
+**B. Production host gates (before any deploy, on the host, read-only first).**
+
+1. Proxy and firewall, following pre-deploy step 11 of [production deploy](../operations/production-deploy.md#pre-deploy): kamal-proxy publishes no host port (if it does, confirm cloudflared reaches it over the `kamal` network and run `bin/kamal proxy reboot` before the deploy), cloudflared targets kamal-proxy on port 80, and the boot-persistent firewall rule is installed and proven by the probe from another machine with `tcpdump` evidence.
+2. Encrypted off-host backup: a fresh `bin/ops/backup` bundle copied to approved encrypted off-host storage.
+3. Actual restore proof: `bin/ops/restore-verify` of that bundle on disposable targets, plus the decryption check with the separately protected `RAILS_MASTER_KEY` ([encryption root secrets](../operations/backup-and-restore.md#encryption-root-secrets)).
+4. Migration timing: row counts and long-running transactions checked against pre-deploy step 8.
+5. `bin/ops/preflight` passes in the candidate runtime.
+
+**C. BYOK cutover (deploy).** Human: approve `bin/kamal deploy` (no destination) at a quiet time. If the deploy fails after the billing migration commits, redeploy the same release promptly, after the `pg_stat_activity` check in the rollback section; never roll back the image or the migrations ([rollback](../operations/production-deploy.md#rollback)).
+
+**D. Production smoke tests.** `bin/ops/post-deploy-smoke`, `/ready`, kamal-proxy shows no port binding and `forward_headers` true, the application log records a browser's public address for `/login`, an existing account sees no tour invitation and a new account sees one, and no failed Solid Queue jobs mention the run payer or `billing_source`. One AI start per payment source is a paid request and needs its own explicit authorization.
+
+**E. Tag and publish.** Human: only after gate D passes.

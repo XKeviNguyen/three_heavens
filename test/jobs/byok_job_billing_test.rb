@@ -112,6 +112,48 @@ class ByokJobBillingTest < ActiveSupport::TestCase
     assert_equal "managed_ai_access_revoked", run.reload.error_code
   end
 
+  # Start services authorize before their stamping transaction. Unless the
+  # caller already holds a transaction (the New translation form does), the
+  # owner's share lock is released in between. A payment change landing in
+  # that gap is ordered after the start: the work keeps the payer it was
+  # started under, and a key or permission withdrawn meanwhile fails it closed
+  # at the claim. Passing an earlier authorization as billing: (as pipelines
+  # do for later stages) reproduces the gap deterministically.
+  test "a payment change between a start's authorization and its stamp bills the start's payer or fails closed" do
+    {
+      "switch to managed" => -> { @current_test_user.update!(ai_payment_source: "managed") },
+      "replace the key" => -> { Accounts::AiSettings.store_key!(@current_test_user, api_key: REPLACEMENT_KEY, state_token: state_token) },
+      "withdraw managed access" => -> { @current_test_user.update!(managed_ai_access: false) }
+    }.each do |change, apply|
+      @calls.clear
+      credential = use_personal_key unless change == "withdraw managed access"
+      authorization = Ai::BillingPolicy.authorize!(@current_test_user)
+      apply.call
+      experiment = create_experiment
+      experiment.update!(status: :pending)
+
+      run = TranslationExperiments::Start.call(
+        experiment: experiment, llm_models: [ llm_models(:openrouter_claude) ], billing: authorization
+      ).sole
+      assert_equal [ authorization.billing_source, credential&.id ], [ run.billing_source, run.open_router_credential_id ], change
+
+      perform_authorized_ai_job(TranslationRunJob, run)
+
+      case change
+      when "switch to managed"
+        assert_equal [ [ "personal", PERSONAL_KEY ] ], @calls, change
+      when "replace the key"
+        assert_empty @calls, change
+        assert_equal "personal_key_unavailable", run.reload.error_code
+      else
+        assert_empty @calls, change
+        assert_equal "managed_ai_access_revoked", run.reload.error_code
+      end
+      reset_key!
+      @current_test_user.update!(managed_ai_access: true)
+    end
+  end
+
   test "a key replaced or deleted before the claim fails every job type closed" do
     %w[replace delete].each do |change|
       build_runs.each do |run|
