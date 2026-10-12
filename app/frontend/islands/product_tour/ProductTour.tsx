@@ -285,8 +285,10 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   }
 
   useEffect(() => {
+    // Rereads the visit's failure too: a write may have failed after this
+    // page rendered but before this effect subscribed.
     const follow = (failed: boolean) => {
-      if (failed) switchFailed.current = true
+      if (failed || switchFailedThisVisit) switchFailed.current = true
       setGuidesEnabled(currentGuides())
       setGuidesPending(guidesSettling())
     }

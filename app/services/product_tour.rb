@@ -226,9 +226,25 @@ module ProductTour
   # before a switch write committed carries an older revision, so the browser
   # keeps the newer value.
   def self.page_guides_state(user)
-    enabled, revision = User.where(id: user.id).pick(:product_tour_page_guides, :product_tour_guides_revision)
-    { page_guides: enabled, revision: revision }
+    enabled, outcome, revision = User.where(id: user.id)
+      .pick(:product_tour_page_guides, :product_tour_outcome, :product_tour_guides_revision)
+    { page_guides: page_guides_on?(enabled, outcome, revision), revision: revision }
   end
+
+  def self.page_guides_enabled?(user)
+    page_guides_on?(user.product_tour_page_guides, user.product_tour_outcome, user.product_tour_guides_revision)
+  end
+
+  # The release before page guides records a completed welcome tour without
+  # writing the switch, so its revision stays 0; every write by this code
+  # raises it. Such a completion, made while that release still served during
+  # the deploy, turns page guides on as a completion here would. Tours
+  # completed before the deploy were marked off by a migration
+  # (20261012110000).
+  def self.page_guides_on?(enabled, outcome, revision)
+    enabled || (outcome == "completed" && revision.zero?)
+  end
+  private_class_method :page_guides_on?
 
   def self.page_seen?(user, key)
     user.product_tour_page_outcomes.exists?(tour_key: key, version: PAGE_VERSION)

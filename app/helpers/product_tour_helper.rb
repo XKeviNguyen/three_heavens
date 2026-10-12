@@ -12,7 +12,6 @@ module ProductTourHelper
   def product_tour_props
     page_family = ProductTour.page_tour_key(controller_path)
     page_key = ProductTour.page_context_key(controller_path, action_name, request.request_method)
-    guides = current_user.product_tour_page_guides
     {
       version: ProductTour::VERSION,
       offer: ProductTour.offered?(current_user),
@@ -23,7 +22,7 @@ module ProductTourHelper
       messages: t("product_tour.ui"),
       # Queried even with the switch off: turning it on from another page may
       # let this page's guide open once that change is saved.
-      page_guides: { enabled: guides, revision: current_user.product_tour_guides_revision,
+      page_guides: { enabled: ProductTour.page_guides_enabled?(current_user), revision: current_user.product_tour_guides_revision,
                      key: page_key, version: ProductTour::PAGE_VERSION,
                      seen: page_key ? ProductTour.page_seen?(current_user, page_key) : false },
       tours: {

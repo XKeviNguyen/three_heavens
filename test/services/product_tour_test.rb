@@ -75,6 +75,18 @@ class ProductTourTest < ActiveSupport::TestCase
     assert_operator second.fetch(:revision), :>, first.fetch(:revision)
   end
 
+  test "a tour completed by the release before page guides still turns them on" do
+    # As that release records it: the outcome only, the switch never written.
+    @user.update_columns(product_tour_version: ProductTour::VERSION, product_tour_outcome: "completed", product_tour_page_guides: false)
+    assert_equal 0, @user.reload.product_tour_guides_revision
+    assert ProductTour.page_guides_enabled?(@user)
+    assert ProductTour.page_guides_state(@user).fetch(:page_guides)
+
+    ProductTour.set_page_guides!(@user, false)
+    assert_not ProductTour.page_guides_enabled?(@user.reload)
+    assert_not ProductTour.page_guides_state(@user).fetch(:page_guides)
+  end
+
   test "the first page guide outcome wins and repeats write nothing" do
     assert ProductTour.record_page_outcome!(@user, "projects:list", "dismissed")
     assert_not ProductTour.record_page_outcome!(@user, "projects:list", "completed")

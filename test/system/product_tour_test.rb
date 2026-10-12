@@ -550,6 +550,43 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert @user.reload.product_tour_page_guides
   end
 
+  test "a switch change that fails just as the next page's Help appears is still undone there" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    fail_held_requests_when_next_island_renders
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "a newer islands bundle loaded during a visit reloads the page once instead of mixing releases" do
+    sign_in_in_browser
+    visit glossaries_path
+    page.execute_script("const marker = document.createElement('div'); marker.id = 'cached-by-older-bundle'; document.body.append(marker)")
+    within("#app-sidebar") { click_link "History" }
+    assert_selector "h1", text: "Translation history"
+    page.execute_script("window.olderBundleDocument = true")
+    # As after a deploy: a Turbo visit adds the newer bundle's script here.
+    page.execute_script(<<~JS)
+      import(document.querySelector("script[src*='/assets/islands']").src + "?deploy=next")
+    JS
+
+    assert_until { page.evaluate_script("window.olderBundleDocument === undefined && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Translation history"
+    assert_selector "[data-react-island='product-tour'] button[aria-expanded]", text: "Help"
+    page.go_back
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "#cached-by-older-bundle", visible: :all
+    assert_selector "[data-react-island='product-tour'] button[aria-expanded]", text: "Help"
+  end
+
   test "finishing the welcome tour and leaving at once shows the next page's guide once guides are on" do
     @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
     sign_in_in_browser
@@ -711,6 +748,20 @@ class ProductTourSystemTest < ApplicationSystemTestCase
   def release_switch_requests(fail: false)
     assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
     page.execute_script("window.heldSwitchRequests.splice(0).forEach((request) => request[arguments[0] ? 'fail' : 'go']())", fail)
+  end
+
+  # Fails the held requests once the next page's Help has rendered, before
+  # its effects subscribe to the switch.
+  def fail_held_requests_when_next_island_renders
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:render", () => {
+        const island = document.querySelector("[data-react-island='product-tour']")
+        new MutationObserver((records, observer) => {
+          observer.disconnect()
+          window.heldSwitchRequests.splice(0).forEach((request) => request.fail())
+        }).observe(island, { childList: true })
+      }, { once: true })
+    JS
   end
 
   # Fails the held requests while the next page is swapped in: after the old
