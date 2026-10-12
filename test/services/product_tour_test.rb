@@ -38,6 +38,68 @@ class ProductTourTest < ActiveSupport::TestCase
     assert_raises(ActiveRecord::StatementInvalid) { @user.update_columns(product_tour_version: 1, product_tour_outcome: nil) }
   end
 
+  test "a page view maps to one guide context; other requests and pages to none" do
+    assert_equal "projects:list", ProductTour.page_context_key("projects", "index", "GET")
+    assert_equal "projects:detail", ProductTour.page_context_key("projects", "show", "GET")
+    assert_equal "references:form", ProductTour.page_context_key("translation_references", "new", "GET")
+    assert_nil ProductTour.page_context_key("translation_references", "create", "POST"), "a re-rendered form is mid-task"
+    assert_nil ProductTour.page_context_key("settings/accounts", "show", "GET")
+    assert_nil ProductTour.page_context_key("projects", "download", "GET")
+
+    assert ProductTour.valid_page_key?("terminology:form")
+    [ "terminology", "admin:list", "terminology:list:x", "terminology:list:", "terminology:list\n", "terminology:edit" ].each { |key| assert_not ProductTour.valid_page_key?(key), key }
+  end
+
+  test "the first page guide outcome wins and repeats write nothing" do
+    assert ProductTour.record_page_outcome!(@user, "projects:list", "dismissed")
+    assert_not ProductTour.record_page_outcome!(@user, "projects:list", "completed")
+    assert_equal [ [ "projects:list", "dismissed", ProductTour::PAGE_VERSION ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome, :version)
+    assert ProductTour.page_seen?(@user, "projects:list")
+    assert_not ProductTour.page_seen?(@user, "projects:detail")
+    assert_raises(ArgumentError) { ProductTour.record_page_outcome!(@user, "projects:list", "preexisting") }
+    assert_raises(ArgumentError) { ProductTour.record_page_outcome!(@user, "nowhere:list", "completed") }
+  end
+
+  test "repeated writes from several threads leave one row, and the database refuses a duplicate" do
+    threads = 4.times.map do
+      Thread.new { ActiveRecord::Base.connection_pool.with_connection { ProductTour.record_page_outcome!(@user, "history:list", "completed") } }
+    end
+    assert_equal 1, threads.map(&:value).count(true)
+    assert_equal 1, @user.product_tour_page_outcomes.where(tour_key: "history:list").count
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      ProductTourPageOutcome.create!(user: @user, tour_key: "history:list", version: ProductTour::PAGE_VERSION, outcome: "dismissed")
+    end
+  end
+
+  test "completing the offered tour turns page guides on; dismissing it or replaying it does not" do
+    assert ProductTour.record_outcome!(@user, "completed")
+    assert @user.reload.product_tour_page_guides
+
+    newcomer = users(:admin)
+    newcomer.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    ProductTour.record_outcome!(newcomer, "dismissed")
+    assert_not newcomer.reload.product_tour_page_guides
+
+    preexisting = users(:other)
+    assert_not ProductTour.record_outcome!(preexisting, "completed")
+    assert_not preexisting.reload.product_tour_page_guides, "an established account keeps manual guides"
+
+    # A later tour version is offered again, but never overrides the switch.
+    with_tour_version(ProductTour::VERSION + 1) do
+      assert ProductTour.record_outcome!(preexisting, "completed")
+    end
+    assert_not preexisting.reload.product_tour_page_guides
+  end
+
+  test "the database rejects malformed page guide rows" do
+    [ { tour_key: "Projects:list" }, { tour_key: "projects:edit" }, { outcome: "seen" }, { version: 0 } ].each do |attributes|
+      row = { user: @user, tour_key: "projects:list", version: 1, outcome: "completed" }.merge(attributes)
+      assert_raises(ActiveRecord::StatementInvalid, attributes.inspect) do
+        ProductTourPageOutcome.transaction(requires_new: true) { ProductTourPageOutcome.create!(row) }
+      end
+    end
+  end
+
   test "every page tour belongs to real controllers and every step is translated in each locale" do
     controllers = ProductTour::PAGE_TOURS.values.flat_map { |tour| tour[:controllers] }
     assert_equal controllers.uniq, controllers, "a controller maps to one page tour"
@@ -49,10 +111,11 @@ class ProductTourTest < ActiveSupport::TestCase
       tours.each do |scope, steps|
         assert steps.first[:targets].blank?, "#{scope} opens with a centered step that can always be shown"
         steps.each do |step|
-          %w[title body].each do |part|
-            key = "product_tour.#{scope}.#{step[:id]}.#{part}"
-            assert I18n.exists?(key, locale), "missing #{locale} #{key}"
-          end
+          key = "product_tour.#{scope}.#{step[:id]}"
+          assert I18n.exists?("#{key}.title", locale), "missing #{locale} #{key}.title"
+          points = I18n.t("#{key}.points", locale: locale, default: nil)
+          assert points.is_a?(Array) && (1..3).cover?(points.size) && points.all?(&:present?),
+            "#{locale} #{key}.points has one to three short ideas"
         end
       end
     end
@@ -84,5 +147,17 @@ class ProductTourTest < ActiveSupport::TestCase
         end
       end
     end
+  end
+
+  private
+
+  def with_tour_version(version)
+    original = ProductTour::VERSION
+    ProductTour.send(:remove_const, :VERSION)
+    ProductTour.const_set(:VERSION, version)
+    yield
+  ensure
+    ProductTour.send(:remove_const, :VERSION)
+    ProductTour.const_set(:VERSION, original)
   end
 end

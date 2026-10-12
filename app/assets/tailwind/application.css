@@ -962,3 +962,36 @@ html[lang="ja"] .landing-final-cta h2 { line-height: 1.3; letter-spacing: -.015e
   .landing-page *::before,
   .landing-page *::after { animation: none !important; transition: none !important; }
 }
+
+/* Help (ProductTour island): a thin seven-colour border with a soft glow.
+   Only compositor-friendly properties move: the colours turn by rotating a
+   conic gradient (transform) and the glow brightens and fades (opacity); the
+   blur itself never animates. It plays once, for under five seconds, on the
+   first page of a visit (WCAG 2.2.2) and again while hovered or focused;
+   with reduced motion it stays a still rainbow outline. */
+@keyframes th-neon-turn { to { rotate: 1turn; } }
+@keyframes th-neon-breathe { 0%, 100% { opacity: .2; } 50% { opacity: .5; } }
+.th-neon { position: relative; display: block; isolation: isolate; border-radius: 12px; padding: 1.5px; }
+.th-neon__ring, .th-neon__glow { position: absolute; border-radius: inherit; pointer-events: none; }
+.th-neon__ring { inset: 0; z-index: -1; overflow: hidden; }
+.th-neon__ring::before, .th-neon__glow {
+  background: conic-gradient(from 0deg, #ff5d6c, #ff9f45, #ffd84d, #4fd682, #33c9e8, #5b7cfa, #b26bf2, #ff5d6c);
+}
+.th-neon__ring::before { content: ""; position: absolute; left: 50%; top: 50%; width: 160%; aspect-ratio: 1; translate: -50% -50%; }
+.th-neon__glow { inset: -3px; z-index: -2; filter: blur(8px); opacity: .22; }
+@media (prefers-reduced-motion: no-preference) {
+  .th-neon--intro .th-neon__ring::before { animation: th-neon-turn 4.8s cubic-bezier(.45, .05, .55, .95) 1; }
+  .th-neon--intro .th-neon__glow { animation: th-neon-breathe 2.4s ease-in-out 2; }
+  /* Focus turns it twice; it keeps turning only while the pointer rests on it. */
+  .th-neon:focus-within .th-neon__ring::before { animation: th-neon-turn 6s linear 2; }
+  .th-neon:focus-within .th-neon__glow { animation: th-neon-breathe 3s ease-in-out 4; }
+  .th-neon:hover .th-neon__ring::before { animation: th-neon-turn 6s linear infinite; }
+  .th-neon:hover .th-neon__glow { animation: th-neon-breathe 3s ease-in-out infinite; }
+}
+@media (forced-colors: active) { .th-neon { border: 1px solid ButtonText; padding: 0; } .th-neon__ring, .th-neon__glow { display: none; } }
+
+/* Help's menu opens below its button: at the top of the sidebar it spans the
+   sidebar; in the mobile header (see header .appearance-menu-panel) it aligns
+   with the button's right edge. */
+.th-help-menu--sidebar { top: calc(100% + 6px); bottom: auto; left: 0; }
+.th-help-menu--header { width: min(18rem, calc(100vw - 2rem)); }

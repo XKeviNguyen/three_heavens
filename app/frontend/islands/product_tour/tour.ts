@@ -4,7 +4,8 @@
 export interface TourStep {
   id: string
   title: string
-  body: string
+  // One short idea per point, shown as separate lines.
+  points: string[]
   // Element names (data-tour-target); empty for a centered step.
   targets: string[]
 }
@@ -23,14 +24,29 @@ export interface TourMessages {
   step_counter: string
   start_translation: string
   refreshing: string
+  page_guides: string
+  page_guides_on: string
+  page_guides_off: string
+  auto_note: string
   invite: { title: string; body: string; start: string; later: string }
+}
+
+// This page's guide: whether guides open by themselves for the account, the
+// page context key ("projects:list", null when this view has none), and
+// whether the account has already ended this guide.
+export interface PageGuides {
+  enabled: boolean
+  key: string | null
+  seen: boolean
+  version: number
 }
 
 export interface ProductTourProps {
   version: number
   offer: boolean
-  urls: { outcome: string; start_translation: string }
+  urls: { outcome: string; page: string; preference: string; start_translation: string }
   messages: TourMessages
+  page_guides: PageGuides
   tours: { global: TourStep[]; page: TourStep[] | null }
 }
 
@@ -45,10 +61,11 @@ const isString = (value: unknown): value is string => typeof value === "string"
 
 function parseStep(value: unknown): TourStep | null {
   if (!isRecord(value)) return null
-  const { id, title, body, targets } = value
-  if (!isString(id) || !isString(title) || !isString(body)) return null
+  const { id, title, points, targets } = value
+  if (!isString(id) || !isString(title)) return null
+  if (!Array.isArray(points) || points.length === 0 || points.length > 4 || !points.every((point) => isString(point) && point !== "")) return null
   if (!Array.isArray(targets) || !targets.every(isString)) return null
-  return { id, title, body, targets }
+  return { id, title, points, targets }
 }
 
 function parseSteps(value: unknown): TourStep[] | null {
@@ -59,7 +76,7 @@ function parseSteps(value: unknown): TourStep[] | null {
 
 function parseMessages(value: unknown): TourMessages | null {
   if (!isRecord(value) || !isRecord(value.invite)) return null
-  const keys = ["help", "full_tour", "page_tour", "next", "back", "skip", "finish", "close", "step_counter", "start_translation", "refreshing"] as const
+  const keys = ["help", "full_tour", "page_tour", "next", "back", "skip", "finish", "close", "step_counter", "start_translation", "refreshing", "page_guides", "page_guides_on", "page_guides_off", "auto_note"] as const
   if (!keys.every((key) => isString(value[key]))) return null
   const invite = value.invite
   if (![invite.title, invite.body, invite.start, invite.later].every(isString)) return null
@@ -68,16 +85,27 @@ function parseMessages(value: unknown): TourMessages | null {
 
 // The island boundary: server props are checked once, so the components can
 // rely on their types. Invalid props render nothing rather than a broken tour.
+function parsePageGuides(value: unknown): PageGuides | null {
+  if (!isRecord(value)) return null
+  const { enabled, key, seen, version } = value
+  if (typeof enabled !== "boolean" || typeof seen !== "boolean") return null
+  if (key !== null && !(isString(key) && /^[a-z_]+:(list|form|detail)$/.test(key))) return null
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) return null
+  return { enabled, key, seen, version }
+}
+
 export function parseProductTourProps(value: unknown): ProductTourProps | null {
   if (!isRecord(value) || !isRecord(value.urls) || !isRecord(value.tours)) return null
   const { version, offer, urls, tours } = value
+  const pageGuides = parsePageGuides(value.page_guides)
   const messages = parseMessages(value.messages)
   const global = parseSteps(tours.global)
   const page = tours.page === null ? null : parseSteps(tours.page)
   if (typeof version !== "number" || !Number.isInteger(version) || version < 1) return null
-  if (typeof offer !== "boolean" || !isString(urls.outcome) || !isString(urls.start_translation)) return null
-  if (!messages || !global || (tours.page !== null && !page)) return null
-  return { version, offer, urls: { outcome: urls.outcome, start_translation: urls.start_translation }, messages, tours: { global, page } }
+  const { outcome, page: pageUrl, preference, start_translation } = urls
+  if (typeof offer !== "boolean" || !isString(outcome) || !isString(pageUrl) || !isString(preference) || !isString(start_translation)) return null
+  if (!messages || !global || !pageGuides || (tours.page !== null && !page)) return null
+  return { version, offer, urls: { outcome, page: pageUrl, preference, start_translation }, messages, page_guides: pageGuides, tours: { global, page } }
 }
 
 function isVisible(element: HTMLElement): boolean {

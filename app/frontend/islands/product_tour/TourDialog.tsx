@@ -14,6 +14,8 @@ interface TourDialogProps {
   messages: TourMessages
   // Offered on the last step of the global tour.
   finishLink: { href: string; label: string } | null
+  // Opened by itself (a page guide on its first visit): says it shows once.
+  auto: boolean
   onEnd: (outcome: TourOutcome) => void
 }
 
@@ -60,7 +62,7 @@ function arrowStyle(placement: Placement): CSSProperties | null {
   }
 }
 
-export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDialogProps) {
+export function TourDialog({ kind, steps, messages, finishLink, auto, onEnd }: TourDialogProps) {
   const [index, setIndex] = useState(0)
   const [layout, setLayout] = useState<{ box: Box | null; placement: Placement }>({ box: null, placement: { kind: "centered" } })
   const [announcement, setAnnouncement] = useState("")
@@ -187,7 +189,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
       firstRender.current = false
       return
     }
-    if (entry) setAnnouncement(`${counter}. ${entry.step.title}. ${entry.step.body}`)
+    if (entry) setAnnouncement(`${counter}. ${entry.step.title}. ${entry.step.points.join(" ")}`)
   }, [index])
 
   if (!entry) return null
@@ -201,7 +203,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
     <dialog
       ref={dialogRef}
       aria-labelledby={`${ids}-title`}
-      aria-describedby={`${ids}-body`}
+      aria-describedby={auto && index === 0 ? `${ids}-body ${ids}-note` : `${ids}-body`}
       data-testid="product-tour"
       data-tour-kind={kind}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-transparent p-0 backdrop:bg-transparent"
@@ -269,9 +271,22 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
           <h2 id={`${ids}-title`} className="text-xl font-semibold leading-snug tracking-tight text-slate-950">
             {entry.step.title}
           </h2>
-          <p id={`${ids}-body`} className="mt-2 text-[15px] leading-6 text-slate-700">
-            {entry.step.body}
-          </p>
+          {/* One idea per line: a list when there are several, a paragraph for one. */}
+          {entry.step.points.length > 1 ? (
+            <ul id={`${ids}-body`} role="list" className="mt-3 flex flex-col gap-2.5 text-[15px] leading-6 text-slate-700">
+              {entry.step.points.map((point) => (
+                <li key={point} className="flex gap-2.5">
+                  <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-slate-400" />
+                  <span className="min-w-0">{point}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p id={`${ids}-body`} className="mt-2 text-[15px] leading-6 text-slate-700">
+              {entry.step.points[0]}
+            </p>
+          )}
+          {auto && index === 0 ? <p id={`${ids}-note`} className="mt-3 text-[13px] leading-5 text-slate-600">{messages.auto_note}</p> : null}
           {isLast && finishLink ? (
             <a
               href={finishLink.href}
