@@ -81,11 +81,25 @@ en:
           points:
           - Paste text, or upload a TXT, Markdown, DOCX, or PDF file.
           - You can check the text before you start.
-        knowledge:
-          title: Optional guidance
+        terminology:
+          title: Terminology
           points:
-          - Pick a glossary to keep terms consistent.
-          - More options add references and a methodology.
+          - Use the terms you want the AI to translate the same way every time.
+          - Pick a saved glossary, or add terms here.
+        references:
+          title: Translation references
+          points:
+          - Choose example translations you have already approved.
+          - The AI follows their wording and style.
+        methodology:
+          title: Methodology
+          points:
+          - Choose how you want the AI to write the translation.
+          - Keep "No methodology" to use only your own instructions.
+        priority:
+          title: Guidance priority
+          points:
+          - Choose which guidance wins when they disagree.
         workflow:
           title: AI workflow
           points:
@@ -118,7 +132,8 @@ en:
         list:
           title: Your projects
           points:
-          - Open a project to see its documents and progress.
+          - Your projects appear here.
+          - Open one to see its documents and progress.
         start:
           title: Add work
           points:
@@ -143,7 +158,8 @@ en:
         list:
           title: Find a translation
           points:
-          - Each entry shows the project, languages, and guidance used.
+          - Your translations appear here, newest first.
+          - Each one shows its project, languages, and guidance.
         reopen:
           title: Continue or repeat
           points:
@@ -191,7 +207,7 @@ en:
         list:
           title: Your references
           points:
-          - Pick active references in the advanced options of a new translation.
+          - Pick the ones to follow under Translation references in New translation.
         source:
           title: Source text
           points:
@@ -220,7 +236,7 @@ en:
         list:
           title: Your methodologies
           points:
-          - Pick an active methodology in the advanced options of a new translation.
+          - Pick one to follow under Methodology in New translation.
         instructions:
           title: Your rules
           points:

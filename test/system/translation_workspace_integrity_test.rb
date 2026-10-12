@@ -32,7 +32,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     find("#workspace-glossary summary", text: "Choose saved glossary").click
     find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
-    find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@methodology.current_revision_id}']").choose
     within "#workspace-manual-models" do
@@ -76,7 +75,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     find("#workspace-glossary summary", text: "Choose saved glossary").click
     find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
-    find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@methodology.current_revision_id}']").choose
     within "#workspace-manual-models" do
@@ -153,7 +151,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     find("#workspace-glossary summary", text: "Choose saved glossary").click
     find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
     assert_selector "#workspace-glossary", text: "Workspace terms"
-    find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@methodology.current_revision_id}']").choose
     within "#workspace-manual-models" do
@@ -182,10 +179,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     assert_core_state
     click_button "Paste text"
     assert_core_state
-
-    find("details > summary", text: /References, methodology/).click
-    assert_core_state
-    find("details > summary", text: /References, methodology/).click
 
     within "#workspace-manual-models" do
       search = find("input[placeholder='Search OpenRouter models…']")
@@ -440,7 +433,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
   test "no more references can be ticked than a draft and a launch accept" do
     5.times { |index| create_translation_reference(title: "Extra reference #{index}") }
     visit new_translation_workspace_path
-    find("details > summary", text: /References, methodology/).click
     boxes = all("input[name='translation_workspace[translation_reference_revision_ids][]']")
     assert_equal 6, boxes.size
     boxes.first(5).each(&:check)
@@ -718,7 +710,6 @@ class TranslationWorkspaceIntegrityTest < ApplicationSystemTestCase
     fill_in "Instructions for the translation", with: "Retain these instructions."
     find("#workspace-glossary summary", text: "Choose saved glossary").click
     find("input[name='translation_workspace[glossary_revision_id]'][value='#{@glossary.current_revision_id}']", visible: :all).choose
-    find("details > summary", text: /References, methodology/).click
     find("input[name='translation_workspace[translation_reference_revision_ids][]']").check
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@methodology.current_revision_id}']").choose
     within "#workspace-manual-models" do

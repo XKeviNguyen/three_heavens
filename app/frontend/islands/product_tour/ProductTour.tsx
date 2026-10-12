@@ -337,8 +337,10 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   // waiting, not after that change failed, not on a cached page (Back/Forward,
   // a Turbo preview), and only on a quiet page: not over another dialog, not
   // while the user is typing, and not on a page that keeps refreshing.
+  // While guides are off the page waits instead, so turning them on in Help
+  // opens this page's guide without a reload.
   useEffect(() => {
-    if (autoDecided.current || guidesPending) return
+    if (autoDecided.current || guidesPending || (!guidesEnabled && !offerPending)) return
     autoDecided.current = true
     const key = pageGuides.key
     if (!guidesEnabled || !key || pageGuides.seen || offerPending || refreshing || fromCache || switchFailed.current) return
@@ -361,10 +363,11 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
         if (answer === undefined) return
         seenPages.add(id)
         const claimed = (answer as { recorded?: unknown } | null)?.recorded === true
-        if (claimed && mounted.current && !document.querySelector("dialog[open]")) start("page", true)
+        // Turning guides off while the claim was answered wins.
+        if (claimed && mounted.current && currentGuides() && !document.querySelector("dialog[open]")) start("page", true)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guidesPending])
+  }, [guidesPending, guidesEnabled])
 
   useEffect(() => {
     if (offerPending || helpIntroPlayed || document.documentElement.hasAttribute("data-turbo-preview")) return

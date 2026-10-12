@@ -35,7 +35,7 @@ class ProductToursController < ApplicationController
     outcome = known_outcome!(attributes[:outcome])
     key = attributes[:key].to_s
     raise ActionController::BadRequest, "Unknown page guide" unless ProductTour.valid_page_key?(key)
-    return head :conflict unless attributes[:version].to_s == ProductTour::PAGE_VERSION.to_s
+    return head :conflict unless attributes[:version].to_s == ProductTour.page_version(key).to_s
 
     render json: { recorded: ProductTour.record_page_outcome!(current_user, key, outcome) }
   end

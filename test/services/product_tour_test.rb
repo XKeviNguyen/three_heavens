@@ -97,6 +97,20 @@ class ProductTourTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { ProductTour.record_page_outcome!(@user, "nowhere:list", "completed") }
   end
 
+  test "a rewritten page guide has its own version, so only it opens again and older rows stay" do
+    assert_equal ProductTour::PAGE_VERSION + 1, ProductTour.page_version("translation_workspaces:form")
+    assert_equal ProductTour::PAGE_VERSION, ProductTour.page_version("projects:list")
+    @user.product_tour_page_outcomes.create!(tour_key: "translation_workspaces:form", version: 1, outcome: "completed")
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+
+    assert_not ProductTour.page_seen?(@user, "translation_workspaces:form")
+    assert ProductTour.page_seen?(@user, "projects:list")
+    assert ProductTour.record_page_outcome!(@user, "translation_workspaces:form", "dismissed")
+    assert ProductTour.record_page_outcome!(@user, "translation_workspaces:form", "completed")
+    assert_equal [ [ 1, "completed" ], [ 2, "completed" ] ],
+      @user.product_tour_page_outcomes.where(tour_key: "translation_workspaces:form").order(:version).pluck(:version, :outcome)
+  end
+
   test "repeated writes from several threads leave one row, and the database refuses a duplicate" do
     threads = 4.times.map do
       Thread.new { ActiveRecord::Base.connection_pool.with_connection { ProductTour.record_page_outcome!(@user, "history:list", "completed") } }

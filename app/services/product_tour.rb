@@ -20,7 +20,9 @@ module ProductTour
   # it again.
   VERSION = 1
   # Raise to show every page guide automatically again (to accounts with page
-  # guides on), for example after rewriting them.
+  # guides on), for example after rewriting them. Rewriting one family's guide
+  # raises its rewrites: in PAGE_TOURS instead, so only that guide opens again;
+  # rows for earlier versions stay as they are.
   PAGE_VERSION = 1
   OUTCOMES = %w[completed dismissed].freeze
   # A page family has up to three contexts with different tasks: its list, its
@@ -51,11 +53,16 @@ module ProductTour
   PAGE_TOURS = {
     "new_translation" => {
       controllers: %w[translation_workspaces],
+      # 1: each kind of translation guidance got its own step.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "languages", targets: %w[workspace-languages] },
         { id: "source", targets: %w[workspace-source] },
-        { id: "knowledge", targets: %w[workspace-knowledge] },
+        { id: "terminology", targets: %w[workspace-terminology] },
+        { id: "references", targets: %w[workspace-references] },
+        { id: "methodology", targets: %w[workspace-methodology] },
+        { id: "priority", targets: %w[workspace-guidance-priority] },
         { id: "workflow", targets: %w[workspace-workflow] },
         { id: "launch", targets: %w[workspace-launch] }
       ]
@@ -220,6 +227,12 @@ module ProductTour
     match.present? && PAGE_KEY_PAGES.key?(match[:page])
   end
 
+  # The guide version a valid page key is taught at (see PAGE_VERSION).
+  def self.page_version(key)
+    controller = PAGE_KEY_PAGES.fetch(PAGE_KEY.match(key.to_s)[:page])
+    PAGE_VERSION + PAGE_TOURS.fetch(page_tour_key(controller)).fetch(:rewrites, 0)
+  end
+
   # The page-guides switch and the revision that orders it. Every write to the
   # switch increments users.product_tour_guides_revision in the same UPDATE,
   # under the row lock, so revisions follow commit order. A page rendered
@@ -231,7 +244,7 @@ module ProductTour
   end
 
   def self.page_seen?(user, key)
-    user.product_tour_page_outcomes.exists?(tour_key: key, version: PAGE_VERSION)
+    user.product_tour_page_outcomes.exists?(tour_key: key, version: page_version(key))
   end
 
   # Records a page guide as seen, once per key and version. The first write
@@ -245,15 +258,16 @@ module ProductTour
     raise ArgumentError, "unknown product tour outcome" unless OUTCOMES.include?(outcome)
     raise ArgumentError, "unknown page guide" unless valid_page_key?(key)
 
+    version = page_version(key)
     result = ProductTourPageOutcome.insert_all(
-      [ { user_id: user.id, tour_key: key, version: PAGE_VERSION, outcome: outcome, created_at: Time.current } ],
+      [ { user_id: user.id, tour_key: key, version: version, outcome: outcome, created_at: Time.current } ],
       unique_by: :index_product_tour_page_outcomes_once,
       returning: :id
     )
     return true if result.rows.any?
     return false unless outcome == "completed"
 
-    user.product_tour_page_outcomes.where(tour_key: key, version: PAGE_VERSION, outcome: "dismissed")
+    user.product_tour_page_outcomes.where(tour_key: key, version: version, outcome: "dismissed")
       .update_all(outcome: "completed") == 1
   end
 

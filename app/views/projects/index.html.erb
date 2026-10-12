@@ -11,7 +11,8 @@
   </header>
 
   <% if @projects.empty? %>
-    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+    <%# Empty, the list is still where its guide points: its records will appear here. %>
+    <section class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm" data-tour-target="record-list">
       <h2 class="text-lg font-semibold text-slate-950"><%= t("projects_ui.empty") %></h2>
       <p class="mt-2 text-sm text-slate-600"><%= t("projects_ui.empty_intro") %></p>
       <%= link_to t("projects_ui.start_translation"), new_translation_workspace_path, class: "mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>

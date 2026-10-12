@@ -101,35 +101,41 @@
           </div>
         </section>
 
-        <section class="border-t border-slate-200 p-5 sm:p-6 lg:p-7" data-tour-target="workspace-knowledge">
+        <section class="border-t border-slate-200 p-5 sm:p-6 lg:p-7">
           <div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-slate-950"><%= t("workspace_ui.guidance") %></h2><p class="mt-1 text-sm text-slate-500"><%= t("workspace_ui.guidance_intro") %></p></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><%= t("workspace_ui.optional") %></span></div>
-          <fieldset id="workspace-glossary" class="mt-5 min-w-0">
-            <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><%= t("workspace_ui.terminology") %> <%= render "shared/hint", text: t("workspace_ui.terminology_hint"), label: t("workspace_ui.terminology") %></legend>
-            <div class="mt-3"><%= render "workspace_terminology/panel", glossaries: @glossaries, selected_revision_id: @translation_workspace.glossary_revision_id, pagination: @glossaries_pagination %></div>
-          </fieldset>
+          <%# All four kinds of guidance are in view: behind a disclosure, few people found references, methodology or priority. %>
+          <div class="mt-5 grid gap-x-8 gap-y-6 lg:grid-cols-2">
+            <fieldset id="workspace-glossary" class="min-w-0 lg:col-span-2" aria-describedby="workspace-glossary-intro" data-tour-target="workspace-terminology">
+              <%= render "translation_workspaces/guidance_legend", number: 1, title: t("workspace_ui.terminology"), intro: t("workspace_ui.terminology_intro"), intro_id: "workspace-glossary-intro" %>
+              <div class="mt-3"><%= render "workspace_terminology/panel", glossaries: @glossaries, selected_revision_id: @translation_workspace.glossary_revision_id, pagination: @glossaries_pagination %></div>
+            </fieldset>
 
-          <details class="mt-5 border-t border-slate-100 pt-4">
-            <summary class="cursor-pointer text-sm font-semibold text-slate-800"><%= t("workspace_ui.advanced") %></summary>
-            <div class="mt-5 grid gap-7 lg:grid-cols-2">
-              <fieldset id="workspace-references" data-controller="choice-limit" data-choice-limit-max-value="<%= ExperimentReferenceRevision::MAXIMUM_REFERENCES %>" data-action="change->choice-limit#update">
-                <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><%= t("workspace_ui.references") %> <%= render "shared/hint", text: t("workspace_ui.references_hint"), label: t("workspace_ui.references") %></legend>
+            <%# A legend sits on its fieldset's border, so the dividers are on wrappers. %>
+            <div class="min-w-0 border-t border-slate-100 pt-5">
+              <fieldset id="workspace-references" class="min-w-0" aria-describedby="workspace-references-intro" data-tour-target="workspace-references" data-controller="choice-limit" data-choice-limit-max-value="<%= ExperimentReferenceRevision::MAXIMUM_REFERENCES %>" data-action="change->choice-limit#update">
+                <%= render "translation_workspaces/guidance_legend", number: 2, title: t("workspace_ui.references"), intro: t("workspace_ui.references_intro"), intro_id: "workspace-references-intro" %>
                 <p class="mt-1 text-xs text-slate-500"><%= t("workspace_ui.references_limit") %></p>
                 <div class="mt-3 space-y-2"><% @translation_references.each do |reference| %><% revision = reference.current_revision %><label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/40"><%= check_box_tag "translation_workspace[translation_reference_revision_ids][]", revision.id, @translation_workspace.translation_reference_revision_ids.map(&:to_s).include?(revision.id.to_s), id: "translation_workspace_translation_reference_revision_ids_#{revision.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %><span><span class="block text-sm font-medium"><%= revision.title %> · <%= t("glossaries_ui.revision_inline", version: revision.version) %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></label><% end %></div>
                 <%= render "translation_workspaces/configuration_pagination", pagination: @translation_references_pagination, label: t("workspace_ui.translation_references"), page_param: :translation_reference_page %>
                 <% selected_count = @translation_workspace.translation_reference_revision_ids.count(&:present?) %><p class="mt-2 text-xs font-semibold text-slate-600"><%= t("workspace_ui.references_selected", count: selected_count) %></p>
                 <% if @translation_references.empty? %><p class="mt-2 text-xs text-slate-500"><%= link_to t("references_ui.create"), new_translation_reference_path, class: "font-semibold text-blue-700" %> <%= t("workspace_ui.references_empty_suffix") %></p><% end %>
               </fieldset>
+            </div>
 
-              <div class="space-y-6">
-                <fieldset id="workspace-methodology">
-                  <legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><%= t("workspace_ui.methodology") %> <%= render "shared/hint", text: t("workspace_ui.methodology_hint"), label: t("workspace_ui.methodology") %></legend>
-                  <div class="mt-3 space-y-2"><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, "", checked: @translation_workspace.methodology_profile_revision_id.blank?, class: "mt-1 size-4" %><span><span class="text-sm font-semibold"><%= t("workspace_ui.no_methodology") %></span><span class="mt-0.5 block text-xs text-slate-500"><%= t("workspace_ui.no_methodology_hint") %></span></span></span></label><% @methodology_profiles.each do |profile| %><% revision = profile.current_revision %><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, revision.id, checked: @translation_workspace.methodology_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · <%= t("glossaries_ui.revision_inline", version: revision.version) %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></span></label><% end %></div>
-                  <%= render "translation_workspaces/configuration_pagination", pagination: @methodology_profiles_pagination, label: t("workspace_ui.methodology_profiles"), page_param: :methodology_profile_page %>
+            <div class="min-w-0 space-y-6 border-t border-slate-100 pt-5">
+              <fieldset id="workspace-methodology" class="min-w-0" aria-describedby="workspace-methodology-intro" data-tour-target="workspace-methodology">
+                <%= render "translation_workspaces/guidance_legend", number: 3, title: t("workspace_ui.methodology"), intro: t("workspace_ui.methodology_intro"), intro_id: "workspace-methodology-intro" %>
+                <div class="mt-3 space-y-2"><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, "", checked: @translation_workspace.methodology_profile_revision_id.blank?, class: "mt-1 size-4" %><span><span class="text-sm font-semibold"><%= t("workspace_ui.no_methodology") %></span><span class="mt-0.5 block text-xs text-slate-500"><%= t("workspace_ui.no_methodology_hint") %></span></span></span></label><% @methodology_profiles.each do |profile| %><% revision = profile.current_revision %><label class="block rounded-xl border border-slate-200 p-3"><span class="flex items-start gap-3"><%= form.radio_button :methodology_profile_revision_id, revision.id, checked: @translation_workspace.methodology_profile_revision_id.to_s == revision.id.to_s, class: "mt-1 size-4" %><span><span class="block text-sm font-semibold"><%= revision.name %> · <%= t("glossaries_ui.revision_inline", version: revision.version) %></span><span class="mt-0.5 block text-xs text-slate-500"><%= revision.source_language %> → <%= revision.target_language %></span></span></span></label><% end %></div>
+                <%= render "translation_workspaces/configuration_pagination", pagination: @methodology_profiles_pagination, label: t("workspace_ui.methodology_profiles"), page_param: :methodology_profile_page %>
+              </fieldset>
+              <div class="border-t border-slate-100 pt-5">
+                <fieldset id="workspace-guidance" class="min-w-0" aria-describedby="workspace-guidance-intro" data-tour-target="workspace-guidance-priority">
+                  <%= render "translation_workspaces/guidance_legend", number: 4, title: t("workspace_ui.guidance_priority"), intro: t("workspace_ui.guidance_priority_intro"), intro_id: "workspace-guidance-intro" %>
+                  <div class="mt-3 space-y-2"><% TranslationGuidance::Policy::LABELS.each do |value, _label| %><label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><%= form.radio_button :guidance_preference, value, checked: @translation_workspace.guidance_preference == value, class: "size-4" %><span class="text-sm font-semibold"><%= localized_guidance_label(value) %></span></label><% end %></div>
                 </fieldset>
-                <fieldset id="workspace-guidance"><legend class="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><%= t("workspace_ui.guidance_priority") %> <%= render "shared/hint", text: t("workspace_ui.guidance_priority_hint"), label: t("workspace_ui.guidance_priority") %></legend><div class="mt-3 space-y-2"><% TranslationGuidance::Policy::LABELS.each do |value, _label| %><label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><%= form.radio_button :guidance_preference, value, checked: @translation_workspace.guidance_preference == value, class: "size-4" %><span class="text-sm font-semibold"><%= localized_guidance_label(value) %></span></label><% end %></div></fieldset>
               </div>
             </div>
-          </details>
+          </div>
         </section>
       </div>
 
