@@ -62,6 +62,19 @@ class ProductTourTest < ActiveSupport::TestCase
                      ProductTour.page_context_key("pipeline_runs", "show", "GET")
   end
 
+  test "the switch's revision follows the order writes commit in, not the clock" do
+    before = ProductTour.page_guides_state(@user)
+    travel_to(Time.current) { ProductTour.set_page_guides!(@user, true) }
+    first = ProductTour.page_guides_state(@user)
+    # A later write whose request read an earlier clock still orders after.
+    travel_to(1.minute.ago) { ProductTour.set_page_guides!(@user, false) }
+    second = ProductTour.page_guides_state(@user)
+
+    assert_equal [ true, false ], [ first[:page_guides], second[:page_guides] ]
+    assert_operator first.fetch(:revision), :>, before.fetch(:revision)
+    assert_operator second.fetch(:revision), :>, first.fetch(:revision)
+  end
+
   test "the first page guide outcome wins and repeats write nothing" do
     assert ProductTour.record_page_outcome!(@user, "projects:list", "dismissed")
     assert_not ProductTour.record_page_outcome!(@user, "projects:list", "completed")

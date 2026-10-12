@@ -116,7 +116,7 @@ class ProductToursTest < ActionDispatch::IntegrationTest
   test "page guide props name this page's context and the account's own progress" do
     sign_in_as @user
     get projects_path
-    assert_equal({ "enabled" => false, "stamp" => ProductTour.page_guides_stamp(@user.reload.updated_at), "key" => "projects:list",
+    assert_equal({ "enabled" => false, "revision" => @user.reload.product_tour_guides_revision, "key" => "projects:list",
                    "version" => ProductTour::PAGE_VERSION, "seen" => false }, tour_props.fetch("page_guides"))
     assert_equal page_product_tour_path, tour_props.dig("urls", "page")
 
@@ -176,13 +176,13 @@ class ProductToursTest < ActionDispatch::IntegrationTest
   test "the guides switch accepts only true or false" do
     sign_in_as @user
     get projects_path
-    rendered_stamp = tour_props.dig("page_guides", "stamp")
+    rendered_revision = tour_props.dig("page_guides", "revision")
     patch preference_product_tour_path, params: { product_tour_preference: { page_guides: true } }.to_json, headers: JSON_HEADERS
     assert_response :ok
     assert @user.reload.product_tour_page_guides
     # The answer orders the switch after any page rendered before it.
-    assert_equal({ "page_guides" => true, "stamp" => ProductTour.page_guides_stamp(@user.updated_at) }, response.parsed_body)
-    assert_operator response.parsed_body["stamp"], :>, rendered_stamp
+    assert_equal({ "page_guides" => true, "revision" => @user.product_tour_guides_revision }, response.parsed_body)
+    assert_operator response.parsed_body["revision"], :>, rendered_revision
     patch preference_product_tour_path, params: { product_tour_preference: { page_guides: "false" } }.to_json, headers: JSON_HEADERS
     assert_response :bad_request
     assert @user.reload.product_tour_page_guides

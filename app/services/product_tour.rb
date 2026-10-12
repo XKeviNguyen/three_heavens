@@ -220,16 +220,14 @@ module ProductTour
     match.present? && PAGE_KEY_PAGES.key?(match[:page])
   end
 
-  # The page-guides switch with a stamp that orders it: the account row's
-  # updated_at in microseconds. A page rendered before a switch write committed
-  # carries an older stamp, so the browser keeps the newer value.
+  # The page-guides switch and the revision that orders it. Every write to the
+  # switch increments users.product_tour_guides_revision in the same UPDATE,
+  # under the row lock, so revisions follow commit order. A page rendered
+  # before a switch write committed carries an older revision, so the browser
+  # keeps the newer value.
   def self.page_guides_state(user)
-    enabled, updated_at = User.where(id: user.id).pick(:product_tour_page_guides, :updated_at)
-    { page_guides: enabled, stamp: page_guides_stamp(updated_at) }
-  end
-
-  def self.page_guides_stamp(updated_at)
-    updated_at.to_i * 1_000_000 + updated_at.usec
+    enabled, revision = User.where(id: user.id).pick(:product_tour_page_guides, :product_tour_guides_revision)
+    { page_guides: enabled, revision: revision }
   end
 
   def self.page_seen?(user, key)
@@ -252,7 +250,9 @@ module ProductTour
   end
 
   def self.set_page_guides!(user, enabled)
-    User.where(id: user.id).update_all(product_tour_page_guides: enabled, updated_at: Time.current)
+    User.where(id: user.id).update_all([ <<~SQL.squish, enabled, Time.current ])
+      product_tour_page_guides = ?, product_tour_guides_revision = product_tour_guides_revision + 1, updated_at = ?
+    SQL
   end
 
   def self.offered?(user)
@@ -273,7 +273,8 @@ module ProductTour
       .where("product_tour_version IS NULL OR product_tour_version < ?", VERSION)
       .update_all([ <<~SQL.squish, VERSION, outcome, Time.current, outcome == "completed" ]) == 1
         product_tour_version = ?, product_tour_outcome = ?, updated_at = ?,
-        product_tour_page_guides = CASE WHEN product_tour_version IS NULL AND ? THEN TRUE ELSE product_tour_page_guides END
+        product_tour_page_guides = CASE WHEN product_tour_version IS NULL AND ? THEN TRUE ELSE product_tour_page_guides END,
+        product_tour_guides_revision = product_tour_guides_revision + 1
       SQL
   end
 end

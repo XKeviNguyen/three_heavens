@@ -41,25 +41,38 @@ const pageId = (guides: PageGuides) => `${guides.key}@${guides.version}`
 
 // The page-guides switch as this document knows it, across Turbo visits.
 // confirmedGuides is the newest value the server reported, ordered by its
-// stamp: props rendered before a write committed (a page fetched while the
-// write was in flight, a cached page) never override it, newer props (another
-// tab) do. pendingGuides is the account's choice while it is being saved; it
-// wins until the write settles, and the island on screen then follows the
-// result (guideListeners).
-type GuidesState = { value: boolean; stamp: number }
+// revision (commit order): props rendered before a write committed (a page
+// fetched while the write was in flight, a cached page) never override it,
+// newer props (another tab) do. Two writes can change it: the account's
+// switch (pendingGuides holds the choice, which wins until saved) and the
+// welcome tour's outcome (completing it turns guides on). While either is
+// settling, a page's guide waits to decide; the island on screen follows the
+// result (guideListeners), and a page mounted after a failure in its visit
+// learns of it from switchFailedThisVisit.
+type GuidesState = { value: boolean; revision: number }
 let confirmedGuides: GuidesState | null = null
 let pendingGuides: boolean | null = null
+let outcomeSettling = false
+let switchFailedThisVisit = false
 const guideListeners = new Set<(failed: boolean) => void>()
 function confirmGuides(next: GuidesState) {
-  if (!confirmedGuides || next.stamp >= confirmedGuides.stamp) confirmedGuides = next
+  if (!confirmedGuides || next.revision >= confirmedGuides.revision) confirmedGuides = next
 }
 function currentGuides(): boolean {
   return pendingGuides ?? confirmedGuides?.value ?? false
 }
+function guidesSettling(): boolean {
+  return pendingGuides !== null || outcomeSettling
+}
+// Tells the island on screen that a write started or settled.
+function notifyGuides(failed: boolean) {
+  if (failed) switchFailedThisVisit = true
+  guideListeners.forEach((listener) => listener(failed))
+}
 function guidesAnswer(answer: unknown): GuidesState | null {
   if (answer === null || typeof answer !== "object") return null
-  const { page_guides: value, stamp } = answer as Record<string, unknown>
-  return typeof value === "boolean" && typeof stamp === "number" && Number.isSafeInteger(stamp) ? { value, stamp } : null
+  const { page_guides: value, revision } = answer as Record<string, unknown>
+  return typeof value === "boolean" && typeof revision === "number" && Number.isSafeInteger(revision) ? { value, revision } : null
 }
 // The welcome tour's outcome write; a switch press waits for it, so the server
 // applies the account's explicit choice last.
@@ -67,6 +80,7 @@ let outcomeWrite: Promise<unknown> = Promise.resolve()
 let restoringVisit = false
 document.addEventListener("turbo:visit", (event) => {
   restoringVisit = (event as CustomEvent<{ action?: string }>).detail?.action === "restore"
+  switchFailedThisVisit = false
 })
 function renderedFromCache(): boolean {
   return restoringVisit || document.documentElement.hasAttribute("data-turbo-preview")
@@ -81,6 +95,8 @@ document.addEventListener("turbo:load", () => {
     sendingPages.clear()
     confirmedGuides = null
     pendingGuides = null
+    outcomeSettling = false
+    switchFailedThisVisit = false
     helpIntroPlayed = false
     signedInSession += 1
   }
@@ -182,10 +198,10 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   const [offerPending, setOfferPending] = useState(() => offer && Math.max(resolvedVersion, sendingVersion) < version)
   const [refreshing] = useState(pageAutoRefreshes)
   const [guidesEnabled, setGuidesEnabled] = useState(() => {
-    confirmGuides({ value: pageGuides.enabled, stamp: pageGuides.stamp })
+    confirmGuides({ value: pageGuides.enabled, revision: pageGuides.revision })
     return currentGuides()
   })
-  const [guidesPending, setGuidesPending] = useState(() => pendingGuides !== null)
+  const [guidesPending, setGuidesPending] = useState(guidesSettling)
   // Back/Forward and previews show a cached page: never a moment to teach.
   const [fromCache] = useState(renderedFromCache)
   const [menuAnchor, setMenuAnchor] = useState<Anchor | null>(null)
@@ -199,7 +215,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   const headerRoot = useRef<HTMLDivElement>(null)
   const restoreFocus = useRef(false)
   const autoDecided = useRef(false)
-  const switchFailed = useRef(false)
+  const switchFailed = useRef(switchFailedThisVisit)
   const sessionRef = useRef(session)
   sessionRef.current = session
   const ids = useId()
@@ -211,11 +227,15 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     setOfferPending(false)
     const sentIn = signedInSession
     sendingVersion = Math.max(sendingVersion, version)
+    outcomeSettling = true
+    notifyGuides(false)
     outcomeWrite = send(urls.outcome, { product_tour: { outcome, version } })
       .then(readJson)
       .then((answer) => {
         if (sentIn !== signedInSession) return
+        outcomeSettling = false
         if (answer === undefined) {
+          notifyGuides(false)
           // Not recorded (offline, signed out, refused): the next page offers it again.
           sendingVersion = 0
           return
@@ -224,10 +244,8 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
         // Completing a first tour turns page guides on, unless another tab
         // answered first: the server says which.
         const guides = guidesAnswer(answer)
-        if (guides) {
-          confirmGuides(guides)
-          guideListeners.forEach((listener) => listener(false))
-        }
+        if (guides) confirmGuides(guides)
+        notifyGuides(false)
       })
   }
 
@@ -252,7 +270,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     if (pendingGuides !== null) return
     pendingGuides = !currentGuides()
     const next = pendingGuides
-    guideListeners.forEach((listener) => listener(false))
+    notifyGuides(false)
     const sentIn = signedInSession
     void outcomeWrite
       .then(() => send(urls.preference, { product_tour_preference: { page_guides: next } }))
@@ -262,7 +280,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
         pendingGuides = null
         const saved = guidesAnswer(answer)
         if (saved) confirmGuides(saved)
-        guideListeners.forEach((listener) => listener(saved === null))
+        notifyGuides(saved === null)
       })
   }
 
@@ -270,7 +288,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     const follow = (failed: boolean) => {
       if (failed) switchFailed.current = true
       setGuidesEnabled(currentGuides())
-      setGuidesPending(pendingGuides !== null)
+      setGuidesPending(guidesSettling())
     }
     guideListeners.add(follow)
     follow(false)

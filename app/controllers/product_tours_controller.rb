@@ -40,7 +40,7 @@ class ProductToursController < ApplicationController
   end
 
   # Help → "Show page guides automatically". Answers with the stored switch and
-  # its stamp (see ProductTour.page_guides_state).
+  # its revision (see ProductTour.page_guides_state).
   def preference
     enabled = params.expect(product_tour_preference: [ :page_guides ])[:page_guides]
     raise ActionController::BadRequest, "page_guides must be true or false" unless [ true, false ].include?(enabled)

@@ -533,6 +533,40 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
   end
 
+  test "a switch change that fails while the next page is swapped in is still undone there" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    fail_held_requests_between_pages
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert @user.reload.product_tour_page_guides
+  end
+
+  test "finishing the welcome tour and leaving at once shows the next page's guide once guides are on" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit projects_path
+    within("[data-testid='product-tour-invite']") { click_button "Take the tour" }
+    6.times { click_tour_button "Next" }
+    hold_switch_requests("/product_tour")
+    click_tour_button "Done"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    release_switch_requests
+    assert_tour_step "1 of", "Glossaries"
+    assert @user.reload.product_tour_page_guides
+  end
+
   test "a switch change that fails is undone on the page reached meanwhile" do
     @user.update_columns(product_tour_page_guides: true)
     @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
@@ -661,14 +695,14 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # Holds the page-guides switch's requests in this document (it survives
-  # Turbo visits) until released, like a slow network; fail: answers 503.
-  def hold_switch_requests
-    page.execute_script(<<~JS)
+  # Holds this document's requests to one path (the document survives Turbo
+  # visits) until released, like a slow network; fail: answers 503.
+  def hold_switch_requests(path = "/product_tour/preference")
+    page.execute_script(<<~JS, path)
       const original = window.fetch
       window.heldSwitchRequests = []
       window.fetch = (input, init) => {
-        if (!String(input).includes("/product_tour/preference")) return original(input, init)
+        if (new URL(String(input), location.href).pathname !== arguments[0]) return original(input, init)
         return new Promise((resolve, reject) => window.heldSwitchRequests.push({ go: () => original(input, init).then(resolve, reject), fail: () => resolve(new Response(null, { status: 503 })) }))
       }
     JS
@@ -677,6 +711,14 @@ class ProductTourSystemTest < ApplicationSystemTestCase
   def release_switch_requests(fail: false)
     assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
     page.execute_script("window.heldSwitchRequests.splice(0).forEach((request) => request[arguments[0] ? 'fail' : 'go']())", fail)
+  end
+
+  # Fails the held requests while the next page is swapped in: after the old
+  # island unmounted (turbo:before-render) and before the new one mounts.
+  def fail_held_requests_between_pages
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:render", () => window.heldSwitchRequests.splice(0).forEach((request) => request.fail()), { once: true })
+    JS
   end
 
   def guides_switch

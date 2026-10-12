@@ -3606,11 +3606,13 @@ CREATE TABLE public.users (
     product_tour_version integer,
     product_tour_outcome character varying,
     product_tour_page_guides boolean DEFAULT false NOT NULL,
+    product_tour_guides_revision bigint DEFAULT 0 NOT NULL,
     CONSTRAINT users_ai_payment_source_check CHECK ((((ai_payment_source)::text = 'managed'::text) OR ((ai_payment_source)::text = 'personal'::text))),
     CONSTRAINT users_appearance_check CHECK (((appearance)::text = ANY (ARRAY[('system'::character varying)::text, ('light'::character varying)::text, ('dark'::character varying)::text]))),
     CONSTRAINT users_locale_check CHECK (((locale)::text = ANY (ARRAY[('en'::character varying)::text, ('vi'::character varying)::text, ('ja'::character varying)::text]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
     CONSTRAINT users_product_tour_check CHECK ((((product_tour_version IS NULL) AND (product_tour_outcome IS NULL)) OR ((product_tour_version IS NOT NULL) AND (product_tour_version > 0) AND (product_tour_outcome IS NOT NULL) AND (((product_tour_outcome)::text = 'completed'::text) OR ((product_tour_outcome)::text = 'dismissed'::text) OR ((product_tour_outcome)::text = 'preexisting'::text))))),
+    CONSTRAINT users_product_tour_guides_revision_check CHECK ((product_tour_guides_revision >= 0)),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
     CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
 );
@@ -7083,6 +7085,7 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261012100000'),
 ('20261012090000'),
 ('20261011090000'),
 ('20261010090300'),

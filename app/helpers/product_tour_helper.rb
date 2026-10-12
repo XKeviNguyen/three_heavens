@@ -23,7 +23,7 @@ module ProductTourHelper
       messages: t("product_tour.ui"),
       # Queried even with the switch off: turning it on from another page may
       # let this page's guide open once that change is saved.
-      page_guides: { enabled: guides, stamp: ProductTour.page_guides_stamp(current_user.updated_at),
+      page_guides: { enabled: guides, revision: current_user.product_tour_guides_revision,
                      key: page_key, version: ProductTour::PAGE_VERSION,
                      seen: page_key ? ProductTour.page_seen?(current_user, page_key) : false },
       tours: {
