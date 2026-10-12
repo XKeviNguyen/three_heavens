@@ -226,6 +226,10 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
 
   function recordOutcome(outcome: TourOutcome) {
     if (!offerPending) return
+    // Answering the welcome window ends this page's wait for its guide, unless
+    // guides are still off: then turning them on in Help opens it. (Finishing
+    // the tour turns them on, and a second tour right after it is too much.)
+    if (outcome === "completed" || currentGuides()) autoDecided.current = true
     // Hidden on this page at once; remembered across pages only once the
     // server has recorded it (see resolvedVersion).
     setOfferPending(false)
@@ -333,17 +337,17 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
 
   // This page's guide opens by itself on the account's first visit, decided
   // once, when the page appears (or, if a switch change from the previous
-  // page is still being saved, once it is): not while the invitation is
-  // waiting, not after that change failed, not on a cached page (Back/Forward,
-  // a Turbo preview), and only on a quiet page: not over another dialog, not
-  // while the user is typing, and not on a page that keeps refreshing.
-  // While guides are off the page waits instead, so turning them on in Help
-  // opens this page's guide without a reload.
+  // page is still being saved, once it is): not after that change failed, not
+  // on a cached page (Back/Forward, a Turbo preview), and only on a quiet
+  // page: not over another dialog, not while the user is typing, and not on a
+  // page that keeps refreshing. While guides are off or the invitation is
+  // waiting, the page waits instead, so turning guides on in Help opens this
+  // page's guide without a reload (see recordOutcome for the invitation).
   useEffect(() => {
-    if (autoDecided.current || guidesPending || (!guidesEnabled && !offerPending)) return
+    if (autoDecided.current || guidesPending || offerPending || !guidesEnabled) return
     autoDecided.current = true
     const key = pageGuides.key
-    if (!guidesEnabled || !key || pageGuides.seen || offerPending || refreshing || fromCache || switchFailed.current) return
+    if (!key || pageGuides.seen || refreshing || fromCache || switchFailed.current) return
     const id = pageId(pageGuides)
     if (seenPages.has(id) || sendingPages.has(id)) return
     if (document.documentElement.hasAttribute("data-turbo-preview")) return

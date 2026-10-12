@@ -27,7 +27,7 @@ class TranslationGuidanceTest < ApplicationSystemTestCase
     titles = SECTIONS.map do |section|
       within(section) { find("legend", visible: true).text }
     end
-    assert_equal [ "1Terminology", "2References", "3Methodology", "4Guidance priority" ], titles.map { |title| title.delete("\n") }
+    assert_equal [ "1Terminology", "2Translation references", "3Methodology", "4Guidance priority" ], titles.map { |title| title.delete("\n") }
     assert_text "Select preferred terms to keep translations consistent."
     assert_text "Choose which guidance takes priority when they conflict."
 

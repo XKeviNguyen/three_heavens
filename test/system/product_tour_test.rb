@@ -430,6 +430,21 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
   end
 
+  # Codex review of #98: the page had already decided while the welcome
+  # window was open, so a newcomer's first switch-on did nothing there.
+  test "after Not now, turning page guides on in Help opens this page's guide at once" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit projects_path
+    within("[data-testid='product-tour-invite']") { click_button "Not now" }
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    open_help_and_click "Show page guides automatically"
+    assert_tour_step "1 of", "Projects"
+    assert_until { ProductTour.page_seen?(@user, "projects:list") }
+  end
+
   test "turning page guides off again while this page's guide is being claimed keeps it closed" do
     sign_in_in_browser
     visit glossaries_path
