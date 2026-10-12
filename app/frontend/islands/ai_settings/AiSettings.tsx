@@ -239,24 +239,36 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
   const showSetup = !(state.payment_source === "managed" && !state.denial_code && !key.configured)
 
   return (
-    <div className="space-y-6">
-      <p
-        className={`rounded-xl border p-4 text-sm leading-6 ${state.denial_code ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
+    <div className="flex flex-col gap-6">
+      {/* An alert: icon, then the state in words (the icon is decorative). */}
+      <div
+        className={`flex items-start gap-3 rounded-xl border p-4 text-sm leading-6 ${state.denial_code ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
         data-testid="ai-settings-status"
         data-tour-target="ai-status"
       >
-        {state.denial_code ? (
-          <>
-            <strong className="font-semibold">{messages.current.blocked}</strong> {messages.here[state.denial_code] ?? denials[state.denial_code] ?? ""}
-          </>
-        ) : state.payment_source === "personal" ? (
-          messages.current.ready_personal
-        ) : (
-          messages.current.ready_managed
-        )}
-      </p>
+        <svg aria-hidden="true" className="mt-0.5 size-5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+          {state.denial_code ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 3.5l7 12.5H3L10 3.5zM10 8.5v3.5M10 14.2v.3" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM6.8 10.2l2.2 2.2 4.2-4.6" />
+          )}
+        </svg>
+        <p>
+          {state.denial_code ? (
+            <>
+              <strong className="font-semibold">{messages.current.blocked}</strong> {messages.here[state.denial_code] ?? denials[state.denial_code] ?? ""}
+            </>
+          ) : state.payment_source === "personal" ? (
+            messages.current.ready_personal
+          ) : (
+            messages.current.ready_managed
+          )}
+        </p>
+      </div>
 
-      <div role="status" aria-live="polite" className="text-sm">
+      {/* Always mounted (a live region must exist before it speaks); while
+          empty it cancels its own flex gap instead of doubling it. */}
+      <div role="status" aria-live="polite" className="text-sm empty:-mt-6">
         {busy ? <p className="text-slate-600">{messages.working}</p> : null}
         {notice ? <p className="font-medium text-emerald-800">{notice}</p> : null}
       </div>
@@ -281,7 +293,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
                 <li key={label} aria-current={current ? "step" : undefined} className="flex items-start gap-2.5 text-sm">
                   <span
                     aria-hidden="true"
-                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${done ? "bg-emerald-700 text-white" : current ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-600"}`}
+                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums ${done ? "bg-emerald-700 text-white" : current ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-600"}`}
                   >
                     {done ? "✓" : step + 1}
                   </span>
@@ -305,7 +317,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
             return (
               <label
                 key={source}
-                className={`mt-3 flex gap-3 rounded-xl border p-4 ${checked ? "border-blue-500 bg-blue-50" : "border-slate-200"} ${unavailable ? "cursor-not-allowed" : "cursor-pointer hover:border-blue-300"}`}
+                className={`mt-3 flex gap-3 rounded-lg border p-4 ${checked ? "border-blue-500 bg-blue-50" : "border-slate-200"} ${unavailable ? "cursor-not-allowed" : "cursor-pointer hover:border-blue-300"}`}
               >
                 <input
                   type="radio"
@@ -320,7 +332,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className={`font-medium ${unavailable ? "text-slate-600" : "text-slate-950"}`}>{messages.sources[source].label}</span>
                     {source === "managed" && !state.managed_access ? (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-950">
+                      <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                         {messages.sources.managed.badge}
                       </span>
                     ) : null}
@@ -374,7 +386,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
             onChange={(event) => setApiKey(event.target.value)}
             aria-invalid={keyError ? true : undefined}
             aria-describedby={keyError ? `${ids}-key-hint ${ids}-key-error` : `${ids}-key-hint`}
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500"
           />
           <p id={`${ids}-key-hint`} className="mt-1 text-xs text-slate-500">
             {messages.key.hint}

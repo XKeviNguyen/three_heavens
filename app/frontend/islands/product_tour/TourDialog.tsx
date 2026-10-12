@@ -18,7 +18,8 @@ interface TourDialogProps {
 }
 
 const SPOTLIGHT_PADDING = 6
-const DIM = "rgb(2 6 23 / 0.66)"
+// The theme's overlay token (application.css), so light and dark both dim.
+const DIM = "var(--th-scrim)"
 // The spotlight's outline is part of its inline box-shadow (a ring utility
 // would be overridden by it); the accent token follows the light/dark theme.
 const OUTLINE = "0 0 0 2px var(--color-blue-500), 0 0 0 7px color-mix(in srgb, var(--color-blue-500) 28%, transparent)"
@@ -218,8 +219,9 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
             boxShadow: `${OUTLINE}, 0 0 0 9999px ${DIM}`
           }}
         >
-          {/* A soft glow that breathes to draw the eye; still when motion is reduced. */}
-          <span className="absolute -inset-1 rounded-[14px] shadow-[0_0_28px_6px_color-mix(in_srgb,var(--color-blue-500)_45%,transparent)] motion-safe:animate-pulse" />
+          {/* A soft static halo: endless motion would distract (and needs a
+              pause control under WCAG 2.2.2), so the outline does the work. */}
+          <span className="absolute -inset-1 rounded-[14px] shadow-[0_0_24px_4px_color-mix(in_srgb,var(--color-blue-500)_35%,transparent)]" />
         </div>
       ) : (
         <div aria-hidden="true" className="fixed inset-0" style={{ background: DIM }} />
@@ -234,7 +236,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
         // to the room beside the target. The header and the action row are
         // pinned: only the text scrolls, so Back, Next, Skip and Finish stay
         // visible on short screens and at 200% zoom.
-        className="fixed flex max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_24px_64px_-12px_rgb(2_6_23/0.5)]"
+        className="fixed flex max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] flex-col rounded-xl border border-slate-200 bg-white text-slate-900 shadow-(--th-shadow-float)"
         style={cardStyle(placement)}
       >
         {arrow ? (
@@ -242,7 +244,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
         ) : null}
         <div className="shrink-0 px-5 pt-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{eyebrow}</p>
+            <p className="text-[13px] font-medium tracking-[0.01em] text-slate-600">{eyebrow}</p>
             <button
               type="button"
               onClick={() => end("dismissed")}
@@ -267,7 +269,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
           <h2 id={`${ids}-title`} className="text-xl font-semibold leading-snug tracking-tight text-slate-950">
             {entry.step.title}
           </h2>
-          <p id={`${ids}-body`} className="mt-2 text-[15px] leading-7 text-slate-700">
+          <p id={`${ids}-body`} className="mt-2 text-[15px] leading-6 text-slate-700">
             {entry.step.body}
           </p>
           {isLast && finishLink ? (
@@ -281,7 +283,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
             </a>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-slate-200 bg-slate-50 px-5 py-3">
           <button
             type="button"
             onClick={() => end("dismissed")}

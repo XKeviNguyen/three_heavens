@@ -284,10 +284,10 @@ function InviteDialog({ messages, steps, onStart, onLater }: { messages: TourMes
       aria-labelledby={`${ids}-title`}
       aria-describedby={`${ids}-body`}
       data-testid="product-tour-invite"
-      className="fixed inset-0 m-auto open:flex max-h-[calc(100dvh-1.5rem)] w-[min(32rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_32px_80px_-16px_rgb(2_6_23/0.55)] backdrop:bg-[rgb(2_6_23/0.62)]"
+      className="fixed inset-0 m-auto open:flex max-h-[calc(100dvh-1.5rem)] w-[min(32rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-(--th-shadow-float) backdrop:bg-(--th-scrim)"
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2 pt-6 sm:px-8 sm:pt-8">
-        <span aria-hidden="true" className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+        <span aria-hidden="true" className="grid size-11 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-blue-700">
           <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
             <circle cx="12" cy="12" r="9" />
             <path strokeLinejoin="round" d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
@@ -296,13 +296,13 @@ function InviteDialog({ messages, steps, onStart, onLater }: { messages: TourMes
         <h2 id={`${ids}-title`} className="mt-5 text-2xl font-semibold leading-tight tracking-tight text-slate-950">
           {messages.invite.title}
         </h2>
-        <p id={`${ids}-body`} className="mt-2 text-[15px] leading-7 text-slate-700">
+        <p id={`${ids}-body`} className="mt-2 text-[15px] leading-6 text-slate-700">
           {messages.invite.body}
         </p>
-        <ol className="mt-5 grid gap-x-5 gap-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 sm:grid-cols-2">
+        <ol className="mt-5 grid gap-x-5 gap-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 sm:grid-cols-2">
           {steps.map((step, index) => (
             <li key={step.id} className="flex items-start gap-2.5">
-              <span aria-hidden="true" className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-blue-600 text-[11px] font-semibold text-white">
+              <span aria-hidden="true" className="mt-px grid size-5 shrink-0 place-items-center rounded-full border border-slate-300 bg-white text-[11px] font-semibold tabular-nums text-slate-700">
                 {index + 1}
               </span>
               <span className="leading-5">{step.title}</span>
@@ -315,14 +315,14 @@ function InviteDialog({ messages, steps, onStart, onLater }: { messages: TourMes
           ref={primaryRef}
           type="button"
           onClick={onStart}
-          className="min-h-11 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          className="min-h-11 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
         >
           {messages.invite.start}
         </button>
         <button
           type="button"
           onClick={onLater}
-          className="min-h-11 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          className="min-h-11 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
         >
           {messages.invite.later}
         </button>
