@@ -25,14 +25,14 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_tour_step "1 of 7", "Welcome to Three Heavens"
     assert_no_selector "[data-testid='product-tour-spotlight']", visible: :all
 
-    titles = [ "Your workspace", "Translation knowledge", "Workflow setups", "AI access and who pays", "Start a translation", "From candidates to a final translation" ]
+    titles = [ "Your workspace", "Your translation library", "Workflow setups", "AI access and payment", "Start a translation", "From drafts to a final translation" ]
     titles.each.with_index(2) do |title, number|
       click_tour_button "Next"
       assert_tour_step "#{number} of 7", title
     end
-    assert_spotlight_on "#app-sidebar a[href='#{settings_ai_settings_path}']", step: "AI access and who pays", back: 2
+    assert_spotlight_on "#app-sidebar a[href='#{settings_ai_settings_path}']", step: "AI access and payment", back: 2
 
-    click_tour_button "Finish"
+    click_tour_button "Done"
     assert_no_selector "[data-testid='product-tour']", visible: :all
     assert_equal "Help", active_element_text, "focus returns to Help"
     # The outcome is written by an asynchronous request.
@@ -123,9 +123,9 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_selector "[data-react-island='product-tour'][data-react-mounted='true']"
     assert_no_selector "[data-testid='product-tour-invite']"
 
-    open_help_and_click "Full product tour"
+    open_help_and_click "Product tour"
     assert_tour_step "1 of 7", "Welcome to Three Heavens"
-    click_tour_button "Skip tour"
+    click_tour_button "Skip"
 
     assert_no_selector "[data-testid='product-tour']", visible: :all
     assert_equal "preexisting", @user.reload.product_tour_outcome, "a replay writes nothing"
@@ -137,21 +137,21 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_selector "h1", text: "References"
     assert_no_selector "[data-tour-target='record-list']", visible: :all
 
-    open_help_and_click "Tour this page"
-    # Intro and Add a reference; the list, form and history steps are absent here.
-    assert_tour_step "1 of 2", "Translation references"
+    open_help_and_click "Guide to this page"
+    # Intro and New reference; the list, form and history steps are absent here.
+    assert_tour_step "1 of 2", "References"
     click_tour_button "Next"
-    assert_tour_step "2 of 2", "Add a reference"
+    assert_tour_step "2 of 2", "New reference"
     assert_spotlight_on "[data-tour-target='library-new']"
-    click_tour_button "Finish"
+    click_tour_button "Done"
     assert_no_selector "[data-testid='product-tour']", visible: :all
 
     click_link "New reference"
     assert_selector "[data-react-island='file-field'][data-react-mounted='true']", count: 2
-    open_help_and_click "Tour this page"
-    assert_tour_step "1 of 3", "Translation references"
+    open_help_and_click "Guide to this page"
+    assert_tour_step "1 of 3", "References"
     click_tour_button "Next"
-    assert_tour_step "2 of 3", "Source example"
+    assert_tour_step "2 of 3", "Source text"
     assert_spotlight_on "[data-tour-target='reference-source']"
   end
 
@@ -166,8 +166,8 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_selector "[data-react-island='product-tour'][data-react-mounted='true']"
 
     assert_no_selector "[data-testid='product-tour-invite']"
-    open_help_and_click "Tour this page"
-    assert_selector "[data-react-island='product-tour'] li", text: "This page refreshes while AI work runs."
+    open_help_and_click "Guide to this page"
+    assert_selector "[data-react-island='product-tour'] li", text: "This page updates while AI work runs."
     assert_no_selector "[data-testid='product-tour']", visible: :all
     assert_nil @user.reload.product_tour_outcome
   end
@@ -177,14 +177,14 @@ class ProductTourSystemTest < ApplicationSystemTestCase
   test "double clicking Skip closes the tour without clicking the page behind it" do
     sign_in_in_browser
     visit new_translation_reference_path
-    open_help_and_click "Full product tour"
+    open_help_and_click "Product tour"
     assert_tour_step "1 of 7", "Welcome to Three Heavens"
     page.execute_script(<<~JS)
       window.clicksBehindTour = 0
       document.addEventListener("click", (event) => { if (!event.target.closest("[data-testid='product-tour']")) window.clicksBehindTour++ })
     JS
 
-    find("[data-testid='product-tour-card'] button", text: "Skip tour").double_click
+    find("[data-testid='product-tour-card'] button", text: "Skip").double_click
 
     assert_no_selector "[data-testid='product-tour']", visible: :all
     assert_equal 0, page.evaluate_script("window.clicksBehindTour")
@@ -195,9 +195,9 @@ class ProductTourSystemTest < ApplicationSystemTestCase
   test "a target removed while it is shown is skipped instead of leaving a stale spotlight" do
     sign_in_in_browser
     visit new_translation_reference_path
-    open_help_and_click "Tour this page"
+    open_help_and_click "Guide to this page"
     click_tour_button "Next"
-    assert_tour_step "2 of 3", "Source example"
+    assert_tour_step "2 of 3", "Source text"
 
     page.execute_script("document.querySelector(\"[data-tour-target='reference-source']\").remove()")
 
@@ -210,7 +210,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     visit projects_path
     within("#app-sidebar") { click_link "History" }
     assert_selector "h1", text: "Translation history"
-    open_help_and_click "Full product tour"
+    open_help_and_click "Product tour"
     assert_tour_step "1 of 7", "Welcome to Three Heavens"
 
     page.go_back
@@ -222,7 +222,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
 
     assert_equal 1, page.evaluate_script("document.querySelectorAll('[data-react-island=\"product-tour\"][data-react-mounted]').length")
     assert_equal 1, page.evaluate_script("window.ThreeHeavensIslands.mountedCount()")
-    open_help_and_click "Full product tour"
+    open_help_and_click "Product tour"
     assert_selector "dialog[data-testid='product-tour']", count: 1
   end
 
@@ -305,7 +305,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
   test "a narrow navigation target gets the card beside it, not over the navigation" do
     sign_in_in_browser
     visit projects_path
-    open_help_and_click "Full product tour"
+    open_help_and_click "Product tour"
     click_tour_button "Next"
     assert_spotlight_on "[data-tour-target='nav-work']"
 
@@ -320,7 +320,351 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_equal "anchored", find("[data-testid='product-tour-card']")["data-placement"]
   end
 
+  # The account's first visit to each page shows its guide once; ending it
+  # (Done, Skip, Escape, or leaving the page) is remembered per page.
+  test "after the welcome tour, each page's guide opens by itself once" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit projects_path
+    within("[data-testid='product-tour-invite']") { click_button "Take the tour" }
+    6.times { click_tour_button "Next" }
+    click_tour_button "Done"
+    assert_until { @user.reload.product_tour_page_guides }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+    assert_selector "[data-testid='product-tour-card']", text: "Shown once. Replay it or turn these off under Help."
+    click_tour_button "Next"
+    click_tour_button "Done"
+    assert_until { ProductTour.page_seen?(@user, "glossaries:list") }
+
+    visit glossaries_path
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    visit translation_references_path
+    assert_tour_step "1 of", "References"
+    find("[data-testid='product-tour']").send_keys(:escape)
+    assert_until { @user.product_tour_page_outcomes.find_by(tour_key: "translation_references:list")&.outcome == "dismissed" }
+    visit translation_references_path
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    open_help_and_click "Guide to this page"
+    assert_tour_step "1 of", "References"
+    assert_no_selector "[data-testid='product-tour-card']", text: "Shown once."
+    click_tour_button "Skip"
+    assert_equal 2, @user.product_tour_page_outcomes.count, "a replay writes nothing more"
+  end
+
+  test "dismissing the welcome keeps page guides off until Help turns them on" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit projects_path
+    # Help's border waits for the welcome window to be answered before it plays.
+    assert_no_selector "#app-sidebar .th-neon--intro", visible: :all
+    within("[data-testid='product-tour-invite']") { click_button "Not now" }
+    assert_selector "#app-sidebar .th-neon--intro", visible: :all
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
+
+    visit glossaries_path
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    help = find("[data-react-island='product-tour'] button[aria-expanded]")
+    help.click
+    switch = find("[data-react-island='product-tour'] li button[aria-pressed]", text: "Show page guides automatically")
+    assert_equal [ "false", "Off" ], [ switch["aria-pressed"], switch.find("span[aria-hidden]").text ]
+    switch.click
+    assert_until { @user.reload.product_tour_page_guides }
+    assert_equal [ "true", "On" ], [ switch["aria-pressed"], switch.find("span[aria-hidden]").text ]
+
+    visit translation_references_path
+    assert_tour_step "1 of", "References"
+    click_tour_button "Skip"
+
+    find("[data-react-island='product-tour'] button[aria-expanded]").click
+    # The appearance menu must not reset Help's switch (both use .appearance-option).
+    find("[data-react-island='product-tour'] li button[aria-pressed='true']", text: "Show page guides automatically").click
+    assert_until { !@user.reload.product_tour_page_guides }
+    visit methodology_profiles_path
+    assert_selector "h1", text: "Methodologies"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "an established account sees no page guide by itself" do
+    sign_in_in_browser
+    [ projects_path, glossaries_path, translation_references_path, history_path ].each do |path|
+      visit path
+      assert_selector "[data-react-island='product-tour'][data-react-mounted='true']"
+      assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 0.5
+    end
+    assert_empty @user.product_tour_page_outcomes
+  end
+
+  # Turbo restores a cached copy of the page on Back, with props saying the
+  # guide was not seen yet; leaving mid-guide counts as dismissing it.
+  test "Back, Forward and leaving mid-guide never reopen a page guide" do
+    @user.update_columns(product_tour_page_guides: true)
+    sign_in_in_browser
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+    click_tour_button "Skip"
+    within("#app-sidebar") { click_link "History" }
+    assert_tour_step "1 of", "Translation history"
+    page.go_back
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    # Leaving History mid-guide dismissed it.
+    assert_until { ProductTour.page_seen?(@user, "history:list") }
+    page.go_forward
+    assert_selector "h1", text: "Translation history"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    page.refresh
+    assert_selector "h1", text: "Translation history"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "Help is the first control in the sidebar and in the phone header, with its border still when motion is reduced" do
+    sign_in_in_browser
+    visit projects_path
+    help = find("[data-react-island='product-tour'] button[aria-expanded]")
+    assert_equal "Help", help.text
+    first_link = find("#app-sidebar nav a", match: :first)
+    assert_operator help.rect.y, :<, first_link.rect.y, "Help sits above the navigation"
+    # The server reserves Help's height, so mounting it never shifts the
+    # navigation under a resting pointer.
+    reserved, mounted = page.evaluate_script(<<~JS)
+      (() => { const island = document.getElementById("product-tour"); return [parseFloat(getComputedStyle(island).minHeight), island.getBoundingClientRect().height] })()
+    JS
+    assert_equal reserved, mounted
+    intro = page.evaluate_script(<<~JS)
+      (() => { const s = getComputedStyle(document.querySelector("#app-sidebar .th-neon__ring"), "::before"); return [s.animationName, s.animationIterationCount, parseFloat(s.animationDuration)] })()
+    JS
+    assert_equal "th-neon-turn", intro[0]
+    assert_equal "1", intro[1]
+    assert_operator intro[2], :<, 5, "the intro animation lasts under five seconds"
+
+    page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
+    visit history_path
+    still = page.evaluate_script("getComputedStyle(document.querySelector('#app-sidebar .th-neon__ring'), '::before').animationName")
+    assert_equal "none", still
+    page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", features: [])
+
+    page.current_window.resize_to(375, 740)
+    visit projects_path
+    header_help = find("#app-header button[aria-expanded]", text: "Help")
+    assert_no_selector "#app-sidebar", visible: true
+    header_help.click
+    assert_selector "#app-header li button", text: "Product tour"
+    find("#app-header li button", text: "Product tour").click
+    assert_tour_step "1 of 7", "Welcome to Three Heavens"
+    click_tour_button "Skip"
+    assert_equal "Help", active_element_text, "focus returns to the header's Help"
+  ensure
+    page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", features: []) rescue nil
+    page.current_window.resize_to(1400, 1000)
+  end
+
   private
+
+  test "a newer page guide version opens again in the same visit, without a reload" do
+    @user.update_columns(product_tour_page_guides: true)
+    sign_in_in_browser
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+    click_tour_button "Skip"
+    glossaries = ProductTour.page_context_key("glossaries", "index", "GET")
+    assert_until { ProductTour.page_seen?(@user, glossaries) }
+
+    with_page_version(ProductTour::PAGE_VERSION + 1) do
+      within("#app-sidebar") { click_link "Glossaries" }
+      assert_tour_step "1 of", "Glossaries"
+    end
+  end
+
+  test "turning page guides off and leaving at once never shows a guide on the next page" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal "false", guides_switch["aria-pressed"], "the new page shows the choice being saved"
+
+    release_switch_requests
+    assert_until { !@user.reload.product_tour_page_guides }
+    assert_equal "false", guides_switch["aria-pressed"]
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "turning page guides on and leaving at once shows the next page's guide once the choice is saved" do
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal "true", guides_switch["aria-pressed"]
+
+    release_switch_requests
+    assert_tour_step "1 of", "Glossaries"
+    assert @user.reload.product_tour_page_guides
+  end
+
+  test "turning page guides back on and leaving at once never repeats a guide already seen" do
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    @user.product_tour_page_outcomes.create!(tour_key: ProductTour.page_context_key("glossaries", "index", "GET"),
+                                              version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    release_switch_requests
+    assert_until { @user.reload.product_tour_page_guides }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "a switch change that fails while the next page is swapped in is still undone there" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    fail_held_requests_between_pages
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert @user.reload.product_tour_page_guides
+  end
+
+  test "a switch change that fails just as the next page's Help appears is still undone there" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    fail_held_requests_when_next_island_renders
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "a page prefetched before its guide was seen elsewhere does not open the guide again" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    glossaries = ProductTour.page_context_key("glossaries", "index", "GET")
+    # Hovering prefetches the page while its guide is still unseen.
+    find("#app-sidebar a", text: "Glossaries").hover
+    assert_until { page.evaluate_script("performance.getEntriesByType('resource').some((entry) => entry.name.endsWith('/glossaries'))") }
+    # Meanwhile another tab or device finishes that guide.
+    @user.product_tour_page_outcomes.create!(tour_key: glossaries, version: ProductTour::PAGE_VERSION, outcome: "completed")
+
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal [ "completed" ], @user.product_tour_page_outcomes.where(tour_key: glossaries).pluck(:outcome)
+  end
+
+  test "a newer islands bundle loaded during a visit reloads the page once instead of mixing releases" do
+    sign_in_in_browser
+    visit glossaries_path
+    page.execute_script("const marker = document.createElement('div'); marker.id = 'cached-by-older-bundle'; document.body.append(marker)")
+    within("#app-sidebar") { click_link "History" }
+    assert_selector "h1", text: "Translation history"
+    page.execute_script("window.olderBundleDocument = true")
+    # As after a deploy: a Turbo visit adds the newer bundle's script here.
+    page.execute_script(<<~JS)
+      import(document.querySelector("script[src*='/assets/islands']").src + "?deploy=next")
+    JS
+
+    assert_until { page.evaluate_script("window.olderBundleDocument === undefined && document.readyState === 'complete'") }
+    assert_selector "h1", text: "Translation history"
+    assert_selector "[data-react-island='product-tour'] button[aria-expanded]", text: "Help"
+    page.go_back
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "#cached-by-older-bundle", visible: :all
+    assert_selector "[data-react-island='product-tour'] button[aria-expanded]", text: "Help"
+  end
+
+  test "finishing the welcome tour and leaving at once shows the next page's guide once guides are on" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit projects_path
+    within("[data-testid='product-tour-invite']") { click_button "Take the tour" }
+    6.times { click_tour_button "Next" }
+    hold_switch_requests("/product_tour")
+    click_tour_button "Done"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    release_switch_requests
+    assert_tour_step "1 of", "Glossaries"
+    assert @user.reload.product_tour_page_guides
+  end
+
+  test "a switch change that fails is undone on the page reached meanwhile" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    release_switch_requests(fail: true)
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert @user.reload.product_tour_page_guides
+    # Not on the page reached while the change was pending; normally afterwards.
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    within("#app-sidebar") { click_link "References" }
+    assert_tour_step "1 of", "References"
+  end
+
+  test "Back and Forward show cached pages without opening their guides" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit glossaries_path
+    within("[data-testid='product-tour-invite']") { click_button "Take the tour" }
+    6.times { click_tour_button "Next" }
+    click_tour_button "Done"
+    assert_until { @user.reload.product_tour_page_guides }
+
+    within("#app-sidebar") { click_link "References" }
+    assert_tour_step "1 of", "References"
+    click_tour_button "Skip"
+    page.go_back
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    page.go_forward
+    assert_selector "h1", text: "References"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    # A fresh page load of the unseen page is a genuine first visit.
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+  end
 
   def sign_in_in_browser
     visit login_path
@@ -404,6 +748,60 @@ class ProductTourSystemTest < ApplicationSystemTestCase
       flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
       sleep 0.05
     end
+  end
+
+  # Holds this document's requests to one path (the document survives Turbo
+  # visits) until released, like a slow network; fail: answers 503.
+  def hold_switch_requests(path = "/product_tour/preference")
+    page.execute_script(<<~JS, path)
+      const original = window.fetch
+      window.heldSwitchRequests = []
+      window.fetch = (input, init) => {
+        if (new URL(String(input), location.href).pathname !== arguments[0]) return original(input, init)
+        return new Promise((resolve, reject) => window.heldSwitchRequests.push({ go: () => original(input, init).then(resolve, reject), fail: () => resolve(new Response(null, { status: 503 })) }))
+      }
+    JS
+  end
+
+  def release_switch_requests(fail: false)
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    page.execute_script("window.heldSwitchRequests.splice(0).forEach((request) => request[arguments[0] ? 'fail' : 'go']())", fail)
+  end
+
+  # Fails the held requests once the next page's Help has rendered, before
+  # its effects subscribe to the switch.
+  def fail_held_requests_when_next_island_renders
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:render", () => {
+        const island = document.querySelector("[data-react-island='product-tour']")
+        new MutationObserver((records, observer) => {
+          observer.disconnect()
+          window.heldSwitchRequests.splice(0).forEach((request) => request.fail())
+        }).observe(island, { childList: true })
+      }, { once: true })
+    JS
+  end
+
+  # Fails the held requests while the next page is swapped in: after the old
+  # island unmounted (turbo:before-render) and before the new one mounts.
+  def fail_held_requests_between_pages
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:render", () => window.heldSwitchRequests.splice(0).forEach((request) => request.fail()), { once: true })
+    JS
+  end
+
+  def guides_switch
+    find("[data-react-island='product-tour'] li button[aria-pressed]", text: "Show page guides automatically", visible: :all)
+  end
+
+  def with_page_version(version)
+    original = ProductTour::PAGE_VERSION
+    ProductTour.send(:remove_const, :PAGE_VERSION)
+    ProductTour.const_set(:PAGE_VERSION, version)
+    yield
+  ensure
+    ProductTour.send(:remove_const, :PAGE_VERSION)
+    ProductTour.const_set(:PAGE_VERSION, original)
   end
 
   # The accessible name of the focused element.

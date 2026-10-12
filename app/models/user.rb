@@ -35,6 +35,7 @@ class User < ApplicationRecord
   has_many :federated_identities, dependent: :delete_all
   has_many :sessions, dependent: :delete_all
   has_many :open_router_credentials, dependent: :delete_all
+  has_many :product_tour_page_outcomes, dependent: :delete_all
   has_one :active_open_router_credential, -> { active }, class_name: "OpenRouterCredential", inverse_of: :user
 
   enum :role, { user: "user", admin: "admin" }, validate: true

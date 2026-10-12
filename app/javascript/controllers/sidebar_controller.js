@@ -9,8 +9,17 @@ const FOCUSABLE = [
   "[tabindex]:not([tabindex='-1'])"
 ].join(",")
 
+// Turbo replaces the page on every visit. Keeping the navigation's scroll
+// position stops links from jumping under a resting pointer, where hover
+// prefetching would then load a page nobody chose.
+let navScrollTop = 0
+// Pages without the navigation (sign-in, sign-out) start the next one at the top.
+document.addEventListener("turbo:load", () => {
+  if (!document.querySelector("[data-sidebar-target='nav']")) navScrollTop = 0
+})
+
 export default class extends Controller {
-  static targets = ["panel", "scrim", "trigger"]
+  static targets = ["panel", "scrim", "trigger", "nav"]
 
   connect() {
     this.onKeydown = this.onKeydown.bind(this)
@@ -18,11 +27,15 @@ export default class extends Controller {
     // back open (without its Escape handler or scroll lock) after Back.
     this.onBeforeCache = () => this.collapse()
     document.addEventListener("turbo:before-cache", this.onBeforeCache)
+    this.onBeforeRender = () => { if (this.hasNavTarget) navScrollTop = this.navTarget.scrollTop }
+    document.addEventListener("turbo:before-render", this.onBeforeRender)
+    if (this.hasNavTarget) this.navTarget.scrollTop = navScrollTop
   }
 
   disconnect() {
     document.removeEventListener("keydown", this.onKeydown)
     document.removeEventListener("turbo:before-cache", this.onBeforeCache)
+    document.removeEventListener("turbo:before-render", this.onBeforeRender)
     document.body.classList.remove("overflow-hidden")
   }
 
