@@ -21,8 +21,8 @@ interface SettingsState {
 interface Messages {
   source_legend: string
   sources: {
-    personal: { label: string; description: string }
-    managed: { label: string; description: string; enabled: string; disabled: string }
+    personal: { label: string; description: string; needs_key: string }
+    managed: { label: string; description: string; enabled: string; disabled: string; badge: string }
   }
   save_source: string
   current: { ready_personal: string; ready_managed: string; blocked: string }
@@ -36,8 +36,13 @@ interface Messages {
     replace: string
     delete: string
     delete_confirm: string
+    delete_confirm_personal: string
+    replace_confirm: string
     cancel: string
   }
+  setup: { heading: string; steps: [string, string, string]; step_done: string; step_current: string }
+  // Denial texts worded for this page (the general ones point to AI settings).
+  here: Partial<Record<DenialCode, string>>
   billing: { heading: string; items: string[] }
   working: string
   errors: Record<"network" | "session" | "unexpected", string>
@@ -83,6 +88,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
   const [selected, setSelected] = useState<PaymentSource>(initialState.payment_source)
   const [apiKey, setApiKey] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingReplace, setConfirmingReplace] = useState(false)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const inFlight = useRef(false)
@@ -90,6 +96,8 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
   const keyHeading = useRef<HTMLHeadingElement>(null)
   const deleteButton = useRef<HTMLButtonElement>(null)
   const cancelButton = useRef<HTMLButtonElement>(null)
+  const keySubmit = useRef<HTMLButtonElement>(null)
+  const replaceCancel = useRef<HTMLButtonElement>(null)
   // Focus to restore after the next render, when the focused control is replaced.
   const pendingFocus = useRef<HTMLElement | null | (() => HTMLElement | null)>(null)
 
@@ -115,6 +123,10 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
     // based on a state the first one is about to change.
     if (inFlight.current) return
     inFlight.current = true
+    // Only a confirmation open when this request started belongs to it; one
+    // opened while an unrelated request runs is left alone.
+    const confirmedReplace = confirmingReplace
+    const confirmedDelete = confirmingDelete
     setBusy(true)
     setFeedback(null)
     try {
@@ -139,17 +151,35 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
       }
       if (response.ok) {
         setApiKey("")
-        if (confirmingDelete) pendingFocus.current = () => keyHeading.current
-        setConfirmingDelete(false)
+        if (confirmedDelete) pendingFocus.current = () => keyHeading.current
+        else if (confirmedReplace) pendingFocus.current = () => keySubmit.current
+        if (confirmedDelete) setConfirmingDelete(false)
+        if (confirmedReplace) setConfirmingReplace(false)
         setFeedback({ kind: "notice", text: payload.notice ?? "", field: null })
       } else {
+        // A refused replace or delete (stale page, invalid key) closes its
+        // confirmation: the state may now show another key, which the user
+        // has not confirmed.
+        closeConfirmations(confirmedReplace, confirmedDelete)
         setFeedback({ kind: "error", text: payload.error ?? messages.errors.unexpected, field: payload.field ?? null })
       }
     } catch {
+      closeConfirmations(confirmedReplace, confirmedDelete)
       setFeedback({ kind: "error", text: messages.errors.network, field: null })
     } finally {
       inFlight.current = false
       setBusy(false)
+    }
+  }
+
+  function closeConfirmations(replace: boolean, remove: boolean) {
+    if (replace) {
+      pendingFocus.current = () => keySubmit.current
+      setConfirmingReplace(false)
+    }
+    if (remove) {
+      pendingFocus.current = () => deleteButton.current ?? keyHeading.current
+      setConfirmingDelete(false)
     }
   }
 
@@ -159,9 +189,25 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
     void mutate("PATCH", urls.source, { ai_settings: { payment_source: selected, state_token: state.state_token } })
   }
 
+  // Replacing a saved key deletes the old one, so it is confirmed first, like
+  // deleting. An empty field goes straight to the server, which explains it.
   function submitKey(event: FormEvent) {
     event.preventDefault()
+    if (state.personal_key.configured && apiKey.trim() !== "" && !confirmingReplace) {
+      pendingFocus.current = () => replaceCancel.current
+      setConfirmingReplace(true)
+      return
+    }
+    sendKey()
+  }
+
+  function sendKey() {
     void mutate("PUT", urls.key, { open_router_key: { api_key: apiKey, state_token: state.state_token } })
+  }
+
+  function cancelReplace() {
+    pendingFocus.current = () => keySubmit.current
+    setConfirmingReplace(false)
   }
 
   function deleteKey() {
@@ -173,35 +219,56 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
   const addedOn = key.configured
     ? new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(new Date(key.added_at))
     : ""
+  const hint = key.configured ? (key.hint ?? "") : ""
   const error = feedback?.kind === "error" ? feedback : null
   const sourceError = error?.field === "payment_source" ? error.text : null
   const keyError = error?.field === "api_key" ? error.text : null
   const generalError = error && !sourceError && !keyError ? error.text : null
   const notice = feedback?.kind === "notice" ? feedback.text : null
   const options: { source: PaymentSource; available: boolean; detail: string | null }[] = [
-    { source: "personal", available: key.configured, detail: null },
+    { source: "personal", available: key.configured, detail: key.configured ? null : messages.sources.personal.needs_key },
     {
       source: "managed",
       available: state.managed_access,
       detail: state.managed_access ? messages.sources.managed.enabled : messages.sources.managed.disabled
     }
   ]
+  // Add key → choose it → ready. Each step is done or not from the server's state.
+  const setupDone = [key.configured, key.configured && state.payment_source === "personal", key.configured && state.payment_source === "personal" && !state.denial_code]
+  const currentStep = setupDone.indexOf(false)
+  const showSetup = !(state.payment_source === "managed" && !state.denial_code && !key.configured)
 
   return (
-    <div className="space-y-6">
-      <p
-        className={`rounded-xl border p-4 text-sm ${state.denial_code ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
+    <div className="flex flex-col gap-6">
+      {/* An alert: icon, then the state in words (the icon is decorative). */}
+      <div
+        className={`flex items-start gap-3 rounded-xl border p-4 text-sm leading-6 ${state.denial_code ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
         data-testid="ai-settings-status"
         data-tour-target="ai-status"
       >
-        {state.denial_code
-          ? `${messages.current.blocked} ${denials[state.denial_code] ?? ""}`
-          : state.payment_source === "personal"
-            ? messages.current.ready_personal
-            : messages.current.ready_managed}
-      </p>
+        <svg aria-hidden="true" className="mt-0.5 size-5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+          {state.denial_code ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 3.5l7 12.5H3L10 3.5zM10 8.5v3.5M10 14.2v.3" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM6.8 10.2l2.2 2.2 4.2-4.6" />
+          )}
+        </svg>
+        <p>
+          {state.denial_code ? (
+            <>
+              <strong className="font-semibold">{messages.current.blocked}</strong> {messages.here[state.denial_code] ?? denials[state.denial_code] ?? ""}
+            </>
+          ) : state.payment_source === "personal" ? (
+            messages.current.ready_personal
+          ) : (
+            messages.current.ready_managed
+          )}
+        </p>
+      </div>
 
-      <div role="status" aria-live="polite" className="text-sm">
+      {/* Always mounted (a live region must exist before it speaks); while
+          empty it cancels its own flex gap instead of doubling it. */}
+      <div role="status" aria-live="polite" className="text-sm empty:-mt-6">
         {busy ? <p className="text-slate-600">{messages.working}</p> : null}
         {notice ? <p className="font-medium text-emerald-800">{notice}</p> : null}
       </div>
@@ -211,27 +278,73 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
         </p>
       ) : null}
 
+      {/* The own-key steps, unless the account is already ready on platform
+          billing and has no key: then they are an option, not a to-do. */}
+      {showSetup ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby={`${ids}-setup-heading`} data-testid="ai-settings-setup">
+          <h2 id={`${ids}-setup-heading`} className="text-sm font-semibold text-slate-950">
+            {messages.setup.heading}
+          </h2>
+          <ol className="mt-3 grid gap-3 sm:grid-cols-3">
+            {messages.setup.steps.map((label, step) => {
+              const done = setupDone[step]
+              const current = step === currentStep
+              return (
+                <li key={label} aria-current={current ? "step" : undefined} className="flex items-start gap-2.5 text-sm">
+                  <span
+                    aria-hidden="true"
+                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums ${done ? "bg-emerald-700 text-white" : current ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-600"}`}
+                  >
+                    {done ? "✓" : step + 1}
+                  </span>
+                  <span className={done ? "text-slate-700" : current ? "font-semibold text-slate-950" : "text-slate-600"}>
+                    {label}
+                    <span className="sr-only">{done ? ` (${messages.setup.step_done})` : current ? ` (${messages.setup.step_current})` : ""}</span>
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
+      ) : null}
+
       <form onSubmit={submitSource} className="rounded-xl border border-slate-200 bg-white p-5" data-tour-target="ai-source" noValidate>
         <fieldset aria-describedby={sourceError ? `${ids}-source-error` : undefined}>
           <legend className="text-lg font-semibold text-slate-950">{messages.source_legend}</legend>
-          {options.map(({ source, available, detail }) => (
-            <label key={source} className="mt-4 flex gap-3">
-              <input
-                type="radio"
-                name="payment_source"
-                value={source}
-                checked={selected === source}
-                disabled={!available && state.payment_source !== source}
-                onChange={() => setSelected(source)}
-                className="mt-1 size-4"
-              />
-              <span>
-                <span className="block font-medium text-slate-950">{messages.sources[source].label}</span>
-                <span className="block text-sm text-slate-600">{messages.sources[source].description}</span>
-                {detail ? <span className="block text-sm text-slate-600">{detail}</span> : null}
-              </span>
-            </label>
-          ))}
+          {options.map(({ source, available, detail }) => {
+            const unavailable = !available && state.payment_source !== source
+            const checked = selected === source
+            return (
+              <label
+                key={source}
+                className={`mt-3 flex gap-3 rounded-lg border p-4 ${checked ? "border-blue-500 bg-blue-50" : "border-slate-200"} ${unavailable ? "cursor-not-allowed" : "cursor-pointer hover:border-blue-300"}`}
+              >
+                <input
+                  type="radio"
+                  name="payment_source"
+                  value={source}
+                  checked={checked}
+                  disabled={unavailable}
+                  onChange={() => setSelected(source)}
+                  className="mt-1 size-4 shrink-0"
+                />
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className={`font-medium ${unavailable ? "text-slate-600" : "text-slate-950"}`}>{messages.sources[source].label}</span>
+                    {source === "managed" && !state.managed_access ? (
+                      <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {messages.sources.managed.badge}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-slate-600">{messages.sources[source].description}</span>
+                  {detail ? (
+                    <span className={`mt-1 block text-sm ${source === "personal" ? "font-medium text-blue-700" : "text-slate-600"}`}>{detail}</span>
+                  ) : null}
+                </span>
+              </label>
+            )
+          })}
         </fieldset>
         {sourceError ? (
           <p id={`${ids}-source-error`} role="alert" className="mt-3 text-sm text-red-700">
@@ -248,7 +361,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
           {messages.key.heading}
         </h2>
         <p className="mt-1 text-sm text-slate-600" data-testid="ai-settings-key-status">
-          {key.configured ? interpolate(messages.key.configured, { hint: key.hint ?? "", date: addedOn }) : messages.key.missing}
+          {key.configured ? interpolate(messages.key.configured, { hint, date: addedOn }) : messages.key.missing}
         </p>
         <form onSubmit={submitKey} className="mt-4" noValidate>
           <label htmlFor={`${ids}-api-key`} className="block text-sm font-medium text-slate-800">
@@ -273,7 +386,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
             onChange={(event) => setApiKey(event.target.value)}
             aria-invalid={keyError ? true : undefined}
             aria-describedby={keyError ? `${ids}-key-hint ${ids}-key-error` : `${ids}-key-hint`}
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500"
           />
           <p id={`${ids}-key-hint`} className="mt-1 text-xs text-slate-500">
             {messages.key.hint}
@@ -283,16 +396,39 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
               {keyError}
             </p>
           ) : null}
-          <button type="submit" aria-disabled={busy} className={`mt-3 ${primaryButton}`}>
-            {key.configured ? messages.key.replace : messages.key.save}
-          </button>
+          {confirmingReplace ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="group" aria-labelledby={`${ids}-replace-prompt`}>
+              <p id={`${ids}-replace-prompt`} className="text-sm text-amber-950">
+                {interpolate(messages.key.replace_confirm, { hint })}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" aria-disabled={busy} onClick={sendKey} className={primaryButton}>
+                  {messages.key.replace}
+                </button>
+                <button
+                  type="button"
+                  ref={replaceCancel}
+                  aria-disabled={busy}
+                  onClick={() => busy || cancelReplace()}
+                  className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  {messages.key.cancel}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button ref={keySubmit} type="submit" aria-disabled={busy} className={`mt-3 ${primaryButton}`}>
+              {key.configured ? messages.key.replace : messages.key.save}
+            </button>
+          )}
         </form>
-        {key.configured ? (
+        {key.configured && !confirmingReplace ? (
           <div className="mt-3">
             {confirmingDelete ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3" role="group" aria-labelledby={`${ids}-delete-prompt`}>
                 <p id={`${ids}-delete-prompt`} className="text-sm text-red-900">
-                  {messages.key.delete_confirm}
+                  {interpolate(messages.key.delete_confirm, { hint })}
+                  {state.payment_source === "personal" ? ` ${messages.key.delete_confirm_personal}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button

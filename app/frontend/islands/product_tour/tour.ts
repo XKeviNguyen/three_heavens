@@ -128,24 +128,34 @@ export interface Box {
 
 export type Placement =
   | { kind: "centered" }
-  | { kind: "sheet"; edge: "top" | "bottom" }
+  // maxHeight is set on phones only: the room left on the side away from the
+  // target, so the card does not cover it (its actions stay pinned and visible).
+  | { kind: "sheet"; edge: "top" | "bottom"; maxHeight: number | null }
   | { kind: "anchored"; side: "top" | "bottom" | "left" | "right"; top: number; left: number; arrow: number }
 
 const GAP = 12
 const MARGIN = 12
 // Below this width the card is a full-width sheet instead of a popover.
 const SHEET_BREAKPOINT = 640
+// A phone sheet never gets shorter than this, even if it then overlaps a tall
+// target: title, a few lines of text, and the action row must fit.
+const SHEET_MIN_HEIGHT = 240
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max))
 
-// Where the card goes for a target box, in viewport coordinates. Tries below,
-// above, right, then left of the target; if the card fits nowhere beside it
-// (a tall target, 200% zoom), it becomes a sheet on the edge away from it.
+// Where the card goes for a target box, in viewport coordinates. A target
+// narrower than the card (a navigation link, a button) gets the card beside
+// it, so the column it sits in stays readable; a wide target (a page section)
+// gets it below or above. If the card fits nowhere beside the target (a tall
+// target, 200% zoom), it becomes a sheet on the edge away from it.
 export function placeCard(target: Box | null, card: { width: number; height: number }, viewport: { width: number; height: number }): Placement {
   if (!target) return { kind: "centered" }
   const targetCenterY = target.top + target.height / 2
   if (viewport.width < SHEET_BREAKPOINT) {
-    return { kind: "sheet", edge: targetCenterY > viewport.height / 2 ? "top" : "bottom" }
+    const edge = targetCenterY > viewport.height / 2 ? "top" : "bottom"
+    const room = edge === "bottom" ? viewport.height - (target.top + target.height) - GAP - MARGIN : target.top - GAP - MARGIN
+    const maxHeight = Math.min(viewport.height - MARGIN * 2, Math.max(room, SHEET_MIN_HEIGHT))
+    return { kind: "sheet", edge, maxHeight: Math.floor(maxHeight) }
   }
 
   const centerX = target.left + target.width / 2
@@ -155,21 +165,35 @@ export function placeCard(target: Box | null, card: { width: number; height: num
   const fitsHorizontally = card.width + MARGIN * 2 <= viewport.width
   const fitsVertically = card.height + MARGIN * 2 <= viewport.height
 
-  const below = target.top + target.height + GAP
-  if (fitsHorizontally && below + card.height + MARGIN <= viewport.height) {
-    return { kind: "anchored", side: "bottom", top: below, left: horizontalLeft, arrow: clamp(centerX - horizontalLeft, 20, card.width - 20) }
+  const below = (): Placement | null => {
+    const top = target.top + target.height + GAP
+    return fitsHorizontally && top + card.height + MARGIN <= viewport.height
+      ? { kind: "anchored", side: "bottom", top, left: horizontalLeft, arrow: clamp(centerX - horizontalLeft, 20, card.width - 20) }
+      : null
   }
-  const above = target.top - GAP - card.height
-  if (fitsHorizontally && above >= MARGIN) {
-    return { kind: "anchored", side: "top", top: above, left: horizontalLeft, arrow: clamp(centerX - horizontalLeft, 20, card.width - 20) }
+  const above = (): Placement | null => {
+    const top = target.top - GAP - card.height
+    return fitsHorizontally && top >= MARGIN
+      ? { kind: "anchored", side: "top", top, left: horizontalLeft, arrow: clamp(centerX - horizontalLeft, 20, card.width - 20) }
+      : null
   }
-  const right = target.left + target.width + GAP
-  if (fitsVertically && right + card.width + MARGIN <= viewport.width) {
-    return { kind: "anchored", side: "right", top: verticalTop, left: right, arrow: clamp(centerY - verticalTop, 20, card.height - 20) }
+  const right = (): Placement | null => {
+    const left = target.left + target.width + GAP
+    return fitsVertically && left + card.width + MARGIN <= viewport.width
+      ? { kind: "anchored", side: "right", top: verticalTop, left, arrow: clamp(centerY - verticalTop, 20, card.height - 20) }
+      : null
   }
-  const left = target.left - GAP - card.width
-  if (fitsVertically && left >= MARGIN) {
-    return { kind: "anchored", side: "left", top: verticalTop, left, arrow: clamp(centerY - verticalTop, 20, card.height - 20) }
+  const left = (): Placement | null => {
+    const position = target.left - GAP - card.width
+    return fitsVertically && position >= MARGIN
+      ? { kind: "anchored", side: "left", top: verticalTop, left: position, arrow: clamp(centerY - verticalTop, 20, card.height - 20) }
+      : null
   }
-  return { kind: "sheet", edge: centerY > viewport.height / 2 ? "top" : "bottom" }
+
+  const order = target.width < card.width ? [right, left, below, above] : [below, above, right, left]
+  for (const candidate of order) {
+    const placement = candidate()
+    if (placement) return placement
+  }
+  return { kind: "sheet", edge: centerY > viewport.height / 2 ? "top" : "bottom", maxHeight: null }
 }

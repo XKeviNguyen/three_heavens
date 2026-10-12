@@ -18,7 +18,11 @@ interface TourDialogProps {
 }
 
 const SPOTLIGHT_PADDING = 6
-const DIM = "rgb(2 6 23 / 0.62)"
+// The theme's overlay token (application.css), so light and dark both dim.
+const DIM = "var(--th-scrim)"
+// The spotlight's outline is part of its inline box-shadow (a ring utility
+// would be overridden by it); the accent token follows the light/dark theme.
+const OUTLINE = "0 0 0 2px var(--color-blue-500), 0 0 0 7px color-mix(in srgb, var(--color-blue-500) 28%, transparent)"
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -35,7 +39,7 @@ function cardStyle(placement: Placement): CSSProperties {
     case "centered":
       return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }
     case "sheet":
-      return { left: "50%", transform: "translateX(-50%)", [placement.edge]: 12 }
+      return { left: "50%", transform: "translateX(-50%)", [placement.edge]: 12, ...(placement.maxHeight ? { maxHeight: placement.maxHeight } : {}) }
     case "anchored":
       return { top: placement.top, left: placement.left }
   }
@@ -191,6 +195,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
   const { box, placement } = layout
   const arrow = arrowStyle(placement)
   const motion = prefersReducedMotion() ? "" : "transition-[top,left,width,height] duration-200 ease-out"
+  const eyebrow = kind === "global" ? messages.full_tour : messages.page_tour
 
   return (
     <dialog
@@ -205,15 +210,19 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
         <div
           aria-hidden="true"
           data-testid="product-tour-spotlight"
-          className={`pointer-events-none fixed rounded-xl ring-2 ring-blue-500 ${motion}`}
+          className={`pointer-events-none fixed rounded-xl ${motion}`}
           style={{
             top: box.top - SPOTLIGHT_PADDING,
             left: box.left - SPOTLIGHT_PADDING,
             width: box.width + SPOTLIGHT_PADDING * 2,
             height: box.height + SPOTLIGHT_PADDING * 2,
-            boxShadow: `0 0 0 9999px ${DIM}`
+            boxShadow: `${OUTLINE}, 0 0 0 9999px ${DIM}`
           }}
-        />
+        >
+          {/* A soft static halo: endless motion would distract (and needs a
+              pause control under WCAG 2.2.2), so the outline does the work. */}
+          <span className="absolute -inset-1 rounded-[14px] shadow-[0_0_24px_4px_color-mix(in_srgb,var(--color-blue-500)_35%,transparent)]" />
+        </div>
       ) : (
         <div aria-hidden="true" className="fixed inset-0" style={{ background: DIM }} />
       )}
@@ -222,57 +231,73 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
         ref={cardRef}
         data-testid="product-tour-card"
         data-placement={placement.kind}
-        // Size never depends on placement, so a measurement cannot flip the
-        // placement back and forth.
-        className="fixed max-h-[60dvh] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto sm:max-h-[calc(100dvh-1.5rem)] rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl"
+        // Size never depends on anchored placement, so a measurement cannot
+        // flip it back and forth; only phone sheets (always sheets) are capped
+        // to the room beside the target. The header and the action row are
+        // pinned: only the text scrolls, so Back, Next, Skip and Finish stay
+        // visible on short screens and at 200% zoom.
+        className="fixed flex max-h-[calc(100dvh-1.5rem)] w-[min(24rem,calc(100vw-1.5rem))] flex-col rounded-xl border border-slate-200 bg-white text-slate-900 shadow-(--th-shadow-float)"
         style={cardStyle(placement)}
       >
         {arrow ? (
           <span aria-hidden="true" className="absolute size-3 rotate-45 border border-slate-200 bg-white" style={arrow} />
         ) : null}
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-semibold text-blue-700">{counter}</p>
-          <button
-            type="button"
-            onClick={() => end("dismissed")}
-            aria-label={messages.close}
-            className="-m-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-950"
-          >
-            <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-              <path strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </button>
+        <div className="shrink-0 px-5 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] font-medium tracking-[0.01em] text-slate-600">{eyebrow}</p>
+            <button
+              type="button"
+              onClick={() => end("dismissed")}
+              aria-label={messages.close}
+              className="-mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-950 pointer-coarse:size-11"
+            >
+              <svg className="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <path strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />
+              </svg>
+            </button>
+          </div>
+          <div className="mt-1 flex items-center gap-3">
+            <ol aria-hidden="true" className="flex flex-1 gap-1">
+              {steps.map((_, step) => (
+                <li key={step} className={`h-1.5 flex-1 rounded-full ${step <= index ? "bg-blue-600" : "bg-slate-300"}`} />
+              ))}
+            </ol>
+            <p className="shrink-0 text-xs font-semibold tabular-nums text-slate-600">{counter}</p>
+          </div>
         </div>
-        <h2 id={`${ids}-title`} className="text-lg font-semibold leading-snug text-slate-950">
-          {entry.step.title}
-        </h2>
-        <p id={`${ids}-body`} className="mt-2 text-sm leading-6 text-slate-700">
-          {entry.step.body}
-        </p>
-        {isLast && finishLink ? (
-          <a
-            href={finishLink.href}
-            onClick={() => end("completed")}
-            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 underline-offset-4 hover:underline"
-          >
-            {finishLink.label}
-          </a>
-        ) : null}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4">
+          <h2 id={`${ids}-title`} className="text-xl font-semibold leading-snug tracking-tight text-slate-950">
+            {entry.step.title}
+          </h2>
+          <p id={`${ids}-body`} className="mt-2 text-[15px] leading-6 text-slate-700">
+            {entry.step.body}
+          </p>
+          {isLast && finishLink ? (
+            <a
+              href={finishLink.href}
+              onClick={() => end("completed")}
+              className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-blue-700 underline-offset-4 hover:underline"
+            >
+              {finishLink.label}
+              <span aria-hidden="true">→</span>
+            </a>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-slate-200 bg-slate-50 px-5 py-3">
           <button
             type="button"
             onClick={() => end("dismissed")}
-            className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            className="min-h-11 rounded-lg px-2 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950"
           >
             {messages.skip}
           </button>
-          <div className="flex flex-wrap gap-2">
+          <div className="ml-auto flex gap-2">
             {/* Never removed or disabled on the first step, so focus is not lost. */}
             <button
               type="button"
               aria-disabled={index === 0}
               onClick={() => index > 0 && move(-1)}
-              className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
             >
               {messages.back}
             </button>
@@ -280,7 +305,7 @@ export function TourDialog({ kind, steps, messages, finishLink, onEnd }: TourDia
               ref={primaryRef}
               type="button"
               onClick={() => move(1)}
-              className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              className="min-h-11 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
             >
               {isLast ? messages.finish : messages.next}
             </button>

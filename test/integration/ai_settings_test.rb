@@ -38,6 +38,18 @@ class AiSettingsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, KEY.first(20)
   end
 
+  test "the server-rendered fallback confirms replacing and deleting a saved key, naming it" do
+    sign_in_as @user
+    get settings_ai_settings_path
+    assert_select "input[type=submit][value='Save key']:not([data-turbo-confirm])"
+
+    Accounts::AiSettings.store_key!(@user, api_key: KEY, state_token: Accounts::AiSettings.state(@user.reload).fetch(:state_token))
+    get settings_ai_settings_path
+    hint = "…#{KEY.last(4)}"
+    assert_select "input[type=submit][value='Replace key'][data-turbo-confirm=?]", I18n.t("ai_settings.key.replace_confirm", hint: hint)
+    assert_select "input[type=submit][value='Delete key'][data-turbo-confirm=?]", I18n.t("ai_settings.key.delete_confirm", hint: hint)
+  end
+
   test "BYOK works with managed access disabled; managed selection is refused" do
     @user.update!(managed_ai_access: false)
     sign_in_as @user

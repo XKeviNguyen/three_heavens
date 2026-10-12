@@ -78,6 +78,10 @@
   --th-warning-soft: #fff5e5;
   --th-danger: #c9342f;
   --th-danger-soft: #fff0f0;
+  /* Scrim behind modal overlays (tour, welcome dialog). */
+  --th-scrim: rgb(15 23 42 / .62);
+  /* Floating panels over the scrim (tour card, welcome dialog). */
+  --th-shadow-float: 0 2px 6px rgb(15 23 42 / .08), 0 20px 48px rgb(15 23 42 / .24);
   /* Muted text sits on white, the canvas, the sidebar and tinted panels;
      Tailwind's slate-500 drops to 4.3:1 on the sidebar, this keeps 4.8:1. */
   --color-slate-500: #5b6b82;
@@ -105,6 +109,9 @@
     --th-warning-soft: rgb(255 159 10 / .14);
     --th-danger: #ff453a;
     --th-danger-soft: rgb(255 69 58 / .14);
+    --th-scrim: rgb(0 0 0 / .68);
+    /* On dark surfaces a shadow needs pure black and more weight to show at all. */
+    --th-shadow-float: 0 2px 8px rgb(0 0 0 / .5), 0 24px 64px rgb(0 0 0 / .7);
 
     /* Surfaces: white cards on the canvas become raised dark surfaces. */
     --color-white: var(--th-surface);
