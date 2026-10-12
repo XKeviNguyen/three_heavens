@@ -245,16 +245,16 @@ ja:
     unavailable: "このアカウントではAI翻訳がまだ有効になっていません。資料や翻訳方針は今から準備できます。翻訳を始めるには、管理者がAI利用を有効にする必要があります。"
   admin_users:
     title: ユーザー
-    description: "AI翻訳を利用できるユーザーを設定します。ログインとAIの利用は別の権限です。"
+    description: "Three Heavensが費用を負担する「プラットフォーム管理のAI」を利用できるユーザーを設定します。ユーザー自身のOpenRouterキーには影響しません。ログインとAIの利用は別の権限です。"
     status: アカウント状態
     verification: メール確認
-    managed_ai: AI利用権限
+    managed_ai: "プラットフォーム管理のAI"
     action: 操作
     verified: 確認済み
     unverified: 未確認
     enabled: 有効
     disabled: 無効
-    enable: AI利用を許可
-    disable: AI利用を停止
-    granted: AI利用を許可しました。
-    revoked: AI利用を停止しました。
+    enable: "プラットフォーム管理のAIを許可"
+    disable: "プラットフォーム管理のAIを停止"
+    granted: "このアカウントでプラットフォーム管理のAIを許可しました。"
+    revoked: "このアカウントでプラットフォーム管理のAIを停止しました。"

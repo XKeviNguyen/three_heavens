@@ -9,11 +9,13 @@ ja:
       personal:
         label: 自分のOpenRouter APIキー
         description: キーを使ったすべてのリクエストの料金を、あなたがOpenRouterに直接支払います。管理者の承認は不要です。
+        needs_key: "先に下でキーを保存すると、ここで選べるようになります。"
       managed:
         label: プラットフォーム管理のAI
         description: Three HeavensがプラットフォームのOpenRouterキーで支払います。利用できるユーザーは管理者が決めます。
         enabled: 管理者があなたのアカウントで有効にしています。
         disabled: あなたのアカウントでは有効になっていません。管理者に依頼するか、自分のキーを使ってください。
+        badge: "管理者の承認が必要"
     save_source: この支払い元を使う
     current:
       ready_personal: 新しいAI処理はあなたのOpenRouterキーで支払われます。
@@ -28,8 +30,22 @@ ja:
       save: キーを保存
       replace: キーを置き換える
       delete: キーを削除
-      delete_confirm: OpenRouterキーを削除しますか？このキーで実行を待っている処理は失敗し、別の支払い元には切り替わりません。
+      delete_confirm: "末尾が%{hint}のキーを削除しますか？このキーで実行を待っている処理は失敗し、別の支払い元には切り替わりません。"
+      delete_confirm_personal: "現在このキーで支払っているため、新しいキーを保存するか別の支払い元を選ぶまで、新しいAI処理は開始できません。"
+      replace_confirm: "末尾が%{hint}のキーを置き換えますか？新しいキーを保存すると古いキーは削除され、古いキーで実行を待っている処理は失敗し、別の支払い元には切り替わりません。"
       cancel: キャンセル
+    setup:
+      heading: "自分のOpenRouterキーで支払う"
+      steps:
+        - "OpenRouterキーを保存する"
+        - "支払い元として自分のキーを選ぶ"
+        - "準備完了：新しいAI処理はあなたのOpenRouterアカウントに請求されます"
+      step_done: "完了"
+      step_current: "次のステップ"
+    # Denial texts for this page itself (the general ones point to AI settings).
+    here:
+      personal_key_unavailable: "選択したOpenRouterキーがありません。下で新しいキーを保存するか、別の支払い元を選んでください。"
+      managed_ai_access_revoked: "このアカウントではプラットフォーム管理のAIが有効になっていません。下で自分のOpenRouterキーを保存して選ぶか、管理者に依頼してください。"
     billing:
       heading: 課金のしくみ
       items:
@@ -56,6 +72,7 @@ ja:
   ai_billing:
     open_settings: AI設定を開く
     retry_payer:
+      heading: "この再試行の支払い元"
       personal: "この再試行はあなたのOpenRouterキー（末尾 %{hint}）で実行され、あなたのOpenRouterアカウントに請求されます。"
       managed: "この再試行はプラットフォーム管理のAIで実行され、プラットフォームが支払います。"
     retry_payer_changed: "このページの表示後に、AI処理の支払い元が変更されました。再試行の横に表示される支払い元を確認してから、もう一度再試行してください。"

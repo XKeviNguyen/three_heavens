@@ -245,16 +245,16 @@ en:
     unavailable: AI translation isn't turned on for this account yet. You can prepare documents and guidance now; an administrator must turn on AI access before translations can run.
   admin_users:
     title: Users
-    description: Choose who can use AI translation. Signing in and using AI are separate permissions.
+    description: "Choose who may use platform-managed AI, which Three Heavens pays for. It does not affect anyone's own OpenRouter key, and signing in and using AI are separate permissions."
     status: Account status
     verification: Email verification
-    managed_ai: AI access
+    managed_ai: "Platform-managed AI"
     action: Action
     verified: Verified
     unverified: Unverified
     enabled: Enabled
     disabled: Disabled
-    enable: Turn on AI access
-    disable: Turn off AI access
-    granted: AI access turned on.
-    revoked: AI access turned off.
+    enable: "Allow platform-managed AI"
+    disable: "Stop platform-managed AI"
+    granted: "Platform-managed AI turned on for this account."
+    revoked: "Platform-managed AI turned off for this account."

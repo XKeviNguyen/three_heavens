@@ -245,16 +245,16 @@ vi:
     unavailable: "Tài khoản này chưa được bật quyền dùng AI để dịch. Bạn vẫn có thể chuẩn bị tài liệu và hướng dẫn; quản trị viên cần bật quyền dùng AI trước khi bắt đầu dịch."
   admin_users:
     title: Người dùng
-    description: "Chọn ai được dùng AI để dịch. Quyền đăng nhập và quyền dùng AI là hai quyền riêng."
+    description: "Chọn ai được dùng AI do nền tảng quản lý (nền tảng chi trả). Việc này không ảnh hưởng tới khóa OpenRouter riêng của người dùng; quyền đăng nhập và quyền dùng AI là hai quyền riêng."
     status: Trạng thái tài khoản
     verification: Xác nhận email
-    managed_ai: Quyền dùng AI
+    managed_ai: "AI do nền tảng quản lý"
     action: Thao tác
     verified: Đã xác nhận
     unverified: Chưa xác nhận
     enabled: Đã bật
     disabled: Đã tắt
-    enable: Bật quyền dùng AI
-    disable: Tắt quyền dùng AI
-    granted: Đã bật quyền dùng AI.
-    revoked: Đã tắt quyền dùng AI.
+    enable: "Cho phép AI do nền tảng quản lý"
+    disable: "Dừng AI do nền tảng quản lý"
+    granted: "Đã bật AI do nền tảng quản lý cho tài khoản này."
+    revoked: "Đã tắt AI do nền tảng quản lý cho tài khoản này."

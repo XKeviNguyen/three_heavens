@@ -127,10 +127,89 @@ class AiSettingsSystemTest < ApplicationSystemTestCase
     page.driver.browser.execute_cdp("Network.emulateNetworkConditions", offline: true, latency: 0,
                                                                          downloadThroughput: -1, uploadThroughput: -1)
     click_button "Replace key"
+    within("[role='group']") { click_button "Replace key" }
     assert_selector "[role='alert']", text: "Three Heavens couldn't be reached"
   ensure
     page.driver.browser.execute_cdp("Network.emulateNetworkConditions", offline: false, latency: 0,
                                                                          downloadThroughput: -1, uploadThroughput: -1)
+  end
+
+  test "the page explains each state where the user is, and replacing or deleting a key names it first" do
+    @user.update!(managed_ai_access: false)
+    sign_in_in_browser
+    visit settings_ai_settings_path
+    assert_island_mounted
+
+    status = find("[data-testid='ai-settings-status']")
+    assert_includes status.text, "Save your own OpenRouter key below"
+    assert_not_includes status.text, "in AI settings", "no pointer to the page the user is already on"
+    assert_selector "label", text: "Administrator approval needed"
+    assert_selector "label", text: "Save your key below first, then choose it here."
+    assert_current_setup_step "Save your OpenRouter key"
+
+    fill_in "OpenRouter API key", with: KEY
+    click_button "Save key"
+    assert_text "OpenRouter key saved."
+    assert_no_selector "label", text: "Save your key below first"
+    assert_current_setup_step "Choose your key as the payment source"
+
+    choose "My OpenRouter API key"
+    click_button "Use this payment source"
+    assert_selector "[data-testid='ai-settings-status']", text: "New AI work is paid with your OpenRouter key."
+    assert_no_selector "[data-testid='ai-settings-setup'] [aria-current='step']"
+
+    replacement = "sk-or-v1-#{"5e" * 32}"
+    fill_in "OpenRouter API key", with: replacement
+    click_button "Replace key"
+    within("[role='group']") do
+      assert_text "Replace the key ending …#{KEY.last(4)}?"
+      click_button "Cancel"
+    end
+    assert_equal "Replace key", active_element_text, "focus returns to the replace button"
+    assert_selector "[data-testid='ai-settings-key-status']", text: "Saved key ending …#{KEY.last(4)}"
+    assert_equal 1, @user.open_router_credentials.active.count
+
+    click_button "Replace key"
+    within("[role='group']") { click_button "Replace key" }
+    assert_text "OpenRouter key saved."
+    assert_selector "[data-testid='ai-settings-key-status']", text: "Saved key ending …#{replacement.last(4)}"
+    assert_not_includes page.html, replacement
+
+    click_button "Delete key"
+    within("[role='group']") do
+      assert_text "Delete the key ending …#{replacement.last(4)}?"
+      assert_text "You pay with this key now"
+      click_button "Delete key"
+    end
+    assert_text "OpenRouter key deleted."
+    assert_includes find("[data-testid='ai-settings-status']").text, "Save a new key below"
+  end
+
+  test "a refused replacement closes its confirmation, and a platform-ready account sees no own-key to-do" do
+    sign_in_in_browser
+    visit settings_ai_settings_path
+    assert_island_mounted
+    assert_selector "[data-testid='ai-settings-status']", text: "New AI work is paid by the platform."
+    # Own-key steps are an option here, not a pending task.
+    assert_no_selector "[data-testid='ai-settings-setup']"
+
+    token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
+    Accounts::AiSettings.store_key!(@user, api_key: KEY, state_token: token)
+    visit settings_ai_settings_path
+    assert_island_mounted
+    assert_selector "[data-testid='ai-settings-setup']"
+
+    # Another window replaces the key while this page still shows the old one.
+    token = Accounts::AiSettings.state(@user.reload).fetch(:state_token)
+    Accounts::AiSettings.store_key!(@user, api_key: "sk-or-v1-#{"7a" * 32}", state_token: token)
+    fill_in "OpenRouter API key", with: "sk-or-v1-#{"6b" * 32}"
+    click_button "Replace key"
+    within("[role='group']") { click_button "Replace key" }
+    assert_selector "[role='alert']", text: "These settings changed in another window."
+    # The confirmation does not stay open for a key the user has not seen.
+    assert_no_selector "[role='group']"
+    assert_equal "Replace key", active_element_text
+    assert_selector "[data-testid='ai-settings-key-status']", text: "Saved key ending …7a7a"
   end
 
   private
@@ -141,6 +220,10 @@ class AiSettingsSystemTest < ApplicationSystemTestCase
     find("input[type=password]").fill_in with: PASSWORD
     find("input[type=email]").ancestor("form").find("[type=submit]").click
     assert_selector "#app-sidebar", visible: :all
+  end
+
+  def assert_current_setup_step(label)
+    assert_selector "[data-testid='ai-settings-setup'] li[aria-current='step']", text: label
   end
 
   def active_element_text
