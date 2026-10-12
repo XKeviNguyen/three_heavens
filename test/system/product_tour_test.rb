@@ -264,6 +264,62 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(1400, 1000)
   end
 
+  test "the invitation is a modal welcome: the page behind is inert and Escape means Not now" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil)
+    sign_in_in_browser
+    visit projects_path
+
+    invite = find("dialog[open][data-testid='product-tour-invite']")
+    assert_equal "Take the tour", active_element_text, "focus starts on the invitation's primary action"
+    within(invite) { assert_selector "li", count: 7 }
+    assert page.evaluate_script("document.querySelector(\"[data-testid='product-tour-invite']\").matches(':modal')"), "the invitation is a modal dialog, so the page behind it is inert"
+
+    invite.send_keys(:escape)
+    assert_no_selector "[data-testid='product-tour-invite']"
+    assert_no_selector "[data-testid='product-tour']", visible: :all
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
+  end
+
+  # A short phone in the language with the longest text: the actions are
+  # pinned, so none of them can be scrolled or clipped out of view.
+  test "on a short phone in Vietnamese every tour action stays fully visible" do
+    @user.update!(locale: "vi")
+    page.current_window.resize_to(375, 667)
+    sign_in_in_browser
+    visit projects_path
+    open_help_via_menu I18n.t("product_tour.ui.full_tour", locale: :vi)
+
+    7.times do |index|
+      assert_selector "[data-testid='product-tour-card']", text: "#{index + 1}/7"
+      assert_card_inside_viewport
+      labels = [ I18n.t("product_tour.ui.skip", locale: :vi), I18n.t("product_tour.ui.back", locale: :vi),
+                 I18n.t(index == 6 ? "product_tour.ui.finish" : "product_tour.ui.next", locale: :vi) ]
+      labels.each { |label| assert_fully_visible_in_card(label) }
+      click_tour_button(labels.last)
+    end
+    assert_no_selector "[data-testid='product-tour']", visible: :all
+  ensure
+    page.current_window.resize_to(1400, 1000)
+  end
+
+  test "a narrow navigation target gets the card beside it, not over the navigation" do
+    sign_in_in_browser
+    visit projects_path
+    open_help_and_click "Full product tour"
+    click_tour_button "Next"
+    assert_spotlight_on "[data-tour-target='nav-work']"
+
+    sides = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.querySelector("[data-testid='product-tour-card']").getBoundingClientRect()
+        const target = document.querySelector("[data-tour-target='nav-work']").getBoundingClientRect()
+        return [Math.round(card.left), Math.round(target.right)]
+      })()
+    JS
+    assert_operator sides[0], :>=, sides[1], "the card starts right of the highlighted navigation"
+    assert_equal "anchored", find("[data-testid='product-tour-card']")["data-placement"]
+  end
+
   private
 
   def sign_in_in_browser
@@ -325,6 +381,21 @@ class ProductTourSystemTest < ApplicationSystemTestCase
       (() => { const r = document.querySelector("[data-testid='product-tour-card']").getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight })()
     JS
     assert inside, "the tour card and its controls are inside the viewport"
+  end
+
+  # The button is inside the card's visible box and the viewport (not clipped
+  # by the card's scrolling text area).
+  def assert_fully_visible_in_card(label)
+    visible = page.evaluate_script(<<~JS, label)
+      (() => {
+        const card = document.querySelector("[data-testid='product-tour-card']")
+        const button = Array.from(card.querySelectorAll("button")).find((b) => b.textContent.trim() === arguments[0])
+        if (!button) return false
+        const c = card.getBoundingClientRect(), b = button.getBoundingClientRect()
+        return b.top >= c.top && b.bottom <= c.bottom && b.left >= c.left && b.right <= c.right && b.bottom <= window.innerHeight
+      })()
+    JS
+    assert visible, "#{label} is fully visible"
   end
 
   def assert_until(timeout: 5)
