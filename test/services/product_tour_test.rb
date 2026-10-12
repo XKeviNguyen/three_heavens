@@ -41,13 +41,25 @@ class ProductTourTest < ActiveSupport::TestCase
   test "a page view maps to one guide context; other requests and pages to none" do
     assert_equal "projects:list", ProductTour.page_context_key("projects", "index", "GET")
     assert_equal "projects:detail", ProductTour.page_context_key("projects", "show", "GET")
-    assert_equal "references:form", ProductTour.page_context_key("translation_references", "new", "GET")
+    assert_equal "translation_references:form", ProductTour.page_context_key("translation_references", "new", "GET")
+    assert_equal "settings_ai_settings:detail", ProductTour.page_context_key("settings/ai_settings", "show", "GET")
     assert_nil ProductTour.page_context_key("translation_references", "create", "POST"), "a re-rendered form is mid-task"
     assert_nil ProductTour.page_context_key("settings/accounts", "show", "GET")
     assert_nil ProductTour.page_context_key("projects", "download", "GET")
 
-    assert ProductTour.valid_page_key?("terminology:form")
-    [ "terminology", "admin:list", "terminology:list:x", "terminology:list:", "terminology:list\n", "terminology:edit" ].each { |key| assert_not ProductTour.valid_page_key?(key), key }
+    assert ProductTour.valid_page_key?("glossaries:form")
+    [ "glossaries", "terminology:list", "admin:list", "glossaries:list:x", "glossaries:list:", "glossaries:list\n", "glossaries:edit" ].each { |key| assert_not ProductTour.valid_page_key?(key), key }
+  end
+
+  test "every guided page has its own key, so pages of one family are taught separately" do
+    keys = ProductTour::PAGE_TOUR_BY_CONTROLLER.keys.flat_map do |controller|
+      %w[index new show].filter_map { |action| ProductTour.page_context_key(controller, action, "GET") }
+    end
+    assert_equal keys.uniq, keys
+    keys.each { |key| assert(ProductTour.valid_page_key?(key) && key.length <= 64, key) }
+    # Both belong to the workflows family but show different steps.
+    assert_not_equal ProductTour.page_context_key("workflow_profiles", "show", "GET"),
+                     ProductTour.page_context_key("pipeline_runs", "show", "GET")
   end
 
   test "the first page guide outcome wins and repeats write nothing" do

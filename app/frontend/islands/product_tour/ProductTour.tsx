@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { TourDialog, type TourOutcome } from "./TourDialog"
-import { parseProductTourProps, resolveSteps, type ProductTourProps, type ResolvedStep, type TourKind, type TourMessages, type TourStep } from "./tour"
+import { parseProductTourProps, resolveSteps, type PageGuides, type ProductTourProps, type ResolvedStep, type TourKind, type TourMessages, type TourStep } from "./tour"
 
 // Help (top of the sidebar, and in the mobile header) → the product tour, this
 // page's guide, and whether page guides open by themselves; the one-time
@@ -32,17 +32,35 @@ type Anchor = "sidebar" | "header"
 let resolvedVersion = 0
 let sendingVersion = 0
 let signedInSession = 0
-// The same for page guides, by page key: a cached page whose props still say
-// "not seen" must not open its guide again once it has ended.
-const recordedPageKeys = new Set<string>()
-const sendingPageKeys = new Set<string>()
-// The page-guides switch as last accepted by the server in this document, for
-// cached pages (a Turbo preview, Back/Forward) rendered before it changed.
-// Freshly rendered pages trust their props, which another tab may have changed.
-let pageGuidesAccepted: boolean | null = null
-// Bumped by every press of the switch, so a late answer to the welcome tour's
-// outcome never overrides a newer choice.
-let preferenceChanges = 0
+// The same for page guides, by page key and guide version ("projects:list@1"):
+// a page whose props were rendered before its guide ended must not open it
+// again, while a newer guide version still opens.
+const recordedPages = new Set<string>()
+const sendingPages = new Set<string>()
+const pageId = (guides: PageGuides) => `${guides.key}@${guides.version}`
+
+// The page-guides switch as this document knows it, across Turbo visits.
+// confirmedGuides is the newest value the server reported, ordered by its
+// stamp: props rendered before a write committed (a page fetched while the
+// write was in flight, a cached page) never override it, newer props (another
+// tab) do. pendingGuides is the account's choice while it is being saved; it
+// wins until the write settles, and the island on screen then follows the
+// result (guideListeners).
+type GuidesState = { value: boolean; stamp: number }
+let confirmedGuides: GuidesState | null = null
+let pendingGuides: boolean | null = null
+const guideListeners = new Set<(failed: boolean) => void>()
+function confirmGuides(next: GuidesState) {
+  if (!confirmedGuides || next.stamp >= confirmedGuides.stamp) confirmedGuides = next
+}
+function currentGuides(): boolean {
+  return pendingGuides ?? confirmedGuides?.value ?? false
+}
+function guidesAnswer(answer: unknown): GuidesState | null {
+  if (answer === null || typeof answer !== "object") return null
+  const { page_guides: value, stamp } = answer as Record<string, unknown>
+  return typeof value === "boolean" && typeof stamp === "number" && Number.isSafeInteger(stamp) ? { value, stamp } : null
+}
 // The welcome tour's outcome write; a switch press waits for it, so the server
 // applies the account's explicit choice last.
 let outcomeWrite: Promise<unknown> = Promise.resolve()
@@ -59,9 +77,10 @@ document.addEventListener("turbo:load", () => {
   if (!document.querySelector("[data-react-island='product-tour']")) {
     resolvedVersion = 0
     sendingVersion = 0
-    recordedPageKeys.clear()
-    sendingPageKeys.clear()
-    pageGuidesAccepted = null
+    recordedPages.clear()
+    sendingPages.clear()
+    confirmedGuides = null
+    pendingGuides = null
     helpIntroPlayed = false
     signedInSession += 1
   }
@@ -98,12 +117,18 @@ function csrfToken(): string {
   return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ""
 }
 
+function readJson(response: Response | null): Promise<unknown> {
+  return response ? response.json().catch(() => undefined) : Promise.resolve(undefined)
+}
+
 // keepalive lets a write finish if the user follows a link right away.
-// Resolves to the response when the server accepted the write, else null.
+// Resolves to the response when the server accepted the write, else null; a
+// write that hangs counts as failed, so the switch is never locked for good.
 function send(url: string, body: unknown): Promise<Response | null> {
   return fetch(url, {
     method: "PATCH",
     keepalive: true,
+    signal: AbortSignal.timeout(15_000),
     credentials: "same-origin",
     redirect: "manual",
     headers: { Accept: "application/json", "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
@@ -156,7 +181,13 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   const [session, setSession] = useState<Session>({ phase: "idle" })
   const [offerPending, setOfferPending] = useState(() => offer && Math.max(resolvedVersion, sendingVersion) < version)
   const [refreshing] = useState(pageAutoRefreshes)
-  const [guidesEnabled, setGuidesEnabled] = useState(() => (renderedFromCache() ? pageGuidesAccepted : null) ?? pageGuides.enabled)
+  const [guidesEnabled, setGuidesEnabled] = useState(() => {
+    confirmGuides({ value: pageGuides.enabled, stamp: pageGuides.stamp })
+    return currentGuides()
+  })
+  const [guidesPending, setGuidesPending] = useState(() => pendingGuides !== null)
+  // Back/Forward and previews show a cached page: never a moment to teach.
+  const [fromCache] = useState(renderedFromCache)
   const [menuAnchor, setMenuAnchor] = useState<Anchor | null>(null)
   const [headerSlot] = useState(() => document.getElementById("product-tour-header-slot"))
   // Played once the welcome window is answered, so it is not spent unseen
@@ -167,7 +198,8 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   const menuRoot = useRef<HTMLDivElement>(null)
   const headerRoot = useRef<HTMLDivElement>(null)
   const restoreFocus = useRef(false)
-  const preferenceInFlight = useRef(false)
+  const autoDecided = useRef(false)
+  const switchFailed = useRef(false)
   const sessionRef = useRef(session)
   sessionRef.current = session
   const ids = useId()
@@ -178,11 +210,9 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     // server has recorded it (see resolvedVersion).
     setOfferPending(false)
     const sentIn = signedInSession
-    const changesBefore = preferenceChanges
     sendingVersion = Math.max(sendingVersion, version)
     outcomeWrite = send(urls.outcome, { product_tour: { outcome, version } })
-      .then((response) => response?.json() as Promise<unknown> | undefined)
-      .catch(() => undefined)
+      .then(readJson)
       .then((answer) => {
         if (sentIn !== signedInSession) return
         if (answer === undefined) {
@@ -193,42 +223,61 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
         resolvedVersion = Math.max(resolvedVersion, version)
         // Completing a first tour turns page guides on, unless another tab
         // answered first: the server says which.
-        const guides = (answer as { page_guides?: unknown } | null)?.page_guides
-        if (typeof guides === "boolean" && changesBefore === preferenceChanges) {
-          pageGuidesAccepted = guides
-          setGuidesEnabled(guides)
+        const guides = guidesAnswer(answer)
+        if (guides) {
+          confirmGuides(guides)
+          guideListeners.forEach((listener) => listener(false))
         }
       })
   }
 
-  // Remembers that this page's guide ended, once per page key. A failed write
-  // is forgotten, so the guide may open by itself again on a later visit.
+  // Remembers that this page's guide ended, once per page and guide version.
+  // A failed write is forgotten, so the guide may open by itself again later.
   function recordPageOutcome(outcome: TourOutcome) {
     const key = pageGuides.key
-    if (!key || pageGuides.seen || recordedPageKeys.has(key) || sendingPageKeys.has(key)) return
-    sendingPageKeys.add(key)
+    const id = pageId(pageGuides)
+    if (!key || pageGuides.seen || recordedPages.has(id) || sendingPages.has(id)) return
+    sendingPages.add(id)
     const sentIn = signedInSession
     void send(urls.page, { product_tour_page: { key, outcome, version: pageGuides.version } }).then((recorded) => {
       if (sentIn !== signedInSession) return
-      sendingPageKeys.delete(key)
-      if (recorded) recordedPageKeys.add(key)
+      sendingPages.delete(id)
+      if (recorded) recordedPages.add(id)
     })
   }
 
+  // One switch write at a time, even across pages; the page on screen when it
+  // settles shows the saved value, or the previous one if it failed.
   function toggleGuides() {
-    if (preferenceInFlight.current) return
-    preferenceInFlight.current = true
-    preferenceChanges += 1
-    const next = !guidesEnabled
-    setGuidesEnabled(next)
+    if (pendingGuides !== null) return
+    pendingGuides = !currentGuides()
+    const next = pendingGuides
+    guideListeners.forEach((listener) => listener(false))
     const sentIn = signedInSession
-    void outcomeWrite.then(() => send(urls.preference, { product_tour_preference: { page_guides: next } })).then((saved) => {
-      preferenceInFlight.current = false
-      if (sentIn !== signedInSession) return
-      if (saved) pageGuidesAccepted = next
-      else setGuidesEnabled(!next)
-    })
+    void outcomeWrite
+      .then(() => send(urls.preference, { product_tour_preference: { page_guides: next } }))
+      .then(readJson)
+      .then((answer) => {
+        if (sentIn !== signedInSession) return
+        pendingGuides = null
+        const saved = guidesAnswer(answer)
+        if (saved) confirmGuides(saved)
+        guideListeners.forEach((listener) => listener(saved === null))
+      })
   }
+
+  useEffect(() => {
+    const follow = (failed: boolean) => {
+      if (failed) switchFailed.current = true
+      setGuidesEnabled(currentGuides())
+      setGuidesPending(pendingGuides !== null)
+    }
+    guideListeners.add(follow)
+    follow(false)
+    return () => {
+      guideListeners.delete(follow)
+    }
+  }, [])
 
   function start(kind: TourKind, auto = false) {
     const steps = kind === "global" ? tours.global : tours.page
@@ -254,20 +303,22 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   }
 
   // This page's guide opens by itself on the account's first visit, decided
-  // when the page appears: not while the invitation is waiting, and only on a
-  // quiet, fully rendered page: not over
-  // another dialog, not while the user is typing, not on a Turbo preview of a
-  // cached page, and not on a page that keeps refreshing.
+  // once, when the page appears (or, if a switch change from the previous
+  // page is still being saved, once it is): not while the invitation is
+  // waiting, not after that change failed, not on a cached page (Back/Forward,
+  // a Turbo preview), and only on a quiet page: not over another dialog, not
+  // while the user is typing, and not on a page that keeps refreshing.
   useEffect(() => {
+    if (autoDecided.current || guidesPending) return
+    autoDecided.current = true
     const key = pageGuides.key
-    if (!guidesEnabled || !key || pageGuides.seen || offerPending || refreshing) return
-    if (recordedPageKeys.has(key) || sendingPageKeys.has(key)) return
+    if (!guidesEnabled || !key || pageGuides.seen || offerPending || refreshing || fromCache || switchFailed.current) return
+    if (recordedPages.has(pageId(pageGuides)) || sendingPages.has(pageId(pageGuides))) return
     if (document.documentElement.hasAttribute("data-turbo-preview")) return
     if (document.querySelector("dialog[open]") || isEditing(document.activeElement)) return
     start("page", true)
-    // Decided once, when the page appears.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [guidesPending])
 
   useEffect(() => {
     if (offerPending || helpIntroPlayed || document.documentElement.hasAttribute("data-turbo-preview")) return

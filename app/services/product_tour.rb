@@ -11,9 +11,9 @@
 # - users.product_tour_page_guides: whether page guides open by themselves the
 #   first time a page is visited. Off for existing accounts; turned on when a
 #   newly offered global tour is completed; the account can change it in Help.
-# - product_tour_page_outcomes: one row per page context ("projects:list") and
-#   PAGE_VERSION, written once when a page guide ends, so it opens by itself
-#   at most once. Replaying from Help never removes a row.
+# - product_tour_page_outcomes: one row per page ("projects:list": controller
+#   and context) and PAGE_VERSION, written once when a page guide ends, so it
+#   opens by itself at most once. Replaying from Help never removes a row.
 module ProductTour
   # Raise when the global tour changes enough that every account, including
   # those that completed or dismissed an earlier version, should be offered
@@ -198,22 +198,38 @@ module ProductTour
     PAGE_TOUR_BY_CONTROLLER[controller_path]
   end
 
-  # The context key for the page being rendered, or nil when this page has no
-  # guide or is not a plain page view (a re-rendered form after a failed
-  # submit is mid-task, never a moment to teach).
+  # A guide's outcome is kept per page, its controller and context: one family
+  # can span controllers whose pages show different steps (workflow setups
+  # and pipeline runs), and each page is taught on its own.
+  PAGE_KEY_PAGES = PAGE_TOUR_BY_CONTROLLER.keys.to_h { |controller| [ controller.tr("/", "_"), controller ] }.freeze
+
+  # The key for the page being rendered, or nil when this page has no guide or
+  # is not a plain page view (a re-rendered form after a failed submit is
+  # mid-task, never a moment to teach).
   def self.page_context_key(controller_path, action_name, request_method)
     return nil unless request_method == "GET"
 
-    family = page_tour_key(controller_path)
     context = PAGE_CONTEXTS[action_name]
-    family && context && "#{family}:#{context}"
+    page_tour_key(controller_path) && context && "#{controller_path.tr("/", "_")}:#{context}"
   end
 
-  PAGE_KEY = /\A(?<family>[a-z_]+):(?:list|form|detail)\z/
+  PAGE_KEY = /\A(?<page>[a-z_]+):(?:list|form|detail)\z/
 
   def self.valid_page_key?(key)
     match = PAGE_KEY.match(key.to_s)
-    match.present? && PAGE_TOURS.key?(match[:family])
+    match.present? && PAGE_KEY_PAGES.key?(match[:page])
+  end
+
+  # The page-guides switch with a stamp that orders it: the account row's
+  # updated_at in microseconds. A page rendered before a switch write committed
+  # carries an older stamp, so the browser keeps the newer value.
+  def self.page_guides_state(user)
+    enabled, updated_at = User.where(id: user.id).pick(:product_tour_page_guides, :updated_at)
+    { page_guides: enabled, stamp: page_guides_stamp(updated_at) }
+  end
+
+  def self.page_guides_stamp(updated_at)
+    updated_at.to_i * 1_000_000 + updated_at.usec
   end
 
   def self.page_seen?(user, key)

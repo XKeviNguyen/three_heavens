@@ -36,6 +36,8 @@ export interface TourMessages {
 // whether the account has already ended this guide.
 export interface PageGuides {
   enabled: boolean
+  // Orders the switch value: the account row's updated_at, in microseconds.
+  stamp: number
   key: string | null
   seen: boolean
   version: number
@@ -87,11 +89,12 @@ function parseMessages(value: unknown): TourMessages | null {
 // rely on their types. Invalid props render nothing rather than a broken tour.
 function parsePageGuides(value: unknown): PageGuides | null {
   if (!isRecord(value)) return null
-  const { enabled, key, seen, version } = value
+  const { enabled, stamp, key, seen, version } = value
   if (typeof enabled !== "boolean" || typeof seen !== "boolean") return null
+  if (typeof stamp !== "number" || !Number.isSafeInteger(stamp) || stamp < 0) return null
   if (key !== null && !(isString(key) && /^[a-z_]+:(list|form|detail)$/.test(key))) return null
   if (typeof version !== "number" || !Number.isInteger(version) || version < 1) return null
-  return { enabled, key, seen, version }
+  return { enabled, stamp, key, seen, version }
 }
 
 export function parseProductTourProps(value: unknown): ProductTourProps | null {

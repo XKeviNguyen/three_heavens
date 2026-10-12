@@ -24,7 +24,7 @@ class ProductToursController < ApplicationController
     return head :conflict unless attributes[:version].to_s == ProductTour::VERSION.to_s
 
     ProductTour.record_outcome!(current_user, outcome)
-    render json: { page_guides: User.where(id: current_user.id).pick(:product_tour_page_guides) }
+    render json: ProductTour.page_guides_state(current_user)
   end
 
   # A page guide ended: remembered so it does not open by itself again.
@@ -39,13 +39,14 @@ class ProductToursController < ApplicationController
     head :no_content
   end
 
-  # Help → "Show page guides automatically".
+  # Help → "Show page guides automatically". Answers with the stored switch and
+  # its stamp (see ProductTour.page_guides_state).
   def preference
     enabled = params.expect(product_tour_preference: [ :page_guides ])[:page_guides]
     raise ActionController::BadRequest, "page_guides must be true or false" unless [ true, false ].include?(enabled)
 
     ProductTour.set_page_guides!(current_user, enabled)
-    head :no_content
+    render json: ProductTour.page_guides_state(current_user)
   end
 
   private

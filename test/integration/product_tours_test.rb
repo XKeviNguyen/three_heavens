@@ -51,12 +51,12 @@ class ProductToursTest < ActionDispatch::IntegrationTest
 
     patch product_tour_path, params: { product_tour: { outcome: "completed", version: ProductTour::VERSION } }.to_json, headers: JSON_HEADERS
     assert_response :ok
-    assert_equal({ "page_guides" => true }, response.parsed_body)
+    assert_equal true, response.parsed_body.fetch("page_guides")
     assert_equal [ ProductTour::VERSION, "completed" ], [ @user.reload.product_tour_version, @user.product_tour_outcome ]
 
     patch product_tour_path, params: { product_tour: { outcome: "dismissed", version: ProductTour::VERSION } }.to_json, headers: JSON_HEADERS
     assert_response :ok
-    assert_equal({ "page_guides" => true }, response.parsed_body)
+    assert_equal true, response.parsed_body.fetch("page_guides")
     assert_equal "completed", @user.reload.product_tour_outcome
 
     get projects_path
@@ -69,7 +69,7 @@ class ProductToursTest < ActionDispatch::IntegrationTest
     patch product_tour_path, params: { product_tour: { outcome: "completed", version: ProductTour::VERSION } }.to_json, headers: JSON_HEADERS
 
     assert_response :ok
-    assert_equal({ "page_guides" => false }, response.parsed_body)
+    assert_equal false, response.parsed_body.fetch("page_guides")
     assert_equal [ "dismissed", false ], [ @user.reload.product_tour_outcome, @user.product_tour_page_guides ]
   end
 
@@ -116,7 +116,8 @@ class ProductToursTest < ActionDispatch::IntegrationTest
   test "page guide props name this page's context and the account's own progress" do
     sign_in_as @user
     get projects_path
-    assert_equal({ "enabled" => false, "key" => "projects:list", "version" => ProductTour::PAGE_VERSION, "seen" => false }, tour_props.fetch("page_guides"))
+    assert_equal({ "enabled" => false, "stamp" => ProductTour.page_guides_stamp(@user.reload.updated_at), "key" => "projects:list",
+                   "version" => ProductTour::PAGE_VERSION, "seen" => false }, tour_props.fetch("page_guides"))
     assert_equal page_product_tour_path, tour_props.dig("urls", "page")
 
     @user.update_columns(product_tour_page_guides: true)
@@ -132,13 +133,13 @@ class ProductToursTest < ActionDispatch::IntegrationTest
 
   test "a page guide's outcome is recorded once for the signed-in account" do
     sign_in_as @user
-    body = { product_tour_page: { key: "terminology:list", outcome: "completed", version: ProductTour::PAGE_VERSION } }
+    body = { product_tour_page: { key: "glossaries:list", outcome: "completed", version: ProductTour::PAGE_VERSION } }
     patch page_product_tour_path, params: body.to_json, headers: JSON_HEADERS
     assert_response :no_content
     patch page_product_tour_path, params: body.deep_merge(product_tour_page: { outcome: "dismissed" }).to_json, headers: JSON_HEADERS
     assert_response :no_content
 
-    assert_equal [ [ "terminology:list", "completed" ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome)
+    assert_equal [ [ "glossaries:list", "completed" ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome)
   end
 
   test "unknown, malformed, or outdated page guide writes are rejected without a write" do
@@ -174,9 +175,14 @@ class ProductToursTest < ActionDispatch::IntegrationTest
 
   test "the guides switch accepts only true or false" do
     sign_in_as @user
+    get projects_path
+    rendered_stamp = tour_props.dig("page_guides", "stamp")
     patch preference_product_tour_path, params: { product_tour_preference: { page_guides: true } }.to_json, headers: JSON_HEADERS
-    assert_response :no_content
+    assert_response :ok
     assert @user.reload.product_tour_page_guides
+    # The answer orders the switch after any page rendered before it.
+    assert_equal({ "page_guides" => true, "stamp" => ProductTour.page_guides_stamp(@user.updated_at) }, response.parsed_body)
+    assert_operator response.parsed_body["stamp"], :>, rendered_stamp
     patch preference_product_tour_path, params: { product_tour_preference: { page_guides: "false" } }.to_json, headers: JSON_HEADERS
     assert_response :bad_request
     assert @user.reload.product_tour_page_guides

@@ -337,7 +337,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_selector "[data-testid='product-tour-card']", text: "Shown once. Replay it or turn these off under Help."
     click_tour_button "Next"
     click_tour_button "Done"
-    assert_until { ProductTour.page_seen?(@user, "terminology:list") }
+    assert_until { ProductTour.page_seen?(@user, "glossaries:list") }
 
     visit glossaries_path
     assert_selector "h1", text: "Glossaries"
@@ -346,7 +346,7 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     visit translation_references_path
     assert_tour_step "1 of", "References"
     find("[data-testid='product-tour']").send_keys(:escape)
-    assert_until { @user.product_tour_page_outcomes.find_by(tour_key: "references:list")&.outcome == "dismissed" }
+    assert_until { @user.product_tour_page_outcomes.find_by(tour_key: "translation_references:list")&.outcome == "dismissed" }
     visit translation_references_path
     assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
 
@@ -468,6 +468,115 @@ class ProductTourSystemTest < ApplicationSystemTestCase
 
   private
 
+  test "a newer page guide version opens again in the same visit, without a reload" do
+    @user.update_columns(product_tour_page_guides: true)
+    sign_in_in_browser
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+    click_tour_button "Skip"
+    glossaries = ProductTour.page_context_key("glossaries", "index", "GET")
+    assert_until { ProductTour.page_seen?(@user, glossaries) }
+
+    with_page_version(ProductTour::PAGE_VERSION + 1) do
+      within("#app-sidebar") { click_link "Glossaries" }
+      assert_tour_step "1 of", "Glossaries"
+    end
+  end
+
+  test "turning page guides off and leaving at once never shows a guide on the next page" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal "false", guides_switch["aria-pressed"], "the new page shows the choice being saved"
+
+    release_switch_requests
+    assert_until { !@user.reload.product_tour_page_guides }
+    assert_equal "false", guides_switch["aria-pressed"]
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "turning page guides on and leaving at once shows the next page's guide once the choice is saved" do
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal "true", guides_switch["aria-pressed"]
+
+    release_switch_requests
+    assert_tour_step "1 of", "Glossaries"
+    assert @user.reload.product_tour_page_guides
+  end
+
+  test "turning page guides back on and leaving at once never repeats a guide already seen" do
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    @user.product_tour_page_outcomes.create!(tour_key: ProductTour.page_context_key("glossaries", "index", "GET"),
+                                              version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+
+    release_switch_requests
+    assert_until { @user.reload.product_tour_page_guides }
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+  end
+
+  test "a switch change that fails is undone on the page reached meanwhile" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    hold_switch_requests
+    open_help_and_click "Show page guides automatically"
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    release_switch_requests(fail: true)
+    assert_until { guides_switch["aria-pressed"] == "true" }
+    assert @user.reload.product_tour_page_guides
+    # Not on the page reached while the change was pending; normally afterwards.
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    within("#app-sidebar") { click_link "References" }
+    assert_tour_step "1 of", "References"
+  end
+
+  test "Back and Forward show cached pages without opening their guides" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil, product_tour_page_guides: false)
+    sign_in_in_browser
+    visit glossaries_path
+    within("[data-testid='product-tour-invite']") { click_button "Take the tour" }
+    6.times { click_tour_button "Next" }
+    click_tour_button "Done"
+    assert_until { @user.reload.product_tour_page_guides }
+
+    within("#app-sidebar") { click_link "References" }
+    assert_tour_step "1 of", "References"
+    click_tour_button "Skip"
+    page.go_back
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    page.go_forward
+    assert_selector "h1", text: "References"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+
+    # A fresh page load of the unseen page is a genuine first visit.
+    visit glossaries_path
+    assert_tour_step "1 of", "Glossaries"
+  end
+
   def sign_in_in_browser
     visit login_path
     find("input[type=email]").fill_in with: @user.email
@@ -550,6 +659,38 @@ class ProductTourSystemTest < ApplicationSystemTestCase
       flunk "condition not met within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
       sleep 0.05
     end
+  end
+
+  # Holds the page-guides switch's requests in this document (it survives
+  # Turbo visits) until released, like a slow network; fail: answers 503.
+  def hold_switch_requests
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.heldSwitchRequests = []
+      window.fetch = (input, init) => {
+        if (!String(input).includes("/product_tour/preference")) return original(input, init)
+        return new Promise((resolve, reject) => window.heldSwitchRequests.push({ go: () => original(input, init).then(resolve, reject), fail: () => resolve(new Response(null, { status: 503 })) }))
+      }
+    JS
+  end
+
+  def release_switch_requests(fail: false)
+    assert_until { page.evaluate_script("window.heldSwitchRequests.length") > 0 }
+    page.execute_script("window.heldSwitchRequests.splice(0).forEach((request) => request[arguments[0] ? 'fail' : 'go']())", fail)
+  end
+
+  def guides_switch
+    find("[data-react-island='product-tour'] li button[aria-pressed]", text: "Show page guides automatically", visible: :all)
+  end
+
+  def with_page_version(version)
+    original = ProductTour::PAGE_VERSION
+    ProductTour.send(:remove_const, :PAGE_VERSION)
+    ProductTour.const_set(:PAGE_VERSION, version)
+    yield
+  ensure
+    ProductTour.send(:remove_const, :PAGE_VERSION)
+    ProductTour.const_set(:PAGE_VERSION, original)
   end
 
   # The accessible name of the focused element.

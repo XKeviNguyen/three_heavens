@@ -21,9 +21,11 @@ module ProductTourHelper
         start_translation: new_translation_workspace_path
       },
       messages: t("product_tour.ui"),
-      # Only queried when the guide could open by itself.
-      page_guides: { enabled: guides, key: page_key, version: ProductTour::PAGE_VERSION,
-                     seen: guides && page_key ? ProductTour.page_seen?(current_user, page_key) : false },
+      # Queried even with the switch off: turning it on from another page may
+      # let this page's guide open once that change is saved.
+      page_guides: { enabled: guides, stamp: ProductTour.page_guides_stamp(current_user.updated_at),
+                     key: page_key, version: ProductTour::PAGE_VERSION,
+                     seen: page_key ? ProductTour.page_seen?(current_user, page_key) : false },
       tours: {
         global: product_tour_steps("global", ProductTour::GLOBAL_STEPS),
         page: page_family && product_tour_steps("pages.#{page_family}", ProductTour::PAGE_TOURS.fetch(page_family)[:steps])

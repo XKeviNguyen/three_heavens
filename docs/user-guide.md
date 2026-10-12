@@ -35,7 +35,7 @@ The first time you sign in, a welcome window offers a seven-step tour of the pro
 
 **Page guides that open by themselves.** If you finish the welcome tour the first time it is offered, the switch is turned on: the first time you open a page that has a guide (Projects, Glossaries, References, a project's own page, and so on), its guide opens once. Finishing it, skipping it, pressing Escape, or leaving the page counts as seen, so it does not open again on that page; **Guide to this page** still replays it. If you chose **Not now** or skipped the welcome tour, guides stay off until you turn the switch on. Accounts that existed before page guides were added start with the switch off, and a later, updated welcome tour never changes the switch you already have. Your progress is saved to your account, so it follows you to other browsers and devices.
 
-A guide never opens by itself over another window, while you are typing, after a form was sent back with errors, or on a page that is refreshing itself to show running AI work.
+A guide never opens by itself over another window, while you are typing, after a form was sent back with errors, on a page you return to with Back or Forward, or on a page that is refreshing itself to show running AI work. If you change the switch and open another page right away, that page follows your new choice once it is saved; if saving fails, the switch shows its previous setting again.
 
 Guides only highlight parts of the page. They never click, submit, upload, save a key, change a setting, or start AI work, and leaving the page ends them.
 
