@@ -566,6 +566,24 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
   end
 
+  test "a page prefetched before its guide was seen elsewhere does not open the guide again" do
+    @user.update_columns(product_tour_page_guides: true)
+    @user.product_tour_page_outcomes.create!(tour_key: "projects:list", version: ProductTour::PAGE_VERSION, outcome: "completed")
+    sign_in_in_browser
+    visit projects_path
+    glossaries = ProductTour.page_context_key("glossaries", "index", "GET")
+    # Hovering prefetches the page while its guide is still unseen.
+    find("#app-sidebar a", text: "Glossaries").hover
+    assert_until { page.evaluate_script("performance.getEntriesByType('resource').some((entry) => entry.name.endsWith('/glossaries'))") }
+    # Meanwhile another tab or device finishes that guide.
+    @user.product_tour_page_outcomes.create!(tour_key: glossaries, version: ProductTour::PAGE_VERSION, outcome: "completed")
+
+    within("#app-sidebar") { click_link "Glossaries" }
+    assert_selector "h1", text: "Glossaries"
+    assert_no_selector "[data-testid='product-tour']", visible: :all, wait: 1
+    assert_equal [ "completed" ], @user.product_tour_page_outcomes.where(tour_key: glossaries).pluck(:outcome)
+  end
+
   test "a newer islands bundle loaded during a visit reloads the page once instead of mixing releases" do
     sign_in_in_browser
     visit glossaries_path

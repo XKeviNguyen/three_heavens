@@ -135,9 +135,10 @@ class ProductToursTest < ActionDispatch::IntegrationTest
     sign_in_as @user
     body = { product_tour_page: { key: "glossaries:list", outcome: "completed", version: ProductTour::PAGE_VERSION } }
     patch page_product_tour_path, params: body.to_json, headers: JSON_HEADERS
-    assert_response :no_content
+    assert_response :ok
+    assert_equal({ "recorded" => true }, response.parsed_body)
     patch page_product_tour_path, params: body.deep_merge(product_tour_page: { outcome: "dismissed" }).to_json, headers: JSON_HEADERS
-    assert_response :no_content
+    assert_equal({ "recorded" => false }, response.parsed_body, "a second tab's claim loses")
 
     assert_equal [ [ "glossaries:list", "completed" ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome)
   end

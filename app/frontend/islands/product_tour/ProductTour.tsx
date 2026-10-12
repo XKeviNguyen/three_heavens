@@ -33,9 +33,11 @@ let resolvedVersion = 0
 let sendingVersion = 0
 let signedInSession = 0
 // The same for page guides, by page key and guide version ("projects:list@1"):
-// a page whose props were rendered before its guide ended must not open it
-// again, while a newer guide version still opens.
-const recordedPages = new Set<string>()
+// a page whose props were rendered before its guide was seen must not open it
+// again, while a newer guide version still opens. Across tabs and devices,
+// the server decides: a guide opens by itself only after claiming its page.
+const seenPages = new Set<string>()
+const completedPages = new Set<string>()
 const sendingPages = new Set<string>()
 const pageId = (guides: PageGuides) => `${guides.key}@${guides.version}`
 
@@ -91,7 +93,8 @@ document.addEventListener("turbo:load", () => {
   if (!document.querySelector("[data-react-island='product-tour']")) {
     resolvedVersion = 0
     sendingVersion = 0
-    recordedPages.clear()
+    seenPages.clear()
+    completedPages.clear()
     sendingPages.clear()
     confirmedGuides = null
     pendingGuides = null
@@ -215,6 +218,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   const headerRoot = useRef<HTMLDivElement>(null)
   const restoreFocus = useRef(false)
   const autoDecided = useRef(false)
+  const mounted = useRef(true)
   const switchFailed = useRef(switchFailedThisVisit)
   const sessionRef = useRef(session)
   sessionRef.current = session
@@ -249,18 +253,23 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
       })
   }
 
-  // Remembers that this page's guide ended, once per page and guide version.
-  // A failed write is forgotten, so the guide may open by itself again later.
+  // Remembers how this page's guide ended, once per page and guide version:
+  // dismissing a guide already seen writes nothing; finishing it is written
+  // once (the server turns a dismissed guide into a completed one). A failed
+  // write is forgotten, so the guide may open by itself again later.
   function recordPageOutcome(outcome: TourOutcome) {
     const key = pageGuides.key
     const id = pageId(pageGuides)
-    if (!key || pageGuides.seen || recordedPages.has(id) || sendingPages.has(id)) return
+    if (!key || sendingPages.has(id)) return
+    if (outcome === "dismissed" ? pageGuides.seen || seenPages.has(id) : completedPages.has(id)) return
     sendingPages.add(id)
     const sentIn = signedInSession
     void send(urls.page, { product_tour_page: { key, outcome, version: pageGuides.version } }).then((recorded) => {
       if (sentIn !== signedInSession) return
       sendingPages.delete(id)
-      if (recorded) recordedPages.add(id)
+      if (!recorded) return
+      seenPages.add(id)
+      if (outcome === "completed") completedPages.add(id)
     })
   }
 
@@ -303,7 +312,7 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     const steps = kind === "global" ? tours.global : tours.page
     if (refreshing) return
     setMenuAnchor(null)
-    if (!steps || session.phase === "running") return
+    if (!steps || sessionRef.current.phase === "running") return
     // Closes the mobile navigation drawer (sidebar controller) first, so the
     // steps are resolved against what will actually be visible.
     document.dispatchEvent(new CustomEvent("product-tour:start"))
@@ -333,10 +342,27 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
     autoDecided.current = true
     const key = pageGuides.key
     if (!guidesEnabled || !key || pageGuides.seen || offerPending || refreshing || fromCache || switchFailed.current) return
-    if (recordedPages.has(pageId(pageGuides)) || sendingPages.has(pageId(pageGuides))) return
+    const id = pageId(pageGuides)
+    if (seenPages.has(id) || sendingPages.has(id)) return
     if (document.documentElement.hasAttribute("data-turbo-preview")) return
     if (document.querySelector("dialog[open]") || isEditing(document.activeElement)) return
-    start("page", true)
+    // Only a guide with something here to point at is claimed.
+    if (!tours.page || !resolveSteps(tours.page, "page").some((entry) => entry.target !== null)) return
+    // Claimed first, as seen (dismissed): another tab, device, or a page
+    // prefetched before the guide was seen elsewhere loses the claim and stays
+    // quiet; finishing the guide upgrades it to completed.
+    sendingPages.add(id)
+    const sentIn = signedInSession
+    void send(urls.page, { product_tour_page: { key, outcome: "dismissed", version: pageGuides.version } })
+      .then(readJson)
+      .then((answer) => {
+        if (sentIn !== signedInSession) return
+        sendingPages.delete(id)
+        if (answer === undefined) return
+        seenPages.add(id)
+        const claimed = (answer as { recorded?: unknown } | null)?.recorded === true
+        if (claimed && mounted.current && !document.querySelector("dialog[open]")) start("page", true)
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guidesPending])
 
@@ -349,12 +375,14 @@ function ProductTourIsland({ version, offer, urls, messages, page_guides: pageGu
   // Leaving the page (a link, Back, a reload) while its guide is open counts as
   // dismissing it, so it does not open by itself again.
   useEffect(() => {
+    mounted.current = true
     const leave = () => {
       const current = sessionRef.current
       if (current.phase === "running" && current.kind === "page") recordPageOutcome("dismissed")
     }
     window.addEventListener("pagehide", leave)
     return () => {
+      mounted.current = false
       window.removeEventListener("pagehide", leave)
       leave()
     }

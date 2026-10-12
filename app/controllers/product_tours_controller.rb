@@ -27,7 +27,9 @@ class ProductToursController < ApplicationController
     render json: ProductTour.page_guides_state(current_user)
   end
 
-  # A page guide ended: remembered so it does not open by itself again.
+  # A page guide is seen: remembered so it does not open by itself again.
+  # Answers whether this request recorded it, which is how the island claims
+  # a guide before opening it by itself.
   def page
     attributes = params.expect(product_tour_page: %i[key outcome version])
     outcome = known_outcome!(attributes[:outcome])
@@ -35,8 +37,7 @@ class ProductToursController < ApplicationController
     raise ActionController::BadRequest, "Unknown page guide" unless ProductTour.valid_page_key?(key)
     return head :conflict unless attributes[:version].to_s == ProductTour::PAGE_VERSION.to_s
 
-    ProductTour.record_page_outcome!(current_user, key, outcome)
-    head :no_content
+    render json: { recorded: ProductTour.record_page_outcome!(current_user, key, outcome) }
   end
 
   # Help → "Show page guides automatically". Answers with the stored switch and

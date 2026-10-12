@@ -75,22 +75,22 @@ class ProductTourTest < ActiveSupport::TestCase
     assert_operator second.fetch(:revision), :>, first.fetch(:revision)
   end
 
-  test "a tour completed by the release before page guides still turns them on" do
-    # As that release records it: the outcome only, the switch never written.
+  test "a tour completed by the release before page guides leaves them off" do
+    # Decided: that release writes only the outcome; such accounts keep the
+    # default for existing accounts (manual guidance from Help).
     @user.update_columns(product_tour_version: ProductTour::VERSION, product_tour_outcome: "completed", product_tour_page_guides: false)
-    assert_equal 0, @user.reload.product_tour_guides_revision
-    assert ProductTour.page_guides_enabled?(@user)
-    assert ProductTour.page_guides_state(@user).fetch(:page_guides)
-
-    ProductTour.set_page_guides!(@user, false)
-    assert_not ProductTour.page_guides_enabled?(@user.reload)
     assert_not ProductTour.page_guides_state(@user).fetch(:page_guides)
   end
 
-  test "the first page guide outcome wins and repeats write nothing" do
+  test "a page guide is recorded once; only finishing a dismissed guide changes it" do
+    # The first write claims the page (the island opens a guide by itself
+    # only when its claim, written as dismissed, created the row).
     assert ProductTour.record_page_outcome!(@user, "projects:list", "dismissed")
+    assert_not ProductTour.record_page_outcome!(@user, "projects:list", "dismissed")
+    assert ProductTour.record_page_outcome!(@user, "projects:list", "completed")
     assert_not ProductTour.record_page_outcome!(@user, "projects:list", "completed")
-    assert_equal [ [ "projects:list", "dismissed", ProductTour::PAGE_VERSION ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome, :version)
+    assert_not ProductTour.record_page_outcome!(@user, "projects:list", "dismissed"), "completed is final"
+    assert_equal [ [ "projects:list", "completed", ProductTour::PAGE_VERSION ] ], @user.product_tour_page_outcomes.pluck(:tour_key, :outcome, :version)
     assert ProductTour.page_seen?(@user, "projects:list")
     assert_not ProductTour.page_seen?(@user, "projects:detail")
     assert_raises(ArgumentError) { ProductTour.record_page_outcome!(@user, "projects:list", "preexisting") }

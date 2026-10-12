@@ -226,33 +226,21 @@ module ProductTour
   # before a switch write committed carries an older revision, so the browser
   # keeps the newer value.
   def self.page_guides_state(user)
-    enabled, outcome, revision = User.where(id: user.id)
-      .pick(:product_tour_page_guides, :product_tour_outcome, :product_tour_guides_revision)
-    { page_guides: page_guides_on?(enabled, outcome, revision), revision: revision }
+    enabled, revision = User.where(id: user.id).pick(:product_tour_page_guides, :product_tour_guides_revision)
+    { page_guides: enabled, revision: revision }
   end
-
-  def self.page_guides_enabled?(user)
-    page_guides_on?(user.product_tour_page_guides, user.product_tour_outcome, user.product_tour_guides_revision)
-  end
-
-  # The release before page guides records a completed welcome tour without
-  # writing the switch, so its revision stays 0; every write by this code
-  # raises it. Such a completion, made while that release still served during
-  # the deploy, turns page guides on as a completion here would. Tours
-  # completed before the deploy were marked off by the migration that added
-  # the revision (20261012100000).
-  def self.page_guides_on?(enabled, outcome, revision)
-    enabled || (outcome == "completed" && revision.zero?)
-  end
-  private_class_method :page_guides_on?
 
   def self.page_seen?(user, key)
     user.product_tour_page_outcomes.exists?(tour_key: key, version: PAGE_VERSION)
   end
 
-  # Records how the account ended a page guide. The first outcome per key and
-  # version wins (INSERT ... ON CONFLICT DO NOTHING): a double click, a retry,
-  # or a second tab writes nothing more. Returns whether this call recorded it.
+  # Records a page guide as seen, once per key and version. The first write
+  # creates the row (INSERT ... ON CONFLICT DO NOTHING), so a double click, a
+  # retry, a second tab, or another device writes nothing more; the island
+  # writes "dismissed" before a guide opens by itself and opens it only if
+  # that write created the row. The one later change is finishing a guide
+  # that was shown or dismissed: dismissed becomes completed, which is final.
+  # Returns whether this call changed anything.
   def self.record_page_outcome!(user, key, outcome)
     raise ArgumentError, "unknown product tour outcome" unless OUTCOMES.include?(outcome)
     raise ArgumentError, "unknown page guide" unless valid_page_key?(key)
@@ -262,7 +250,11 @@ module ProductTour
       unique_by: :index_product_tour_page_outcomes_once,
       returning: :id
     )
-    result.rows.any?
+    return true if result.rows.any?
+    return false unless outcome == "completed"
+
+    user.product_tour_page_outcomes.where(tour_key: key, version: PAGE_VERSION, outcome: "dismissed")
+      .update_all(outcome: "completed") == 1
   end
 
   def self.set_page_guides!(user, enabled)
