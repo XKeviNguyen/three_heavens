@@ -239,8 +239,8 @@ module ProductTour
   # writing the switch, so its revision stays 0; every write by this code
   # raises it. Such a completion, made while that release still served during
   # the deploy, turns page guides on as a completion here would. Tours
-  # completed before the deploy were marked off by a migration
-  # (20261012110000).
+  # completed before the deploy were marked off by the migration that added
+  # the revision (20261012100000).
   def self.page_guides_on?(enabled, outcome, revision)
     enabled || (outcome == "completed" && revision.zero?)
   end

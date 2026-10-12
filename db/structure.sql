@@ -7085,7 +7085,6 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
-('20261012110000'),
 ('20261012100000'),
 ('20261012090000'),
 ('20261011090000'),
