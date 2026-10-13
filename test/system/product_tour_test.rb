@@ -507,9 +507,12 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_tour_step "8 of 9", "AI workflow"
     click_tour_button "Next"
     click_tour_button "Done"
-    assert_until { ProductTour.page_seen?(@user, "translation_workspaces:form") }
-    assert_equal [ [ 1, "completed" ], [ 2, "completed" ] ],
-      @user.product_tour_page_outcomes.where(tour_key: "translation_workspaces:form").order(:version).pluck(:version, :outcome)
+    # The guide's claim row (dismissed) exists before it opens; Done upgrades it
+    # in a separate request, so wait for that, not for the row.
+    assert_until do
+      @user.product_tour_page_outcomes.where(tour_key: "translation_workspaces:form").order(:version).pluck(:version, :outcome) ==
+        [ [ 1, "completed" ], [ 2, "completed" ] ]
+    end
 
     # Replaying from Help shows the same steps and writes nothing more.
     open_help_and_click "Guide to this page"
