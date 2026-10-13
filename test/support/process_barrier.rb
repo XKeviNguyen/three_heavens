@@ -61,9 +61,21 @@ module ProcessBarrier
   end
   private :crash_at_boundary
 
+  # Parallel test workers share one PostgreSQL server (max_connections 100 in
+  # CI), and a fan-out holds a connection per child until its barrier opens.
+  # Fan-outs from different workers once overlapped past that limit, so only
+  # one runs at a time; the lock is a file because the workers are processes.
+  def in_processes(count, &work)
+    FileUtils.mkdir_p(Rails.root.join("tmp"))
+    File.open(Rails.root.join("tmp/process_barrier.lock"), File::RDWR | File::CREAT, 0o600) do |lock|
+      lock.flock(File::LOCK_EX)
+      fan_out(count, &work)
+    end
+  end
+
   # Every child starts on its own PostgreSQL connection after all children
   # have reached the pipe barrier. No sleeps or inherited database sessions.
-  def in_processes(count, &work)
+  def fan_out(count, &work)
     ActiveRecord::Base.connection_handler.clear_all_connections!
     children = count.times.map do |index|
       ready_read, ready_write = IO.pipe
@@ -92,7 +104,17 @@ module ProcessBarrier
       [ pid, ready_read, start_write, result_read ]
     end
     Timeout.timeout(30) do
-      children.each { |_, ready, _, _| raise "child failed before barrier" unless ready.read(1) == "r" }
+      children.each do |_, ready, _, result|
+        next if ready.read(1) == "r"
+
+        # The child reports why it stopped (for example, a refused connection).
+        reported = begin
+          Marshal.load(result)[:error]
+        rescue StandardError
+          nil
+        end
+        raise "child failed before barrier: #{reported || 'no error reported'}"
+      end
       children.each { |_, _, start, _| start.write("g"); start.close }
       children.map do |pid, _, _, result|
         payload = Marshal.load(result)
@@ -113,6 +135,7 @@ module ProcessBarrier
       end
     end
   end
+  private :fan_out
 
   # The pipe proves the independent PostgreSQL session owns the lock before
   # cleanup runs. Releasing it is explicit; no timing assumptions or sleeps.
