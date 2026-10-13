@@ -64,7 +64,7 @@ Every migration added since v1.1.0, applied in order by `db:prepare` while the n
 
 | Migration | Change | Locks and failure behavior |
 | --- | --- | --- |
-| `20261010090000_create_open_router_credentials` | New `open_router_credentials` table (encrypted keys), partial unique index, CHECK constraints. | New table only; `lock_timeout = 1s`. |
+| `20261010090000_create_open_router_credentials` | New `open_router_credentials` table (encrypted keys), partial unique index, CHECK constraints. | The `user_id` foreign key takes SHARE ROW EXCLUSIVE on `users` until the migration commits, which waits for and blocks writes to `users`; `lock_timeout = 1s`, so a write to `users` held open for over a second fails the migration and the deploy, before the billing fence. Redeploy. |
 | `20261010090100_add_ai_billing_identity` | `users.ai_payment_source`; `billing_source` and `open_router_credential_id` on the ten billed tables, with the constraints added `NOT VALID`; the default is removed again, which fences out pre-BYOK code; payer trigger on `ai_provider_attempts`. | ACCESS EXCLUSIVE locks on each table until the migration commits; `lock_timeout = 1s`. Roll forward only after it commits ([rollback](../operations/production-deploy.md#rollback)). |
 | `20261010090200_validate_ai_billing_identity` | Validates those foreign keys and CHECK constraints. | SHARE UPDATE EXCLUSIVE while scanning; `lock_timeout = 10s`. |
 | `20261010090300_index_ai_billing_credentials` | Partial `open_router_credential_id` indexes, built `CONCURRENTLY`. | No DDL transaction. Waits for older transactions. A retry drops and rebuilds an index left invalid. |
@@ -72,7 +72,18 @@ Every migration added since v1.1.0, applied in order by `db:prepare` while the n
 | `20261012090000_create_product_tour_page_outcomes` | `users.product_tour_page_guides` (constant default, no rewrite); new `product_tour_page_outcomes` table with a unique index and CHECK constraints. | Brief ACCESS EXCLUSIVE on `users`; `lock_timeout = 1s`. |
 | `20261012100000_add_product_tour_guides_revision_to_users` | `users.product_tour_guides_revision` (constant default) and a validated CHECK constraint. | ACCESS EXCLUSIVE on `users` while validating; `lock_timeout = 1s`. |
 
-A failed transactional migration rolls back completely and is retried by the next deploy. Every migration is additive, so v1.1.0 code keeps working while they run; only the billing fence affects it, and that is intended. No migration reads or rewrites encrypted columns.
+A failed transactional migration rolls back completely and is retried by the next deploy. No migration reads or rewrites encrypted columns.
+
+Schema compatibility and availability differ during the deploy.
+
+- **Schema:** every change is additive, so v1.1.0 code stays compatible with the new schema. Only the billing fence affects it, and that is intended.
+- **Availability:** the old container keeps serving while the migrations run, and its requests wait on their locks. Every signed-in request reads `users`; `current_user` joins it with `sessions`.
+  - While a migration holds ACCESS EXCLUSIVE on `users`, reads and writes there wait.
+  - While it holds SHARE ROW EXCLUSIVE, only writes wait.
+  - A migration still queued for its lock also blocks the requests behind it, for at most the 1-second `lock_timeout`.
+  - The longest hold is the `20261011090000` backfill: 0.02 seconds at production size, 1.2 seconds at 100,000 `users` rows, and 13 to 17 seconds per million rows.
+
+At production size the pause is well under a second, but requests do stall. Deploy at a quiet time.
 
 Rehearsal on a disposable PostgreSQL 17 database loaded with the v1.1.0 schema at release candidate `b152d11` gave these results.
 
