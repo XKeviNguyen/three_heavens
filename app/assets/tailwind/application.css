@@ -69,6 +69,8 @@
   --th-border-strong: #d1d1d6;
   --th-accent: #0071e3;
   --th-accent-hover: #006bd6;
+  /* The logo's mark (shared/_brand_mark), on the public site and in the app. */
+  --th-brand: #0b72ea;
   --th-accent-soft: #eaf3ff;
   --th-accent-fill: #0071e3;
   --th-accent-fill-hover: #006bd6;
@@ -78,6 +80,10 @@
   --th-warning-soft: #fff5e5;
   --th-danger: #c9342f;
   --th-danger-soft: #fff0f0;
+  /* Scrim behind modal overlays (tour, welcome dialog). */
+  --th-scrim: rgb(15 23 42 / .62);
+  /* Floating panels over the scrim (tour card, welcome dialog). */
+  --th-shadow-float: 0 2px 6px rgb(15 23 42 / .08), 0 20px 48px rgb(15 23 42 / .24);
   /* Muted text sits on white, the canvas, the sidebar and tinted panels;
      Tailwind's slate-500 drops to 4.3:1 on the sidebar, this keeps 4.8:1. */
   --color-slate-500: #5b6b82;
@@ -95,6 +101,7 @@
     --th-border-strong: #3a3a3c;
     --th-accent: #0a84ff;
     --th-accent-hover: #409cff;
+    --th-brand: #3b9bff;
     --th-accent-soft: rgb(10 132 255 / .16);
     /* #0a84ff under white text is 3.6:1; solid fills use a deeper blue (4.8:1). */
     --th-accent-fill: #0a6fe0;
@@ -105,6 +112,9 @@
     --th-warning-soft: rgb(255 159 10 / .14);
     --th-danger: #ff453a;
     --th-danger-soft: rgb(255 69 58 / .14);
+    --th-scrim: rgb(0 0 0 / .68);
+    /* On dark surfaces a shadow needs pure black and more weight to show at all. */
+    --th-shadow-float: 0 2px 8px rgb(0 0 0 / .5), 0 24px 64px rgb(0 0 0 / .7);
 
     /* Surfaces: white cards on the canvas become raised dark surfaces. */
     --color-white: var(--th-surface);
@@ -622,8 +632,9 @@ html[lang="ja"] .landing-page { word-break: auto-phrase; line-break: strict; }
 .landing-header { position: relative; z-index: 20; border-bottom: 1px solid var(--landing-divider); background: var(--landing-header-bg); }
 .landing-header-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; min-height: 72px; }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; width: max-content; color: var(--landing-ink); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
-.landing-brand-mark { display: inline-flex; width: 34px; color: var(--landing-blue); }
-.landing-brand-mark svg { width: 100%; height: auto; }
+.th-brand-mark { display: inline-flex; flex: none; color: var(--th-brand); }
+.th-brand-mark svg { width: 100%; height: auto; }
+.landing-brand-mark { width: 34px; }
 .landing-primary-nav { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: 550; }
 .landing-primary-nav a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 9px; color: var(--landing-nav); transition: color 160ms ease, background-color 160ms ease; }
 .landing-primary-nav a:hover { color: var(--landing-blue-strong); background: var(--landing-hover); }
@@ -955,3 +966,36 @@ html[lang="ja"] .landing-final-cta h2 { line-height: 1.3; letter-spacing: -.015e
   .landing-page *::before,
   .landing-page *::after { animation: none !important; transition: none !important; }
 }
+
+/* Help (ProductTour island): a thin seven-colour border with a soft glow.
+   Only compositor-friendly properties move: the colours turn by rotating a
+   conic gradient (transform) and the glow brightens and fades (opacity); the
+   blur itself never animates. It plays once, for under five seconds, on the
+   first page of a visit (WCAG 2.2.2) and again while hovered or focused;
+   with reduced motion it stays a still rainbow outline. */
+@keyframes th-neon-turn { to { rotate: 1turn; } }
+@keyframes th-neon-breathe { 0%, 100% { opacity: .2; } 50% { opacity: .5; } }
+.th-neon { position: relative; display: block; isolation: isolate; border-radius: 12px; padding: 1.5px; }
+.th-neon__ring, .th-neon__glow { position: absolute; border-radius: inherit; pointer-events: none; }
+.th-neon__ring { inset: 0; z-index: -1; overflow: hidden; }
+.th-neon__ring::before, .th-neon__glow {
+  background: conic-gradient(from 0deg, #ff5d6c, #ff9f45, #ffd84d, #4fd682, #33c9e8, #5b7cfa, #b26bf2, #ff5d6c);
+}
+.th-neon__ring::before { content: ""; position: absolute; left: 50%; top: 50%; width: 160%; aspect-ratio: 1; translate: -50% -50%; }
+.th-neon__glow { inset: -3px; z-index: -2; filter: blur(8px); opacity: .22; }
+@media (prefers-reduced-motion: no-preference) {
+  .th-neon--intro .th-neon__ring::before { animation: th-neon-turn 4.8s cubic-bezier(.45, .05, .55, .95) 1; }
+  .th-neon--intro .th-neon__glow { animation: th-neon-breathe 2.4s ease-in-out 2; }
+  /* Focus turns it twice; it keeps turning only while the pointer rests on it. */
+  .th-neon:focus-within .th-neon__ring::before { animation: th-neon-turn 6s linear 2; }
+  .th-neon:focus-within .th-neon__glow { animation: th-neon-breathe 3s ease-in-out 4; }
+  .th-neon:hover .th-neon__ring::before { animation: th-neon-turn 6s linear infinite; }
+  .th-neon:hover .th-neon__glow { animation: th-neon-breathe 3s ease-in-out infinite; }
+}
+@media (forced-colors: active) { .th-neon { border: 1px solid ButtonText; padding: 0; } .th-neon__ring, .th-neon__glow { display: none; } }
+
+/* Help's menu opens below its button: at the top of the sidebar it spans the
+   sidebar; in the mobile header (see header .appearance-menu-panel) it aligns
+   with the button's right edge. */
+.th-help-menu--sidebar { top: calc(100% + 6px); bottom: auto; left: 0; }
+.th-help-menu--header { width: min(18rem, calc(100vw - 2rem)); }

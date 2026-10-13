@@ -79,7 +79,8 @@ export default class extends Controller {
     document.documentElement.dataset.appearance = appearance
     document.querySelector("meta[name='color-scheme']")?.setAttribute("content", appearance === "system" ? "light dark" : appearance)
     // A page can show more than one copy of the control (e.g. landing header and mobile menu).
-    document.querySelectorAll(".appearance-option").forEach(option => option.setAttribute("aria-pressed", String(option.dataset.appearance === appearance)))
+    // Only appearance choices: other menus (Help) reuse the option styling.
+    document.querySelectorAll(".appearance-option[data-appearance]").forEach(option => option.setAttribute("aria-pressed", String(option.dataset.appearance === appearance)))
     document.querySelectorAll("[data-appearance-target='summary']").forEach(summary => summary.setAttribute("aria-label", `${this.labelsValue.heading}: ${this.labelsValue[appearance]}`))
     document.dispatchEvent(new CustomEvent("appearance:change", { detail: { appearance } }))
   }

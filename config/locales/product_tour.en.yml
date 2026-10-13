@@ -2,265 +2,428 @@ en:
   product_tour:
     ui:
       help: Help
-      full_tour: Full product tour
-      page_tour: Tour this page
+      full_tour: Product tour
+      page_tour: Guide to this page
+      page_guides: Show page guides automatically
+      page_guides_on: 'On'
+      page_guides_off: 'Off'
       next: Next
       back: Back
-      skip: Skip tour
-      finish: Finish
-      close: Close tour
+      skip: Skip
+      finish: Done
+      close: Close guide
       step_counter: "%{current} of %{total}"
       start_translation: Start a new translation
-      refreshing: "This page refreshes while AI work runs. Tours are available once it finishes."
+      refreshing: This page updates while AI work runs. Guides open when it's done.
+      auto_note: Shown once. Replay it or turn these off under Help.
       invite:
         title: New to Three Heavens?
-        body: Take a seven-step tour of how translation, review, and your knowledge library fit together. It changes nothing, and Help can replay it any time.
+        body: Take a quick look at how everything fits together. It won't change anything.
         start: Take the tour
         later: Not now
     global:
       welcome:
         title: Welcome to Three Heavens
-        body: An AI-assisted translation workspace. Several models translate, other models review and judge the results independently, and you make the final editorial decisions, backed by the terminology and examples you keep.
+        points:
+        - AI models translate your text.
+        - Other models review and rank each translation.
+        - You make the final decisions.
       workspace:
         title: Your workspace
-        body: Start new work from New translation. Projects keep each language pair's documents and their runs together, and History lists every translation run, newest first, so you can reopen any of them.
+        points:
+        - Start new work from New translation.
+        - Projects keep documents for one language pair together.
+        - History lists every translation, newest first.
       knowledge:
-        title: Translation knowledge
-        body: Glossaries hold preferred terms, References hold translations you already approve, and Methodology holds reusable instructions. Choose them when you start a translation to keep wording and style consistent.
+        title: Your translation library
+        points:
+        - Glossaries keep your terms consistent.
+        - References show translations you've already approved.
+        - Methodology tells the AI how you want it to write.
       workflows:
         title: Workflow setups
-        body: Save which models translate, review, judge, and suggest improvements. Choose a saved setup in Automatic mode and the pipeline runs translation, blind review, and judging for you, then stops so you can edit.
+        points:
+        - Save which models translate, review, and judge.
+        - In Automatic mode, a setup runs each step for you.
+        - It stops before the final edit, so you stay in control.
       ai_access:
-        title: AI access and who pays
-        body: In AI settings you choose who pays for new AI work. Your own OpenRouter key bills your OpenRouter account. Platform-managed AI is paid by the platform and needs an administrator's approval. You can finish this tour without adding a key.
+        title: AI access and payment
+        points:
+        - Choose who pays for new AI work in AI settings.
+        - With your own OpenRouter key, OpenRouter bills you.
+        - With platform-managed AI, Three Heavens pays. An admin must turn it on for you.
       start:
         title: Start a translation
-        body: Choose the source and target languages, paste text or upload a TXT, Markdown, DOCX, or PDF file, add optional guidance, and pick models or a workflow setup. Nothing is sent to AI until you start it yourself.
+        points:
+        - Choose the languages, then add your text or a file.
+        - Pick the AI models or a workflow setup.
+        - Nothing goes to the AI until you start it.
       quality:
-        title: From candidates to a final translation
-        body: Each model's translation becomes a candidate. Reviewers evaluate the candidates without seeing which model wrote them, judges rank them, and the winner opens in the editor, where you revise, compare versions, finalize, and download TXT or DOCX.
+        title: From drafts to a final translation
+        points:
+        - Each model's translation becomes a candidate.
+        - Reviewers and judges compare the candidates and pick a winner.
+        - The winner opens in the editor, where you finish and download it.
     pages:
       new_translation:
         intro:
           title: New translation
-          body: This page collects everything one translation run needs. Nothing starts, and nothing is charged, until you choose to start it.
+          points:
+          - Set up one translation on this page.
+          - Nothing starts, and nothing costs money, until you start it.
         languages:
           title: Project and languages
-          body: Pick an existing project, or name a new one with its source and target languages. A project keeps one language pair.
+          points:
+          - Pick a project, or name a new one.
+          - Each project uses one language pair.
         source:
-          title: Source document
-          body: Paste the text, or switch to Upload for a TXT, Markdown, DOCX, or PDF file. You can review and edit the extracted text before starting.
-        knowledge:
-          title: Optional guidance
-          body: Select a glossary for preferred terms. Advanced options add approved references, a methodology, and which guidance takes priority.
+          title: Your text
+          points:
+          - Paste text, or upload a TXT, Markdown, DOCX, or PDF file.
+          - You can check the text before you start.
+        terminology:
+          title: Terminology
+          points:
+          - Use the terms you want the AI to translate the same way every time.
+          - Pick a saved glossary, or add terms here.
+        references:
+          title: Translation references
+          points:
+          - Choose example translations you have already approved.
+          - The AI follows their wording and style.
+        methodology:
+          title: Methodology
+          points:
+          - Choose how you want the AI to write the translation.
+          - Keep "No methodology" to use only your own instructions.
+        priority:
+          title: Guidance priority
+          points:
+          - Choose which guidance wins when they disagree.
         workflow:
           title: AI workflow
-          body: In Manual mode you choose the translator models. In Automatic mode a saved workflow setup runs review and judging too. Either way, you approve the final translation.
+          points:
+          - 'Manual: you choose the translation models.'
+          - 'Automatic: a saved setup also runs review and judging.'
+          - Either way, you approve the final translation.
         launch:
           title: Review and start
-          body: Check who pays for this run and what it will do, then start it. The start button is the only control here that sends work to AI.
+          points:
+          - Check who pays and what will run.
+          - Only the start button sends work to the AI.
       source_import:
         intro:
-          title: Upload a source file
-          body: Upload one document to turn it into reviewable source text. Uploading and previewing never sends anything to AI.
+          title: Upload a file
+          points:
+          - Turn a document into text you can check.
+          - Uploading never sends anything to the AI.
         file:
-          title: Choose or drop a file
-          body: TXT, Markdown, DOCX, and PDF files are supported, within the size limit shown. The extracted text is shown for you to check before you translate it.
+          title: Choose a file
+          points:
+          - Use a TXT, Markdown, DOCX, or PDF file.
+          - Keep it under the size limit shown here.
+          - You'll see the text before you translate it.
       projects:
         intro:
           title: Projects
-          body: A project groups the documents of one language pair and every translation run made from them.
+          points:
+          - A project holds documents for one language pair.
+          - It also keeps every translation made from them.
         list:
           title: Your projects
-          body: Open a project to see its documents and where each run stands.
+          points:
+          - Your projects appear here.
+          - Open one to see its documents and progress.
         start:
-          title: Add work to this project
-          body: Paste new source text or upload a file; the project's languages are filled in for you.
+          title: Add work
+          points:
+          - Paste text or upload a file.
+          - The project's languages are filled in for you.
         documents:
           title: Documents
-          body: Each document lists its runs, newest first. Uploaded originals can be downloaded again.
+          points:
+          - Each document lists its translations, newest first.
+          - You can download uploaded originals again.
         next_action:
-          title: Pick up where you left off
-          body: The highlighted link always points to the next useful step for that run, such as blind review, judging, or the editor.
+          title: What's next
+          points:
+          - The highlighted link shows the next step.
+          - 'For example: review, judging, or the editor.'
       history:
         intro:
           title: Translation history
-          body: Every translation run you made, newest first, with its status, models, and known AI cost.
+          points:
+          - Every translation you've run, newest first.
+          - Each one shows its status, models, and known AI cost.
         list:
-          title: Find a run
-          body: Each entry shows its project, languages, and the guidance it used.
+          title: Find a translation
+          points:
+          - Your translations appear here, newest first.
+          - Each one shows its project, languages, and guidance.
         reopen:
-          title: Reopen or repeat
-          body: Continue with the next step, open any stage, or repeat a run's configuration as a new translation.
+          title: Continue or repeat
+          points:
+          - Continue with the next step, or open any stage.
+          - Reuse a run's settings for a new translation.
       terminology:
         intro:
           title: Glossaries
-          body: A glossary lists preferred terms for one language pair, so every translation uses the same wording.
+          points:
+          - A glossary lists your preferred terms.
+          - Translations then use the same wording every time.
         create:
-          title: Create a glossary
-          body: Start a new glossary for a language pair.
+          title: New glossary
+          points:
+          - Create a glossary for one language pair.
         list:
           title: Your glossaries
-          body: Active glossaries can be chosen when you start a translation.
+          points:
+          - Pick an active glossary when you start a translation.
         entries:
           title: Terms
-          body: Add each source term with its preferred translation. Saving creates a new revision.
+          points:
+          - Add each term with its preferred translation.
+          - Each save creates a new version.
         revisions:
-          title: Revisions
-          body: Every saved change is a revision. Runs keep the exact revision they used, even after you edit the glossary.
+          title: Versions
+          points:
+          - Every save is kept as a version.
+          - Past translations keep the version they used.
         status:
-          title: Revise or archive
-          body: Create a new revision, or archive a glossary you no longer offer for new work. Archiving keeps its history.
+          title: Update or archive
+          points:
+          - Save a new version, or archive a glossary you no longer need.
+          - Archiving keeps its history.
       references:
         intro:
-          title: Translation references
-          body: A reference pairs a source passage with a translation you already approve, so AI can follow your established wording and style.
+          title: References
+          points:
+          - A reference pairs a source text with a translation you've approved.
+          - The AI follows its wording and style.
         create:
-          title: Add a reference
-          body: Create a reference for one language pair.
+          title: New reference
+          points:
+          - Add a reference for one language pair.
         list:
           title: Your references
-          body: Active references can be chosen in the advanced options of a new translation.
+          points:
+          - Pick the ones to follow under Translation references in New translation.
         source:
-          title: Source example
-          body: Paste the source passage or upload one file. Provide pasted text or a file, not both.
+          title: Source text
+          points:
+          - Paste the source text, or upload a file.
+          - Use one or the other, not both.
         translation:
           title: Approved translation
-          body: Paste or upload the translation you approve for that passage. Files are checked and extracted when you save.
+          points:
+          - Paste or upload the translation you approve.
+          - Files are checked when you save.
         revisions:
-          title: Revision history
-          body: Each save is a revision. Translation runs keep the revision they used.
+          title: Versions
+          points:
+          - Every save is kept as a version.
+          - Past translations keep the version they used.
       methodology:
         intro:
           title: Methodology
-          body: A methodology is reusable written guidance on how translations should be produced, such as tone, audience, or formatting rules.
+          points:
+          - Write your translation rules once.
+          - 'For example: tone, audience, or formatting.'
         create:
-          title: Create a methodology
-          body: Write guidance once and reuse it across translations.
+          title: New methodology
+          points:
+          - Write rules once, then reuse them in any translation.
         list:
           title: Your methodologies
-          body: Active methodologies can be chosen in the advanced options of a new translation.
+          points:
+          - Pick one to follow under Methodology in New translation.
         instructions:
-          title: Guidance
-          body: Describe how the translation should read. Saving creates a new revision.
+          title: Your rules
+          points:
+          - Describe how the translation should read.
+          - Each save creates a new version.
         revisions:
-          title: Revisions
-          body: Runs keep the exact revision they used, so past results stay explainable.
+          title: Versions
+          points:
+          - Past translations keep the version they used.
+          - So you can always see why a result reads the way it does.
       workflows:
         intro:
           title: Workflow setups
-          body: A workflow setup saves which models translate, review, judge, and suggest improvements, for use in Automatic mode.
+          points:
+          - A setup saves which models translate, review, judge, and suggest edits.
+          - Automatic mode on New translation uses it.
         create:
-          title: Create a setup
-          body: Start a new setup, or duplicate an existing one to adjust it.
+          title: New setup
+          points:
+          - Create a setup, or copy one and change it.
         list:
           title: Your setups
-          body: Active setups appear in Automatic mode on the New translation page.
+          points:
+          - Active setups appear in Automatic mode on New translation.
         configure:
           title: Choose the models
-          body: Pick models for each role. Automatic runs use exactly these models and show the planned AI work before you start.
+          points:
+          - Pick models for each role.
+          - You'll see the planned AI work before anything starts.
         completion:
-          title: When to stop
-          body: Stop at the winning draft, or also collect AI suggestions. Suggestions never change your draft unless you apply them.
+          title: Where to stop
+          points:
+          - Stop at the winning draft, or also get AI suggestions.
+          - Suggestions never change your draft unless you apply them.
         pipeline:
-          title: Pipeline progress
-          body: An automatic run moves through translation, blind review, and judging, then stops when it is ready for you to edit.
+          title: Progress
+          points:
+          - An automatic run translates, reviews, and judges.
+          - It stops when the draft is ready for you to edit.
       ai_settings:
         intro:
           title: AI settings
-          body: Choose who pays for new AI work. Nothing on this page starts AI work.
+          points:
+          - Choose who pays for new AI work.
+          - Nothing on this page starts AI work.
         status:
-          title: Current status
-          body: Shows whether new AI work can start and who pays for it.
+          title: Status
+          points:
+          - Shows whether new AI work can start, and who pays.
         source:
           title: Payment source
-          body: Your own OpenRouter key bills your OpenRouter account. Platform-managed AI is paid by the platform and needs an administrator's approval.
+          points:
+          - 'Your own OpenRouter key: OpenRouter bills you.'
+          - 'Platform-managed AI: Three Heavens pays, once an admin turns it on for you.'
         key:
           title: Your OpenRouter key
-          body: The key is stored encrypted and never shown again; only its last characters appear. Replacing or deleting it never moves your work to the platform's key.
+          points:
+          - Your key is stored encrypted.
+          - After you save it, only its last few characters are shown.
+          - Replacing or deleting it never moves your work to the platform's key.
         billing:
           title: How billing works
-          body: Each run records who pays when it starts. Changing this setting affects new work only, and an explicit retry uses the payer shown next to it.
+          points:
+          - Each run keeps the payer chosen when it started.
+          - Changes here only affect new work.
+          - A retry uses the payer shown next to it.
       results:
         intro:
           title: Translation results
-          body: This page follows one translation run from its models to the next step.
+          points:
+          - Follow one translation from the models to the next step.
         progress:
-          title: Where this run stands
-          body: Translation, blind review, judging, and the editor, with the current stage highlighted.
+          title: Progress
+          points:
+          - The stages are translation, review, judging, and editing.
+          - The current stage is highlighted.
         outputs:
-          title: Translation candidates
-          body: Each model's output, status, and known cost.
+          title: Candidates
+          points:
+          - See each model's translation, status, and known cost.
         retry:
-          title: Recover failed work
-          body: Failed models can be retried explicitly. The panel shows who will pay for that retry.
+          title: Retry failed work
+          points:
+          - Retry a failed model when you choose to.
+          - The panel shows who pays for the retry.
         next:
           title: Next step
-          body: When at least two candidates are complete, start a blind review, or continue to the existing one.
+          points:
+          - When two candidates are ready, start a blind review.
       blind_review:
         intro:
           title: Blind review
-          body: Reviewer models evaluate the candidates without knowing which model wrote them.
+          points:
+          - Reviewer models check each candidate.
+          - They don't see which model wrote it.
         progress:
-          title: Workflow progress
-          body: Blind review is the second stage, after translation.
+          title: Progress
+          points:
+          - Blind review comes after translation.
         evaluations:
           title: Reviews
-          body: Each reviewer's structured feedback per candidate, including suggested wording where offered.
+          points:
+          - Read each reviewer's feedback on each candidate.
+          - Some include suggested wording.
         retry:
-          title: Recover failed reviews
-          body: Failed reviewers can be retried explicitly. The panel shows who will pay for that retry.
+          title: Retry failed reviews
+          points:
+          - Retry a failed reviewer when you choose to.
+          - The panel shows who pays for the retry.
         next:
-          title: Continue to judging
-          body: When the review is complete, choose judge models to rank the candidates.
+          title: Go to judging
+          points:
+          - When the reviews are done, pick judge models to rank the candidates.
       judging:
         intro:
           title: Judging
-          body: Judge models independently score and rank the reviewed candidates.
+          points:
+          - Judge models score and rank the reviewed candidates.
+          - Each judge works on its own.
         progress:
-          title: Workflow progress
-          body: Judging is the third stage; the editor follows.
+          title: Progress
+          points:
+          - Judging comes after blind review.
+          - The editor comes next.
         winner:
           title: The winner
-          body: The overall winner and the way to open it in the final editor.
+          points:
+          - This is the top-ranked candidate.
+          - Open it in the editor from here.
         runs:
           title: Judge results
-          body: Each judge's chosen winner, confidence, rationale, strengths, and risks, so you can see how the result was reached.
+          points:
+          - See each judge's pick, confidence, and reasons.
         retry:
-          title: Recover failed judges
-          body: Failed judges can be retried explicitly. The panel shows who will pay for that retry.
+          title: Retry failed judges
+          points:
+          - Retry a failed judge when you choose to.
+          - The panel shows who pays for the retry.
       final_editor:
         intro:
           title: Final editor
-          body: You make the final decisions here. Nothing changes your draft unless you do it.
+          points:
+          - You make the final decisions here.
+          - Nothing changes your draft unless you change it.
         guidance:
           title: Guidance used
-          body: The glossary, methodology, and references this run used, for checking as you edit.
+          points:
+          - The glossary, methodology, and references this translation used.
         draft:
           title: Your draft
-          body: Edit and save versions. Download the current version as TXT or DOCX at any time.
+          points:
+          - Edit and save versions.
+          - Download the current version as TXT or DOCX.
         refine:
           title: AI suggestions
-          body: Ask suggestion models for improvements to the current version. Apply a suggestion only if you want it.
+          points:
+          - Ask AI models for ideas to improve this version.
+          - Use a suggestion only if you want it.
         revisions:
-          title: Revision history
-          body: Every saved version is kept. Restore an earlier one as a new draft version.
+          title: Version history
+          points:
+          - Every saved version is kept.
+          - Restore an earlier one as a new version.
         finalize:
           title: Finalize
-          body: Finalize the current version when it is ready; you can reopen it later if needed.
+          points:
+          - Finalize when the translation is ready.
+          - You can reopen it later.
       benchmarks:
         intro:
           title: Model benchmarks
-          body: How each model has performed in your own runs. Every average shows how many results it is based on.
+          points:
+          - See how each model did in your own translations.
+          - Each average shows how many results it's based on.
         sort:
-          title: Sort the models
-          body: Order models by the measure you care about.
+          title: Sort
+          points:
+          - Sort the models by what matters to you.
         list:
           title: Model results
-          body: Open a model for its role diagnostics and recent history.
+          points:
+          - Open a model to see its details and recent work.
         roles:
-          title: Role diagnostics
-          body: How the model behaved as a reviewer or judge. Differences describe what happened; they do not prove a cause.
+          title: Reviewer and judge details
+          points:
+          - See how the model did as a reviewer or judge.
+          - Differences show what happened, not why.
   file_field:
     choose: Choose file
     replace: Choose a different file
@@ -268,7 +431,7 @@ en:
     remove_named: Remove %{name}
     drop: or drop a file here
     none: No file selected.
-    help: "TXT, Markdown, DOCX, or PDF · up to %{maximum} MiB · checked again when you save"
+    help: TXT, Markdown, DOCX, or PDF · up to %{maximum} MiB · checked again when you save
     selected: "%{name} selected (%{size})."
     removed: File removed.
     unsupported: "%{name} is not a supported file. Choose a TXT, Markdown, DOCX, or PDF file."

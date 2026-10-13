@@ -2739,6 +2739,42 @@ ALTER SEQUENCE public.pipeline_runs_id_seq OWNED BY public.pipeline_runs.id;
 
 
 --
+-- Name: product_tour_page_outcomes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_tour_page_outcomes (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    tour_key character varying NOT NULL,
+    version integer NOT NULL,
+    outcome character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT product_tour_page_outcomes_key_check CHECK (((char_length((tour_key)::text) <= 64) AND ((tour_key)::text ~ '^[a-z_]+:(list|form|detail)$'::text))),
+    CONSTRAINT product_tour_page_outcomes_outcome_check CHECK ((((outcome)::text = 'completed'::text) OR ((outcome)::text = 'dismissed'::text))),
+    CONSTRAINT product_tour_page_outcomes_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: product_tour_page_outcomes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.product_tour_page_outcomes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: product_tour_page_outcomes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.product_tour_page_outcomes_id_seq OWNED BY public.product_tour_page_outcomes.id;
+
+
+--
 -- Name: projects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3569,11 +3605,14 @@ CREATE TABLE public.users (
     ai_payment_source character varying DEFAULT 'managed'::character varying NOT NULL,
     product_tour_version integer,
     product_tour_outcome character varying,
+    product_tour_page_guides boolean DEFAULT false NOT NULL,
+    product_tour_guides_revision bigint DEFAULT 0 NOT NULL,
     CONSTRAINT users_ai_payment_source_check CHECK ((((ai_payment_source)::text = 'managed'::text) OR ((ai_payment_source)::text = 'personal'::text))),
     CONSTRAINT users_appearance_check CHECK (((appearance)::text = ANY (ARRAY[('system'::character varying)::text, ('light'::character varying)::text, ('dark'::character varying)::text]))),
     CONSTRAINT users_locale_check CHECK (((locale)::text = ANY (ARRAY[('en'::character varying)::text, ('vi'::character varying)::text, ('ja'::character varying)::text]))),
     CONSTRAINT users_normalized_email_check CHECK ((((email)::text = lower(btrim((email)::text))) AND (char_length((email)::text) >= 3) AND (char_length((email)::text) <= 254))),
     CONSTRAINT users_product_tour_check CHECK ((((product_tour_version IS NULL) AND (product_tour_outcome IS NULL)) OR ((product_tour_version IS NOT NULL) AND (product_tour_version > 0) AND (product_tour_outcome IS NOT NULL) AND (((product_tour_outcome)::text = 'completed'::text) OR ((product_tour_outcome)::text = 'dismissed'::text) OR ((product_tour_outcome)::text = 'preexisting'::text))))),
+    CONSTRAINT users_product_tour_guides_revision_check CHECK ((product_tour_guides_revision >= 0)),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('admin'::character varying)::text]))),
     CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
 );
@@ -3924,6 +3963,13 @@ ALTER TABLE ONLY public.pipeline_events ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.pipeline_runs ALTER COLUMN id SET DEFAULT nextval('public.pipeline_runs_id_seq'::regclass);
+
+
+--
+-- Name: product_tour_page_outcomes id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tour_page_outcomes ALTER COLUMN id SET DEFAULT nextval('public.product_tour_page_outcomes_id_seq'::regclass);
 
 
 --
@@ -4319,6 +4365,14 @@ ALTER TABLE ONLY public.pipeline_events
 
 ALTER TABLE ONLY public.pipeline_runs
     ADD CONSTRAINT pipeline_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_tour_page_outcomes product_tour_page_outcomes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tour_page_outcomes
+    ADD CONSTRAINT product_tour_page_outcomes_pkey PRIMARY KEY (id);
 
 
 --
@@ -5216,6 +5270,13 @@ CREATE INDEX index_pipeline_runs_on_open_router_credential_id ON public.pipeline
 --
 
 CREATE INDEX index_pipeline_runs_on_profile_revision ON public.pipeline_runs USING btree (workflow_profile_revision_id);
+
+
+--
+-- Name: index_product_tour_page_outcomes_once; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_product_tour_page_outcomes_once ON public.product_tour_page_outcomes USING btree (user_id, tour_key, version);
 
 
 --
@@ -6714,6 +6775,14 @@ ALTER TABLE ONLY public.final_translations
 
 
 --
+-- Name: product_tour_page_outcomes fk_rails_88878a0433; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_tour_page_outcomes
+    ADD CONSTRAINT fk_rails_88878a0433 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: judge_runs fk_rails_8a4030c1c3; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7016,6 +7085,8 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261012100000'),
+('20261012090000'),
 ('20261011090000'),
 ('20261010090300'),
 ('20261010090200'),

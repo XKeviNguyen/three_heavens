@@ -29,23 +29,24 @@
     <% if authenticated? %>
       <div data-controller="sidebar" data-action="product-tour:start@document->sidebar#collapse" class="min-h-screen">
         <header id="app-header" class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-          <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" data-tour-target="nav-menu" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+          <button type="button" data-action="sidebar#open" data-sidebar-target="trigger" data-tour-target="nav-menu" aria-controls="app-sidebar" aria-expanded="false" class="inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
             <svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>
             <%= t("navigation.menu") %>
           </button>
           <%= link_to root_path, aria: { label: t("shared_ui.home") }, class: "flex min-w-0 items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
-            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-xs font-bold text-white" aria-hidden="true">TH</span>
-            <span class="truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
+            <%= render "shared/brand_mark", class_name: "w-[30px]" %>
+            <span class="truncate font-bold tracking-[-0.02em] text-slate-950">Three Heavens</span>
           <% end %>
-          <span class="size-11" aria-hidden="true"></span>
+          <%# The product tour island (sidebar) puts the mobile Help button here. %>
+          <div id="product-tour-header-slot" class="flex min-w-11 flex-none justify-end min-[360px]:min-w-24"></div>
         </header>
 
         <aside id="app-sidebar" data-sidebar-target="panel" class="fixed inset-y-0 left-0 z-40 hidden w-64 max-w-[85vw] flex-col overflow-y-auto border-r border-slate-200 bg-white/95 backdrop-blur lg:flex" aria-label="<%= t("navigation.primary") %>">
           <div class="flex min-h-16 items-center gap-3 border-b border-slate-100 px-5">
             <%= link_to root_path, aria: { label: t("shared_ui.home") }, class: "flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" do %>
-              <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
+              <%= render "shared/brand_mark", class_name: "w-[34px]" %>
               <span class="min-w-0">
-                <span class="block truncate font-semibold tracking-tight text-slate-950">Three Heavens</span>
+                <span class="block truncate font-bold tracking-[-0.02em] text-slate-950">Three Heavens</span>
                 <span class="block truncate text-xs text-slate-500"><%= t("navigation.subtitle") %></span>
               </span>
             <% end %>
@@ -54,7 +55,10 @@
             </button>
           </div>
 
-          <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="<%= t("navigation.primary") %>">
+          <%# Help sits first, above the navigation, so it is found without scrolling. %>
+          <div class="px-3 pt-4"><%= product_tour_island %></div>
+
+          <nav data-sidebar-target="nav" class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="<%= t("navigation.primary") %>">
             <% sidebar_sections.each do |section| %>
               <%= tag.div data: { tour_target: section[:tour] }.compact do %>
                 <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500"><%= section[:label] %></p>
@@ -78,7 +82,6 @@
             <%= link_to t("ai_settings.navigation"), settings_ai_settings_path, class: "block rounded-lg px-3 py-2 text-sm font-medium #{controller_path == "settings/ai_settings" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}", aria: { current: (controller_path == "settings/ai_settings" ? "page" : nil) }, data: { tour_target: "nav-ai-settings" } %>
             <div class="flex min-w-0 items-end gap-2">
               <div class="min-w-0 flex-1"><%= render "shared/locale_selector" %></div>
-              <%= product_tour_island %>
               <%= render "shared/appearance_menu" %>
             </div>
             <%= button_to t("navigation.log_out"), session_path, method: :delete, class: "mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" %>
@@ -103,9 +106,9 @@
     <% else %>
       <main id="main-content" tabindex="-1" class="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-4 py-10 outline-none sm:px-6">
         <div class="mb-8 flex items-center gap-3">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-sm font-bold text-white" aria-hidden="true">TH</span>
+          <%= render "shared/brand_mark", class_name: "w-[34px]" %>
           <span>
-            <span class="block font-semibold tracking-tight text-slate-950">Three Heavens</span>
+            <span class="block font-bold tracking-[-0.02em] text-slate-950">Three Heavens</span>
             <span class="block text-xs text-slate-500"><%= t("navigation.subtitle") %></span>
           </span>
         </div>

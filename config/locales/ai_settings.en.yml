@@ -9,11 +9,13 @@ en:
       personal:
         label: My OpenRouter API key
         description: You pay OpenRouter directly for every request made with your key. No administrator approval is needed.
+        needs_key: "Save your key below first, then choose it here."
       managed:
         label: Platform-managed AI
         description: Three Heavens pays with its own OpenRouter key. An administrator decides who may use it.
         enabled: Enabled for your account by an administrator.
         disabled: Not enabled for your account. Ask an administrator, or use your own key.
+        badge: "Administrator approval needed"
     save_source: Use this payment source
     current:
       ready_personal: New AI work is paid with your OpenRouter key.
@@ -28,8 +30,22 @@ en:
       save: Save key
       replace: Replace key
       delete: Delete key
-      delete_confirm: Delete your OpenRouter key? Work waiting to run with it will fail and won't switch to another payer.
+      delete_confirm: "Delete the key ending %{hint}? Work waiting to run with it will fail and won't switch to another payer."
+      delete_confirm_personal: "You pay with this key now, so new AI work can't start until you save a new key or choose another payment source."
+      replace_confirm: "Replace the key ending %{hint}? It is deleted when the new key is saved; work waiting to run with it will fail and won't switch to another payer."
       cancel: Cancel
+    setup:
+      heading: "Pay with your own OpenRouter key"
+      steps:
+        - "Save your OpenRouter key"
+        - "Choose your key as the payment source"
+        - "Ready: new AI work is charged to your OpenRouter account"
+      step_done: "Done"
+      step_current: "Next step"
+    # Denial texts for this page itself (the general ones point to AI settings).
+    here:
+      personal_key_unavailable: "Your selected OpenRouter key is missing. Save a new key below, or choose another payment source."
+      managed_ai_access_revoked: "Platform-managed AI isn't enabled for this account. Save your own OpenRouter key below and choose it, or ask an administrator."
     billing:
       heading: How billing works
       items:
@@ -56,6 +72,7 @@ en:
   ai_billing:
     open_settings: Open AI settings
     retry_payer:
+      heading: "Who pays for this retry"
       personal: "This retry is paid with your own OpenRouter key ending %{hint}; your OpenRouter account is charged."
       managed: "This retry uses platform-managed AI; the platform pays."
     retry_payer_changed: "Who pays for AI work changed after this page was shown. Check the payer shown with the retry, then retry again."

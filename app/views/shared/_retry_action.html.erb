@@ -1,9 +1,16 @@
 <%# locals: (label:, path:, confirm:, button_class:) %>
-<%# The payer shown is posted back; the retry is refused if it changed since. %>
+<%# The payer shown is posted back; the retry is refused if it changed since.
+    It is labelled and set apart, so who will be charged is read before Retry. %>
 <% payer = retry_payer %>
-<% if payer.is_a?(Ai::BillingPolicy::Denied) %>
-  <p class="mt-3 text-sm font-semibold text-amber-900" data-testid="retry-payer"><%= t("ai_billing.denied.#{payer.code}") %> <%= link_to t("ai_billing.open_settings"), settings_ai_settings_path, class: "underline underline-offset-2" %></p>
-<% else %>
-  <p class="mt-3 text-sm text-slate-700" data-testid="retry-payer"><%= retry_payer_label(payer) %></p>
+<% denied = payer.is_a?(Ai::BillingPolicy::Denied) %>
+<div class="mt-3 rounded-lg border px-4 py-3 text-sm <%= denied ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white" %>">
+  <p class="text-xs font-semibold uppercase tracking-wide text-slate-600"><%= t("ai_billing.retry_payer.heading") %></p>
+  <% if denied %>
+    <p class="mt-1 font-semibold text-amber-900" data-testid="retry-payer"><%= t("ai_billing.denied.#{payer.code}") %> <%= link_to t("ai_billing.open_settings"), settings_ai_settings_path, class: "underline underline-offset-2" %></p>
+  <% else %>
+    <p class="mt-1 font-medium text-slate-900" data-testid="retry-payer"><%= retry_payer_label(payer) %></p>
+  <% end %>
+</div>
+<% unless denied %>
   <%= button_to label, path, method: :post, params: { billing_source: payer.billing_source, billing_key: payer.open_router_credential_id.to_s }, data: { turbo_confirm: confirm, turbo_submits_with: t("results_ui.queueing_retries") }, class: button_class %>
 <% end %>

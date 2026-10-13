@@ -25,20 +25,25 @@ Translation itself needs a way to pay for AI work; see [AI settings and who pays
 
 ### Guided tours
 
-The first time you sign in, a small card offers a seven-step tour of the product. **Take the tour** walks through the workspace, your translation knowledge, workflow setups, AI settings, starting a translation, and how candidates become a final translation. **Not now**, **Skip tour**, or Escape closes it, and you are not asked again.
+The first time you sign in, a welcome window offers a seven-step tour of the product. **Take the tour** walks through the workspace, your translation library, workflow setups, AI settings, starting a translation, and how candidates become a final translation. **Not now**, **Skip**, or Escape closes it, and you are not asked again.
 
-Open **Help** (the **?** button beside the language selector) at any time:
+**Help** is the first button in the sidebar, above the navigation; on a phone it is in the top bar, next to the menu. It opens:
 
-- **Full product tour** replays the seven steps.
-- **Tour this page** explains the page you are on, such as New translation, References, Blind review, or the final editor. Steps for parts the page does not show (an empty list, a section you cannot use) are skipped.
+- **Product tour**, which replays the seven steps.
+- **Guide to this page**, which explains the page you are on, such as New translation, References, Blind review, or the final editor. Steps for parts the page does not show (an empty list, a section you cannot use) are skipped.
+- **Show page guides automatically**, a switch that shows **On** or **Off**.
 
-Tours only highlight parts of the page. They never click, submit, upload, save a key, or start AI work, and leaving the page ends them. While a page is refreshing itself to show running AI work, tours wait until the work finishes.
+**Page guides that open by themselves.** If you finish the welcome tour the first time it is offered, the switch is turned on: the first time you open a page that has a guide (Projects, Glossaries, References, a project's own page, and so on), its guide opens once. Finishing it, skipping it, pressing Escape, or leaving the page counts as seen, so it does not open again on that page; **Guide to this page** still replays it. If you chose **Not now** or skipped the welcome tour, guides stay off until you turn the switch on; turning it on also opens the guide of the page you are on, if you have not seen it yet (on a page you returned to with Back or Forward, it waits for the next page). Accounts that existed before page guides were added start with the switch off, and a later, updated welcome tour never changes the switch you already have. Your progress is saved to your account, so it follows you to other browsers and devices.
+
+A guide never opens by itself over another window, while you are typing, after a form was sent back with errors, on a page you return to with Back or Forward, or on a page that is refreshing itself to show running AI work. If you change the switch and open another page right away, that page follows your new choice once it is saved; if saving fails, the switch shows its previous setting again.
+
+Guides only highlight parts of the page. They never click, submit, upload, save a key, change a setting, or start AI work, and leaving the page ends them.
 
 ### AI settings and who pays
 
 Open **AI settings** in the sidebar to choose who pays for new AI work:
 
-- **Your own OpenRouter key.** Paste a key from your OpenRouter account and select it; your OpenRouter account is charged for your AI work. You do not need an administrator's permission. The key is stored encrypted and never shown again (only its last characters), and replacing or deleting it never moves your work to the platform.
+- **Your own OpenRouter key.** Paste a key from your OpenRouter account and select it; your OpenRouter account is charged for your AI work. You do not need an administrator's permission. The key is stored encrypted; after you save it, only its last few characters are shown, and replacing or deleting it never moves your work to the platform.
 - **Platform-managed AI.** Paid by the platform; available only after an administrator allows it for your account.
 
 Each translation, review, judging, and suggestion run records who paid when it started. Changing the setting affects new work only. A failed run whose key was removed or replaced is never retried with the platform's key. Your browser or password manager may still offer to save the key field; the page asks them not to, but cannot force it.
@@ -57,6 +62,8 @@ Open **New translation**:
 The form saves itself as you type. If you close the tab or your browser crashes, the draft is restored the next time you open the page. **Discard draft** clears it.
 
 ## 3. Add guidance (optional)
+
+All four kinds of guidance are shown on the page, numbered in reading order; the page guide gives each its own step.
 
 - **Terminology.** Choose a saved glossary, or add terms directly with **+ Add terminology**. A glossary is a list of source terms and the exact target terms to use (for example *Grace → 恵み*). Editing it saves a new version; translations that already used it keep their version.
 - **References.** Pick up to five approved bilingual examples that show the wording and style you want. When you create a reference, paste each side or choose one TXT, Markdown, DOCX, or PDF file per side (up to 10 MiB; drop a file on the box or use **Choose file**). The chosen file's name and size are shown, and you can replace or remove it before saving; choosing a file never saves the form. Use pasted text or a file for each side, not both.

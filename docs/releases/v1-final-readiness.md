@@ -4,6 +4,21 @@ This record covers the last V1 feature milestone: guided product tours, the tran
 
 Nothing here is released, tagged, or deployed. Merging, releasing, tagging, and deploying each need explicit human approval.
 
+## Release status
+
+The code release (`develop` → `main`) and the production release are separate. Green CI proves only the first.
+
+| Item | Status |
+| --- | --- |
+| Features | Complete on `develop`: PRs #90, #91, #96, #97, #98 and the test-only #99. |
+| CI | All five jobs pass on each pull request's exact head and on `develop`'s post-merge head. The `develop` → `main` release pull request records its own run. |
+| Migration inventory | Seven migrations are pending against production (v1.1.0); see [migrations pending in production](#migrations-pending-in-production). |
+| Production host evidence | Read-only inspection only. Gate B is not passed; host findings are kept in the operator's private audit record, not in this repository. |
+| Backup and recovery proof | Not done. No encrypted off-host production backup has been restored and decrypted yet (gates B2 and B3). |
+| Network isolation | Not proven from an independent test point (gate B1). |
+| Human approval | Pending for the `main` merge, each production gate, the deploy, and the tag. |
+| Deployed SHA | None. Production still runs v1.1.0 (`15459c2`). |
+
 ## What this milestone adds
 
 | Area | Behavior | Main code |
@@ -38,8 +53,48 @@ New AI work is authorized once, when it starts (an automatic workflow at launch,
 - **[PR #86](https://github.com/XKeviNguyen/three_heavens/pull/86) — obsolete proprietary licensing language.** Open and stale. The repository is MIT licensed; PR #86 must not be merged as it is.
 - **BYOK production cutover.** PR #90's billing migrations fence out pre-BYOK code (see [production deploy and rollback](../operations/production-deploy.md#rollback)). The first deploy fails AI starts on the old container until traffic switches. An image rollback past that release leaves AI starts failing closed and stalls automatic workflow reconciliation, so roll forward only. CI does not prove migration timing or live billing behavior on production data.
 - **Production network, firewall, and secrets.** Unverified. `proxy.run.publish: false` applies only when the kamal-proxy container is created, so a proxy created from v1.1.0's configuration (`ssl: true`, default port publishing) still publishes ports 80 and 443 after this deploy unless it is rebooted. The host firewall rule, cloudflared's route, Cloudflare's header settings, and the recoverability of the encryption root secrets can be verified only on the production host.
+- **Welcome tours completed during the deploy.** While migrations run, the old container keeps serving. If it is a release that already has the welcome tour (for example `0af83e1`), a tour completed on it in that window is recorded without turning page guides on. Those accounts get the default for existing accounts: guides open only from Help, and the Help switch turns automatic guides on. This was accepted on purpose (PR #97) in preference to cross-release fallbacks.
+- **Page guides claimed just before leaving.** Before a guide opens by itself, its page is claimed on the server, so it opens once across tabs and devices. If the user leaves the page, or another dialog opens, within that request's round-trip (typically under 100 ms), the claim still counts the guide as seen, and it does not open by itself later. It stays available from **Help → Guide to this page**. This was accepted on purpose (PR #97) in preference to a releasable claim.
 - **Tours on refreshing pages.** Pages that reload every 5 seconds while AI work runs (results, blind review, judging, automatic workflow progress) do not start tours or show the invitation until the work finishes.
 - **No-JavaScript language selection.** The language combobox on reference and workspace forms needs JavaScript to submit a language (a pre-existing limitation, not introduced here). The reference file inputs themselves work without JavaScript.
+
+## Migrations pending in production
+
+Every migration added since v1.1.0, applied in order by `db:prepare` while the new container boots. Each runs in its own transaction except `20261010090300`.
+
+| Migration | Change | Locks and failure behavior |
+| --- | --- | --- |
+| `20261010090000_create_open_router_credentials` | New `open_router_credentials` table (encrypted keys), partial unique index, CHECK constraints. | The `user_id` foreign key takes SHARE ROW EXCLUSIVE on `users` until the migration commits, which waits for and blocks writes to `users`; `lock_timeout = 1s`, so a write to `users` held open for over a second fails the migration and the deploy, before the billing fence. Redeploy. |
+| `20261010090100_add_ai_billing_identity` | `users.ai_payment_source`; `billing_source` and `open_router_credential_id` on the ten billed tables, with the constraints added `NOT VALID`; the default is removed again, which fences out pre-BYOK code; payer trigger on `ai_provider_attempts`. | ACCESS EXCLUSIVE locks on each table until the migration commits; `lock_timeout = 1s`. Roll forward only after it commits ([rollback](../operations/production-deploy.md#rollback)). |
+| `20261010090200_validate_ai_billing_identity` | Validates those foreign keys and CHECK constraints. | SHARE UPDATE EXCLUSIVE while scanning; `lock_timeout = 10s`. |
+| `20261010090300_index_ai_billing_credentials` | Partial `open_router_credential_id` indexes, built `CONCURRENTLY`. | No DDL transaction. Waits for older transactions. A retry drops and rebuilds an index left invalid. |
+| `20261011090000_add_product_tour_state_to_users` | `users.product_tour_version` and `product_tour_outcome`; backfills every existing account as `preexisting`; CHECK constraint. | ACCESS EXCLUSIVE on `users` for the whole backfill; `lock_timeout = 1s`. |
+| `20261012090000_create_product_tour_page_outcomes` | `users.product_tour_page_guides` (constant default, no rewrite); new `product_tour_page_outcomes` table with a unique index and CHECK constraints. | Brief ACCESS EXCLUSIVE on `users`; `lock_timeout = 1s`. |
+| `20261012100000_add_product_tour_guides_revision_to_users` | `users.product_tour_guides_revision` (constant default) and a validated CHECK constraint. | ACCESS EXCLUSIVE on `users` while validating; `lock_timeout = 1s`. |
+
+A failed transactional migration rolls back completely and is retried by the next deploy. No migration reads or rewrites encrypted columns.
+
+Schema compatibility and availability differ during the deploy.
+
+- **Schema:** every change is additive, so v1.1.0 code stays compatible with the new schema. Only the billing fence affects it, and that is intended.
+- **Availability:** the old container keeps serving while the migrations run, and its requests wait on their locks. Every signed-in request reads `users`; `current_user` joins it with `sessions`.
+  - While a migration holds ACCESS EXCLUSIVE on `users`, reads and writes there wait.
+  - While it holds SHARE ROW EXCLUSIVE, only writes wait.
+  - A migration still queued for its lock also blocks the requests behind it, for at most the 1-second `lock_timeout`.
+  - The longest hold is the `20261011090000` backfill: 0.02 seconds at production size, 1.2 seconds at 100,000 `users` rows, and 13 to 17 seconds per million rows.
+
+At production size the pause is well under a second, but requests do stall. Deploy at a quiet time.
+
+Rehearsal on a disposable PostgreSQL 17 database loaded with the v1.1.0 schema at release candidate `b152d11` gave these results.
+
+- **Production-sized data (2 accounts and one encrypted workspace draft):** all seven migrations took 0.49 seconds (2.0 seconds including Rails boot).
+- **Integrity:** no invalid indexes and no unvalidated constraints. Existing accounts were backfilled as `preexisting`, with page guides off.
+- **Encryption and retry:** the encrypted draft still decrypted, and a second migrate applied nothing.
+- **Larger data:** the two page-guide migrations added 0.05 seconds at 100,000 `users` rows and 0.36 seconds at 1,000,000.
+
+For timing at larger sizes, see pre-deploy step 8 in [production deploy](../operations/production-deploy.md#pre-deploy).
+
+The development migration `20261012110000` existed only in intermediate PR #97 commits, and the PR removed it before merging. It is not in the release. A development database that ran it keeps a harmless orphan `schema_migrations` row.
 
 ## Operational notes for this milestone
 
@@ -54,9 +109,9 @@ Each gate needs explicit human approval, and passing one never implies the next.
 
 **A. Code release approval (repository only).**
 
-1. Merge the release-stabilization pull request (these documents and tests) after its five CI jobs pass on its exact head SHA, then verify the `develop` head's post-merge CI (all five jobs) on its exact SHA.
+1. Verify the `develop` head's post-merge CI (all five jobs) on its exact SHA.
 2. Close PR #86 without merging; it is not part of the release.
-3. Human: audit and approve the `develop` → `main` release pull request after its own CI on its exact head SHA.
+3. Human: audit and approve the `develop` → `main` release pull request after its own CI on its exact head SHA. Merge it with a merge commit, not squash or rebase, so `develop` stays an ancestor of `main`. Nothing deploys on a `main` merge: the repository has no deploy workflow, Actions secrets, webhooks, or environments.
 
 **B. Production host gates (before any deploy, on the host, read-only first).**
 

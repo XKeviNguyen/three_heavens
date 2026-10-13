@@ -9,11 +9,13 @@ vi:
       personal:
         label: Khóa API OpenRouter của tôi
         description: Bạn trả tiền trực tiếp cho OpenRouter cho mọi yêu cầu dùng khóa của bạn. Không cần quản trị viên phê duyệt.
+        needs_key: "Hãy lưu khóa ở bên dưới trước, rồi chọn mục này."
       managed:
         label: AI do nền tảng quản lý
         description: Three Heavens trả tiền bằng khóa OpenRouter của nền tảng. Quản trị viên quyết định ai được dùng.
         enabled: Quản trị viên đã bật cho tài khoản của bạn.
         disabled: Chưa được bật cho tài khoản của bạn. Hãy hỏi quản trị viên hoặc dùng khóa của riêng bạn.
+        badge: "Cần quản trị viên cấp quyền"
     save_source: Dùng nguồn thanh toán này
     current:
       ready_personal: Công việc AI mới được trả bằng khóa OpenRouter của bạn.
@@ -28,8 +30,22 @@ vi:
       save: Lưu khóa
       replace: Thay khóa
       delete: Xóa khóa
-      delete_confirm: Xóa khóa OpenRouter của bạn? Công việc đang chờ chạy bằng khóa này sẽ thất bại và không chuyển sang bên trả tiền khác.
+      delete_confirm: "Xóa khóa kết thúc bằng %{hint}? Công việc đang chờ chạy bằng khóa này sẽ thất bại và không chuyển sang bên trả tiền khác."
+      delete_confirm_personal: "Bạn đang trả tiền bằng khóa này, nên công việc AI mới sẽ không thể bắt đầu cho tới khi bạn lưu khóa mới hoặc chọn nguồn thanh toán khác."
+      replace_confirm: "Thay khóa kết thúc bằng %{hint}? Khóa cũ bị xóa khi khóa mới được lưu; công việc đang chờ chạy bằng khóa cũ sẽ thất bại và không chuyển sang bên trả tiền khác."
       cancel: Hủy
+    setup:
+      heading: "Tự trả tiền bằng khóa OpenRouter của bạn"
+      steps:
+        - "Lưu khóa OpenRouter của bạn"
+        - "Chọn khóa của bạn làm nguồn thanh toán"
+        - "Sẵn sàng: công việc AI mới được tính vào tài khoản OpenRouter của bạn"
+      step_done: "Xong"
+      step_current: "Bước tiếp theo"
+    # Denial texts for this page itself (the general ones point to AI settings).
+    here:
+      personal_key_unavailable: "Chưa có khóa OpenRouter cho nguồn bạn đã chọn. Hãy lưu khóa mới ở bên dưới hoặc chọn nguồn thanh toán khác."
+      managed_ai_access_revoked: "AI do nền tảng quản lý chưa được bật cho tài khoản này. Hãy lưu khóa OpenRouter của riêng bạn ở bên dưới rồi chọn nó, hoặc hỏi quản trị viên."
     billing:
       heading: Cách tính phí
       items:
@@ -56,6 +72,7 @@ vi:
   ai_billing:
     open_settings: Mở cài đặt AI
     retry_payer:
+      heading: "Ai trả tiền cho lần thử lại này"
       personal: "Lần thử lại này dùng khóa OpenRouter của bạn (kết thúc bằng %{hint}); tài khoản OpenRouter của bạn sẽ bị tính phí."
       managed: "Lần thử lại này dùng AI do nền tảng quản lý; nền tảng chi trả."
     retry_payer_changed: "Người chi trả cho công việc AI đã thay đổi sau khi trang này hiển thị. Hãy kiểm tra người chi trả hiển thị cạnh nút thử lại rồi thử lại."

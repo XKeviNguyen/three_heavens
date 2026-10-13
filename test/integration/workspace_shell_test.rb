@@ -44,6 +44,24 @@ class WorkspaceShellTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # One logo: the app renders the homepage's mark from the same partial, so the
+  # two cannot drift apart (the app used to show a separate "TH" badge).
+  test "the app shows the homepage's logo, linked home with an accessible name" do
+    get root_path
+    homepage_mark = css_select(".landing-header .th-brand-mark svg").sole.to_html
+
+    sign_in_as users(:normal)
+    get projects_path
+    assert_response :success
+    [ "#app-sidebar", "#app-header" ].each do |shell|
+      assert_select "#{shell} a[href='#{root_path}'][aria-label='Three Heavens home']" do |links|
+        assert_select ".th-brand-mark[aria-hidden='true']", count: 1
+        assert_equal homepage_mark, css_select(links.sole, ".th-brand-mark svg").sole.to_html
+      end
+    end
+    assert_select "#app-sidebar span, #app-header span", text: "TH", count: 0
+  end
+
   test "unauthenticated shell keeps the brand visible on the login page" do
     get login_path
 

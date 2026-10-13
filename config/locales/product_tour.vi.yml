@@ -1,266 +1,429 @@
 vi:
   product_tour:
     ui:
-      help: Trợ giúp
-      full_tour: Tham quan toàn bộ sản phẩm
-      page_tour: Tham quan trang này
-      next: Tiếp
+      help: Hướng dẫn
+      full_tour: Khám phá Three Heavens
+      page_tour: Hướng dẫn trang này
+      page_guides: Tự động hiện hướng dẫn cho từng trang
+      page_guides_on: Bật
+      page_guides_off: Tắt
+      next: Tiếp theo
       back: Quay lại
-      skip: Bỏ qua hướng dẫn
+      skip: Bỏ qua
       finish: Hoàn tất
       close: Đóng hướng dẫn
       step_counter: "%{current}/%{total}"
       start_translation: Bắt đầu bản dịch mới
-      refreshing: "Trang này tự làm mới khi công việc AI đang chạy. Bạn có thể xem hướng dẫn sau khi công việc hoàn tất."
+      refreshing: Trang này tự cập nhật trong lúc AI xử lý. Bạn có thể mở hướng dẫn khi xử lý xong.
+      auto_note: Hướng dẫn này chỉ tự hiện một lần. Bạn có thể xem lại hoặc tắt trong mục Hướng dẫn.
       invite:
         title: Lần đầu dùng Three Heavens?
-        body: Xem hướng dẫn bảy bước về cách dịch, nhận xét và thư viện kiến thức của bạn phối hợp với nhau. Hướng dẫn không thay đổi gì, và bạn có thể xem lại bất cứ lúc nào từ Trợ giúp.
+        body: Xem nhanh cách các phần phối hợp với nhau. Việc này không thay đổi gì trong tài khoản của bạn.
         start: Xem hướng dẫn
         later: Để sau
     global:
       welcome:
         title: Chào mừng đến với Three Heavens
-        body: Không gian dịch thuật có AI hỗ trợ. Nhiều mô hình cùng dịch, các mô hình khác nhận xét và chấm điểm kết quả một cách độc lập, còn bạn đưa ra quyết định biên tập cuối cùng, dựa trên thuật ngữ và ví dụ do bạn lưu giữ.
+        points:
+        - Các mô hình AI dịch văn bản của bạn.
+        - Các mô hình khác nhận xét và xếp hạng từng bản dịch.
+        - Bạn là người quyết định cuối cùng.
       workspace:
-        title: Không gian làm việc của bạn
-        body: Bắt đầu công việc mới từ Bản dịch mới. Dự án gom tài liệu và các lượt dịch của từng cặp ngôn ngữ lại một chỗ, còn Lịch sử liệt kê mọi lượt dịch, mới nhất trước, để bạn mở lại bất kỳ lượt nào.
+        title: Khu vực làm việc
+        points:
+        - Bắt đầu việc mới từ mục Bản dịch mới.
+        - Mỗi dự án gom tài liệu của một cặp ngôn ngữ.
+        - Lịch sử liệt kê mọi lượt dịch, mới nhất ở trên cùng.
       knowledge:
-        title: Kiến thức dịch thuật
-        body: Bảng thuật ngữ chứa các thuật ngữ ưu tiên, Bản dịch tham khảo chứa các bản dịch bạn đã duyệt, và Phương pháp chứa các hướng dẫn dùng lại được. Hãy chọn chúng khi bắt đầu dịch để giữ cách dùng từ và văn phong nhất quán.
+        title: Thư viện dịch thuật
+        points:
+        - Bảng thuật ngữ giúp bạn dùng từ nhất quán.
+        - Bản dịch tham khảo là những bản dịch bạn đã duyệt.
+        - Phương pháp cho AI biết bạn muốn văn phong thế nào.
       workflows:
         title: Cấu hình quy trình
-        body: Lưu lại mô hình nào dịch, nhận xét, chấm điểm và đề xuất cải thiện. Chọn một cấu hình đã lưu ở chế độ Tự động, quy trình sẽ chạy dịch, nhận xét ẩn danh và chấm điểm giúp bạn, rồi dừng để bạn biên tập.
+        points:
+        - Lưu sẵn các mô hình để dịch, nhận xét và chấm điểm.
+        - Ở chế độ Tự động, cấu hình sẽ chạy từng bước giúp bạn.
+        - Quy trình dừng trước bước biên tập cuối để bạn tự quyết định.
       ai_access:
-        title: Truy cập AI và ai trả tiền
-        body: Trong Cài đặt AI, bạn chọn ai trả tiền cho công việc AI mới. Khóa OpenRouter của riêng bạn tính vào tài khoản OpenRouter của bạn. AI do nền tảng quản lý do nền tảng trả tiền và cần quản trị viên phê duyệt. Bạn có thể hoàn tất hướng dẫn này mà không cần thêm khóa.
+        title: Dùng AI và thanh toán
+        points:
+        - Vào Cài đặt AI để chọn bên trả tiền cho các lượt chạy AI mới.
+        - Nếu dùng khóa OpenRouter riêng, OpenRouter sẽ tính phí bạn.
+        - Nếu dùng AI do nền tảng quản lý, Three Heavens trả tiền. Quản trị viên cần bật quyền này cho bạn.
       start:
         title: Bắt đầu một bản dịch
-        body: Chọn ngôn ngữ nguồn và đích, dán văn bản hoặc tải lên tệp TXT, Markdown, DOCX hoặc PDF, thêm hướng dẫn tùy chọn, rồi chọn mô hình hoặc cấu hình quy trình. Không có gì được gửi tới AI cho đến khi chính bạn bắt đầu.
+        points:
+        - Chọn ngôn ngữ, rồi thêm văn bản hoặc tệp.
+        - Chọn mô hình AI hoặc một cấu hình quy trình.
+        - AI chỉ nhận dữ liệu khi bạn bấm bắt đầu.
       quality:
-        title: Từ bản dịch ứng viên đến bản dịch cuối
-        body: Bản dịch của mỗi mô hình trở thành một ứng viên. Các mô hình nhận xét đánh giá ứng viên mà không biết mô hình nào đã viết, các mô hình chấm điểm xếp hạng chúng, và bản thắng được mở trong trình biên tập, nơi bạn chỉnh sửa, so sánh các phiên bản, hoàn tất và tải về TXT hoặc DOCX.
+        title: Từ bản nháp đến bản dịch cuối
+        points:
+        - Bản dịch của mỗi mô hình là một bản ứng viên.
+        - Các mô hình nhận xét và chấm điểm sẽ so sánh rồi chọn bản thắng.
+        - Bản thắng được mở trong trình biên tập để bạn hoàn thiện và tải về.
     pages:
       new_translation:
         intro:
           title: Bản dịch mới
-          body: Trang này gom mọi thứ một lượt dịch cần. Không có gì bắt đầu và không có khoản phí nào phát sinh cho đến khi bạn chọn bắt đầu.
+          points:
+          - Trang này dùng để thiết lập một bản dịch.
+          - Chưa có gì chạy hay bị tính phí cho đến khi bạn bấm bắt đầu.
         languages:
           title: Dự án và ngôn ngữ
-          body: Chọn một dự án có sẵn, hoặc đặt tên cho dự án mới cùng ngôn ngữ nguồn và đích. Mỗi dự án chỉ có một cặp ngôn ngữ.
+          points:
+          - Chọn một dự án có sẵn, hoặc đặt tên cho dự án mới.
+          - Mỗi dự án dùng một cặp ngôn ngữ.
         source:
-          title: Tài liệu nguồn
-          body: Dán văn bản, hoặc chuyển sang Tải lên để chọn tệp TXT, Markdown, DOCX hoặc PDF. Bạn có thể xem và sửa văn bản đã trích xuất trước khi bắt đầu.
-        knowledge:
-          title: Hướng dẫn tùy chọn
-          body: Chọn một bảng thuật ngữ để dùng các thuật ngữ ưu tiên. Tùy chọn nâng cao cho phép thêm bản dịch tham khảo, một phương pháp, và chọn hướng dẫn nào được ưu tiên.
+          title: Văn bản cần dịch
+          points:
+          - Dán văn bản, hoặc tải lên tệp TXT, Markdown, DOCX hay PDF.
+          - Bạn có thể xem lại văn bản trước khi bắt đầu.
+        terminology:
+          title: Thuật ngữ
+          points:
+          - Dùng những từ bạn muốn AI dịch nhất quán.
+          - Chọn bảng thuật ngữ đã lưu, hoặc thêm thuật ngữ tại đây.
+        references:
+          title: Bản dịch tham khảo
+          points:
+          - Chọn bản dịch mẫu mà bạn đã duyệt.
+          - AI sẽ dựa vào đó để giữ cách diễn đạt phù hợp.
+        methodology:
+          title: Phương pháp
+          points:
+          - Chọn cách bạn muốn AI thực hiện bản dịch.
+          - Giữ "Không dùng phương pháp" nếu chỉ cần hướng dẫn của bạn.
+        priority:
+          title: Ưu tiên hướng dẫn
+          points:
+          - Chọn hướng dẫn nào quan trọng hơn khi có xung đột.
         workflow:
           title: Quy trình AI
-          body: Ở chế độ Thủ công, bạn chọn các mô hình dịch. Ở chế độ Tự động, một cấu hình quy trình đã lưu sẽ chạy cả nhận xét và chấm điểm. Dù chọn cách nào, bạn vẫn là người duyệt bản dịch cuối.
+          points:
+          - 'Thủ công: bạn tự chọn mô hình dịch.'
+          - 'Tự động: một cấu hình đã lưu chạy thêm bước nhận xét và chấm điểm.'
+          - Dù chọn cách nào, bạn vẫn là người duyệt bản dịch cuối.
         launch:
           title: Kiểm tra và bắt đầu
-          body: Xem ai trả tiền cho lượt dịch này và nó sẽ làm gì, rồi bắt đầu. Nút bắt đầu là điều khiển duy nhất ở đây gửi công việc tới AI.
+          points:
+          - Xem lại ai trả tiền và những bước sẽ chạy.
+          - Chỉ nút bắt đầu mới gửi việc tới AI.
       source_import:
         intro:
-          title: Tải lên tệp nguồn
-          body: Tải lên một tài liệu để chuyển thành văn bản nguồn có thể xem lại. Tải lên và xem trước không bao giờ gửi gì tới AI.
+          title: Tải tệp lên
+          points:
+          - Chuyển tài liệu thành văn bản để bạn kiểm tra.
+          - Tải tệp lên không gửi gì tới AI.
         file:
-          title: Chọn hoặc thả tệp
-          body: Hỗ trợ tệp TXT, Markdown, DOCX và PDF, trong giới hạn dung lượng hiển thị. Văn bản đã trích xuất sẽ được hiển thị để bạn kiểm tra trước khi dịch.
+          title: Chọn tệp
+          points:
+          - Dùng tệp TXT, Markdown, DOCX hoặc PDF.
+          - Tệp không được vượt quá giới hạn dung lượng ghi ở đây.
+          - Bạn sẽ thấy văn bản trước khi dịch.
       projects:
         intro:
           title: Dự án
-          body: Một dự án gom các tài liệu của một cặp ngôn ngữ và mọi lượt dịch được tạo từ chúng.
+          points:
+          - Mỗi dự án chứa tài liệu của một cặp ngôn ngữ.
+          - Dự án cũng lưu mọi bản dịch làm từ các tài liệu đó.
         list:
           title: Dự án của bạn
-          body: Mở một dự án để xem các tài liệu và tiến độ của từng lượt dịch.
+          points:
+          - Các dự án của bạn hiện ở đây.
+          - Mở một dự án để xem tài liệu và tiến độ.
         start:
-          title: Thêm công việc vào dự án này
-          body: Dán văn bản nguồn mới hoặc tải lên một tệp; ngôn ngữ của dự án được điền sẵn cho bạn.
+          title: Thêm việc
+          points:
+          - Dán văn bản hoặc tải tệp lên.
+          - Ngôn ngữ của dự án đã được điền sẵn.
         documents:
           title: Tài liệu
-          body: Mỗi tài liệu liệt kê các lượt dịch của nó, mới nhất trước. Bản gốc đã tải lên có thể tải xuống lại.
+          points:
+          - Mỗi tài liệu liệt kê các bản dịch, mới nhất ở trên cùng.
+          - Bạn có thể tải lại tệp gốc đã tải lên.
         next_action:
-          title: Tiếp tục từ chỗ bạn đã dừng
-          body: Liên kết được làm nổi bật luôn dẫn tới bước hữu ích tiếp theo của lượt dịch đó, chẳng hạn nhận xét ẩn danh, chấm điểm hoặc trình biên tập.
+          title: Bước tiếp theo
+          points:
+          - Liên kết được tô sáng cho biết việc cần làm tiếp.
+          - 'Ví dụ: nhận xét, chấm điểm hoặc biên tập.'
       history:
         intro:
           title: Lịch sử dịch
-          body: Mọi lượt dịch bạn đã thực hiện, mới nhất trước, kèm trạng thái, mô hình và chi phí AI đã biết.
+          points:
+          - Mọi lượt dịch bạn đã chạy, mới nhất ở trên cùng.
+          - Mỗi lượt cho biết trạng thái, mô hình và chi phí AI đã ghi nhận.
         list:
-          title: Tìm một lượt dịch
-          body: Mỗi mục hiển thị dự án, ngôn ngữ và hướng dẫn mà lượt dịch đã dùng.
+          title: Tìm một bản dịch
+          points:
+          - Các bản dịch của bạn hiện ở đây, mới nhất trước.
+          - Mỗi mục cho biết dự án, ngôn ngữ và hướng dẫn đã dùng.
         reopen:
-          title: Mở lại hoặc lặp lại
-          body: Tiếp tục bước kế tiếp, mở bất kỳ giai đoạn nào, hoặc lặp lại cấu hình của một lượt dịch thành bản dịch mới.
+          title: Tiếp tục hoặc làm lại
+          points:
+          - Tiếp tục bước kế tiếp, hoặc mở bất kỳ giai đoạn nào.
+          - Dùng lại thiết lập của một lượt dịch cho bản dịch mới.
       terminology:
         intro:
           title: Bảng thuật ngữ
-          body: Một bảng thuật ngữ liệt kê các thuật ngữ ưu tiên cho một cặp ngôn ngữ, để mọi bản dịch dùng cùng một cách diễn đạt.
+          points:
+          - Bảng thuật ngữ ghi các cách dịch bạn muốn dùng.
+          - Nhờ vậy, các bản dịch luôn dùng từ giống nhau.
         create:
-          title: Tạo bảng thuật ngữ
-          body: Bắt đầu một bảng thuật ngữ mới cho một cặp ngôn ngữ.
+          title: Bảng thuật ngữ mới
+          points:
+          - Tạo bảng thuật ngữ cho một cặp ngôn ngữ.
         list:
           title: Bảng thuật ngữ của bạn
-          body: Có thể chọn các bảng thuật ngữ đang hoạt động khi bắt đầu dịch.
+          points:
+          - Chọn một bảng đang hoạt động khi bắt đầu bản dịch.
         entries:
           title: Thuật ngữ
-          body: Thêm từng thuật ngữ nguồn cùng bản dịch ưu tiên. Khi lưu sẽ tạo một phiên bản mới.
+          points:
+          - Thêm từng thuật ngữ cùng cách dịch bạn muốn.
+          - Mỗi lần lưu sẽ tạo một phiên bản mới.
         revisions:
           title: Phiên bản
-          body: Mỗi thay đổi đã lưu là một phiên bản. Các lượt dịch giữ đúng phiên bản chúng đã dùng, kể cả sau khi bạn sửa bảng thuật ngữ.
+          points:
+          - Mỗi lần lưu được giữ lại thành một phiên bản.
+          - Các bản dịch cũ vẫn giữ phiên bản đã dùng.
         status:
-          title: Sửa hoặc lưu trữ
-          body: Tạo phiên bản mới, hoặc lưu trữ bảng thuật ngữ bạn không còn dùng cho công việc mới. Lưu trữ vẫn giữ lại lịch sử của nó.
+          title: Cập nhật hoặc lưu trữ
+          points:
+          - Lưu phiên bản mới, hoặc lưu trữ bảng bạn không cần nữa.
+          - Lưu trữ vẫn giữ toàn bộ lịch sử.
       references:
         intro:
           title: Bản dịch tham khảo
-          body: Một bản tham khảo ghép một đoạn nguồn với bản dịch bạn đã duyệt, để AI có thể theo cách dùng từ và văn phong đã định của bạn.
+          points:
+          - Mỗi bản tham khảo ghép một đoạn văn gốc với bản dịch bạn đã duyệt.
+          - AI sẽ theo cách dùng từ và văn phong đó.
         create:
-          title: Thêm bản tham khảo
-          body: Tạo một bản tham khảo cho một cặp ngôn ngữ.
+          title: Bản tham khảo mới
+          points:
+          - Thêm bản tham khảo cho một cặp ngôn ngữ.
         list:
           title: Bản tham khảo của bạn
-          body: Có thể chọn các bản tham khảo đang hoạt động trong tùy chọn nâng cao của bản dịch mới.
+          points:
+          - Chọn bản cần dùng ở mục Bản dịch tham khảo trong trang Bản dịch mới.
         source:
-          title: Ví dụ nguồn
-          body: Dán đoạn nguồn hoặc tải lên một tệp. Chỉ cung cấp văn bản dán hoặc tệp, không dùng cả hai.
+          title: Văn bản gốc
+          points:
+          - Dán văn bản gốc, hoặc tải tệp lên.
+          - Chỉ dùng một trong hai cách.
         translation:
           title: Bản dịch đã duyệt
-          body: Dán hoặc tải lên bản dịch bạn đã duyệt cho đoạn đó. Tệp được kiểm tra và trích xuất khi bạn lưu.
+          points:
+          - Dán hoặc tải lên bản dịch bạn đã duyệt.
+          - Tệp sẽ được kiểm tra khi bạn lưu.
         revisions:
-          title: Lịch sử phiên bản
-          body: Mỗi lần lưu là một phiên bản. Các lượt dịch giữ đúng phiên bản chúng đã dùng.
+          title: Phiên bản
+          points:
+          - Mỗi lần lưu được giữ lại thành một phiên bản.
+          - Các bản dịch cũ vẫn giữ phiên bản đã dùng.
       methodology:
         intro:
           title: Phương pháp
-          body: Một phương pháp là hướng dẫn bằng văn bản, dùng lại được, về cách tạo bản dịch, chẳng hạn giọng văn, đối tượng đọc hoặc quy tắc định dạng.
+          points:
+          - Viết quy tắc dịch một lần.
+          - 'Ví dụ: giọng văn, người đọc hoặc cách trình bày.'
         create:
-          title: Tạo phương pháp
-          body: Viết hướng dẫn một lần và dùng lại cho nhiều bản dịch.
+          title: Phương pháp mới
+          points:
+          - Viết quy tắc một lần, rồi dùng lại cho mọi bản dịch.
         list:
           title: Phương pháp của bạn
-          body: Có thể chọn các phương pháp đang hoạt động trong tùy chọn nâng cao của bản dịch mới.
+          points:
+          - Chọn phương pháp cần dùng ở mục Phương pháp trong trang Bản dịch mới.
         instructions:
-          title: Hướng dẫn
-          body: Mô tả bản dịch nên đọc như thế nào. Khi lưu sẽ tạo một phiên bản mới.
+          title: Quy tắc của bạn
+          points:
+          - Mô tả bản dịch nên được viết như thế nào.
+          - Mỗi lần lưu sẽ tạo một phiên bản mới.
         revisions:
           title: Phiên bản
-          body: Các lượt dịch giữ đúng phiên bản chúng đã dùng, nên kết quả trước đây vẫn giải thích được.
+          points:
+          - Các bản dịch cũ vẫn giữ phiên bản đã dùng.
+          - Nhờ vậy, bạn luôn biết vì sao kết quả được viết theo cách đó.
       workflows:
         intro:
           title: Cấu hình quy trình
-          body: Một cấu hình quy trình lưu lại mô hình nào dịch, nhận xét, chấm điểm và đề xuất cải thiện, để dùng ở chế độ Tự động.
+          points:
+          - Mỗi cấu hình lưu các mô hình để dịch, nhận xét, chấm điểm và đề xuất chỉnh sửa.
+          - Chế độ Tự động ở trang Bản dịch mới sẽ dùng cấu hình này.
         create:
-          title: Tạo cấu hình
-          body: Bắt đầu một cấu hình mới, hoặc nhân bản một cấu hình có sẵn để điều chỉnh.
+          title: Cấu hình mới
+          points:
+          - Tạo cấu hình mới, hoặc sao chép một cấu hình rồi chỉnh lại.
         list:
           title: Cấu hình của bạn
-          body: Các cấu hình đang hoạt động xuất hiện ở chế độ Tự động trên trang Bản dịch mới.
+          points:
+          - Các cấu hình đang hoạt động hiện trong chế độ Tự động ở trang Bản dịch mới.
         configure:
           title: Chọn mô hình
-          body: Chọn mô hình cho từng vai trò. Các lượt chạy tự động dùng đúng những mô hình này và hiển thị công việc AI dự kiến trước khi bạn bắt đầu.
+          points:
+          - Chọn mô hình cho từng vai trò.
+          - Bạn sẽ thấy các việc AI dự kiến làm trước khi bắt đầu.
         completion:
-          title: Khi nào dừng
-          body: Dừng ở bản nháp thắng, hoặc thu thêm đề xuất của AI. Đề xuất không bao giờ thay đổi bản nháp của bạn trừ khi bạn áp dụng.
+          title: Điểm dừng
+          points:
+          - Dừng ở bản thắng, hoặc nhận thêm đề xuất của AI.
+          - Đề xuất không thay đổi bản nháp, trừ khi bạn áp dụng.
         pipeline:
-          title: Tiến độ quy trình
-          body: Một lượt chạy tự động đi qua dịch, nhận xét ẩn danh và chấm điểm, rồi dừng khi sẵn sàng để bạn biên tập.
+          title: Tiến độ
+          points:
+          - Một lượt chạy tự động sẽ dịch, nhận xét rồi chấm điểm.
+          - Quy trình dừng lại khi bản nháp sẵn sàng để bạn biên tập.
       ai_settings:
         intro:
           title: Cài đặt AI
-          body: Chọn ai trả tiền cho công việc AI mới. Không có gì trên trang này bắt đầu công việc AI.
+          points:
+          - Chọn bên trả tiền cho các lượt chạy AI mới.
+          - Thao tác trên trang này không chạy AI.
         status:
-          title: Trạng thái hiện tại
-          body: Cho biết công việc AI mới có thể bắt đầu hay không và ai trả tiền.
+          title: Trạng thái
+          points:
+          - Cho biết bạn có thể chạy AI mới hay chưa, và ai sẽ trả tiền.
         source:
           title: Nguồn thanh toán
-          body: Khóa OpenRouter của riêng bạn tính vào tài khoản OpenRouter của bạn. AI do nền tảng quản lý do nền tảng trả tiền và cần quản trị viên phê duyệt.
+          points:
+          - 'Khóa OpenRouter riêng: OpenRouter tính phí bạn.'
+          - 'AI do nền tảng quản lý: Three Heavens trả tiền, sau khi quản trị viên bật quyền cho bạn.'
         key:
           title: Khóa OpenRouter của bạn
-          body: Khóa được lưu mã hóa và không bao giờ hiển thị lại; chỉ hiện vài ký tự cuối. Thay hoặc xóa khóa không bao giờ chuyển công việc của bạn sang khóa của nền tảng.
+          points:
+          - Khóa được lưu ở dạng mã hóa.
+          - Sau khi lưu, bạn chỉ thấy vài ký tự cuối.
+          - Khi bạn thay hoặc xóa khóa, việc của bạn không bao giờ bị chuyển sang khóa của nền tảng.
         billing:
           title: Cách tính phí
-          body: Mỗi lượt chạy ghi lại ai trả tiền khi bắt đầu. Thay đổi cài đặt này chỉ ảnh hưởng đến công việc mới, và thử lại thủ công dùng bên trả tiền hiển thị bên cạnh.
+          points:
+          - Mỗi lượt chạy giữ bên trả tiền được chọn lúc bắt đầu.
+          - Thay đổi ở đây chỉ áp dụng cho việc mới.
+          - Khi thử lại, bên trả tiền là bên được hiển thị trong khung thử lại.
       results:
         intro:
           title: Kết quả dịch
-          body: Trang này theo dõi một lượt dịch từ các mô hình đến bước tiếp theo.
+          points:
+          - Theo dõi một bản dịch từ các mô hình đến bước tiếp theo.
         progress:
-          title: Lượt dịch đang ở đâu
-          body: Dịch, nhận xét ẩn danh, chấm điểm và trình biên tập, với giai đoạn hiện tại được làm nổi bật.
+          title: Tiến độ
+          points:
+          - Các giai đoạn gồm dịch, nhận xét, chấm điểm và biên tập.
+          - Giai đoạn hiện tại được tô sáng.
         outputs:
-          title: Bản dịch ứng viên
-          body: Kết quả, trạng thái và chi phí đã biết của từng mô hình.
+          title: Bản ứng viên
+          points:
+          - Xem bản dịch, trạng thái và chi phí đã ghi nhận của từng mô hình.
         retry:
-          title: Khôi phục công việc thất bại
-          body: Có thể thử lại thủ công các mô hình thất bại. Bảng này hiển thị ai sẽ trả tiền cho lần thử lại đó.
+          title: Thử lại phần bị lỗi
+          points:
+          - Thử lại mô hình bị lỗi khi bạn muốn.
+          - Khung này cho biết ai trả tiền cho lần thử lại.
         next:
           title: Bước tiếp theo
-          body: Khi có ít nhất hai ứng viên hoàn tất, hãy bắt đầu nhận xét ẩn danh, hoặc tiếp tục với phần nhận xét đã có.
+          points:
+          - Khi có hai bản ứng viên hoàn tất, hãy bắt đầu nhận xét ẩn danh.
       blind_review:
         intro:
           title: Nhận xét ẩn danh
-          body: Các mô hình nhận xét đánh giá các ứng viên mà không biết mô hình nào đã viết.
+          points:
+          - Các mô hình nhận xét sẽ xem xét từng bản ứng viên.
+          - Chúng không biết bản nào do mô hình nào viết.
         progress:
-          title: Tiến độ quy trình
-          body: Nhận xét ẩn danh là giai đoạn thứ hai, sau dịch.
+          title: Tiến độ
+          points:
+          - Nhận xét ẩn danh diễn ra sau bước dịch.
         evaluations:
           title: Nhận xét
-          body: Phản hồi có cấu trúc của từng mô hình nhận xét cho mỗi ứng viên, kèm cách diễn đạt đề xuất nếu có.
+          points:
+          - Đọc nhận xét của từng mô hình cho từng bản ứng viên.
+          - Một số nhận xét có gợi ý cách dùng từ.
         retry:
-          title: Khôi phục nhận xét thất bại
-          body: Có thể thử lại thủ công các mô hình nhận xét thất bại. Bảng này hiển thị ai sẽ trả tiền cho lần thử lại đó.
+          title: Thử lại lượt nhận xét bị lỗi
+          points:
+          - Thử lại mô hình nhận xét bị lỗi khi bạn muốn.
+          - Khung này cho biết ai trả tiền cho lần thử lại.
         next:
-          title: Tiếp tục sang chấm điểm
-          body: Khi nhận xét hoàn tất, hãy chọn các mô hình chấm điểm để xếp hạng các ứng viên.
+          title: Sang bước chấm điểm
+          points:
+          - Khi nhận xét xong, hãy chọn mô hình chấm điểm để xếp hạng các bản ứng viên.
       judging:
         intro:
           title: Chấm điểm
-          body: Các mô hình chấm điểm độc lập cho điểm và xếp hạng các ứng viên đã được nhận xét.
+          points:
+          - Các mô hình chấm điểm sẽ cho điểm và xếp hạng các bản ứng viên đã được nhận xét.
+          - Mỗi mô hình chấm độc lập.
         progress:
-          title: Tiến độ quy trình
-          body: Chấm điểm là giai đoạn thứ ba; tiếp theo là trình biên tập.
+          title: Tiến độ
+          points:
+          - Chấm điểm diễn ra sau nhận xét ẩn danh.
+          - Tiếp theo là bước biên tập.
         winner:
           title: Bản thắng
-          body: Bản thắng chung cuộc và cách mở nó trong trình biên tập bản dịch cuối.
+          points:
+          - Đây là bản ứng viên xếp hạng cao nhất.
+          - Mở bản này trong trình biên tập ngay tại đây.
         runs:
           title: Kết quả chấm điểm
-          body: Lựa chọn bản thắng, độ tin cậy, lý do, điểm mạnh và rủi ro của từng mô hình chấm điểm, để bạn thấy kết quả được đưa ra như thế nào.
+          points:
+          - Xem lựa chọn, độ tin cậy và lý do của từng mô hình chấm điểm.
         retry:
-          title: Khôi phục chấm điểm thất bại
-          body: Có thể thử lại thủ công các mô hình chấm điểm thất bại. Bảng này hiển thị ai sẽ trả tiền cho lần thử lại đó.
+          title: Thử lại lượt chấm điểm bị lỗi
+          points:
+          - Thử lại mô hình chấm điểm bị lỗi khi bạn muốn.
+          - Khung này cho biết ai trả tiền cho lần thử lại.
       final_editor:
         intro:
           title: Trình biên tập bản dịch cuối
-          body: Bạn đưa ra các quyết định cuối cùng tại đây. Không có gì thay đổi bản nháp của bạn trừ khi chính bạn làm.
+          points:
+          - Bạn là người quyết định cuối cùng ở đây.
+          - Bản nháp chỉ thay đổi khi chính bạn sửa.
         guidance:
-          title: Hướng dẫn đã dùng
-          body: Bảng thuật ngữ, phương pháp và bản dịch tham khảo mà lượt dịch này đã dùng, để bạn đối chiếu khi biên tập.
+          title: Hướng dẫn dịch đã dùng
+          points:
+          - Bảng thuật ngữ, phương pháp và bản tham khảo mà bản dịch này đã dùng.
         draft:
           title: Bản nháp của bạn
-          body: Chỉnh sửa và lưu các phiên bản. Bạn có thể tải phiên bản hiện tại về dạng TXT hoặc DOCX bất cứ lúc nào.
+          points:
+          - Chỉnh sửa và lưu các phiên bản.
+          - Tải phiên bản hiện tại về dưới dạng TXT hoặc DOCX.
         refine:
           title: Đề xuất của AI
-          body: Nhờ các mô hình đề xuất cải thiện cho phiên bản hiện tại. Chỉ áp dụng một đề xuất nếu bạn muốn.
+          points:
+          - Nhờ mô hình AI gợi ý cách cải thiện phiên bản này.
+          - Chỉ áp dụng đề xuất khi bạn muốn.
         revisions:
           title: Lịch sử phiên bản
-          body: Mọi phiên bản đã lưu đều được giữ lại. Khôi phục một phiên bản cũ thành phiên bản nháp mới.
+          points:
+          - Mọi phiên bản đã lưu đều được giữ lại.
+          - Bạn có thể khôi phục phiên bản cũ thành một phiên bản mới.
         finalize:
-          title: Hoàn tất
-          body: Hoàn tất phiên bản hiện tại khi đã sẵn sàng; bạn có thể mở lại sau nếu cần.
+          title: Hoàn tất bản dịch
+          points:
+          - Hoàn tất khi bản dịch đã sẵn sàng.
+          - Bạn có thể mở lại sau.
       benchmarks:
         intro:
           title: Thống kê mô hình
-          body: Mỗi mô hình đã hoạt động ra sao trong các lượt dịch của riêng bạn. Mỗi giá trị trung bình cho biết nó dựa trên bao nhiêu kết quả.
+          points:
+          - Xem mỗi mô hình làm tốt đến đâu trong các bản dịch của bạn.
+          - Mỗi điểm trung bình đều ghi rõ số kết quả được dùng để tính.
         sort:
-          title: Sắp xếp mô hình
-          body: Sắp xếp mô hình theo thước đo bạn quan tâm.
+          title: Sắp xếp
+          points:
+          - Sắp xếp mô hình theo tiêu chí bạn quan tâm.
         list:
-          title: Kết quả của mô hình
-          body: Mở một mô hình để xem chẩn đoán theo vai trò và lịch sử gần đây.
+          title: Kết quả theo mô hình
+          points:
+          - Mở một mô hình để xem chi tiết và các lượt gần đây.
         roles:
-          title: Chẩn đoán theo vai trò
-          body: Mô hình đã hoạt động thế nào khi làm người nhận xét hoặc chấm điểm. Các khác biệt chỉ mô tả điều đã xảy ra; chúng không chứng minh nguyên nhân.
+          title: Kết quả khi nhận xét và chấm điểm
+          points:
+          - Xem mô hình làm việc thế nào khi nhận xét hoặc chấm điểm.
+          - Khác biệt cho thấy điều đã xảy ra, không cho biết nguyên nhân.
   file_field:
     choose: Chọn tệp
     replace: Chọn tệp khác
@@ -268,8 +431,8 @@ vi:
     remove_named: Xóa %{name}
     drop: hoặc thả tệp vào đây
     none: Chưa chọn tệp.
-    help: "TXT, Markdown, DOCX hoặc PDF · tối đa %{maximum} MiB · được kiểm tra lại khi bạn lưu"
-    selected: "Đã chọn %{name} (%{size})."
+    help: TXT, Markdown, DOCX hoặc PDF · tối đa %{maximum} MiB · được kiểm tra lại khi bạn lưu
+    selected: Đã chọn %{name} (%{size}).
     removed: Đã xóa tệp.
     unsupported: "%{name} không phải tệp được hỗ trợ. Hãy chọn tệp TXT, Markdown, DOCX hoặc PDF."
     too_large: "%{name} lớn hơn giới hạn tải lên."

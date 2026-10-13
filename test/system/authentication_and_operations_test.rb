@@ -32,6 +32,18 @@ class AuthenticationAndOperationsTest < ApplicationSystemTestCase
     assert_text "AI workflow operations"
   end
 
+  test "the sidebar keeps its scroll position between pages" do
+    sign_in_in_browser(users(:admin), "admin secure password value")
+    bottom = page.evaluate_script(<<~JS)
+      (() => { const nav = document.querySelector("#app-sidebar nav"); nav.scrollTop = nav.scrollHeight; return nav.scrollTop })()
+    JS
+    assert_operator bottom, :>, 0, "the admin navigation scrolls at this window size"
+
+    click_link "Models"
+    assert_text "OpenRouter model catalog"
+    assert_equal bottom, page.evaluate_script("document.querySelector('#app-sidebar nav').scrollTop")
+  end
+
   test "owner explicitly retries a failed translation without a provider call" do
     experiment = failed_experiment_for(users(:normal))
     failed_run = experiment.translation_runs.failed.first

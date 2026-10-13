@@ -36,7 +36,6 @@ class TranslationWorkspacePaginationTest < ApplicationSystemTestCase
     choose_known_language("Target language", "Japanese")
     # Newest first: the oldest profile is on page 2.
     change_methodology_page(2)
-    open_methodology
     find("input[name='translation_workspace[methodology_profile_revision_id]'][value='#{@oldest.current_revision_id}']", visible: :all)
       .find(:xpath, "./ancestor::label[1]").click
     assert_until { draft_payload&.fetch("methodology_profile_revision_id", nil) == @oldest.current_revision_id.to_s }
@@ -105,14 +104,8 @@ class TranslationWorkspacePaginationTest < ApplicationSystemTestCase
 
   private
 
-  def open_methodology
-    summary = find("details > summary", text: I18n.t("workspace_ui.advanced"))
-    summary.click unless summary.find(:xpath, "..").matches_css?("[open]")
-  end
-
   # Clicks the methodology list's page button and waits for the requested page.
   def change_methodology_page(number)
-    open_methodology
     find("nav[aria-label='Methodologies pagination'] button[name='methodology_profile_page'][value='#{number}']").click
     assert_selector "nav[aria-label='Methodologies pagination']", text: /Page #{number} of 2/, visible: :all
   end

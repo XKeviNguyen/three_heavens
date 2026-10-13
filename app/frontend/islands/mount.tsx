@@ -18,6 +18,8 @@ interface IslandState {
   registry: Map<string, IslandComponent>
   mounted: Map<HTMLElement, MountedIsland>
   listening: boolean
+  // The bundle that owns this document's islands.
+  bundle?: string
 }
 
 declare global {
@@ -30,11 +32,21 @@ declare global {
 const state: IslandState = (window.__threeHeavensIslandState ??= {
   registry: new Map(),
   mounted: new Map(),
-  listening: false
+  listening: false,
+  bundle: import.meta.url
 })
 const { registry, mounted } = state
 
+// The bundle is not data-turbo-track, so after a deploy a Turbo visit can
+// evaluate a newer bundle in a document the older one already runs. Their
+// React copies cannot share islands (the older one's listeners would mount
+// the newer components, and its cached pages carry older props), so the page
+// is loaded afresh once, as Turbo does for tracked assets.
+const replacesOlderBundle = state.bundle !== import.meta.url
+if (replacesOlderBundle) window.location.reload()
+
 export function registerIsland<P extends object>(name: string, component: ComponentType<P>): void {
+  if (replacesOlderBundle) return
   registry.set(name, component as IslandComponent)
 }
 
@@ -116,6 +128,7 @@ function unmountOutside(newBody: Node | undefined): void {
 }
 
 export function startIslands(): void {
+  if (replacesOlderBundle) return
   if (!state.listening) {
     state.listening = true
     document.addEventListener("turbo:load", mountAll)
