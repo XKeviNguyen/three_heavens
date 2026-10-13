@@ -4,6 +4,21 @@ This record covers the last V1 feature milestone: guided product tours, the tran
 
 Nothing here is released, tagged, or deployed. Merging, releasing, tagging, and deploying each need explicit human approval.
 
+## Release status
+
+The code release (`develop` → `main`) and the production release are separate. Green CI proves only the first.
+
+| Item | Status |
+| --- | --- |
+| Features | Complete on `develop`: PRs #90, #91, #96, #97, #98 and the test-only #99. |
+| CI | All five jobs pass on each pull request's exact head and on `develop`'s post-merge head. The `develop` → `main` release pull request records its own run. |
+| Migration inventory | Seven migrations are pending against production (v1.1.0); see [migrations pending in production](#migrations-pending-in-production). |
+| Production host evidence | Read-only inspection only. Gate B is not passed; host findings are kept in the operator's private audit record, not in this repository. |
+| Backup and recovery proof | Not done. No encrypted off-host production backup has been restored and decrypted yet (gates B2 and B3). |
+| Network isolation | Not proven from an independent test point (gate B1). |
+| Human approval | Pending for the `main` merge, each production gate, the deploy, and the tag. |
+| Deployed SHA | None. Production still runs v1.1.0 (`15459c2`). |
+
 ## What this milestone adds
 
 | Area | Behavior | Main code |
@@ -43,6 +58,33 @@ New AI work is authorized once, when it starts (an automatic workflow at launch,
 - **Tours on refreshing pages.** Pages that reload every 5 seconds while AI work runs (results, blind review, judging, automatic workflow progress) do not start tours or show the invitation until the work finishes.
 - **No-JavaScript language selection.** The language combobox on reference and workspace forms needs JavaScript to submit a language (a pre-existing limitation, not introduced here). The reference file inputs themselves work without JavaScript.
 
+## Migrations pending in production
+
+Every migration added since v1.1.0, applied in order by `db:prepare` while the new container boots. Each runs in its own transaction except `20261010090300`.
+
+| Migration | Change | Locks and failure behavior |
+| --- | --- | --- |
+| `20261010090000_create_open_router_credentials` | New `open_router_credentials` table (encrypted keys), partial unique index, CHECK constraints. | New table only; `lock_timeout = 1s`. |
+| `20261010090100_add_ai_billing_identity` | `users.ai_payment_source`; `billing_source` and `open_router_credential_id` on the ten billed tables, with the constraints added `NOT VALID`; the default is removed again, which fences out pre-BYOK code; payer trigger on `ai_provider_attempts`. | ACCESS EXCLUSIVE locks on each table until the migration commits; `lock_timeout = 1s`. Roll forward only after it commits ([rollback](../operations/production-deploy.md#rollback)). |
+| `20261010090200_validate_ai_billing_identity` | Validates those foreign keys and CHECK constraints. | SHARE UPDATE EXCLUSIVE while scanning; `lock_timeout = 10s`. |
+| `20261010090300_index_ai_billing_credentials` | Partial `open_router_credential_id` indexes, built `CONCURRENTLY`. | No DDL transaction. Waits for older transactions. A retry drops and rebuilds an index left invalid. |
+| `20261011090000_add_product_tour_state_to_users` | `users.product_tour_version` and `product_tour_outcome`; backfills every existing account as `preexisting`; CHECK constraint. | ACCESS EXCLUSIVE on `users` for the whole backfill; `lock_timeout = 1s`. |
+| `20261012090000_create_product_tour_page_outcomes` | `users.product_tour_page_guides` (constant default, no rewrite); new `product_tour_page_outcomes` table with a unique index and CHECK constraints. | Brief ACCESS EXCLUSIVE on `users`; `lock_timeout = 1s`. |
+| `20261012100000_add_product_tour_guides_revision_to_users` | `users.product_tour_guides_revision` (constant default) and a validated CHECK constraint. | ACCESS EXCLUSIVE on `users` while validating; `lock_timeout = 1s`. |
+
+A failed transactional migration rolls back completely and is retried by the next deploy. Every migration is additive, so v1.1.0 code keeps working while they run; only the billing fence affects it, and that is intended. No migration reads or rewrites encrypted columns.
+
+Rehearsal on a disposable PostgreSQL 17 database loaded with the v1.1.0 schema at release candidate `b152d11` gave these results.
+
+- **Production-sized data (2 accounts and one encrypted workspace draft):** all seven migrations took 0.49 seconds (2.0 seconds including Rails boot).
+- **Integrity:** no invalid indexes and no unvalidated constraints. Existing accounts were backfilled as `preexisting`, with page guides off.
+- **Encryption and retry:** the encrypted draft still decrypted, and a second migrate applied nothing.
+- **Larger data:** the two page-guide migrations added 0.05 seconds at 100,000 `users` rows and 0.36 seconds at 1,000,000.
+
+For timing at larger sizes, see pre-deploy step 8 in [production deploy](../operations/production-deploy.md#pre-deploy).
+
+The development migration `20261012110000` existed only in intermediate PR #97 commits, and the PR removed it before merging. It is not in the release. A development database that ran it keeps a harmless orphan `schema_migrations` row.
+
 ## Operational notes for this milestone
 
 - Migration `20261011090000` adds two nullable `users` columns, backfills every existing row as `preexisting`, and adds a CHECK constraint, under `lock_timeout = 1s`. `users` holds one row per account, so this is brief at the expected size; it holds an ACCESS EXCLUSIVE lock on `users` for the backfill, measured at about 17 seconds per million rows (see pre-deploy step 8 in [production deploy](../operations/production-deploy.md#pre-deploy)). Code from before this milestone ignores the columns; an account it creates during the deploy starts unresolved and is offered the tour, which is correct for a new account.
@@ -56,9 +98,9 @@ Each gate needs explicit human approval, and passing one never implies the next.
 
 **A. Code release approval (repository only).**
 
-1. Merge the release-stabilization pull request (these documents and tests) after its five CI jobs pass on its exact head SHA, then verify the `develop` head's post-merge CI (all five jobs) on its exact SHA.
+1. Verify the `develop` head's post-merge CI (all five jobs) on its exact SHA.
 2. Close PR #86 without merging; it is not part of the release.
-3. Human: audit and approve the `develop` → `main` release pull request after its own CI on its exact head SHA.
+3. Human: audit and approve the `develop` → `main` release pull request after its own CI on its exact head SHA. Merge it with a merge commit, not squash or rebase, so `develop` stays an ancestor of `main`. Nothing deploys on a `main` merge: the repository has no deploy workflow, Actions secrets, webhooks, or environments.
 
 **B. Production host gates (before any deploy, on the host, read-only first).**
 
