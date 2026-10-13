@@ -81,11 +81,25 @@ vi:
           points:
           - Dán văn bản, hoặc tải lên tệp TXT, Markdown, DOCX hay PDF.
           - Bạn có thể xem lại văn bản trước khi bắt đầu.
-        knowledge:
-          title: Hướng dẫn dịch (tùy chọn)
+        terminology:
+          title: Thuật ngữ
           points:
-          - Chọn bảng thuật ngữ để dùng từ nhất quán.
-          - Phần tùy chọn nâng cao cho phép thêm bản dịch tham khảo và phương pháp.
+          - Dùng những từ bạn muốn AI dịch nhất quán.
+          - Chọn bảng thuật ngữ đã lưu, hoặc thêm thuật ngữ tại đây.
+        references:
+          title: Bản dịch tham khảo
+          points:
+          - Chọn bản dịch mẫu mà bạn đã duyệt.
+          - AI sẽ dựa vào đó để giữ cách diễn đạt phù hợp.
+        methodology:
+          title: Phương pháp
+          points:
+          - Chọn cách bạn muốn AI thực hiện bản dịch.
+          - Giữ "Không dùng phương pháp" nếu chỉ cần hướng dẫn của bạn.
+        priority:
+          title: Ưu tiên hướng dẫn
+          points:
+          - Chọn hướng dẫn nào quan trọng hơn khi có xung đột.
         workflow:
           title: Quy trình AI
           points:
@@ -118,6 +132,7 @@ vi:
         list:
           title: Dự án của bạn
           points:
+          - Các dự án của bạn hiện ở đây.
           - Mở một dự án để xem tài liệu và tiến độ.
         start:
           title: Thêm việc
@@ -143,6 +158,7 @@ vi:
         list:
           title: Tìm một bản dịch
           points:
+          - Các bản dịch của bạn hiện ở đây, mới nhất trước.
           - Mỗi mục cho biết dự án, ngôn ngữ và hướng dẫn đã dùng.
         reopen:
           title: Tiếp tục hoặc làm lại
@@ -191,7 +207,7 @@ vi:
         list:
           title: Bản tham khảo của bạn
           points:
-          - Chọn các bản đang hoạt động trong phần tùy chọn nâng cao của bản dịch mới.
+          - Chọn bản cần dùng ở mục Bản dịch tham khảo trong trang Bản dịch mới.
         source:
           title: Văn bản gốc
           points:
@@ -220,7 +236,7 @@ vi:
         list:
           title: Phương pháp của bạn
           points:
-          - Chọn một phương pháp đang hoạt động trong phần tùy chọn nâng cao của bản dịch mới.
+          - Chọn phương pháp cần dùng ở mục Phương pháp trong trang Bản dịch mới.
         instructions:
           title: Quy tắc của bạn
           points:

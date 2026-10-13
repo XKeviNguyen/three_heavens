@@ -129,6 +129,11 @@ class ProductToursTest < ActionDispatch::IntegrationTest
     assert_equal [ "projects:detail", false ], tour_props.fetch("page_guides").values_at("key", "seen")
     get settings_account_path
     assert_nil tour_props.dig("page_guides", "key"), "pages without a guide have no key"
+
+    # Only the rewritten guide moved to a newer version.
+    get new_translation_workspace_path
+    assert_equal [ "translation_workspaces:form", 2, false ], tour_props.fetch("page_guides").values_at("key", "version", "seen")
+    assert_equal %w[intro languages source terminology references methodology priority workflow launch], tour_props.dig("tours", "page").pluck("id")
   end
 
   test "a page guide's outcome is recorded once for the signed-in account" do
@@ -152,7 +157,9 @@ class ProductToursTest < ActionDispatch::IntegrationTest
       [ { key: "projects:list\n", outcome: "completed", version: 1 }, :bad_request ],
       [ { key: "projects:edit", outcome: "completed", version: 1 }, :bad_request ],
       [ { key: "projects:list", outcome: "preexisting", version: 1 }, :bad_request ],
-      [ { key: "projects:list", outcome: "completed", version: ProductTour::PAGE_VERSION + 1 }, :conflict ]
+      [ { key: "projects:list", outcome: "completed", version: ProductTour::PAGE_VERSION + 1 }, :conflict ],
+      # New translation's guide was rewritten: a page still showing the old one cannot record it.
+      [ { key: "translation_workspaces:form", outcome: "completed", version: 1 }, :conflict ]
     ].each do |attributes, status|
       patch page_product_tour_path, params: { product_tour_page: attributes }.to_json, headers: JSON_HEADERS
       assert_response status, attributes.inspect

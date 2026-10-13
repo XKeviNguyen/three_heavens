@@ -23,7 +23,7 @@ module ProductTourHelper
       # Queried even with the switch off: turning it on from another page may
       # let this page's guide open once that change is saved.
       page_guides: { enabled: current_user.product_tour_page_guides, revision: current_user.product_tour_guides_revision,
-                     key: page_key, version: ProductTour::PAGE_VERSION,
+                     key: page_key, version: page_key ? ProductTour.page_version(page_key) : ProductTour::PAGE_VERSION,
                      seen: page_key ? ProductTour.page_seen?(current_user, page_key) : false },
       tours: {
         global: product_tour_steps("global", ProductTour::GLOBAL_STEPS),

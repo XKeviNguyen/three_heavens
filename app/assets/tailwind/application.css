@@ -69,6 +69,8 @@
   --th-border-strong: #d1d1d6;
   --th-accent: #0071e3;
   --th-accent-hover: #006bd6;
+  /* The logo's mark (shared/_brand_mark), on the public site and in the app. */
+  --th-brand: #0b72ea;
   --th-accent-soft: #eaf3ff;
   --th-accent-fill: #0071e3;
   --th-accent-fill-hover: #006bd6;
@@ -99,6 +101,7 @@
     --th-border-strong: #3a3a3c;
     --th-accent: #0a84ff;
     --th-accent-hover: #409cff;
+    --th-brand: #3b9bff;
     --th-accent-soft: rgb(10 132 255 / .16);
     /* #0a84ff under white text is 3.6:1; solid fills use a deeper blue (4.8:1). */
     --th-accent-fill: #0a6fe0;
@@ -629,8 +632,9 @@ html[lang="ja"] .landing-page { word-break: auto-phrase; line-break: strict; }
 .landing-header { position: relative; z-index: 20; border-bottom: 1px solid var(--landing-divider); background: var(--landing-header-bg); }
 .landing-header-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; min-height: 72px; }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; width: max-content; color: var(--landing-ink); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
-.landing-brand-mark { display: inline-flex; width: 34px; color: var(--landing-blue); }
-.landing-brand-mark svg { width: 100%; height: auto; }
+.th-brand-mark { display: inline-flex; flex: none; color: var(--th-brand); }
+.th-brand-mark svg { width: 100%; height: auto; }
+.landing-brand-mark { width: 34px; }
 .landing-primary-nav { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: 550; }
 .landing-primary-nav a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 9px; color: var(--landing-nav); transition: color 160ms ease, background-color 160ms ease; }
 .landing-primary-nav a:hover { color: var(--landing-blue-strong); background: var(--landing-hover); }
