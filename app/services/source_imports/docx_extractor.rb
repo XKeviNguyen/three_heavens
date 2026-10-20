@@ -32,6 +32,10 @@ module SourceImports
       "word/document.xml" => Limits::MAX_DOCUMENT_XML_BYTES
     }.freeze
     BLOCK_CONTAINERS = %w[body hdr ftr footnote endnote tc sdtContent customXml ins moveTo].freeze
+    # External targets the user's file may keep: links and pictures linked
+    # from the web. Extraction reads text only and never follows them. Every
+    # other external part (e.g. a remote attachedTemplate) is refused.
+    EXTERNAL_RELATIONSHIP_SUFFIXES = %w[/hyperlink /image].freeze
     DELETED_CONTAINERS = %w[del moveFrom].freeze
 
     Relationship = Data.define(:id, :type, :target, :external)
@@ -269,7 +273,7 @@ module SourceImports
         seen_ids << id
         external = target_mode == "External"
         if external
-          raise unsafe_archive_error unless type.end_with?("/hyperlink")
+          raise unsafe_archive_error unless type.end_with?(*EXTERNAL_RELATIONSHIP_SUFFIXES)
         else
           resolved = resolve_target(source_part, target)
           raise malformed_error unless @entries_by_name.key?(resolved)

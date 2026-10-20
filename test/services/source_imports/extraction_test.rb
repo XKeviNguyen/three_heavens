@@ -186,6 +186,24 @@ module SourceImports
       assert_includes DocxExtractor.call(bytes), "Faith & hope"
       assert_not File.exist?(marker)
 
+      # A picture linked from the web (a:blip r:link) is kept in the user's
+      # file; extraction reads only the text and never follows the link.
+      linked_picture = build_docx(
+        document_xml: basic_document_xml(<<~XML),
+          <w:p><w:r><w:t>Before picture</w:t></w:r></w:p>
+          <w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:docPr id="1" name="linked"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:link="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+          <w:p><w:r><w:t>After picture</w:t></w:r></w:p>
+        XML
+        entries: {
+          "word/_rels/document.xml.rels" => <<~XML
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.invalid/picture.jpg" TargetMode="External"/>
+            </Relationships>
+          XML
+        }
+      )
+      assert_equal "Before picture\n\nAfter picture", DocxExtractor.call(linked_picture)
+
       traversal = zip_entries(
         "[Content_Types].xml" => CONTENT_TYPES_XML,
         "_rels/.rels" => PACKAGE_RELATIONSHIPS_XML,
@@ -510,9 +528,9 @@ module SourceImports
         "</Relationships>",
         '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'
       )
-      external_image = <<~XML
+      external_template = <<~XML
         <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-          <Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.invalid/image" TargetMode="External"/>
+          <Relationship Id="rIdTemplate" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate" Target="https://example.invalid/template.dotm" TargetMode="External"/>
         </Relationships>
       XML
 
@@ -523,7 +541,7 @@ module SourceImports
         DocxExtractor.call(build_docx(entries: { "_rels/.rels" => duplicate_main }))
       }.code
       assert_equal "unsafe_docx", assert_raises(Error) {
-        DocxExtractor.call(build_docx(entries: { "word/_rels/document.xml.rels" => external_image }))
+        DocxExtractor.call(build_docx(entries: { "word/_rels/document.xml.rels" => external_template }))
       }.code
       assert_equal "unsafe_docx", assert_raises(Error) {
         DocxExtractor.call(build_docx(entries: { "word/embeddings/object1.bin" => "object" }))
