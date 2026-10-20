@@ -1,6 +1,6 @@
 # Case 16 — A picture linked from the web rejected a whole DOCX, and the error page lost its file fields
 
-[← All case studies](README.md) · Topics: document import, security policy, Turbo lifecycle, UX state · Evidence: branch `fix/islands-mount-after-rejected-form` (PR pending)
+[← All case studies](README.md) · Topics: document import, security policy, Turbo lifecycle, UX state · Evidence: [PR #106](https://github.com/XKeviNguyen/three_heavens/pull/106)
 
 ## Incident snapshot
 
@@ -9,8 +9,8 @@
 | **Problem** | Creating a translation reference from two DOCX files (a Vietnamese sermon and its approved Japanese translation) reloaded the form with *"The DOCX cannot be processed safely. Provide either pasted text or an uploaded file for the approved translation side, not both."* The file pickers on that error page had fallen back to the browser's bare *Choose File / No file chosen* input. |
 | **Impact / risk** | A user could not import an ordinary Word document, the message did not say which file failed or why, and the retry produced a second, confusing error. No data was lost and nothing was stored. |
 | **Classification** | User-reported defect on the live site (2026-10-20). Two independent root causes: a DOCX import policy that was stricter than its threat model, and a React-island lifecycle gap after rejected Turbo form submissions. |
-| **Fixed in** | Not yet merged. *Before* = `main` at [`0af83e1`](https://github.com/XKeviNguyen/three_heavens/tree/0af83e17e70d37a6794afab4f68276d72b527a99). |
-| **Verification** | Both regression tests fail on `0af83e1` and pass after the fix. All 8 of the user's DOCX files extract after the fix (7 before). Full `bin/ci` passed (1296 Rails + 216 system runs, 0 failures). |
+| **Fixed in** | [PR #106](https://github.com/XKeviNguyen/three_heavens/pull/106) (commits `df7719c`, `cff20b4` on `develop` at `75ffc90`), open at the time of writing. *Before* = `main` at [`0af83e1`](https://github.com/XKeviNguyen/three_heavens/tree/0af83e17e70d37a6794afab4f68276d72b527a99), the version the user reported against. |
+| **Verification** | Both regression tests fail on `0af83e1` and pass after the fix. All 8 of the user's DOCX files extract after the fix (7 before). Local `bin/ci` and GitHub CI passed on the PR head `cff20b4`. The user confirmed both fixes by hand in a local run. |
 
 ```mermaid
 flowchart TB
@@ -137,7 +137,9 @@ Alternatives not taken: stripping linked images, or rewriting the DOCX to remove
 Recorded results, on a disposable `postgres:17` with a `.env`-free worktree:
 - Upload, product-tour and AI-settings system tests: 24 runs, 0 failures. Full `bin/rails test:system`: 216 runs, 2476 assertions, 0 failures. `tsc --noEmit` clean.
 - `test/services/source_imports` + translation-reference, document-IO and source-upload integration tests: 124 runs, 1093 assertions, 0 failures.
-- Full `bin/ci` with both fixes (style, TypeScript, island build, gem/npm/importmap audits, Brakeman, migrations, tests): passed. Rails tests 1296 runs, 13902 assertions; system tests 216 runs, 2476 assertions; 0 failures.
+- Full `bin/ci` with both fixes on `0af83e1` (style, TypeScript, island build, gem/npm/importmap audits, Brakeman, migrations, tests): passed. Rails tests 1296 runs, 13902 assertions; system tests 216 runs, 2476 assertions; 0 failures.
+- After rebasing onto `develop` `75ffc90`, full `bin/ci` on the PR head `cff20b4`: passed. Rails tests 1316 runs, 14118 assertions; system tests 247 runs, 2772 assertions; 0 failures. GitHub Actions on the same head ([run 39373207797](https://github.com/XKeviNguyen/three_heavens/actions/runs/39373207797)): lint, scan_ruby, scan_js, test and system-test all passed.
+- Manual check by the user with `bin/dev`: the two real DOCX files create a reference, and after a rejected submission the file fields stay enhanced.
 - An independent read-only review found no blocking defect: no code path follows a relationship target or renders uploaded DOCX, and an external `/image` relationship never reaches the internal-part lookups.
 
 ## Trade-offs and remaining limitations
@@ -159,6 +161,7 @@ Recorded results, on a disposable `postgres:17` with a `.env`-free worktree:
 
 ## Sources
 
+- PR: [PR #106](https://github.com/XKeviNguyen/three_heavens/pull/106)
 - Before: `main` at [`0af83e1`](https://github.com/XKeviNguyen/three_heavens/tree/0af83e17e70d37a6794afab4f68276d72b527a99)
 - External-relationship rule introduced in `89b5efb` ([PR #46](https://github.com/XKeviNguyen/three_heavens/pull/46))
 - Island adapter introduced in `c7f4c84` ([PR #90](https://github.com/XKeviNguyen/three_heavens/pull/90)); file-field island in `3f491d1` ([PR #91](https://github.com/XKeviNguyen/three_heavens/pull/91))

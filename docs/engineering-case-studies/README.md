@@ -43,7 +43,7 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 | 13 | [A "single-use" token several processes could use](13-single-use-tokens-and-non-atomic-cache-writes.md) | A cache `write(unless_exist:)` was not atomic | `INSERT … ON CONFLICT DO NOTHING RETURNING` | [#71](https://github.com/XKeviNguyen/three_heavens/pull/71) |
 | 14 | [Sweeps that kept retrying the same broken rows](14-bounded-sweeps-that-starve-their-tail.md) | Oldest-first batches never reached rows behind permanent failures | Claim + retry deadline / fairness cursor | [#72](https://github.com/XKeviNguyen/three_heavens/pull/72), [#21](https://github.com/XKeviNguyen/three_heavens/pull/21) |
 | 15 | [A `rescue` inside a transaction committed half-built work](15-rescue-inside-a-transaction-commits-partial-state.md) | A rescued stage error committed orphan rows | Savepoint per stage | [#43](https://github.com/XKeviNguyen/three_heavens/pull/43) |
-| 16 | [A linked picture rejected a whole DOCX, and the error page lost its file fields](16-linked-docx-picture-and-unmounted-error-page.md) | An external *image* relationship was refused like a remote template; islands mounted only on `turbo:load`, which a 422 never fires | Allow-list external hyperlinks + images; also mount on `turbo:render` | PR pending |
+| 16 | [A linked picture rejected a whole DOCX, and the error page lost its file fields](16-linked-docx-picture-and-unmounted-error-page.md) | An external *image* relationship was refused like a remote template; islands mounted only on `turbo:load`, which a 422 never fires | Allow-list external hyperlinks + images; also mount on `turbo:render` | [#106](https://github.com/XKeviNguyen/three_heavens/pull/106) |
 
 ## Cases by engineering topic
 
