@@ -132,6 +132,9 @@ export function startIslands(): void {
   if (!state.listening) {
     state.listening = true
     document.addEventListener("turbo:load", mountAll)
+    // A rejected form submission (e.g. 422) renders the response page with
+    // turbo:render only; no turbo:load follows.
+    document.addEventListener("turbo:render", mountAll)
     document.addEventListener("turbo:frame-load", mountAll)
     document.addEventListener("turbo:before-cache", unmountAllForCache)
     document.addEventListener("turbo:before-render", (event) => {
