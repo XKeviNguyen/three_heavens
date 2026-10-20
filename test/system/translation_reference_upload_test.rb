@@ -114,6 +114,21 @@ class TranslationReferenceUploadTest < ApplicationSystemTestCase
     within(translation_field) { assert_no_text "You also pasted text above." }
   end
 
+  # Turbo renders a rejected submission with turbo:render and no turbo:load.
+  test "the file fields are enhanced again after the server rejects the form" do
+    fill_in "Title", with: "Rejected"
+    choose_known_language "Source language", "Vietnamese"
+    choose_known_language "Target language", "Japanese"
+    fill_in "Pasted source text", with: "Also pasted"
+    attach_file "Or upload source file", file("source.txt", "Source")
+    click_button "Create a reference"
+
+    assert_text "Provide either pasted text or an uploaded file for the source side, not both."
+    assert_selector "[data-react-island='file-field'][data-react-mounted='true']", count: 2
+    within(source_field) { assert_button "Choose file" }
+    assert_equal 0, TranslationReference.count
+  end
+
   private
 
   def sign_in_in_browser
