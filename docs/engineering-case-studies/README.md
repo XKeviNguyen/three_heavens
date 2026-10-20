@@ -1,12 +1,12 @@
 # Three Heavens — Engineering Case Studies
 
-Fifteen engineering cases, mostly defects plus some design hardening, from building [Three Heavens](https://github.com/XKeviNguyen/three_heavens), a Rails 8.1 and PostgreSQL 17 translation workspace. Each case traces one failure from symptom to root cause, fix and regression test, with links to the exact code before and after the change.
+Sixteen engineering cases, mostly defects plus some design hardening, from building [Three Heavens](https://github.com/XKeviNguyen/three_heavens), a Rails 8.1 and PostgreSQL 17 translation workspace. Each case traces one failure from symptom to root cause, fix and regression test, with links to the exact code before and after the change.
 
 **Evidence standard**
 
 - Every case is reconstructed from its merged pull request, the corrective commits, the code at the commit **before** the fix, and the tests that pin the fix.
 - Measurements are copied from the PRs together with their environment and workload. Where the record is silent, the case says *not established*.
-- Audit reproductions, CI failures and design hardening are labelled as such. **None of these cases is a reported outage or data loss on the live site.**
+- Audit reproductions, CI failures, user-reported defects and design hardening are labelled as such. **None of these cases is a reported outage or data loss on the live site.**
 
 ## How to read a case
 
@@ -43,6 +43,7 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 | 13 | [A "single-use" token several processes could use](13-single-use-tokens-and-non-atomic-cache-writes.md) | A cache `write(unless_exist:)` was not atomic | `INSERT … ON CONFLICT DO NOTHING RETURNING` | [#71](https://github.com/XKeviNguyen/three_heavens/pull/71) |
 | 14 | [Sweeps that kept retrying the same broken rows](14-bounded-sweeps-that-starve-their-tail.md) | Oldest-first batches never reached rows behind permanent failures | Claim + retry deadline / fairness cursor | [#72](https://github.com/XKeviNguyen/three_heavens/pull/72), [#21](https://github.com/XKeviNguyen/three_heavens/pull/21) |
 | 15 | [A `rescue` inside a transaction committed half-built work](15-rescue-inside-a-transaction-commits-partial-state.md) | A rescued stage error committed orphan rows | Savepoint per stage | [#43](https://github.com/XKeviNguyen/three_heavens/pull/43) |
+| 16 | [A linked picture rejected a whole DOCX, and the error page lost its file fields](16-linked-docx-picture-and-unmounted-error-page.md) | An external *image* relationship was refused like a remote template; islands mounted only on `turbo:load`, which a 422 never fires | Allow-list external hyperlinks + images; also mount on `turbo:render` | PR pending |
 
 ## Cases by engineering topic
 
@@ -54,7 +55,8 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 | **Performance and resources** | [03](03-concurrent-request-memory.md) aggregate memory | [14](14-bounded-sweeps-that-starve-their-tail.md) batch fairness |
 | **CI and testing** | [05](05-turbo-system-test-races.md) flaky test vs real bug | [04](04-bundler-boot-order.md) fresh-process tests |
 | **Reliability** | [01](01-postgresql-restore-and-binary-fidelity.md) proven recovery | [14](14-bounded-sweeps-that-starve-their-tail.md), [15](15-rescue-inside-a-transaction-commits-partial-state.md) |
-| **UX state** | [07](07-async-source-import-ownership.md) async ownership | [09](09-back-forward-turbo-history-races.md) Back/Forward |
+| **UX state** | [07](07-async-source-import-ownership.md) async ownership | [09](09-back-forward-turbo-history-races.md) Back/Forward, [16](16-linked-docx-picture-and-unmounted-error-page.md) error-page lifecycle |
+| **Document import** | [16](16-linked-docx-picture-and-unmounted-error-page.md) policy vs threat model | [12](12-upload-response-loss-and-atomic-quota.md) upload replay |
 
 ### Recurring patterns
 
