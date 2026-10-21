@@ -46,6 +46,29 @@ The database dump is taken before the storage archive. Active Storage writes obj
 
 A local completed bundle is not sufficient disaster protection. Copy it promptly to an independent, access-controlled, encrypted off-host backup system using the organization's approved tooling. This repository deliberately does not invent encryption or perform a cloud upload.
 
+### Off-host copies on AWS S3 (production)
+
+The production deployment keeps its off-host copies in Amazon S3. The operator scripts that do this live outside this repository, with the other operator material; this section records the design so that it can be reviewed and reproduced. Bucket names, account and key identifiers, regions, and host paths are deliberately left out.
+
+```mermaid
+flowchart LR
+  B["bin/ops/backup<br/>one-off container, storage read-only"] --> V["Validate bundle<br/>COMPLETE marker, manifest, SHA-256 of every artifact"]
+  V --> E["Encrypt on the host<br/>tar | gpg to the backup public key"]
+  E --> W["Workstation<br/>ciphertext only, sha256 checked"]
+  W -->|"uploader: PutObject only"| S[("S3 bucket<br/>versioned, Object Lock")]
+  S -->|"reader: Get only"| D["Independent download<br/>byte-for-byte compare"]
+  D --> R["Isolated restore drill<br/>no network, plaintext on tmpfs"]
+```
+
+- **Only ciphertext leaves the host.** The validated bundle is archived and encrypted on the production host to the backup key's public half (OpenPGP, RSA-3072). The private key and `RAILS_MASTER_KEY` are kept in an offline password vault with an encrypted copy elsewhere, never on the server, the workstation disk, or in S3. The upload script refuses any file that is not public-key ciphertext addressed to that key.
+- **Write once, never overwrite.** Each copy is a new object under a unique backup ID, uploaded with `If-None-Match: *` and a SHA-256 checksum that S3 verifies before storing. Versioning is on, objects are encrypted at rest (SSE-S3), and Object Lock applies a 30-day GOVERNANCE retention by default. A restore point worth keeping longer, such as the last one before a roll-forward-only migration, has its retention extended by the account owner.
+- **Two narrow identities.** The uploader can only put objects, and only over TLS with the no-overwrite header; it cannot list, read, or delete. The restore reader can only list and read objects, versions, retention, and the bucket's protection settings; it cannot write. Neither can shorten retention or delete a locked version.
+- **Every copy is checked by downloading it.** The reader downloads the version just written into a new directory and checks its version, checksum, encryption, lock mode, and retention; the download must be byte-identical to what was uploaded. Restore drills use that S3 download, not the local file.
+- **Prefixes and lifecycle.** `backups/predeploy/` holds copies taken before a release and has no lifecycle expiry. In the versioned bucket, expiring an object only adds a delete marker and keeps the old bytes as a noncurrent version, so each expiring prefix has two rules: `backups/daily/` expires after 35 days and `backups/verification/` after 31, and the noncurrent version left behind is deleted one day later, once its Object Lock retention has ended. Expired delete markers and incomplete uploads are then cleaned up.
+- **Restore drill.** A copy is proven by restoring the S3 download on an isolated workstation runtime ([Isolated restore verification](#isolated-restore-verification)): decryption with the vault key, `bin/ops/restore-verify`, the backup's own release booting and decrypting its data, then the release candidate migrating it, all without network access, with plaintext only on tmpfs and shredded afterwards.
+
+Before a release with migrations, take a fresh backup and copy it to S3 as above; a risky migration also needs a restore drill of that copy ([production deploy](production-deploy.md)). A scheduled daily copy is designed but not yet installed: until it is, backups are taken by hand before each release.
+
 ## Retention
 
 Retention is dry-run by default and recognizes only fully valid Three Heavens bundles directly beneath the explicit root:
