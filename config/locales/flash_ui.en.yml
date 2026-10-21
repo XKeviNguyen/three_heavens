@@ -31,8 +31,10 @@ en:
       reopened: Final translation reopened for editing.
     review:
       started: Blind review started.
+      replaced: "%{name} replaced the failed reviewer and is reviewing now. Only its work is billed."
     judge:
       started: Judging started.
+      replaced: "%{name} replaced the failed judge and is judging now. Only its work is billed."
     pipeline:
       stopped: Automation stopped. AI requests that had already started will still finish.
     operations:

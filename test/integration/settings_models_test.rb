@@ -346,13 +346,14 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
     get new_translation_workspace_path
     assert_select "input[name='translation_workspace[model_ids][]'][value='#{model.id}']", count: 0
 
-    get experiment_path(reviewer_experiment)
-    assert_select "h2", "Start blind review"
-    assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 0
+    # A deactivated model is refused wherever it is submitted.
+    post experiment_review_rounds_path(reviewer_experiment), params: { review_round: { reviewer_ids: [ model.id ] } }
+    assert_response :unprocessable_content
+    assert_nil reviewer_experiment.reload.review_round
 
-    get review_round_path(judge_selection_review_round)
-    assert_select "h2", "Start judging"
-    assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 0
+    post review_round_judge_rounds_path(judge_selection_review_round), params: { judge_round: { judge_ids: [ model.id ] } }
+    assert_response :unprocessable_content
+    assert_nil judge_selection_review_round.reload.judge_round
 
     assert_equal historical_ids[:translations], model.translation_run_ids.sort
     assert_equal historical_ids[:reviews], model.review_run_ids.sort
@@ -402,11 +403,11 @@ class SettingsModelsTest < ActionDispatch::IntegrationTest
 
     get experiment_path(reviewer_experiment)
     assert_select "h2", "Start blind review"
-    assert_select "input[name='review_round[reviewer_ids][]'][value='#{model.id}']", count: 1
+    assert_select "[data-model-browser-role-value='reviewer']", count: 1
 
     get review_round_path(judge_review_round)
     assert_select "h2", "Start judging"
-    assert_select "input[name='judge_round[judge_ids][]'][value='#{model.id}']", count: 1
+    assert_select "[data-model-browser-role-value='judge']", count: 1
   end
 
   def create_model(suffix)

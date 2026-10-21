@@ -4,7 +4,11 @@ class JudgeRound < ApplicationRecord
   belongs_to :review_round
   belongs_to :winner_translation_run, class_name: "TranslationRun", optional: true
 
-  has_many :judge_runs, dependent: :restrict_with_error
+  # The judges that count; a failed judge replaced by another model
+  # (Judging::ReplaceFailed) stays in all_judge_runs with its own attempts and
+  # cost, but no longer decides the round's status or the winner.
+  has_many :judge_runs, -> { where(superseded_at: nil) }, dependent: :restrict_with_error
+  has_many :all_judge_runs, class_name: "JudgeRun", dependent: :restrict_with_error
   has_one :final_translation, dependent: :restrict_with_error
 
   enum :status, {

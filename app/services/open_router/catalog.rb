@@ -27,7 +27,7 @@ module OpenRouter
     # Bounds the whole fetch: connection, TLS, headers, and the full body.
     TOTAL_TIMEOUT = 10
     MAX_MODELS = 4_000
-    # Ai::ContextBudget reserves 4_096 output tokens for every provider stage.
+    # Every provider stage needs at least this much output (Ai::ContextBudget).
     STAGE_OUTPUT_RESERVE = 4_096
     MIN_CONTEXT_TOKENS = 8_192
 
@@ -63,9 +63,13 @@ module OpenRouter
           context_length.to_i >= MIN_CONTEXT_TOKENS
       end
 
+      # Review, judging and refinement send a strict json_schema response
+      # format with provider.require_parameters, which only providers listing
+      # structured_outputs accept. response_format alone means JSON mode; a
+      # model with only that (e.g. qwen/qwen3.7-flash on 2026-10-21) gets
+      # 404 "no endpoints" for those stages.
       def structured_output_capable?
-        supported_parameters.include?("response_format") ||
-          supported_parameters.include?("structured_outputs")
+        supported_parameters.include?("structured_outputs")
       end
 
       def structured_capable?

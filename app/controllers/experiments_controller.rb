@@ -9,7 +9,6 @@ class ExperimentsController < ApplicationController
       pipeline_run: :workflow_profile_revision,
       review_round: { review_runs: :reviewer_llm_model }
     ).find(params[:id])
-    @reviewer_models = LlmModel.active_openrouter.order(:display_name, :id)
   end
 
   def retry_failed

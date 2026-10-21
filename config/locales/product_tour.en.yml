@@ -297,6 +297,11 @@ en:
           - Your key is stored encrypted.
           - After you save it, only its last few characters are shown.
           - Replacing or deleting it never moves your work to the platform's key.
+        key_status:
+          title: Key check
+          points:
+          - Saving a key checks it with OpenRouter.
+          - Here you see whether OpenRouter accepts it, and its credit limit.
         billing:
           title: How billing works
           points:
@@ -326,6 +331,8 @@ en:
           title: Next step
           points:
           - When two candidates are ready, start a blind review.
+          - Pick reviewers from the whole OpenRouter catalog, not only the models that translated.
+          - Only models that can return structured answers are offered.
       blind_review:
         intro:
           title: Blind review
@@ -336,6 +343,11 @@ en:
           title: Progress
           points:
           - Blind review comes after translation.
+        scores:
+          title: Average scores
+          points:
+          - The gauge shows the average of all candidates.
+          - 'Each tile shows one model''s average and how far it is from that average.'
         evaluations:
           title: Reviews
           points:
@@ -346,10 +358,15 @@ en:
           points:
           - Retry a failed reviewer when you choose to.
           - The panel shows who pays for the retry.
+        replace:
+          title: Replace a failed reviewer
+          points:
+          - Swap a failed reviewer for another model, until judging starts.
+          - 'Only the new model''s work is billed. The failed one keeps its own cost.'
         next:
           title: Go to judging
           points:
-          - When the reviews are done, pick judge models to rank the candidates.
+          - When the reviews are done, pick judge models from the OpenRouter catalog to rank the candidates.
       judging:
         intro:
           title: Judging
@@ -361,6 +378,11 @@ en:
           points:
           - Judging comes after blind review.
           - The editor comes next.
+        scores:
+          title: Average scores
+          points:
+          - 'The gauge shows the judges'' average for all candidates.'
+          - 'Each tile shows one model''s average; the winner also depends on the ranks.'
         winner:
           title: The winner
           points:
@@ -375,6 +397,11 @@ en:
           points:
           - Retry a failed judge when you choose to.
           - The panel shows who pays for the retry.
+        replace:
+          title: Replace a failed judge
+          points:
+          - Swap a failed judge for another model, until the editor is opened.
+          - 'Only the new model''s work is billed. The failed one keeps its own cost.'
       final_editor:
         intro:
           title: Final editor
@@ -393,7 +420,7 @@ en:
         refine:
           title: AI suggestions
           points:
-          - Ask AI models for ideas to improve this version.
+          - Pick AI models from the OpenRouter catalog for ideas to improve this version.
           - Use a suggestion only if you want it.
         revisions:
           title: Version history

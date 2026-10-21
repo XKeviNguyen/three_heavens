@@ -31,14 +31,14 @@ sequenceDiagram
 
 ## Limits and normalization
 
-- 10 MiB per file. Extracted text is limited to 100,000 characters (`Ai::UsageLimits::MAX_SOURCE_CHARACTERS`).
-- The reference form accepts two files in one request, so the proxy accepts bodies up to 21 MiB (two 10 MiB files plus bounded multipart overhead).
+- 21 MiB per file. Extracted text is limited to 100,000 characters (`Ai::UsageLimits::MAX_SOURCE_CHARACTERS`).
+- The reference form accepts two files in one request, so the proxy accepts bodies up to 43 MiB (two 21 MiB files plus bounded multipart overhead).
 - Original filenames are sanitized and limited to 255 characters while keeping the extension.
 - TXT and Markdown must be valid UTF-8; a UTF-8 BOM is removed and line endings become LF. Markdown stays plain text.
 
 ## DOCX
 
-Only genuine, macro-free WordprocessingML packages are accepted. The package declaration, main-document relationship, content types, internal relationship targets, and extension/MIME/magic-byte agreement are validated first. A bounded in-memory ZIP reader allows at most 500 entries, 50 MiB declared total expansion, 16 MiB across relevant XML, 8 MiB for the main document, 2 MiB per secondary text part, and 1 MiB per relationships part. Duplicate or ambiguous names, traversal variants, encrypted entries, macros, embedded objects, unsafe external relationships, and suspicious compression are rejected. XML parsing is strict, DTD-free, and network-disabled.
+Only genuine, macro-free WordprocessingML packages are accepted. The package declaration, main-document relationship, content types, internal relationship targets, and extension/MIME/magic-byte agreement are validated first. A bounded in-memory ZIP reader allows at most 500 entries, 100 MiB declared total expansion, 16 MiB across relevant XML, 8 MiB for the main document, 2 MiB per secondary text part, and 1 MiB per relationships part. Duplicate or ambiguous names, traversal variants, encrypted entries, macros, embedded objects, unsafe external relationships, and suspicious compression are rejected. XML parsing is strict, DTD-free, and network-disabled.
 
 Visible text is converted deterministically: paragraphs become LF-separated lines; tabs and explicit breaks are kept; table cells use tabs and rows use line breaks; hyperlinks, content controls, inserted revisions, field results, and text boxes are kept; deleted, moved-away, and hidden runs are excluded; numbering becomes readable list labels; referenced footnotes, endnotes, and distinct headers/footers are appended once with labels. Layout, styles, and images are not reproduced.
 

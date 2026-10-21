@@ -189,7 +189,7 @@ vi:
       already_consumed: Tệp này đã được dùng cho một lượt dịch. Hãy tải lên lại để bắt đầu lượt dịch khác.
       expired_import: Tệp tải lên này đã hết hạn. Hãy tải tệp lên lại.
       unavailable_import: Tệp tải lên này không còn khả dụng. Hãy tải tệp lên lại.
-      file_too_large: Tệp nguồn vượt giới hạn 10 MiB.
+      file_too_large: Tệp nguồn vượt giới hạn 21 MiB.
       invalid_utf8: Tệp nguồn phải chứa văn bản UTF-8 hợp lệ.
       binary_source: Tệp không chứa văn bản thuần có thể đọc được.
       docx_too_many_entries: Tệp DOCX có quá nhiều thành phần.
@@ -241,6 +241,7 @@ vi:
       users: Người dùng
       models: Mô hình
       operations: Vận hành
+      ai_key: Key AI
   managed_ai:
     unavailable: "Tài khoản này chưa được bật quyền dùng AI để dịch. Bạn vẫn có thể chuẩn bị tài liệu và hướng dẫn; quản trị viên cần bật quyền dùng AI trước khi bắt đầu dịch."
   admin_users:

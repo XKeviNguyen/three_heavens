@@ -14,6 +14,15 @@ class ReadinessAndSecurityHeadersTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "database must not be called"
   end
 
+  # Rails' /up answers only HTML or JSON; any other Accept gets 406.
+  test "the post-deploy smoke's Accept header gets 200 from liveness and readiness" do
+    [ rails_health_check_path, readiness_check_path ].each do |path|
+      get path, headers: { "Accept" => Operations::PostDeploySmoke::ACCEPT }
+
+      assert_response :success, path
+    end
+  end
+
   test "readiness reports primary database availability without private details" do
     get readiness_check_path
 

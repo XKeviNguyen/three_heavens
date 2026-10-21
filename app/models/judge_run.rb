@@ -7,6 +7,9 @@ class JudgeRun < ApplicationRecord
   belongs_to :judge_round
   belongs_to :judge_llm_model, class_name: "LlmModel"
   belongs_to :winner_translation_run, class_name: "TranslationRun", optional: true
+  belongs_to :superseded_by, class_name: "JudgeRun", optional: true
+
+  scope :current, -> { where(superseded_at: nil) }
 
   has_many :judge_evaluations, dependent: :restrict_with_error
   has_many :judge_segment_runs,
@@ -39,6 +42,10 @@ class JudgeRun < ApplicationRecord
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def superseded?
+    superseded_at.present?
   end
 
   def segmented?

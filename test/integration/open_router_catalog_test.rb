@@ -106,7 +106,7 @@ class OpenRouterCatalogTest < ActionDispatch::IntegrationTest
     compatible_entry.merge(
       "id" => "vendor/structured-model",
       "name" => "Vendor: Structured Model",
-      "supported_parameters" => [ "max_tokens", "response_format" ]
+      "supported_parameters" => [ "max_tokens", "response_format", "structured_outputs" ]
     )
   end
 

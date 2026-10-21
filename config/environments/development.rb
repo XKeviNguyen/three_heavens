@@ -55,6 +55,13 @@ Rails.application.configure do
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
 
+  # Development runs jobs in-process (the async adapter), whose default of
+  # five threads queued most AI parts. Match production's job concurrency
+  # (JOB_THREADS, config/queue.yml) so local runs show the real pace.
+  config.active_job.queue_adapter = ActiveJob::QueueAdapters::AsyncAdapter.new(
+    max_threads: Integer(ENV.fetch("JOB_THREADS", 32))
+  )
+
   # Highlight code that triggered redirect in logs.
   config.action_dispatch.verbose_redirect_logs = true
 

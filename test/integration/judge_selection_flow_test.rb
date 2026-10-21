@@ -20,9 +20,7 @@ class JudgeSelectionFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", "Start judging"
     assert_select "form[action='#{review_round_judge_rounds_path(@review_round)}']"
-    assert_select "input[type='checkbox'][value='#{@judge.id}']", count: 1
-    assert_select "input[type='checkbox'][value='#{inactive.id}']", count: 0
-    assert_select "input[type='checkbox'][value='#{direct.id}']", count: 0
+    assert_select "[data-controller='model-browser'][data-model-browser-role-value='judge'][data-model-browser-name-value='judge_round[judge_identifiers][]']", count: 1
 
     assert_enqueued_jobs 1, only: JudgeRunJob do
       post review_round_judge_rounds_path(@review_round),

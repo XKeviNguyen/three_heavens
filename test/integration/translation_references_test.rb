@@ -103,7 +103,7 @@ class TranslationReferencesTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_includes response.body, "10 MiB limit"
+    assert_includes response.body, "#{SourceImports::Limits::MAX_UPLOAD_BYTES / 1.megabyte} MiB limit"
   end
 
   test "ambiguous paste plus file and unsafe DOCX are rejected without AI work" do

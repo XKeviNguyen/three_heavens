@@ -22,6 +22,7 @@ vi:
       ready_managed: Công việc AI mới do nền tảng chi trả.
       blocked: Chưa thể bắt đầu công việc AI mới.
     key:
+      status_heading: "Key của bạn trên OpenRouter"
       heading: Khóa OpenRouter của bạn
       configured: Đã lưu khóa kết thúc bằng %{hint}, thêm ngày %{date}.
       missing: Chưa lưu khóa nào.

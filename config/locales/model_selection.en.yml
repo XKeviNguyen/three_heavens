@@ -1,0 +1,27 @@
+en:
+  model_selection:
+    roles:
+      reviewer: reviewer
+      judge: judge
+      finalizer: refiner
+    too_many:
+      one: Choose at most %{count} model.
+      other: Choose at most %{count} models.
+    duplicate: The same model was chosen twice.
+    choose_one: Choose one model to use instead.
+    incompatible: "That model cannot work as a %{role}: no OpenRouter provider of it returns the structured answer this step needs. Choose a model marked Structured."
+    unavailable: The model could not be checked with OpenRouter right now, or an administrator has turned it off. Try again or choose another model.
+    hints:
+      reviewer: Any OpenRouter model that returns structured answers can review, including models that did not translate.
+      judge: Any OpenRouter model that returns structured answers can judge.
+      finalizer: Any OpenRouter model that returns structured answers can suggest refinements.
+    replacement_label: Model to use instead
+    replace_heading: "Replace %{name} with another model"
+    replace_intro:
+      reviewer: The new model reviews the same anonymous candidates. The failed reviewer stays in the history, and only the new model's work is billed.
+      judge: The new model ranks the same anonymous candidates. The failed judge stays in the history, and only the new model's work is billed.
+    replace_submit:
+      reviewer: Replace and review
+      judge: Replace and judge
+    replace_confirm: Start the new model now? Its work is billed to the payer shown.
+    replaced_line: "%{old} failed (%{code}) and was replaced by %{new}."

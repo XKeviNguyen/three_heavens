@@ -1,0 +1,40 @@
+vi:
+  managed_key:
+    title: Key AI
+    description: "Key OpenRouter của ứng dụng trả tiền cho phần AI của các tài khoản dùng quyền AI của ứng dụng. Key lưu ở đây sẽ thay cho OPENROUTER_API_KEY của máy chủ; xoá đi thì ứng dụng quay lại dùng key của máy chủ."
+    current_heading: Key đang dùng
+    source:
+      saved: "Lưu tại đây (%{hint}) ngày %{date}."
+      environment: "OPENROUTER_API_KEY của máy chủ (%{hint}). Chưa có key nào lưu tại đây."
+      missing: "Chưa có key nào lưu tại đây và máy chủ không có OPENROUTER_API_KEY, nên quyền AI của ứng dụng không chạy được."
+      unreadable: "Không giải mã được key đã lưu (khoá bí mật của máy chủ đã đổi), nên ứng dụng đang dùng OPENROUTER_API_KEY của máy chủ (%{hint}). Hãy lưu lại key."
+      no_hint: "không có"
+    save_heading: Lưu key
+    replace_heading: Thay key
+    key_label: API key OpenRouter
+    key_hint: "Bắt đầu bằng sk-or-. Key được kiểm tra với OpenRouter, lưu mã hoá và không bao giờ hiện lại."
+    save: Lưu key
+    replace: Thay key
+    replace_confirm: "Thay key đã lưu %{hint}? Các tác vụ bắt đầu sau đó sẽ dùng key mới."
+    delete: Xoá key đã lưu
+    delete_confirm: "Xoá key đã lưu? Ứng dụng sẽ quay lại dùng OPENROUTER_API_KEY của máy chủ."
+    flash:
+      saved: "Đã lưu key. OpenRouter chấp nhận key này."
+      saved_unverified: "Đã lưu key, nhưng không kết nối được OpenRouter để kiểm tra. Xem tình trạng bên dưới."
+      deleted: "Đã xoá key đã lưu. Ứng dụng dùng key của máy chủ, nếu có."
+    errors:
+      format: "Hãy nhập API key OpenRouter bắt đầu bằng sk-or-."
+      stale: "Một admin khác vừa đổi key cùng lúc. Tải lại trang rồi thử lại."
+      rate_limited: "Thay đổi quá nhiều trong thời gian ngắn. Đợi một phút rồi thử lại."
+  key_status:
+    valid: OpenRouter chấp nhận key này.
+    invalid: OpenRouter từ chối key này. Hãy thay bằng một key dùng được.
+    unavailable: "Không kết nối được OpenRouter để kiểm tra key này. Hãy thử lại sau."
+    rejected: "OpenRouter từ chối key này nên key chưa được lưu. Hãy kiểm tra đã sao chép đủ key chưa."
+    label: Tên trên OpenRouter
+    limit: Hạn mức credit của key
+    limit_value: "còn %{remaining} trên %{limit}"
+    no_limit: Key này không đặt hạn mức
+    usage_monthly: Đã dùng tháng này
+    free_requests: Lượt model miễn phí còn lại hôm nay
+    balance_note_html: "OpenRouter không cho key này xem số dư credit của tài khoản. Nếu yêu cầu AI lỗi http_402, hãy nạp thêm credit tại %{link}."

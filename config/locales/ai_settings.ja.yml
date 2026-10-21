@@ -22,6 +22,7 @@ ja:
       ready_managed: 新しいAI処理はプラットフォームが支払います。
       blocked: 新しいAI処理はまだ開始できません。
     key:
+      status_heading: "OpenRouter上のあなたのキー"
       heading: あなたのOpenRouterキー
       configured: 末尾が%{hint}のキーを保存済み（%{date}に追加）。
       missing: キーは保存されていません。

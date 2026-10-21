@@ -1,0 +1,27 @@
+vi:
+  model_selection:
+    roles:
+      reviewer: reviewer
+      judge: judge
+      finalizer: model tinh chỉnh
+    too_many:
+      one: "Chỉ chọn tối đa %{count} model."
+      other: "Chỉ chọn tối đa %{count} model."
+    duplicate: "Một model bị chọn hai lần."
+    choose_one: "Hãy chọn một model để thay."
+    incompatible: "Model này không làm %{role} được: không nhà cung cấp OpenRouter nào của nó trả được câu trả lời có cấu trúc mà bước này cần. Hãy chọn model có dấu Structured."
+    unavailable: "Hiện không kiểm tra được model với OpenRouter, hoặc admin đã tắt model này. Hãy thử lại hoặc chọn model khác."
+    hints:
+      reviewer: "Mọi model OpenRouter trả được câu trả lời có cấu trúc đều làm reviewer được, kể cả model không tham gia dịch."
+      judge: "Mọi model OpenRouter trả được câu trả lời có cấu trúc đều làm judge được."
+      finalizer: "Mọi model OpenRouter trả được câu trả lời có cấu trúc đều đề xuất tinh chỉnh được."
+    replacement_label: "Model thay thế"
+    replace_heading: "Thay %{name} bằng model khác"
+    replace_intro:
+      reviewer: "Model mới nhận xét đúng các bản dịch ẩn danh đó. Reviewer bị lỗi vẫn nằm trong lịch sử, và chỉ tính tiền phần việc của model mới."
+      judge: "Model mới xếp hạng đúng các bản dịch ẩn danh đó. Judge bị lỗi vẫn nằm trong lịch sử, và chỉ tính tiền phần việc của model mới."
+    replace_submit:
+      reviewer: "Thay và nhận xét"
+      judge: "Thay và chấm"
+    replace_confirm: "Chạy model mới ngay? Phần việc của nó sẽ tính tiền vào người trả tiền đang hiển thị."
+    replaced_line: "%{old} bị lỗi (%{code}) và đã được thay bằng %{new}."

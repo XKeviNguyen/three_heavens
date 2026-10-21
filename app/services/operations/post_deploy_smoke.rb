@@ -3,6 +3,8 @@ require "uri"
 
 module Operations
   class PostDeploySmoke
+    # Rails' /up responds only to HTML and JSON and answers 406 to text/plain.
+    ACCEPT = "*/*"
     Check = Data.define(:name, :status)
     Result = Data.define(:checks) do
       def successful?
@@ -51,7 +53,7 @@ module Operations
 
     def get_status(uri)
       request = Net::HTTP::Get.new(uri)
-      request["Accept"] = "text/plain"
+      request["Accept"] = ACCEPT
       Net::HTTP.start(
         uri.host,
         uri.port,

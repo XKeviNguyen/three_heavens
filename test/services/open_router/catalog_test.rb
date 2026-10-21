@@ -96,6 +96,11 @@ module OpenRouter
       assert_equal [ "translator" ], text_only.roles
       assert text_only.free?
 
+      json_mode_only = text_only.with(identifier: "vendor/json-mode", supported_parameters: [ "max_tokens", "response_format" ])
+      assert json_mode_only.translation_capable?
+      refute json_mode_only.structured_capable?, "strict json_schema needs structured_outputs"
+      assert_equal [ "translator" ], json_mode_only.roles
+
       image_only = OpenRouter::Catalog::Model.new(
         identifier: "vendor/image",
         name: "Image",

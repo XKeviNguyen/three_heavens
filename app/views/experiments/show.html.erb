@@ -103,10 +103,10 @@
             <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               <p class="font-semibold"><%= t("results_ui.translation.failed") %></p>
               <% if run.error_code.present? %>
-                <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= safe_provider_error_code(run.error_code) %></span></p>
+                <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= run_failure_code(run) %></span></p>
               <% end %>
               <% if run.error_message.present? %>
-                <p class="mt-1 break-words"><%= safe_provider_error(run.error_message) %></p>
+                <p class="mt-1 break-words"><%= run_failure_explanation(run) %></p>
               <% end %>
             </div>
           <% else %>
@@ -141,26 +141,9 @@
       <% if @experiment.document_execution_plan %><p class="mt-2 text-sm font-semibold text-amber-800"><%= t("results_ui.translation.segment_cost", count: @experiment.document_execution_plan.segment_count) %></p><% end %>
 
       <%= form_with url: experiment_review_rounds_path(@experiment), scope: :review_round, class: "mt-5 space-y-5" do |form| %>
-        <% if @reviewer_models.any? %>
-          <fieldset>
-            <legend class="text-sm font-semibold text-slate-800"><%= t("results_ui.translation.active_reviewers") %></legend>
-            <div class="mt-3 grid gap-3 md:grid-cols-2">
-              <% @reviewer_models.each do |reviewer| %>
-                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40">
-                  <%= check_box_tag "review_round[reviewer_ids][]", reviewer.id, false, id: "review_round_reviewer_ids_#{reviewer.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
-                  <span>
-                    <span class="block font-medium text-slate-900"><%= reviewer.display_name %></span>
-                    <span class="mt-1 block text-xs text-slate-500"><%= reviewer.provider %> · <%= reviewer.model_identifier %></span>
-                  </span>
-                </label>
-              <% end %>
-            </div>
-          </fieldset>
-        <% else %>
-          <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800"><%= t("results_ui.translation.no_reviewers") %></p>
-        <% end %>
+        <%= render "shared/role_model_picker", scope: "review_round", role: "reviewer", max: Ai::UsageLimits::MAX_REVIEWERS, label: t("results_ui.translation.active_reviewers"), hint: t("model_selection.hints.reviewer"), selected: @selected_reviewers.to_a %>
 
-        <%= form.submit t("results_ui.translation.start_review_button"), disabled: @reviewer_models.empty?, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: t("results_ui.translation.start_review_confirm"), turbo_submits_with: t("results_ui.translation.starting_review") } %>
+        <%= form.submit t("results_ui.translation.start_review_button"), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: t("results_ui.translation.start_review_confirm"), turbo_submits_with: t("results_ui.translation.starting_review") } %>
       <% end %>
     </section>
   <% end %>

@@ -26,7 +26,7 @@
                         {},
                         class: "mt-1 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" %>
       </div>
-      <%= form.submit t("benchmarks_ui.sort_button"), class: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" %>
+      <%= form.submit t("benchmarks_ui.sort_button"), class: "min-h-10 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" %>
     <% end %>
   </header>
 
@@ -64,7 +64,7 @@
       </p>
 
       <div class="mt-5 overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table class="w-full min-w-[760px] divide-y divide-slate-200 text-left text-sm">
           <thead class="text-xs uppercase tracking-wide text-slate-500">
             <tr><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.model_role") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.self_scores") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.other_scores") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.self_difference") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.agreement") %></th></tr>
           </thead>

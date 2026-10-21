@@ -32,7 +32,7 @@ Non-secret:
 - `MAIL_FROM` (for example `Three Heavens <no-reply@APP_HOST_PLACEHOLDER>`)
 - `SMTP_HOST`; optional `SMTP_PORT` (default 587). Port 465 uses implicit TLS; every other port must offer STARTTLS, and delivery fails rather than sending credentials unencrypted.
 - `GOOGLE_CLIENT_ID` — the production Web OAuth client ID. The app only hides Google sign-in without it, but `bin/ops/preflight` fails its `google_client_id` check, so a V1.1 deployment requires it.
-- optional `RAILS_LOG_LEVEL`, `RAILS_MAX_THREADS`, `JOB_CONCURRENCY`, `AI_STALE_EXECUTION_THRESHOLD_MINUTES` (15–1440, server-only)
+- optional `RAILS_LOG_LEVEL`, `RAILS_MAX_THREADS`, `JOB_CONCURRENCY`, `JOB_THREADS` (job threads per worker process, default 32; the database pool grows to match), `AI_STALE_EXECUTION_THRESHOLD_MINUTES` (15–1440, server-only)
 
 The four database URLs must point to distinct or deliberately isolated databases:
 

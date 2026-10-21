@@ -2,17 +2,18 @@ require "json"
 
 module Ai
   class ContextBudget
-    POLICY_VERSION = "serialized-utf8-bytes-v2"
+    POLICY_VERSION = "serialized-utf8-bytes-v3"
     SAFETY_MARGIN_TOKENS = 1_024
     CONSERVATIVE_CONTEXT_TOKENS = 16_384
     CONSERVATIVE_MAX_OUTPUT_TOKENS = 4_096
     SMALL_DOCUMENT_FALLBACK_CHARACTERS = 8_000
-    STAGE_OUTPUT_TOKENS = {
-      translation: 4_096,
-      review: 4_096,
-      judge: 4_096,
-      finalization: 4_096
-    }.freeze
+    # Every stage needs at least this much room for its answer.
+    MINIMUM_OUTPUT_TOKENS = 4_096
+    # Reasoning models spend part of max_tokens thinking before they answer
+    # (OpenRouter counts both), and a request that runs out is still billed.
+    # Each request therefore asks for up to this much, as far as the model's
+    # output limit and the context left after the input allow.
+    TARGET_OUTPUT_TOKENS = 16_384
     STRUCTURED_SCHEMA_NAMES = {
       review: "blind_translation_review",
       judge: "blind_translation_judgment",
@@ -44,15 +45,15 @@ module Ai
     def self.call(model:, system_prompt:, user_prompt:, response_schema: nil, stage:, source_character_count:,
                   capability_snapshot: nil)
       capabilities = capability_snapshot || capabilities_for(model, source_character_count: source_character_count)
-      reserved = STAGE_OUTPUT_TOKENS.fetch(stage.to_sym)
       maximum_output = capability_value(capabilities, :max_output_tokens)
-      if maximum_output < reserved
+      if maximum_output < MINIMUM_OUTPUT_TOKENS
         raise Error.new(
           "The selected model cannot satisfy the required #{stage} output reserve",
           code: "model_output_capability_insufficient"
         )
       end
-      options = { max_tokens: reserved }
+      requested = [ TARGET_OUTPUT_TOKENS, maximum_output ].min
+      options = { max_tokens: requested }
       if response_schema
         options[:response_format] = {
           type: "json_schema",
@@ -63,6 +64,8 @@ module Ai
           }
         }
         options[:provider] = { require_parameters: true }
+      else
+        options[:reasoning] = Ai::OpenRouterClient.reasoning_for(model.model_identifier)
       end
       serialized = Ai::OpenRouterClient.serialize_request(
         model_identifier: model.model_identifier,
@@ -74,7 +77,8 @@ module Ai
       )
       estimated = estimate_tokens(serialized)
       context = capability_value(capabilities, :context_window_tokens)
-      if estimated + reserved + SAFETY_MARGIN_TOKENS > context
+      reserved = [ requested, context - estimated - SAFETY_MARGIN_TOKENS ].min
+      if reserved < MINIMUM_OUTPUT_TOKENS
         raise Error.new(
           "The selected model cannot safely fit the planned #{stage} request",
           code: "context_budget_exceeded"

@@ -2,9 +2,12 @@ default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
+  # AI jobs mostly wait on OpenRouter, so many run at once: every part of
+  # every model's translation starts together instead of queueing behind
+  # three. Each thread holds a database connection (see database.yml).
   workers:
     - queues: "*"
-      threads: 3
+      threads: <%= ENV.fetch("JOB_THREADS", 32) %>
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 1
 

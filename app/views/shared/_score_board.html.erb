@@ -1,0 +1,69 @@
+<%# locals: (summary:, kind:) %>
+<%# Average scores at a glance: a gauge for all candidates together and a tile
+    per candidate model, highest first, with how far it is from the average. %>
+<% if summary %>
+  <% fraction = score_fraction(summary.average, summary.scale) %>
+  <section data-tour-target="score-board" data-testid="score-board" aria-labelledby="score-board-heading" class="space-y-3">
+    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <h2 id="score-board-heading" class="text-xl font-semibold text-slate-950"><%= t("results_ui.scores.heading.#{kind}") %></h2>
+      <% if summary.finished_runs < summary.total_runs %>
+        <p class="text-sm text-slate-600"><%= t("results_ui.scores.partial", done: summary.finished_runs, total: summary.total_runs) %></p>
+      <% end %>
+    </div>
+
+    <div class="grid gap-3 lg:grid-cols-3">
+      <article class="flex flex-col items-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="score-average">
+        <h3 class="self-start text-sm font-medium text-slate-600"><%= t("results_ui.scores.all_models") %></h3>
+        <div class="relative mt-2 w-48 max-w-full">
+          <svg viewBox="0 0 120 70" class="block w-full" aria-hidden="true" focusable="false">
+            <% gauge_segments.each do |path, color| %>
+              <path d="<%= path %>" fill="none" stroke="<%= color %>" stroke-width="10" stroke-linecap="round" />
+            <% end %>
+            <% knob = gauge_point(fraction) %>
+            <circle cx="<%= knob[0] %>" cy="<%= knob[1] %>" r="6" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+          </svg>
+          <div class="absolute inset-x-0 bottom-0 flex flex-col items-center">
+            <p class="text-3xl font-bold leading-none text-slate-950">
+              <%= formatted_score(summary.average) %><span class="sr-only"> <%= t("results_ui.scores.out_of", max: summary.scale.max) %></span>
+            </p>
+            <span class="mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold <%= score_band_classes(fraction) %>"><%= t("results_ui.scores.bands.#{score_band(fraction)}") %></span>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-slate-500"><%= t("results_ui.scores.scale", min: summary.scale.min, max: summary.scale.max) %> · <%= t("results_ui.scores.based_on.#{kind}", count: summary.finished_runs) %></p>
+      </article>
+
+      <ul class="grid gap-3 sm:grid-cols-2 lg:col-span-2" role="list">
+        <% summary.candidates.each_with_index do |candidate, index| %>
+          <% candidate_fraction = score_fraction(candidate.average, summary.scale) %>
+          <li class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="score-candidate">
+            <h3 class="truncate text-sm font-medium text-slate-600" title="<%= candidate.translation_run.llm_model.display_name %>"><%= candidate.translation_run.llm_model.display_name %></h3>
+            <p class="mt-1 flex flex-wrap items-baseline gap-x-2">
+              <span class="text-2xl font-bold text-slate-950"><%= formatted_score(candidate.average) %></span>
+              <span class="text-sm text-slate-500">/<%= summary.scale.max %></span>
+              <% delta = candidate.delta.round(1) %>
+              <% if delta.positive? %>
+                <span class="text-sm font-semibold text-emerald-700"><span aria-hidden="true">▲</span> <%= formatted_score(delta) %><span class="sr-only"> <%= t("results_ui.scores.above") %></span></span>
+              <% elsif delta.negative? %>
+                <span class="text-sm font-semibold text-red-700"><span aria-hidden="true">▼</span> <%= formatted_score(delta.abs) %><span class="sr-only"> <%= t("results_ui.scores.below") %></span></span>
+              <% else %>
+                <span class="text-sm font-semibold text-slate-500"><%= t("results_ui.scores.even") %></span>
+              <% end %>
+            </p>
+            <svg viewBox="0 0 300 16" class="mt-3 block w-full" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="score-bar-<%= kind %>-<%= index %>" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0" stop-color="#ef4444" />
+                  <stop offset="0.5" stop-color="#facc15" />
+                  <stop offset="1" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+              <rect x="2" y="5" width="296" height="6" rx="3" fill="url(#score-bar-<%= kind %>-<%= index %>)" />
+              <circle cx="<%= (8 + candidate_fraction * 284).round(2) %>" cy="8" r="6" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+            </svg>
+            <span class="mt-3 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold <%= score_band_classes(candidate_fraction) %>"><%= t("results_ui.scores.bands.#{score_band(candidate_fraction)}") %></span>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  </section>
+<% end %>

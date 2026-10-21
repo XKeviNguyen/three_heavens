@@ -1,0 +1,16 @@
+<%# locals: (runs:, model:) %>
+<%# Failed runs that were replaced by another model: kept for their history
+    and cost, no longer part of the round's result. %>
+<% if runs.any? %>
+  <ul class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700" data-testid="replaced-runs">
+    <% runs.each do |run| %>
+      <li>
+        <%= t("model_selection.replaced_line",
+              old: run.public_send(model).display_name,
+              new: run.superseded_by.public_send(model).display_name,
+              code: run_failure_code(run)) %>
+        <% if run.cost %><span class="text-slate-500"> · <%= t("results_ui.telemetry.cost") %> <%= number_to_currency(run.cost, precision: 6) %></span><% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

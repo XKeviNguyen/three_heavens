@@ -14,7 +14,7 @@
   <% else %>
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" data-tour-target="record-list">
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table class="w-full min-w-[640px] divide-y divide-slate-200 text-left text-sm">
           <thead class="bg-slate-50 text-slate-600"><tr><th scope="col" class="px-5 py-3"><%= t("references_ui.field_title") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.languages") %></th><th scope="col" class="px-5 py-3"><%= t("workflows_ui.revision") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.status") %></th><th scope="col" class="px-5 py-3"><%= t("references_ui.updated") %></th></tr></thead>
           <tbody class="divide-y divide-slate-100">
             <% @translation_references.each do |reference| %>
