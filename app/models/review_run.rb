@@ -6,6 +6,9 @@ class ReviewRun < ApplicationRecord
 
   belongs_to :review_round
   belongs_to :reviewer_llm_model, class_name: "LlmModel"
+  belongs_to :superseded_by, class_name: "ReviewRun", optional: true
+
+  scope :current, -> { where(superseded_at: nil) }
 
   has_many :review_evaluations, dependent: :restrict_with_error
   has_many :review_segment_runs,
@@ -32,6 +35,10 @@ class ReviewRun < ApplicationRecord
 
   def terminal?
     status.in?(TERMINAL_STATUSES)
+  end
+
+  def superseded?
+    superseded_at.present?
   end
 
   def segmented?

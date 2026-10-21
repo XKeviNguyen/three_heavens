@@ -33,7 +33,9 @@ class TranslationSegmentRunJob < ApplicationJob
       experiment: translation_run.experiment,
       source_text: segment_run.experiment_segment.source_text
     )
-    Ai::RunContextBudget.call(
+    # The reserve sent is the current policy's; the run's snapshot keeps
+    # what was planned at launch, as the whole-document jobs do.
+    budget = Ai::RunContextBudget.call(
       run: segment_run,
       model: translation_run.llm_model,
       prompt: prompt,
@@ -44,7 +46,7 @@ class TranslationSegmentRunJob < ApplicationJob
       model_identifier: translation_run.llm_model.model_identifier,
       instruction_prompt: prompt.fetch(:system_prompt),
       source_text: prompt.fetch(:user_prompt),
-      max_tokens: segment_run.reserved_output_tokens
+      max_tokens: budget.reserved_output_tokens
     )
     validate_output!(result.content)
     persist_success(segment_run, result, @claimed_attempt)

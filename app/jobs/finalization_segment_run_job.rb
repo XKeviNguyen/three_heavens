@@ -30,7 +30,9 @@ class FinalizationSegmentRunJob < ApplicationJob
     @claimed_credential = claim.credential
     finalization_run = segment_run.finalization_run
     prompt = Finalizations::Prompt.build(finalization_run, experiment_segment: segment_run.experiment_segment)
-    Ai::RunContextBudget.call(
+    # The reserve sent is the current policy's; the run's snapshot keeps
+    # what was planned at launch, as the whole-document jobs do.
+    budget = Ai::RunContextBudget.call(
       run: segment_run,
       model: finalization_run.finalizer_llm_model,
       prompt: prompt,
@@ -40,7 +42,7 @@ class FinalizationSegmentRunJob < ApplicationJob
     result = client_for(finalization_run.finalizer_llm_model).finalization_completion(
       model_identifier: finalization_run.finalizer_llm_model.model_identifier,
       **prompt,
-      max_tokens: segment_run.reserved_output_tokens
+      max_tokens: budget.reserved_output_tokens
     )
     proposal = Finalizations::ResponseValidator.call(
       content: result.content,

@@ -31,8 +31,10 @@ vi:
       reopened: Đã mở lại bản dịch để sửa.
     review:
       started: Đã bắt đầu nhận xét ẩn danh.
+      replaced: "%{name} đã thay reviewer bị lỗi và đang nhận xét. Chỉ tính tiền phần việc của model này."
     judge:
       started: Đã bắt đầu chấm điểm.
+      replaced: "%{name} đã thay judge bị lỗi và đang chấm. Chỉ tính tiền phần việc của model này."
     pipeline:
       stopped: "Đã dừng tự động hóa. Các yêu cầu AI đã bắt đầu vẫn sẽ chạy xong."
     operations:

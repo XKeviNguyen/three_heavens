@@ -47,7 +47,7 @@ class TranslationReferences::AuthoringAttributesTest < ActiveSupport::TestCase
         "approved_translation" => "Approved"
       )
     end
-    assert_includes error.message, "10 MiB limit"
+    assert_includes error.message, "#{SourceImports::Limits::MAX_UPLOAD_BYTES / 1.megabyte} MiB limit"
   end
 
   test "a saturated real worker slot preserves Busy and stops before the second file" do

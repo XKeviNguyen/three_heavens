@@ -54,6 +54,30 @@ vi:
       start_review_button: Bắt đầu nhận xét ẩn danh
       start_review_confirm: "Bắt đầu nhận xét ẩn danh với các mô hình đã chọn? Thao tác này gửi yêu cầu AI và có thể phát sinh chi phí."
       starting_review: Đang bắt đầu nhận xét…
+    scores:
+      heading:
+        review: Điểm nhận xét trung bình
+        judge: Điểm chấm trung bình
+      all_models: Tất cả mô hình
+      partial: "Tự cập nhật khi các lượt chạy xong: đã xong %{done}/%{total}."
+      scale: "Thang %{min}–%{max}"
+      out_of: "trên %{max}"
+      based_on:
+        review:
+          one: từ 1 mô hình nhận xét
+          other: "từ %{count} mô hình nhận xét"
+        judge:
+          one: từ 1 mô hình chấm điểm
+          other: "từ %{count} mô hình chấm điểm"
+      above: cao hơn điểm trung bình của tất cả mô hình
+      below: thấp hơn điểm trung bình của tất cả mô hình
+      even: Bằng trung bình
+      bands:
+        poor: Kém
+        weak: Yếu
+        fair: Trung bình
+        good: Khá
+        excellent: Xuất sắc
     review:
       title: Nhận xét ẩn danh · Three Heavens
       heading: "Nhận xét ẩn danh"
@@ -107,3 +131,27 @@ vi:
       judge_winner: "Lựa chọn của mô hình này"
       confidence: Độ tin cậy
     provider_failure: "Yêu cầu AI thất bại. Hãy xem mã lỗi rồi thử lại nếu muốn."
+    failure_reasons:
+      http_401: "OpenRouter từ chối API key. Hãy kiểm tra key trong phần Cài đặt AI."
+      http_402: "Tài khoản OpenRouter đứng sau key trả tiền cho tác vụ này không đủ số dư cho yêu cầu: trước mỗi yêu cầu, OpenRouter giữ trước chi phí tối đa có thể. Cài đặt AI cho biết key nào đang trả tiền (key của bạn hay của ứng dụng). Hãy nạp thêm credit vào tài khoản OpenRouter đó rồi thử lại."
+      openrouter_credits_exhausted: "Tài khoản OpenRouter đứng sau key trả tiền không đủ số dư cho yêu cầu này (OpenRouter giữ trước chi phí tối đa). Hãy nạp credit tại openrouter.ai/settings/credits rồi thử lại. Cài đặt AI cho biết key nào đang trả tiền."
+      openrouter_key_limit_reached: "Key OpenRouter đang trả tiền đã dùng hết hạn mức chi tiêu của chính nó. Hãy tăng hoặc đặt lại hạn mức của key tại openrouter.ai/settings/keys, hoặc lưu key khác, rồi thử lại."
+      http_403: "OpenRouter từ chối yêu cầu này. Nhà cung cấp model có thể đã gắn cờ nội dung."
+      http_404: "OpenRouter không phục vụ mã model này. Admin nên kiểm tra hoặc tắt model trong mục Models."
+      structured_output_unavailable: "Không nhà cung cấp OpenRouter nào của model này trả được câu trả lời có cấu trúc mà bước này cần, nên model chỉ dịch được chứ không review, chấm hay tinh chỉnh được. Hãy chọn model khác cho bước này (model có dấu Structured trong danh sách)."
+      http_408: "Nhà cung cấp model phản hồi quá lâu. Hãy thử lại sau."
+      http_429: "OpenRouter hoặc nhà cung cấp model đang giới hạn số yêu cầu (thường gặp với model miễn phí). Đợi một lúc rồi thử lại."
+      http_500: "Nhà cung cấp model đang gặp sự cố tạm thời. Hãy thử lại sau."
+      http_502: "Nhà cung cấp model đang gặp sự cố tạm thời. Hãy thử lại sau."
+      http_503: "Model tạm thời không khả dụng. Hãy thử lại sau."
+      incomplete_response: "Model dừng trước khi trả lời xong, thường do hết token đầu ra. Số token đã sinh vẫn bị tính tiền."
+      context_budget_exceeded: "Văn bản cùng hướng dẫn và tài liệu tham khảo quá dài so với cửa sổ ngữ cảnh của model này."
+      model_output_capability_insufficient: "Model này không tạo được câu trả lời đủ dài cho bước này. Hãy chọn model khác."
+      model_capability_unconfigured: "Chưa cấu hình kích thước ngữ cảnh của model này. Admin nên cập nhật trong mục Models."
+      model_unavailable: "Model này đã bị tắt hoặc không còn được hỗ trợ."
+      network_error: "Kết nối tới OpenRouter thất bại. Hãy thử lại sau."
+      translated_segment_too_large: "Câu trả lời của model cho một phần dài hơn mức cho phép."
+      translated_document_too_large: "Bản dịch ghép lại dài hơn mức cho phép."
+      missing_api_key: "Chưa cấu hình key OpenRouter cho yêu cầu này."
+      personal_key_unavailable: "Key OpenRouter của bạn không còn hoặc đã bị xoá. Hãy thêm lại trong phần Cài đặt AI."
+      managed_ai_access_revoked: "Tài khoản này đã bị thu hồi quyền dùng key AI của ứng dụng."

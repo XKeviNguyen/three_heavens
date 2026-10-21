@@ -22,6 +22,7 @@ Rails.application.routes.draw do
     end
     resource :ai_settings, only: %i[show update], path: "ai"
     resource :open_router_key, only: %i[update destroy], path: "ai/openrouter-key"
+    resource :managed_open_router_key, only: %i[show update destroy], path: "ai/managed-key"
     resources :users, only: :index do
       member do
         patch :grant_managed_ai_access
@@ -112,12 +113,14 @@ Rails.application.routes.draw do
   resources :review_rounds, only: :show do
     member do
       post :retry_failed
+      post :replace_reviewer
     end
     resources :judge_rounds, only: :create
   end
   resources :judge_rounds, only: :show do
     member do
       post :retry_failed
+      post :replace_judge
     end
     resource :final_translation, only: :create
   end

@@ -14,6 +14,31 @@ module Ai
       { id: "context-compression", enabled: false }.freeze
     ].freeze
     ACCEPTED_FINISH_REASON = "stop"
+    # Reasoning models think before they answer, and OpenRouter counts that
+    # against max_tokens. Low effort leaves most of the budget for the answer,
+    # and the reasoning text itself is never returned. Only plain translation
+    # requests send it: structured stages require every parameter
+    # (provider.require_parameters), which would exclude providers of models
+    # without reasoning.
+    REASONING = { effort: "low", exclude: true }.freeze
+    # Families measured on 2026-10-21 (a real 3,400-character part): Qwen
+    # ignores effort but honours a token budget (70 s -> 29 s); Gemini 3
+    # thinks least at "minimal" (none at all). The rest keep low effort.
+    REASONING_BY_PREFIX = {
+      "qwen/" => { max_tokens: 1_024, exclude: true }.freeze,
+      "google/gemini-" => { effort: "minimal", exclude: true }.freeze
+    }.freeze
+
+    def self.reasoning_for(model_identifier)
+      REASONING_BY_PREFIX.find { |prefix, _| model_identifier.to_s.start_with?(prefix) }&.last || REASONING
+    end
+    IN_FLIGHT_BUDGET_LIMIT = "openrouter_in_flight_budget"
+    # The two lasting 402 causes get their own codes: an empty account and a
+    # spent per-key limit need different fixes, and both looked the same.
+    PAYMENT_LIMIT_CODES = {
+      "openrouter_credits" => "openrouter_credits_exhausted",
+      "openrouter_key_limit" => "openrouter_key_limit_reached"
+    }.freeze
 
     BoundedResponse = Data.define(:code, :body)
 
@@ -28,6 +53,7 @@ module Ai
       :reasoning_tokens,
       :cost
     )
+    Usage = Data.define(:prompt_tokens, :completion_tokens, :total_tokens, :cached_tokens, :reasoning_tokens, :cost)
 
     class Error < StandardError
       attr_reader :code
@@ -40,6 +66,17 @@ module Ai
 
     class RetryableError < Error; end
     class PermanentError < Error; end
+
+    # The provider generated (and billed) tokens but stopped before finishing,
+    # e.g. at max_tokens. Its usage is kept so the spend is recorded.
+    class IncompleteResponseError < PermanentError
+      attr_reader :usage
+
+      def initialize(message, code:, usage:)
+        @usage = usage
+        super(message, code: code)
+      end
+    end
 
     def self.serialize_request(model_identifier:, messages:, **options)
       request = {
@@ -86,6 +123,7 @@ module Ai
           { role: "system", content: instruction_prompt },
           { role: "user", content: source_text }
         ],
+        reasoning: self.class.reasoning_for(model_identifier),
         **max_tokens_option(max_tokens)
       )
 
@@ -147,6 +185,15 @@ module Ai
       )
 
       parse_response(response)
+    rescue PermanentError => error
+      raise unless error.code == "http_404"
+
+      # With require_parameters, a 404 means no provider of this model
+      # accepts a strict JSON schema, not that the model is unknown.
+      raise PermanentError.new(
+        "No OpenRouter provider serves this model with structured output",
+        code: "structured_output_unavailable"
+      ), cause: nil
     end
 
     def perform_request(model_identifier:, messages:, **options)
@@ -227,26 +274,35 @@ module Ai
       body = parse_json(response.body, retryable: retryable_status?(status))
 
       unless status.between?(200, 299)
-        raise error_for_response(status)
+        raise error_for_response(status, body)
       end
 
       choice = body.fetch("choices").first
+      usage = body.fetch("usage", {})
       unless choice&.fetch("finish_reason", nil) == ACCEPTED_FINISH_REASON
-        raise PermanentError.new(
+        raise IncompleteResponseError.new(
           "The AI response was incomplete",
-          code: "incomplete_response"
+          code: "incomplete_response",
+          # Unreadable usage must not turn this permanent failure retryable.
+          usage: (usage_from(usage) rescue nil)
         )
       end
 
       content = choice&.dig("message", "content")
       raise invalid_response("assistant content is missing") unless content.is_a?(String)
 
-      usage = body.fetch("usage", {})
-
       Result.new(
         content: content,
         provider_response_id: body["id"],
         resolved_model_identifier: body["model"],
+        **usage_from(usage).to_h
+      )
+    rescue KeyError, NoMethodError, TypeError
+      raise invalid_response("unexpected response shape"), cause: nil
+    end
+
+    def usage_from(usage)
+      Usage.new(
         prompt_tokens: optional_integer(usage["prompt_tokens"]),
         completion_tokens: optional_integer(usage["completion_tokens"]),
         total_tokens: optional_integer(usage["total_tokens"]),
@@ -260,8 +316,6 @@ module Ai
         ),
         cost: optional_decimal(usage["cost"])
       )
-    rescue KeyError, NoMethodError, TypeError
-      raise invalid_response("unexpected response shape"), cause: nil
     end
 
     def parse_json(body, retryable:)
@@ -274,15 +328,27 @@ module Ai
       ), cause: nil
     end
 
-    def error_for_response(status)
+    def error_for_response(status, body)
       # Provider errors may echo prompts, credentials, or reasoning. Only the
       # HTTP status is safe to retain in job failures, logs, and owner pages.
-      error_class = retryable_status?(status) ? RetryableError : PermanentError
+      limit_source = status == 402 ? payment_limit_source(body) : nil
+      retryable = retryable_status?(status) || limit_source == IN_FLIGHT_BUDGET_LIMIT
+      error_class = retryable ? RetryableError : PermanentError
 
       error_class.new(
         "OpenRouter request failed (HTTP #{status})",
-        code: "http_#{status}"
+        code: PAYMENT_LIMIT_CODES.fetch(limit_source, "http_#{status}")
       )
+    end
+
+    # A 402 names its cause in error.metadata.limit_source. Running and just
+    # finished requests can fill the account's in-flight budget for a moment;
+    # that clears by itself, so only it is retried. Only this fixed token is
+    # read from the body.
+    def payment_limit_source(body)
+      metadata = body.is_a?(Hash) && body["error"].is_a?(Hash) ? body["error"]["metadata"] : nil
+      source = metadata.is_a?(Hash) ? metadata["limit_source"] : nil
+      source if source == IN_FLIGHT_BUDGET_LIMIT || PAYMENT_LIMIT_CODES.key?(source)
     end
 
     def retryable_status?(status)

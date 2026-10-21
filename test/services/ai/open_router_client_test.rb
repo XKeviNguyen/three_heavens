@@ -101,6 +101,7 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     payload = JSON.parse(http.last_request.body)
     assert_equal "anthropic/claude-requested", payload["model"]
     assert_equal({ "include" => true }, payload["usage"])
+    assert_equal({ "effort" => "low", "exclude" => true }, payload["reasoning"])
     assert_equal(
       [ { "id" => "context-compression", "enabled" => false } ],
       payload["plugins"]
@@ -181,6 +182,85 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
       assert_equal "incomplete_response", error.code
       assert_not_includes error.message, finish_reason
     end
+  end
+
+  # Measured per family: Qwen honours only a token budget, Gemini 3 thinks
+  # least at "minimal"; everything else keeps low effort.
+  test "translation reasoning follows what each model family honours" do
+    {
+      "qwen/qwen3.7-flash" => { "max_tokens" => 1_024, "exclude" => true },
+      "google/gemini-3.1-flash-lite" => { "effort" => "minimal", "exclude" => true },
+      "anthropic/claude-haiku-5.5" => { "effort" => "low", "exclude" => true },
+      "deepseek/deepseek-v4.1-flash" => { "effort" => "low", "exclude" => true }
+    }.each do |model, reasoning|
+      http = fake_http(status: 200, body: { choices: [ { message: { content: "訳" } } ] })
+      build_client(http).chat_completion(**request_attributes, model_identifier: model)
+
+      assert_equal reasoning, JSON.parse(http.last_request.body).fetch("reasoning"), model
+    end
+  end
+
+  # require_parameters turns "no provider accepts a strict schema" into a 404.
+  test "a structured 404 means no provider offers structured output" do
+    structured = assert_raises(Ai::OpenRouterClient::PermanentError) do
+      build_client(fake_http(status: 404, body: { error: { code: 404, message: "No endpoints found" } }))
+        .review_completion(model_identifier: "qwen/qwen3.7-flash", system_prompt: "Review", user_prompt: "Candidate", response_schema: { type: "object" })
+    end
+    assert_equal "structured_output_unavailable", structured.code
+
+    plain = assert_raises(Ai::OpenRouterClient::PermanentError) do
+      build_client(fake_http(status: 404, body: { error: { code: 404, message: "No endpoints found" } })).chat_completion(**request_attributes)
+    end
+    assert_equal "http_404", plain.code
+  end
+
+  # Structured stages require every parameter of their providers, so asking
+  # for reasoning would exclude the providers of models without it.
+  test "only plain translation requests ask for reasoning" do
+    structured = {
+      review_completion: { model_identifier: "review/model", system_prompt: "Review", user_prompt: "Candidate" },
+      judge_completion: { model_identifier: "judge/model", system_prompt: "Judge", user_prompt: "Candidate" },
+      finalization_completion: { model_identifier: "finalizer/model", system_prompt: "Refine", user_prompt: "Draft" }
+    }
+    structured.each do |method, attributes|
+      http = fake_http(status: 200, body: { choices: [ { message: { content: "{}" } } ] })
+      build_client(http).public_send(method, **attributes, response_schema: { type: "object" })
+
+      assert_not JSON.parse(http.last_request.body).key?("reasoning"), method
+    end
+  end
+
+  # OpenRouter bills the tokens of a response cut off at max_tokens, so the
+  # failure carries that spend; unreadable usage never makes it retryable.
+  test "an incomplete response keeps its billed usage" do
+    http = fake_http(
+      status: 200,
+      body: {
+        choices: [ { finish_reason: "length", message: { content: "" } } ],
+        usage: {
+          prompt_tokens: 900, completion_tokens: 4_096, total_tokens: 4_996, cost: "0.0041",
+          completion_tokens_details: { reasoning_tokens: 4_096 }
+        }
+      }
+    )
+
+    error = assert_raises(Ai::OpenRouterClient::IncompleteResponseError) do
+      build_client(http).chat_completion(**request_attributes)
+    end
+
+    assert_equal "incomplete_response", error.code
+    assert_equal 4_096, error.usage.completion_tokens
+    assert_equal 4_096, error.usage.reasoning_tokens
+    assert_equal BigDecimal("0.0041"), error.usage.cost
+
+    http = fake_http(
+      status: 200,
+      body: { choices: [ { finish_reason: "length", message: { content: "" } } ], usage: { completion_tokens: "many" } }
+    )
+    error = assert_raises(Ai::OpenRouterClient::IncompleteResponseError) do
+      build_client(http).chat_completion(**request_attributes)
+    end
+    assert_nil error.usage
   end
 
   test "fails closed when completion termination is missing" do
@@ -348,6 +428,26 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     end
   end
 
+  # OpenRouter's in-flight budget fills while requests run and clears by
+  # itself; an exhausted balance or key limit does not.
+  test "retries only the 402 that names the in-flight budget" do
+    in_flight = fake_http(status: 402, body: { error: { code: 402, message: "Too many in flight", metadata: { limit_source: "openrouter_in_flight_budget" } } })
+    error = assert_raises(Ai::OpenRouterClient::RetryableError) { build_client(in_flight).chat_completion(**request_attributes) }
+    assert_equal "http_402", error.code
+
+    # The lasting causes are named, so the page can say which fix applies.
+    {
+      { limit_source: "openrouter_credits" } => "openrouter_credits_exhausted",
+      { limit_source: "openrouter_key_limit" } => "openrouter_key_limit_reached",
+      { limit_source: "something_new" } => "http_402",
+      nil => "http_402"
+    }.each do |metadata, code|
+      exhausted = fake_http(status: 402, body: { error: { code: 402, message: "Insufficient credits", metadata: metadata }.compact })
+      error = assert_raises(Ai::OpenRouterClient::PermanentError) { build_client(exhausted).chat_completion(**request_attributes) }
+      assert_equal code, error.code
+    end
+  end
+
   test "classifies other client errors as permanent and sanitizes secrets" do
     client = build_client(
       fake_http(
@@ -486,6 +586,15 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
     assert_equal "managed", credential.billing_source
     assert_not_includes credential.inspect, "test-openrouter-key"
     assert_not_includes credential.to_s, "test-openrouter-key"
+  end
+
+  test "the managed credential prefers the admin-saved key and falls back to the environment" do
+    admin = users(:admin)
+    ManagedOpenRouterKey.store!("sk-or-v1-saved-by-admin-0000", by: admin)
+    assert_equal "sk-or-v1-saved-by-admin-0000", Ai::ProviderCredential.managed.api_key
+
+    ManagedOpenRouterKey.delete!
+    assert_equal "test-openrouter-key", Ai::ProviderCredential.managed.api_key
   end
 
   private

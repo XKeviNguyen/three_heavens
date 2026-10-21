@@ -22,6 +22,7 @@ en:
       ready_managed: New AI work is paid by the platform.
       blocked: New AI work can't start yet.
     key:
+      status_heading: "Your key on OpenRouter"
       heading: Your OpenRouter key
       configured: Saved key ending %{hint}, added %{date}.
       missing: No key saved.

@@ -189,7 +189,7 @@ en:
       already_consumed: This uploaded file was already used for a translation. Upload it again to start another one.
       expired_import: This upload has expired. Upload the file again.
       unavailable_import: This upload is no longer available. Upload the file again.
-      file_too_large: The source file is larger than the 10 MiB limit.
+      file_too_large: The source file is larger than the 21 MiB limit.
       invalid_utf8: The source file must contain valid UTF-8 text.
       binary_source: The file does not contain readable plain text.
       docx_too_many_entries: The DOCX contains too many parts.
@@ -241,6 +241,7 @@ en:
       users: Users
       models: Models
       operations: Operations
+      ai_key: AI key
   managed_ai:
     unavailable: AI translation isn't turned on for this account yet. You can prepare documents and guidance now; an administrator must turn on AI access before translations can run.
   admin_users:

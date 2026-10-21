@@ -36,9 +36,10 @@
          end
        end %>
     <% identifier_selections = Array(@form_values["#{role}_identifiers"]).map(&:to_s).reject(&:blank?).map { |identifier| { identifier: identifier, name: identifier } } %>
-    <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <legend class="px-1 text-lg font-semibold text-slate-950"><%= t("workflows_ui.roles.#{role}") %></legend>
-      <p class="mt-1 text-sm text-slate-600"><%= t("workflows_ui.role_order", selection: role_guidance.fetch(role)) %></p>
+    <fieldset class="min-w-0 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <%# Floated, the legend sits inside the card instead of cutting its top border. %>
+      <legend class="float-left w-full text-lg font-semibold text-slate-950"><%= t("workflows_ui.roles.#{role}") %></legend>
+      <p class="clear-left pt-1 text-sm text-slate-600"><%= t("workflows_ui.role_order", selection: role_guidance.fetch(role)) %></p>
       <div class="mt-4">
         <%= render "shared/model_browser",
               role: role,
@@ -52,5 +53,5 @@
     </fieldset>
   <% end %>
 
-  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @workflow_profile&.persisted? ? workflow_profile_path(@workflow_profile) : workflow_profiles_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("workflows_ui.saving") } %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @workflow_profile&.persisted? ? workflow_profile_path(@workflow_profile) : workflow_profiles_path, class: "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("workflows_ui.saving") } %></div>
 <% end %>

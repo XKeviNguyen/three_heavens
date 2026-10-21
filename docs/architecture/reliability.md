@@ -66,8 +66,14 @@ flowchart TD
 - A definite enqueue failure becomes the generic `enqueue_failed` state; raw queue or database errors are never stored.
 - Only the first execution and strictly newer built-in retries of the recorded job may claim a run. Duplicate executions, other jobs, and retries from an earlier manual recovery cycle exit harmlessly. A late result can update only the attempt that claimed the run.
 - `StaleAiWorkReconciliationJob` (every 15 minutes) marks work that has not started, or is running without a fresh claim, for `AI_STALE_EXECUTION_THRESHOLD_MINUTES` (default 120, range 15–1440) as failed with `stale_pending` or `stale_execution`. It never sends a provider request. A job that arrives after recovery is obsolete. Operators can run `bin/rails ai:reconcile_stale`.
-- Retrying failed work is always an explicit owner action with a cost warning. Completed sibling runs, anonymous labels, and the base versions of AI suggestions are preserved.
+- Retrying failed work is always an explicit owner action with a cost warning. Completed sibling runs, anonymous labels, and the base versions of AI suggestions are preserved. A failed reviewer or judge can instead be replaced with another model: the failed run stays as history (status, error, cost) and points to its replacement through a same-round foreign key; a CHECK allows this only on failed runs, and the experiment and round locks plus a unique index stop two requests from replacing the same run. Tests: `test/services/replace_failed_runs_test.rb`.
 - Each claim writes an `ai_provider_attempts` row **before** the context-budget check and before any request is sent, so the ledger counts execution attempts, not HTTP requests.
+
+### Parallel work and the connection budget
+
+All part requests of a stage are enqueued together, and Solid Queue runs up to `JOB_THREADS` jobs at once (32 by default in production and development, `config/queue.yml`), so three models × 8 parts start together. A job holds a database connection while it waits for OpenRouter, so the pools follow the thread count: the primary pool is `JOB_THREADS + RAILS_MAX_THREADS + 2` and the queue pool `+ 8` (`config/database.yml`), which at the defaults (32 + 3) is 37 and 43. One container then needs about 88 PostgreSQL connections at peak; production's `max_connections` is 100. Old and new containers overlap briefly during a deploy, so deploy while no translation is running, or lower `JOB_THREADS`. More threads change speed only: each run is still claimed once, under a row lock, by job ID and execution number.
+
+OpenRouter reserves each request's maximum cost while it is in flight. With a low balance and many parallel requests it can answer 402 with `limit_source: openrouter_in_flight_budget`; that is retried like a temporary error. An empty account (`openrouter_credits_exhausted`) and a spent per-key limit (`openrouter_key_limit_reached`) are permanent and named as such on the result page.
 
 ### Exactly-once applies to application state, not to the provider
 

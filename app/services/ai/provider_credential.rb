@@ -5,8 +5,9 @@ module Ai
   class ProviderCredential
     attr_reader :billing_source
 
+    # The admin-saved key (ManagedOpenRouterKey), else OPENROUTER_API_KEY.
     def self.managed
-      new(billing_source: "managed", api_key: ENV["OPENROUTER_API_KEY"])
+      new(billing_source: "managed", api_key: ManagedOpenRouterKey.effective_api_key)
     end
 
     def self.personal(api_key)

@@ -1,4 +1,6 @@
 class FinalTranslationsController < ApplicationController
+  include CatalogModelSelection
+
   before_action :require_ai_billing_authorization, only: :refine
   HISTORY_PAGE_SIZE = 25
   before_action :set_final_translation, except: :create
@@ -51,13 +53,20 @@ class FinalTranslationsController < ApplicationController
   end
 
   def refine
-    attributes = exact_parameters!(:refinement, %w[finalizer_ids], array_keys: %w[finalizer_ids])
+    attributes = exact_parameters!(:refinement, %w[finalizer_ids finalizer_identifiers],
+                                   array_keys: %w[finalizer_ids finalizer_identifiers])
+    finalizer_ids = resolved_model_ids(
+      identifiers: attributes["finalizer_identifiers"],
+      saved_ids: attributes["finalizer_ids"],
+      role: "finalizer",
+      maximum: Ai::UsageLimits::MAX_FINALIZERS
+    )
     Finalizations::Start.call(
       final_translation: @final_translation,
-      finalizer_ids: attributes["finalizer_ids"]
+      finalizer_ids: finalizer_ids
     )
     redirect_to @final_translation, notice: t("flash_ui.final.refinement_started")
-  rescue FinalTranslations::Error, ActionController::ParameterMissing => error
+  rescue FinalTranslations::Error, CatalogModelSelection::Error, ActionController::ParameterMissing => error
     render_workspace_error(error, :unprocessable_content)
   end
 
@@ -143,10 +152,12 @@ class FinalTranslationsController < ApplicationController
     @applied_versions_by_run = @final_translation.versions
       .where(source_finalization_run_id: visible_run_ids)
       .group_by(&:source_finalization_run_id)
-    @finalizer_models = LlmModel.active_openrouter.order(:display_name, :id)
     winner = @final_translation.source_winner_translation_run
-    @winner_review_evaluations = winner.review_evaluations.includes(:review_run).order(:created_at, :id)
-    @winner_judge_evaluations = winner.judge_evaluations.includes(:judge_run).order(:created_at, :id)
+    # Replaced (superseded) reviewers and judges left no feedback.
+    @winner_review_evaluations = winner.review_evaluations.joins(:review_run).merge(ReviewRun.current)
+      .includes(:review_run).order(:created_at, :id)
+    @winner_judge_evaluations = winner.judge_evaluations.joins(:judge_run).merge(JudgeRun.current)
+      .includes(:judge_run).order(:created_at, :id)
   end
 
   def paginated_history(scope, page_param:)

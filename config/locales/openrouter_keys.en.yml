@@ -1,0 +1,40 @@
+en:
+  managed_key:
+    title: AI key
+    description: The app's own OpenRouter key pays for AI work by accounts that use the app's AI access. A key saved here replaces the server's OPENROUTER_API_KEY; remove it to go back to the server key.
+    current_heading: Key in use
+    source:
+      saved: "Saved here (%{hint}) on %{date}."
+      environment: "The server's OPENROUTER_API_KEY (%{hint}). No key is saved here."
+      missing: No key is saved here and the server has no OPENROUTER_API_KEY, so the app's AI access cannot run.
+      unreadable: "The saved key can no longer be decrypted (the server secret changed), so the app uses the server's OPENROUTER_API_KEY (%{hint}). Save the key again."
+      no_hint: "none"
+    save_heading: Save a key
+    replace_heading: Replace the key
+    key_label: OpenRouter API key
+    key_hint: Starts with sk-or-. It is checked with OpenRouter, stored encrypted and never shown again.
+    save: Save key
+    replace: Replace key
+    replace_confirm: "Replace the saved key %{hint}? Work that starts after this uses the new key."
+    delete: Remove saved key
+    delete_confirm: Remove the saved key? The app goes back to the server's OPENROUTER_API_KEY.
+    flash:
+      saved: The key was saved. OpenRouter accepted it.
+      saved_unverified: The key was saved, but OpenRouter could not be reached to check it. Check its status below.
+      deleted: The saved key was removed. The app uses the server's key, if it has one.
+    errors:
+      format: Enter an OpenRouter API key that starts with sk-or-.
+      stale: Another admin changed the key at the same time. Reload the page and try again.
+      rate_limited: Too many changes in a short time. Wait a minute, then try again.
+  key_status:
+    valid: OpenRouter accepts this key.
+    invalid: OpenRouter rejected this key. Replace it with a working key.
+    unavailable: OpenRouter could not be reached to check this key. Try again later.
+    rejected: OpenRouter rejected this key, so it was not saved. Check that you copied the whole key.
+    label: Name on OpenRouter
+    limit: Key credit limit
+    limit_value: "%{remaining} left of %{limit}"
+    no_limit: No limit set on this key
+    usage_monthly: Used this month
+    free_requests: Free-model requests left today
+    balance_note_html: "OpenRouter does not show the account's credit balance to this key. If AI requests fail with http_402, add credits at %{link}."

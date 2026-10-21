@@ -1027,7 +1027,7 @@ BEGIN
           RAISE EXCEPTION 'Completed review rounds require terminal review runs';
         END IF;
         IF EXISTS (
-          SELECT 1 FROM review_runs WHERE review_round_id = NEW.id AND status = 'failed'
+          SELECT 1 FROM review_runs WHERE review_round_id = NEW.id AND status = 'failed' AND superseded_at IS NULL
         ) THEN
           RAISE EXCEPTION 'Completed review rounds cannot contain failed review runs';
         END IF;
@@ -1041,7 +1041,7 @@ BEGIN
           RAISE EXCEPTION 'Completed judge rounds require terminal judge runs';
         END IF;
         IF EXISTS (
-          SELECT 1 FROM judge_runs WHERE judge_round_id = NEW.id AND status = 'failed'
+          SELECT 1 FROM judge_runs WHERE judge_round_id = NEW.id AND status = 'failed' AND superseded_at IS NULL
         ) THEN
           RAISE EXCEPTION 'Completed judge rounds cannot contain failed judge runs';
         END IF;
@@ -1049,7 +1049,7 @@ BEGIN
            OR NOT EXISTS (
              SELECT 1 FROM judge_evaluations evaluations
              JOIN judge_runs runs ON runs.id = evaluations.judge_run_id
-             WHERE runs.judge_round_id = NEW.id
+             WHERE runs.judge_round_id = NEW.id AND runs.superseded_at IS NULL
                AND evaluations.translation_run_id = NEW.winner_translation_run_id
            ) THEN
           RAISE EXCEPTION 'Completed judge rounds require an evaluated winner';
@@ -2355,6 +2355,8 @@ CREATE TABLE public.judge_runs (
     cost_complete boolean DEFAULT false NOT NULL,
     billing_source character varying NOT NULL,
     open_router_credential_id bigint,
+    superseded_at timestamp(6) without time zone,
+    superseded_by_id bigint,
     CONSTRAINT judge_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT judge_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT judge_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
@@ -2370,6 +2372,7 @@ CREATE TABLE public.judge_runs (
     CONSTRAINT judge_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT judge_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
     CONSTRAINT judge_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT judge_runs_supersession_check CHECK ((((superseded_at IS NULL) AND (superseded_by_id IS NULL)) OR ((superseded_at IS NOT NULL) AND (superseded_by_id IS NOT NULL) AND ((status)::text = 'failed'::text) AND (superseded_by_id <> id)))),
     CONSTRAINT judge_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0))),
     CONSTRAINT judge_runs_winner_status_check CHECK (((winner_translation_run_id IS NULL) OR ((status)::text = 'completed'::text)))
 );
@@ -2507,6 +2510,44 @@ CREATE SEQUENCE public.llm_models_id_seq
 --
 
 ALTER SEQUENCE public.llm_models_id_seq OWNED BY public.llm_models.id;
+
+
+--
+-- Name: managed_open_router_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.managed_open_router_keys (
+    id bigint NOT NULL,
+    api_key text,
+    key_hint character varying,
+    created_by_id bigint,
+    revoked_at timestamp(6) without time zone,
+    revocation_reason character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT managed_open_router_keys_ciphertext_length_check CHECK (((api_key IS NULL) OR (char_length(api_key) <= 4096))),
+    CONSTRAINT managed_open_router_keys_key_hint_length_check CHECK (((key_hint IS NULL) OR (char_length((key_hint)::text) <= 16))),
+    CONSTRAINT managed_open_router_keys_lifecycle_check CHECK ((((revoked_at IS NULL) AND (api_key IS NOT NULL) AND (revocation_reason IS NULL)) OR ((revoked_at IS NOT NULL) AND (api_key IS NULL) AND (revocation_reason IS NOT NULL) AND (((revocation_reason)::text = 'replaced'::text) OR ((revocation_reason)::text = 'deleted'::text)))))
+);
+
+
+--
+-- Name: managed_open_router_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.managed_open_router_keys_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: managed_open_router_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.managed_open_router_keys_id_seq OWNED BY public.managed_open_router_keys.id;
 
 
 --
@@ -2928,6 +2969,8 @@ CREATE TABLE public.review_runs (
     cost_complete boolean DEFAULT false NOT NULL,
     billing_source character varying NOT NULL,
     open_router_credential_id bigint,
+    superseded_at timestamp(6) without time zone,
+    superseded_by_id bigint,
     CONSTRAINT review_runs_billing_identity_check CHECK (((((billing_source)::text = 'managed'::text) AND (open_router_credential_id IS NULL)) OR (((billing_source)::text = 'personal'::text) AND (open_router_credential_id IS NOT NULL)))),
     CONSTRAINT review_runs_budget_numbers_check CHECK (((estimated_input_tokens IS NULL) OR ((estimated_input_tokens >= 0) AND (reserved_output_tokens > 0) AND (context_safety_margin_tokens > 0)))),
     CONSTRAINT review_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
@@ -2942,6 +2985,7 @@ CREATE TABLE public.review_runs (
     CONSTRAINT review_runs_prompt_tokens_check CHECK (((prompt_tokens IS NULL) OR (prompt_tokens >= 0))),
     CONSTRAINT review_runs_reasoning_tokens_check CHECK (((reasoning_tokens IS NULL) OR (reasoning_tokens >= 0))),
     CONSTRAINT review_runs_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text]))),
+    CONSTRAINT review_runs_supersession_check CHECK ((((superseded_at IS NULL) AND (superseded_by_id IS NULL)) OR ((superseded_at IS NOT NULL) AND (superseded_by_id IS NOT NULL) AND ((status)::text = 'failed'::text) AND (superseded_by_id <> id)))),
     CONSTRAINT review_runs_total_tokens_check CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))
 );
 
@@ -3931,6 +3975,13 @@ ALTER TABLE ONLY public.llm_models ALTER COLUMN id SET DEFAULT nextval('public.l
 
 
 --
+-- Name: managed_open_router_keys id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.managed_open_router_keys ALTER COLUMN id SET DEFAULT nextval('public.managed_open_router_keys_id_seq'::regclass);
+
+
+--
 -- Name: methodology_profile_revisions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -4325,6 +4376,14 @@ ALTER TABLE ONLY public.judge_segment_runs
 
 ALTER TABLE ONLY public.llm_models
     ADD CONSTRAINT llm_models_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: managed_open_router_keys managed_open_router_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.managed_open_router_keys
+    ADD CONSTRAINT managed_open_router_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -5098,10 +5157,24 @@ CREATE INDEX index_judge_runs_on_recent_failures ON public.judge_runs USING btre
 
 
 --
+-- Name: index_judge_runs_on_round_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_judge_runs_on_round_and_id ON public.judge_runs USING btree (judge_round_id, id);
+
+
+--
 -- Name: index_judge_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_judge_runs_on_running_last_claimed_at ON public.judge_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_judge_runs_on_superseded_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_judge_runs_on_superseded_by_id ON public.judge_runs USING btree (superseded_by_id) WHERE (superseded_by_id IS NOT NULL);
 
 
 --
@@ -5158,6 +5231,20 @@ CREATE INDEX index_judge_segment_runs_on_running_last_claimed_at ON public.judge
 --
 
 CREATE UNIQUE INDEX index_llm_models_on_gateway_and_model_identifier ON public.llm_models USING btree (gateway, model_identifier);
+
+
+--
+-- Name: index_managed_open_router_keys_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_managed_open_router_keys_on_created_by_id ON public.managed_open_router_keys USING btree (created_by_id);
+
+
+--
+-- Name: index_managed_open_router_keys_one_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_managed_open_router_keys_one_active ON public.managed_open_router_keys USING btree ((true)) WHERE (revoked_at IS NULL);
 
 
 --
@@ -5399,10 +5486,24 @@ CREATE INDEX index_review_runs_on_reviewer_llm_model_id ON public.review_runs US
 
 
 --
+-- Name: index_review_runs_on_round_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_review_runs_on_round_and_id ON public.review_runs USING btree (review_round_id, id);
+
+
+--
 -- Name: index_review_runs_on_running_last_claimed_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_review_runs_on_running_last_claimed_at ON public.review_runs USING btree (last_claimed_at) WHERE ((status)::text = 'running'::text);
+
+
+--
+-- Name: index_review_runs_on_superseded_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_review_runs_on_superseded_by_id ON public.review_runs USING btree (superseded_by_id) WHERE (superseded_by_id IS NOT NULL);
 
 
 --
@@ -6391,6 +6492,14 @@ ALTER TABLE ONLY public.glossaries
 
 
 --
+-- Name: judge_runs fk_judge_runs_superseded_by_same_round; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.judge_runs
+    ADD CONSTRAINT fk_judge_runs_superseded_by_same_round FOREIGN KEY (judge_round_id, superseded_by_id) REFERENCES public.judge_runs(judge_round_id, id);
+
+
+--
 -- Name: methodology_profiles fk_methodology_profiles_owned_current_revision; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6508,6 +6617,14 @@ ALTER TABLE ONLY public.glossary_entries
 
 ALTER TABLE ONLY public.review_runs
     ADD CONSTRAINT fk_rails_2a5d7cdc72 FOREIGN KEY (review_round_id) REFERENCES public.review_rounds(id);
+
+
+--
+-- Name: managed_open_router_keys fk_rails_2e6176f33b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.managed_open_router_keys
+    ADD CONSTRAINT fk_rails_2e6176f33b FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -7055,6 +7172,14 @@ ALTER TABLE ONLY public.judge_rounds
 
 
 --
+-- Name: review_runs fk_review_runs_superseded_by_same_round; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_runs
+    ADD CONSTRAINT fk_review_runs_superseded_by_same_round FOREIGN KEY (review_round_id, superseded_by_id) REFERENCES public.review_runs(review_round_id, id);
+
+
+--
 -- Name: translation_references fk_translation_references_owned_current_revision; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7085,6 +7210,8 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261021090000'),
+('20261020090000'),
 ('20261012100000'),
 ('20261012090000'),
 ('20261011090000'),

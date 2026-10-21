@@ -1,0 +1,27 @@
+ja:
+  model_selection:
+    roles:
+      reviewer: レビュアー
+      judge: 審査員
+      finalizer: 推敲モデル
+    too_many:
+      one: "選べるモデルは最大%{count}個です。"
+      other: "選べるモデルは最大%{count}個です。"
+    duplicate: "同じモデルが2回選ばれています。"
+    choose_one: "代わりに使うモデルを1つ選んでください。"
+    incompatible: "このモデルは%{role}として使えません。この工程に必要な構造化された回答を返せるOpenRouter提供元がありません。Structuredと表示されたモデルを選んでください。"
+    unavailable: "現在OpenRouterでモデルを確認できないか、管理者がこのモデルを無効にしています。もう一度試すか、別のモデルを選んでください。"
+    hints:
+      reviewer: "構造化された回答を返せるOpenRouterモデルなら、翻訳に参加していないモデルでもレビューできます。"
+      judge: "構造化された回答を返せるOpenRouterモデルなら判定できます。"
+      finalizer: "構造化された回答を返せるOpenRouterモデルなら推敲案を出せます。"
+    replacement_label: "代わりに使うモデル"
+    replace_heading: "%{name} を別のモデルに置き換える"
+    replace_intro:
+      reviewer: "新しいモデルが同じ匿名の候補をレビューします。失敗したレビュアーは履歴に残り、課金されるのは新しいモデルの処理だけです。"
+      judge: "新しいモデルが同じ匿名の候補を順位付けします。失敗した審査員は履歴に残り、課金されるのは新しいモデルの処理だけです。"
+    replace_submit:
+      reviewer: "置き換えてレビュー"
+      judge: "置き換えて判定"
+    replace_confirm: "新しいモデルを今すぐ実行しますか？処理は表示中の支払い元に課金されます。"
+    replaced_line: "%{old} は失敗し（%{code}）、%{new} に置き換えられました。"

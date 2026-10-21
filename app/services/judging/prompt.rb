@@ -88,7 +88,8 @@ module Judging
 
     def feedback_for(translation_run)
       review_round_id = judge_run.judge_round.review_round_id
-      review_runs = ReviewRun.where(review_round_id: review_round_id)
+      # Replaced (superseded) reviewers have no feedback to give.
+      review_runs = ReviewRun.current.where(review_round_id: review_round_id)
         .includes(:review_evaluations)
         .order(:id)
       review_runs.each_with_index.map do |review_run, index|

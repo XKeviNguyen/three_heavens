@@ -137,16 +137,21 @@ module ProductTour
     },
     "ai_settings" => {
       controllers: %w[settings/ai_settings],
+      # 1: a saved key is checked with OpenRouter and its status shown.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "status", targets: %w[ai-status] },
         { id: "source", targets: %w[ai-source] },
         { id: "key", targets: %w[ai-key] },
+        { id: "key_status", targets: %w[ai-key-status] },
         { id: "billing", targets: %w[ai-billing] }
       ]
     },
     "results" => {
       controllers: %w[experiments],
+      # 1: reviewers are picked from the OpenRouter catalog.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "progress", targets: %w[workflow-steps] },
@@ -157,26 +162,37 @@ module ProductTour
     },
     "blind_review" => {
       controllers: %w[review_rounds],
+      # 1: average scores; a failed reviewer can be replaced; judges come
+      # from the catalog.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "progress", targets: %w[workflow-steps] },
+        { id: "scores", targets: %w[score-board] },
         { id: "evaluations", targets: %w[run-outputs] },
         { id: "retry", targets: %w[run-retry] },
+        { id: "replace", targets: %w[run-replace] },
         { id: "next", targets: %w[run-next] }
       ]
     },
     "judging" => {
       controllers: %w[judge_rounds],
+      # 1: average scores; a failed judge can be replaced.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "progress", targets: %w[workflow-steps] },
+        { id: "scores", targets: %w[score-board] },
         { id: "winner", targets: %w[judge-winner] },
         { id: "runs", targets: %w[run-outputs] },
-        { id: "retry", targets: %w[run-retry] }
+        { id: "retry", targets: %w[run-retry] },
+        { id: "replace", targets: %w[run-replace] }
       ]
     },
     "final_editor" => {
       controllers: %w[final_translations],
+      # 1: refining models are picked from the OpenRouter catalog.
+      rewrites: 1,
       steps: [
         { id: "intro" },
         { id: "guidance", targets: %w[editor-guidance] },

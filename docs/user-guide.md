@@ -56,7 +56,7 @@ Open **New translation**:
 
 1. **Languages.** Choose the source and target languages (or type a custom language). Use the ⇄ button to swap them.
 2. **Project.** Name a new project, or start from an existing project's page to add a translation to it. A project keeps one language pair.
-3. **Source document.** Give it a title, then **Paste text** or **Upload file** (TXT, Markdown, DOCX, or text PDF, up to 10 MiB). After an upload, review and edit the extracted text before you start. Uploading never sends anything to AI.
+3. **Source document.** Give it a title, then **Paste text** or **Upload file** (TXT, Markdown, DOCX, or text PDF, up to 21 MiB). After an upload, review and edit the extracted text before you start. Uploading never sends anything to AI.
 4. **Your instructions (optional).** Tone, audience, names to keep, formatting — every AI step follows them.
 
 The form saves itself as you type. If you close the tab or your browser crashes, the draft is restored the next time you open the page. **Discard draft** clears it.
@@ -66,7 +66,7 @@ The form saves itself as you type. If you close the tab or your browser crashes,
 All four kinds of guidance are shown on the page, numbered in reading order; the page guide gives each its own step.
 
 - **Terminology.** Choose a saved glossary, or add terms directly with **+ Add terminology**. A glossary is a list of source terms and the exact target terms to use (for example *Grace → 恵み*). Editing it saves a new version; translations that already used it keep their version.
-- **References.** Pick up to five approved bilingual examples that show the wording and style you want. When you create a reference, paste each side or choose one TXT, Markdown, DOCX, or PDF file per side (up to 10 MiB; drop a file on the box or use **Choose file**). The chosen file's name and size are shown, and you can replace or remove it before saving; choosing a file never saves the form. Use pasted text or a file for each side, not both.
+- **References.** Pick up to five approved bilingual examples that show the wording and style you want. When you create a reference, paste each side or choose one TXT, Markdown, DOCX, or PDF file per side (up to 21 MiB; drop a file on the box or use **Choose file**). The chosen file's name and size are shown, and you can replace or remove it before saving; choosing a file never saves the form. Use pasted text or a file for each side, not both.
 - **Methodology.** A reusable style guide describing how the translation should be written.
 - **Guidance priority.** If the guidance disagrees, choose which source wins.
 
@@ -91,15 +91,25 @@ Click **Start translation**. Clicking twice, or retrying after a network error, 
 
 The page refreshes every 5 seconds while models are working. Each card shows the translation, the model you chose, the model actually used, and the cost when the AI service reports it. Token counts (how much text the AI processed) are under **Technical details**. If a model fails, **Retry failed translations** redoes only the failed work after a cost warning. A retry is new AI work: the panel says who will pay for it under your current AI settings: the platform, or your OpenRouter key with its last characters. If that changes before you click (for example in another tab, or by replacing the key), nothing is retried and the page shows the new payer first. Review, judging, and suggestion retries work the same way.
 
+**Long documents run in parts.** A source longer than 4,000 characters is split into parts of about 4,000 characters at paragraph and sentence boundaries; a 29,000-character text becomes 8 parts. Every part of every model is sent at the same time, and each card shows **Processed in parts: 5 / 8 parts done**. The number counts finished parts only: a fast model climbs steadily, while a slower one (one that "thinks" before answering) can stay at 0 / 8 and then jump to 8 / 8, because its parts were running side by side all along. When all parts are done they are joined back in order. If one part fails, only that part is retried. Your glossary, methodology, and references are sent with every part.
+
+![A long document translating in parts](images/readme/15-long-document-parts.png)
+
 ## 6. Blind review
 
-Choose one or more reviewer models and click **Start blind review**. Reviewers see the candidates as *Candidate A, B, C…*; the app never tells them which model wrote which. Each review scores faithfulness, naturalness, terminology, and how well the instructions were followed, and lists strengths, issues, and suggested corrections. Only you see "Written by (hidden from AI)".
+Search the OpenRouter catalog for one or more reviewer models and click **Start blind review**. Reviewers do not have to be the models that translated; only models that can return structured answers are offered, and the server refuses any other. Reviewers see the candidates as *Candidate A, B, C…*; the app never tells them which model wrote which. Each review scores faithfulness, naturalness, terminology, and how well the instructions were followed, and lists strengths, issues, and suggested corrections. Only you see "Written by (hidden from AI)".
+
+**Average scores.** The page opens with **Average review scores**: a gauge for the average of all candidates (1–10) and one tile per translation model, highest first, showing its average, how far it is above (▲) or below (▼) the average of all models, and a rating from *Poor* to *Excellent*. It appears as soon as the first reviewer finishes and says how many are done; replaced reviewers are not counted.
+
+If a reviewer fails (for example, no OpenRouter provider can serve it with structured output), its card offers **Replace … with another model** until judging starts. Pick one model from the catalog; after a cost warning, only the new model reviews the same candidates and only its work is billed, under the payer shown. The failed run stays listed under the round with its own cost. Retrying it instead is still possible.
+
+![Replacing a failed reviewer with another model](images/readme/16-replace-failed-reviewer.png)
 
 ![Blind review scores for two anonymous candidates](images/readme/03-blind-review.png)
 
 ## 7. Judging
 
-Choose judge models and click **Start judging**. Each judge ranks every candidate; the rankings are combined into one **winning translation**. If any judge fails, no winner is chosen until you retry it.
+Search the OpenRouter catalog for judge models and click **Start judging**. Each judge ranks every candidate; the rankings are combined into one **winning translation**. If any judge fails, no winner is chosen until you retry it or replace it with another model from its card (possible until the final editor is opened; only the new judge's work is billed). **Average judge scores** (1–100) are shown the same way as review scores. The winner is chosen by ranking points first, so it is not always the model with the highest average.
 
 ![Judging page with the winning translation and ranking points](images/readme/04-judging.png)
 
@@ -110,7 +120,7 @@ Click **Edit the winning translation**. The winner becomes **version 1** of your
 ![Final translation workspace with the editable draft](images/readme/05-final-editor.png)
 
 - **Save version** creates a new version when the text has changed (saving unchanged text keeps the current version); earlier versions are kept and can be viewed or **restored as a new version**.
-- **Get AI suggestions** asks one or more models to improve the current version. Each suggestion shows the proposed text, a change summary, and terminology notes. **Apply suggestion** turns it into a new version; nothing is ever applied automatically. A suggestion made for an older version is marked *Out of date*.
+- **Get AI suggestions** asks one or more models, picked from the OpenRouter catalog, to improve the current version. Each suggestion shows the proposed text, a change summary, and terminology notes. **Apply suggestion** turns it into a new version; nothing is ever applied automatically. A suggestion made for an older version is marked *Out of date*.
 - If another tab saved a newer version, you are told before anything is overwritten, and your text stays in the editor so you can combine the changes.
 
 ![An AI suggestion ready to apply](images/readme/06-ai-suggestion.png)

@@ -42,6 +42,9 @@
     <%= link_to t("results_ui.back_review"), @judge_round.review_round, class: "ml-5 text-sm font-semibold text-blue-700 hover:text-blue-900" %>
   </div>
 
+  <%= render "shared/score_board", kind: "judge",
+        summary: Results::ScoreSummary.call(@judge_round.judge_runs, evaluations: :judge_evaluations, scale: JudgeEvaluation::SCORE_RANGE) %>
+
   <% if @judge_round.completed? %>
     <% winner = @judge_round.winner_translation_run %>
     <section data-tour-target="judge-winner" class="rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
@@ -53,9 +56,9 @@
 
       <div class="mt-5">
         <% if @judge_round.final_translation %>
-          <%= link_to t("results_ui.judge.open_editor"), @judge_round.final_translation, class: "inline-flex rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800" %>
+          <%= link_to t("results_ui.judge.open_editor"), @judge_round.final_translation, class: "inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800" %>
         <% else %>
-          <%= button_to t("results_ui.judge.create_editor"), judge_round_final_translation_path(@judge_round), method: :post, class: "rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800", data: { turbo_submits_with: t("results_ui.judge.opening_editor") } %>
+          <%= button_to t("results_ui.judge.create_editor"), judge_round_final_translation_path(@judge_round), method: :post, class: "rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("results_ui.judge.opening_editor") } %>
         <% end %>
       </div>
 
@@ -78,6 +81,7 @@
 
   <section data-tour-target="run-outputs" class="space-y-6">
     <h2 class="text-xl font-semibold text-slate-950"><%= t("results_ui.judge.runs") %></h2>
+    <%= render "shared/replaced_runs", runs: @replaced_judge_runs.to_a, model: :judge_llm_model %>
 
     <% @judge_round.judge_runs.sort_by { |run| [run.judge_llm_model.display_name, run.id] }.each do |judge_run| %>
       <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -96,12 +100,17 @@
           <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p class="font-semibold"><%= t("results_ui.judge.failed") %></p>
             <% if judge_run.error_code.present? %>
-              <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= safe_provider_error_code(judge_run.error_code) %></span></p>
+              <p class="mt-1"><%= t("results_ui.error_code") %>: <span class="font-mono"><%= run_failure_code(judge_run) %></span></p>
             <% end %>
             <% if judge_run.error_message.present? %>
-              <p class="mt-1 break-words"><%= safe_provider_error(judge_run.error_message) %></p>
+              <p class="mt-1 break-words"><%= run_failure_explanation(judge_run) %></p>
             <% end %>
           </div>
+          <% if @judge_round.final_translation.nil? %>
+            <%= render "shared/replace_model_action", path: replace_judge_judge_round_path(@judge_round), run_param: :judge_run_id, run_id: judge_run.id, role: "judge",
+                  heading: t("model_selection.replace_heading", name: judge_run.judge_llm_model.display_name), intro: t("model_selection.replace_intro.judge"),
+                  submit: t("model_selection.replace_submit.judge"), confirm: t("model_selection.replace_confirm") %>
+          <% end %>
         <% elsif !judge_run.completed? %>
           <p class="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
             <%= judge_run.running? ? t("results_ui.judge.run_running") : t("results_ui.judge.run_pending") %>

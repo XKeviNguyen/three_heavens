@@ -8,8 +8,11 @@ module Settings
     rate_limit to: MUTATION_LIMIT, within: MUTATION_WINDOW, by: -> { current_user.id }, name: "ai_settings",
                with: :render_rate_limited, only: :update
 
+    class_attribute :key_status, instance_writer: false, default: OpenRouter::KeyStatus
+
     def show
       @ai_settings = Accounts::AiSettings.state(current_user)
+      @key_status = personal_key_status
     end
 
     def update
@@ -21,6 +24,17 @@ module Settings
           state_token: attributes[:state_token]
         )
       end
+    end
+
+    private
+
+    # What OpenRouter reports for the owner's saved key; nil without one, or
+    # when it cannot be decrypted (the page already reports that state).
+    def personal_key_status
+      credential = current_user.open_router_credentials.active.first
+      credential && key_status.cached(credential.api_key)
+    rescue ActiveRecord::Encryption::Errors::Decryption
+      nil
     end
   end
 end

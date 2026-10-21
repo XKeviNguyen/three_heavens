@@ -54,6 +54,30 @@ en:
       start_review_button: Start blind review
       start_review_confirm: Start blind review with the selected models? This sends AI requests and may cost money.
       starting_review: Starting review…
+    scores:
+      heading:
+        review: Average review scores
+        judge: Average judge scores
+      all_models: All models
+      partial: "Updates as runs finish: %{done} of %{total} done."
+      scale: "Scale %{min}–%{max}"
+      out_of: "out of %{max}"
+      based_on:
+        review:
+          one: from 1 reviewer
+          other: "from %{count} reviewers"
+        judge:
+          one: from 1 judge
+          other: "from %{count} judges"
+      above: above the average of all models
+      below: below the average of all models
+      even: Same as average
+      bands:
+        poor: Poor
+        weak: Weak
+        fair: Fair
+        good: Good
+        excellent: Excellent
     review:
       title: Blind review · Three Heavens
       heading: Blind review
@@ -107,3 +131,27 @@ en:
       judge_winner: This judge's pick
       confidence: Confidence
     provider_failure: The AI request failed. Check the error code, then retry if you want to.
+    failure_reasons:
+      http_401: OpenRouter rejected the API key. Check the key in AI settings.
+      http_402: "The OpenRouter account behind the key that paid for this work cannot cover the request: before each request OpenRouter reserves its largest possible cost. AI settings shows which key pays (your own or the app's). Add credits to that OpenRouter account, then retry."
+      openrouter_credits_exhausted: "The OpenRouter account behind the paying key has too little credit for this request (OpenRouter reserves its largest possible cost first). Add credits at openrouter.ai/settings/credits, then retry. AI settings shows which key pays."
+      openrouter_key_limit_reached: "The paying OpenRouter key has used up its own credit limit. Raise or reset the key's limit on openrouter.ai/settings/keys, or save another key, then retry."
+      http_403: OpenRouter refused this request. The model provider may have flagged the content.
+      http_404: OpenRouter does not serve this model ID. An admin should check or deactivate the model under Models.
+      structured_output_unavailable: "No OpenRouter provider of this model can return the structured answer this step needs, so it can translate but not review, judge or refine. Choose another model for this step (one marked Structured in the model list)."
+      http_408: The model provider took too long to answer. Retry later.
+      http_429: OpenRouter or the model provider is limiting requests right now (common for free models). Wait a while, then retry.
+      http_500: The model provider had a temporary problem. Retry later.
+      http_502: The model provider had a temporary problem. Retry later.
+      http_503: The model is temporarily unavailable. Retry later.
+      incomplete_response: The model stopped before finishing its answer, usually because it ran out of output tokens. The tokens it produced are still billed.
+      context_budget_exceeded: The text with its instructions and references is too long for this model's context window.
+      model_output_capability_insufficient: This model cannot produce a long enough answer for this step. Choose another model.
+      model_capability_unconfigured: This model's context size is not configured. An admin should refresh it under Models.
+      model_unavailable: This model is inactive or no longer supported.
+      network_error: The connection to OpenRouter failed. Retry later.
+      translated_segment_too_large: The model's answer for one part was longer than allowed.
+      translated_document_too_large: The assembled translation was longer than allowed.
+      missing_api_key: No OpenRouter key is configured for this request.
+      personal_key_unavailable: Your own OpenRouter key is missing or was removed. Add it again in AI settings.
+      managed_ai_access_revoked: Access to the app's AI key was removed for this account.

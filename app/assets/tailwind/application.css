@@ -17,6 +17,38 @@
     cursor: pointer;
   }
 
+  /* A fieldset defaults to min-width: min-content, so wide content (model
+     cards, tables) pushed whole forms past a phone screen. */
+  fieldset {
+    min-width: 0;
+  }
+
+  /* The browser draws a file input's picker button itself, outside the
+     palette, so it looked unstyled (and nearly invisible in dark mode).
+     Every visible file input gets the site's secondary button. */
+  input[type="file"] {
+    color: var(--color-slate-700);
+    font-size: 0.875rem;
+  }
+
+  input[type="file"]::file-selector-button {
+    margin-inline-end: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-slate-300);
+    border-radius: 0.75rem;
+    background: var(--color-white);
+    color: var(--color-slate-900);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+  }
+
+  input[type="file"]::file-selector-button:hover {
+    background: var(--color-slate-100);
+  }
+
   input:disabled,
   select:disabled,
   textarea:disabled {
@@ -98,7 +130,7 @@
     --th-text-secondary: #aeaeb2;
     --th-text-tertiary: #8e8e93;
     --th-border: #2c2c2e;
-    --th-border-strong: #3a3a3c;
+    --th-border-strong: #48484a;
     --th-accent: #0a84ff;
     --th-accent-hover: #409cff;
     --th-brand: #3b9bff;
@@ -122,7 +154,8 @@
     --color-slate-50: var(--th-surface-subtle);
     --color-slate-100: #29292b;
     --color-slate-200: var(--th-border);
-    --color-slate-300: var(--th-border-strong);
+    /* Field and button borders: --th-border-strong barely showed on a surface. */
+    --color-slate-300: #545458;
     --color-slate-400: var(--th-text-tertiary);
     --color-slate-500: #98989d;
     --color-slate-600: var(--th-text-secondary);
@@ -171,6 +204,15 @@
   }
 }
 
+/* One primary blue in both appearances: views fill primary actions with
+   blue-600 or blue-700, which drew three different blues side by side. */
+html {
+  .bg-blue-600,
+  .bg-blue-700 { background-color: var(--th-accent-fill); }
+  .hover\:bg-blue-700:hover,
+  .hover\:bg-blue-800:hover { background-color: var(--th-accent-fill-hover); }
+}
+
 /* Dark fills keep white text readable where the same shade is also a text role. */
 html {
   @variant dark {
@@ -191,7 +233,7 @@ html {
     .hover\:bg-red-800:hover { background-color: #ad2c28; }
     /* After the fill and hover rules above so unavailable buttons look it. */
     .disabled\:bg-slate-400:disabled,
-    .aria-disabled\:bg-slate-400[aria-disabled="true"] { background-color: #3a3a3c; }
+    .aria-disabled\:bg-slate-400[aria-disabled="true"] { background-color: #2c2c2e; color: #8e8e93; }
     .bg-slate-900,
     .bg-slate-950 { background-color: var(--th-border-strong); }
     .hover\:bg-slate-700:hover { background-color: #48484a; }
@@ -295,11 +337,6 @@ body:has(#workspace-form) #app-sidebar form {
 @media (min-width: 64rem) {
   .public-locale-selector { width: max-content; }
   .public-locale-selector select { width: 8rem; }
-}
-
-body:has(#workspace-form) #app-sidebar a[aria-current="page"] {
-  background: var(--workspace-accent-soft);
-  color: var(--workspace-accent-hover);
 }
 
 body:has(#workspace-form) #main-content {
@@ -426,24 +463,6 @@ body:has(#workspace-form) #workspace-form > #workspace-layout {
 
 #workspace-manual-models [data-model-browser-target="list"] {
   max-height: 360px;
-}
-
-#workspace-manual-models [data-model-browser-target="list"] button {
-  background: var(--workspace-surface);
-  border: 1px solid var(--workspace-border-strong);
-  color: var(--workspace-accent-hover);
-}
-
-#workspace-manual-models [data-model-browser-target="list"] button:hover {
-  background: var(--workspace-accent-soft);
-}
-
-#workspace-manual-models [data-model-browser-target="selected"] button {
-  color: var(--workspace-secondary);
-}
-
-#workspace-manual-models [data-model-browser-target="selected"] button:hover {
-  color: var(--workspace-danger);
 }
 
 #workspace-manual-models [data-model-browser-target="selected"] {

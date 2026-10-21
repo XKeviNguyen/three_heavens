@@ -115,6 +115,9 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
 
   JUDGE_ORDER = %w[demo/lumen demo/quill demo/meridian].freeze
 
+  # About 29,500 characters: eight parts of at most 4,000 characters each.
+  LONG_SOURCE = Array.new(96) { SERMON_SOURCE }.join("\n\n").freeze
+
   # Deterministic stand-in for Ai::OpenRouterClient at the provider boundary.
   class DemoClient
     # Per-model usage so the candidate cards do not all show the same numbers.
@@ -130,6 +133,12 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     end
 
     def review_completion(model_identifier:, **prompt)
+      # Shows how a failed reviewer is replaced with another model.
+      if model_identifier == "demo/echo"
+        raise Ai::OpenRouterClient::PermanentError.new(
+          "No OpenRouter provider serves this model with structured output", code: "structured_output_unavailable"
+        )
+      end
       second_reviewer = model_identifier == "demo/sage"
       evaluations = candidates(prompt).map do |label, translator|
         scores, strengths, issues, corrections = FEEDBACK.fetch(translator)
@@ -222,6 +231,8 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     "demo/quill" => "Quill (demo)",
     "demo/critic" => "Critic (demo)",
     "demo/sage" => "Sage (demo)",
+    "demo/echo" => "Echo (demo)",
+    "demo/scholar" => "Scholar (demo)",
     "demo/arbiter" => "Arbiter (demo)",
     "demo/verdict" => "Verdict (demo)",
     "demo/polish" => "Polish (demo)"
@@ -232,7 +243,7 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     OpenRouter::Catalog.transport = -> { demo_catalog_json }
     @original_client_factories = AI_JOBS.to_h { |job| [ job, job.client_factory ] }
     client = DemoClient.new
-    AI_JOBS.each { |job| job.client_factory = -> { client } }
+    AI_JOBS.each { |job| job.client_factory = ->(_credential = nil) { client } }
 
     LlmModel.update_all(active: false)
     @models = DEMO_MODELS.to_h do |identifier, name|
@@ -256,6 +267,8 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
       email_verified_at: Time.current,
       managed_ai_access: true
     )
+    # The welcome tour would cover the first page; the captures show the app itself.
+    @user.update_columns(product_tour_version: ProductTour::VERSION, product_tour_outcome: "dismissed", product_tour_page_guides: false)
     @glossary = Glossaries::Create.call(
       user: @user,
       attributes: {
@@ -311,19 +324,31 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     assert_text "Lumen (demo)"
     capture "02-translation-candidates", find("h2", text: "Results by model")
 
-    # 2. Blind review by two reviewer models that never see model names.
-    check "review_round_reviewer_ids_#{@models.fetch("demo/critic").id}"
-    check "review_round_reviewer_ids_#{@models.fetch("demo/sage").id}"
-    accept_confirm { click_button "Start blind review" }
+    # 2. Blind review by three reviewer models, picked from the catalog, that
+    # never see model names. Echo fails and is replaced with Scholar.
+    form = "form[action='#{experiment_review_rounds_path(experiment)}']"
+    pick_models form, "Critic (demo)", "Sage (demo)", "Echo (demo)"
+    within(form) { accept_confirm { click_button "Start blind review" } }
     assert_text "Blind review started."
     run_ai_jobs
-    visit review_round_path(experiment.reload.review_round)
+    review_round = experiment.reload.review_round
+    visit review_round_path(review_round)
+    replace = find("[data-testid='replace-model']")
+    replace.find("summary").click
+    pick_models "[data-testid='replace-model']", "Scholar (demo)"
+    capture "16-replace-failed-reviewer", replace.find(:xpath, "ancestor::article")
+    within(replace) { accept_confirm { click_button "Replace and review" } }
+    assert_text "Scholar (demo) replaced the failed reviewer"
+    run_ai_jobs
+    visit review_round_path(review_round)
+    assert_text "Completed"
     capture "03-blind-review"
+    capture "14-score-board", find("[data-testid='score-board']")
 
     # 3. Two independent judges rank the anonymous candidates.
-    check "judge_round_judge_ids_#{@models.fetch("demo/arbiter").id}"
-    check "judge_round_judge_ids_#{@models.fetch("demo/verdict").id}"
-    accept_confirm { click_button "Start judging" }
+    form = "form[action='#{review_round_judge_rounds_path(review_round)}']"
+    pick_models form, "Arbiter (demo)", "Verdict (demo)"
+    within(form) { accept_confirm { click_button "Start judging" } }
     assert_text "Judging started."
     run_ai_jobs
     judge_round = experiment.review_round.reload.judge_round
@@ -334,8 +359,9 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     # 4. The human editor starts from the winner and asks for AI suggestions.
     click_button "Edit the winning translation"
     assert_text "Your final translation draft is ready."
-    check "refinement_finalizer_ids_#{@models.fetch("demo/polish").id}"
-    accept_confirm { click_button "Get AI suggestions" }
+    form = "form[action='#{refine_final_translation_path(judge_round.reload.final_translation)}']"
+    pick_models form, "Polish (demo)"
+    within(form) { accept_confirm { click_button "Get AI suggestions" } }
     assert_text "AI suggestions requested."
     run_ai_jobs
     final_translation = judge_round.reload.final_translation
@@ -381,13 +407,38 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     visit pipeline_run_path(pipeline)
     capture "09-automatic-workflow"
 
-    # 6. Library and history pages.
+    # 6. A long document is split into parts that run in parallel; the page
+    # counts finished parts per model while the rest are still running.
+    visit project_path(experiment.document.project)
+    click_link "Paste text / start translation", match: :first
+    fill_in "Document title", with: "Grace for the Weary (full series)"
+    fill_in "Source text", with: LONG_SOURCE
+    fill_in "Translation name", with: "Sermon series · long document"
+    fill_in "Instructions for the translation", with: "Warm, reverent tone. Use です/ます style."
+    within "#workspace-manual-models" do
+      find("input[placeholder='Search OpenRouter models…']").click
+      %w[Lumen Quill].each do |name|
+        find("div[role='option']", text: "#{name} (demo)", match: :first).find("button", text: "Add").click
+      end
+    end
+    assert_no_text "Saving…"
+    click_button "Start translation"
+    assert_text "Translation started."
+    finished = 0
+    perform_enqueued_jobs(only: ->(job) { job.fetch(:job) == TranslationSegmentRunJob && (finished += 1) <= 5 })
+    long_experiment = Experiment.order(:id).last
+    visit experiment_path(long_experiment)
+    assert_text "5 / 8"
+    capture "15-long-document-parts", find("h2", text: "Results by model")
+    run_ai_jobs
+
+    # 7. Library and history pages.
     visit glossary_path(@glossary)
     capture "10-glossary"
     visit history_path
     capture "11-translation-history"
 
-    # 7. The same editor on a phone, and the Japanese interface.
+    # 8. The same editor on a phone, and the Japanese interface.
     with_viewport(390, 844) do
       visit final_translation_path(final_translation)
       capture "12-mobile-final-editor"
@@ -406,6 +457,14 @@ class ReadmeScreenshotsTest < ApplicationSystemTestCase
     fill_in "Password", with: PASSWORD
     click_button "Sign in"
     assert_text "Signed in successfully."
+  end
+
+  # Adds models from the OpenRouter catalog in the model browser inside scope.
+  def pick_models(scope, *names)
+    within(scope) do
+      find("input[placeholder='Search OpenRouter models…']").click
+      names.each { |name| find("div[role='option']", text: name, match: :first).find("button", text: "Add").click }
+    end
   end
 
   # Runs the real jobs the browser enqueued, including the automatic workflow's

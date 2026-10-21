@@ -11,7 +11,7 @@
 
 It is built for translators of long-form texts — sermons, articles, books — who want more than one AI opinion, need terminology to stay consistent, and must stay responsible for the final wording. You paste or upload a document and add the terms that must not change. Several models translate it independently. Reviewer models score the anonymous candidates, judge models rank them, and you edit the winner, optionally with AI suggestions, before approving a final version. AI never finalizes anything on its own.
 
-![Judging page: the winning Japanese translation of an English sermon, chosen by two judge models, with ranking points for all three candidates and a button to edit the winner](docs/images/readme/04-judging.png)
+![Judging page: average judge scores as a gauge for all models and a tile per model, above the winning Japanese translation of an English sermon](docs/images/readme/04-judging.png)
 
 The interface is available in English, Vietnamese, and Japanese. New to the app? Start with the [user guide](docs/user-guide.md).
 
@@ -23,10 +23,10 @@ The interface is available in English, Vietnamese, and Japanese. New to the app?
 
 | Step (as named in the app) | What happens | Who decides |
 | --- | --- | --- |
-| **New translation** | Paste text or upload TXT, Markdown, DOCX, or text PDF. Add a glossary, approved reference translations, and a methodology (style guide). | You |
-| **Translation** | 1–6 models each write their own translation (at least 2 to continue to review and judging). | AI, in parallel |
-| **Blind review** | Reviewer models score every candidate on faithfulness, naturalness, terminology, and instructions — under anonymous labels. | AI |
-| **Judging** | Judge models rank the anonymous candidates; the rankings are combined into one winner. | AI |
+| **New translation** | Paste text or upload TXT, Markdown, DOCX (pictures kept), or text PDF, up to 21 MiB. Add a glossary, approved reference translations, and a methodology (style guide). | You |
+| **Translation** | 1–6 models each write their own translation (at least 2 to continue to review and judging). Long texts are split into parts that all run at once. | AI, in parallel |
+| **Blind review** | Reviewer models, picked from the whole OpenRouter catalog, score every candidate on faithfulness, naturalness, terminology, and instructions — under anonymous labels. The page shows each model's average score. | AI |
+| **Judging** | Judge models rank the anonymous candidates; the rankings are combined into one winner. A failed reviewer or judge can be replaced with another model. | AI |
 | **Human editor** | The winner becomes version 1 of your draft. Edit it, ask for AI suggestions, apply or ignore them, restore older versions. | You |
 | **Finalize** | Approve a version and download it as TXT or DOCX. | You |
 
@@ -40,51 +40,70 @@ Each step can be started by hand, or a saved **workflow setup** runs translation
 <td width="50%"><img src="docs/images/readme/02-translation-candidates.png" alt="Translation candidates: each model's Japanese translation with its cost"></td>
 </tr>
 <tr>
-<td><b>1. Start a translation.</b> Pick languages, paste or upload the source, choose a glossary, and select several models. The form autosaves to the server about a second after you stop typing.</td>
+<td><b>1. Start a translation.</b> Pick languages, paste or upload the source, choose a glossary, and search the OpenRouter catalog for several models. The form autosaves to the server about a second after you stop typing.</td>
 <td><b>2. Compare independent candidates.</b> Every model translates the same source with the same instructions; nothing is merged or hidden.</td>
 </tr>
 <tr>
-<td><img src="docs/images/readme/03-blind-review.png" alt="Blind review: a reviewer model scores Candidate A and Candidate B on four criteria with strengths, issues, and corrections"></td>
-<td><img src="docs/images/readme/13-japanese-judging.png" alt="Judging page in the Japanese interface showing the winning translation and ranking points"></td>
+<td><img src="docs/images/readme/15-long-document-parts.png" alt="A long document translating in parts: Lumen shows 5 of 8 parts done and Quill 0 of 8, both running"></td>
+<td><img src="docs/images/readme/03-blind-review.png" alt="Blind review page opening with average review scores: a gauge for all models and a tile per model with its distance from the average"></td>
 </tr>
 <tr>
-<td><b>3. Blind review.</b> Review prompts carry anonymous labels instead of model names, which is designed to reduce brand and self-preference bias. Only you see which model wrote each candidate.</td>
-<td><b>4. Judging</b> (shown in the Japanese interface). Each judge ranks every candidate; ranking points are summed across judges. No winner is declared until every judge finishes.</td>
+<td><b>3. Long documents run in parts.</b> A text over 4,000 characters is split at paragraph and sentence boundaries; every part of every model is sent at once, and the counter shows finished parts (<a href="#long-documents-parts-and-parallel-work">why</a>).</td>
+<td><b>4. Blind review with average scores.</b> Reviewers see anonymous labels, never model names. The page opens with the average of all candidates and of each model, highest first; it updates as reviewers finish.</td>
 </tr>
 <tr>
+<td><img src="docs/images/readme/16-replace-failed-reviewer.png" alt="A failed reviewer card with error code structured_output_unavailable, and the open Replace panel showing who pays and Scholar (demo) selected as the new reviewer"></td>
+<td><img src="docs/images/readme/14-score-board.png" alt="After the replacement: average scores from three reviewers, and a line saying Echo failed and was replaced by Scholar"></td>
+</tr>
+<tr>
+<td><b>5. Replace a failed reviewer.</b> The card explains the error. Pick another model from the catalog: it reviews the same anonymous candidates, and only its work is billed, to the payer shown.</td>
+<td><b>6. The round carries on.</b> The failed run stays in the history with its own cost; averages and judging use only the current reviewers. Judges can be replaced the same way.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/13-japanese-judging.png" alt="Judging page in the Japanese interface showing average judge scores and the winning translation"></td>
 <td><img src="docs/images/readme/05-final-editor.png" alt="Final translation workspace: source, instructions, and glossary on the left; the editable Japanese draft (version 1) on the right"></td>
+</tr>
+<tr>
+<td><b>7. Judging</b> (shown in the Japanese interface). Each judge ranks every candidate; ranking points are summed across judges, so the winner can differ from the highest average. No winner is declared until every current judge finishes.</td>
+<td><b>8. You edit the winner.</b> Source, instructions, glossary, and review evidence stay beside the editor. Saving changed text creates a new version.</td>
+</tr>
+<tr>
 <td><img src="docs/images/readme/06-ai-suggestion.png" alt="An AI suggestion for version 1, marked Ready to apply, with a suggested translation, change summary, and terminology notes"></td>
-</tr>
-<tr>
-<td><b>5. You edit the winner.</b> Source, instructions, glossary, and review evidence stay beside the editor. Saving changed text creates a new version.</td>
-<td><b>6. AI suggests, you decide.</b> A suggestion is tied to the exact version it was made for and is applied only when you click <i>Apply suggestion</i>.</td>
-</tr>
-<tr>
 <td><img src="docs/images/readme/07-workflow-setup.png" alt="Workflow setup 'Sunday sermon workflow' listing translator, reviewer, judge, and suggestion models"></td>
+</tr>
+<tr>
+<td><b>9. AI suggests, you decide.</b> A suggestion is tied to the exact version it was made for and is applied only when you click <i>Apply suggestion</i>.</td>
+<td><b>10. Save a workflow setup</b> once: which models translate, review, judge, and suggest.</td>
+</tr>
+<tr>
 <td><img src="docs/images/readme/08-automatic-approval.png" alt="Automatic mode selected with the saved workflow setup and a cost-approval checkbox"></td>
-</tr>
-<tr>
-<td><b>7. Save a workflow setup</b> once: which models translate, review, judge, and suggest.</td>
-<td><b>8. Run it automatically</b> on a second text ("Advent devotional"). You approve the AI requests for each translation before anything is sent.</td>
-</tr>
-<tr>
 <td><img src="docs/images/readme/09-automatic-workflow.png" alt="Automatic workflow page reading 'Ready for you to edit' with a timeline of finished steps"></td>
-<td><img src="docs/images/readme/11-translation-history.png" alt="Translation history with both translations, their winners, and AI cost"></td>
 </tr>
 <tr>
-<td><b>9. It always stops for you.</b> The run ends at "Ready for you to edit": nothing applied, nothing finalized.</td>
-<td><b>10. History</b> keeps every translation, its winner, and its AI cost, marked partial if a step did not report cost.</td>
+<td><b>11. Run it automatically</b> on a second text ("Advent devotional"). You approve the AI requests for each translation before anything is sent.</td>
+<td><b>12. It always stops for you.</b> The run ends at "Ready for you to edit": nothing applied, nothing finalized.</td>
+</tr>
+<tr>
+<td><img src="docs/images/readme/11-translation-history.png" alt="Translation history with the translations, their winners, and AI cost"></td>
+<td><img src="docs/images/readme/10-glossary.png" alt="The 'Japanese Sermon Terms' glossary with its preferred terms"></td>
+</tr>
+<tr>
+<td><b>13. History</b> keeps every translation, its winner, and its AI cost, marked partial if a step did not report cost.</td>
+<td><b>14. Glossaries</b> keep the terms that must not change; each translation records the exact revision it used.</td>
 </tr>
 </table>
 
-Also captured: [glossary](docs/images/readme/10-glossary.png) and [the editor on a phone](docs/images/readme/12-mobile-final-editor.png).
+Also captured: [the editor on a phone](docs/images/readme/12-mobile-final-editor.png).
 
 ## Using the app
 
-1. Sign in, then choose who pays for AI work under **AI settings**: your own OpenRouter key, or platform-managed AI once an administrator allows it (Admin → Users).
-2. **New translation:** choose languages, paste or upload the source, add guidance, pick models or a workflow setup, and start.
-3. Follow the steps: candidates → blind review → judging → **Edit the winning translation**.
-4. Save versions, request AI suggestions, then **Finalize current version** and download TXT or DOCX.
+1. Sign in, then choose who pays for AI work under **AI settings**: your own OpenRouter key, or platform-managed AI once an administrator allows it (Admin → Users). Saving a key checks it with OpenRouter and shows whether it works and its credit limit. Administrators set the platform's own key under **Admin → AI key**, without a redeploy.
+2. **New translation:** choose languages, paste or upload the source (up to 21 MiB), add guidance, pick models or a workflow setup, and start.
+3. **Candidates:** each model's card shows its translation and cost; a long document shows how many of its parts are done.
+4. **Blind review:** search the OpenRouter catalog for reviewer models. They do not have to be the models that translated. Only models that can return structured answers (marked *Structured*) are offered for reviewing, judging, and suggestions, and the server refuses any other; a model without it can still translate. Read the average scores at the top, then each reviewer's feedback.
+5. **Judging:** pick judge models the same way; the winner and the average judge scores appear when every judge has finished.
+6. **If a reviewer or judge fails,** its card shows a plain error code and explanation. **Retry** runs the same model again; **Replace … with another model** runs a different one instead (reviewers until judging starts, judges until the editor is opened). Either way you see who will pay before anything starts.
+7. **Edit the winning translation:** save versions, request AI suggestions, then **Finalize current version** and download TXT or DOCX.
 
 New accounts are offered a seven-step guided tour once; **Help** (the **?** button in the sidebar) replays it and offers a shorter tour of the current page. Tours only highlight the interface: they never click, submit, upload, or start AI work.
 
@@ -139,7 +158,15 @@ flowchart TD
   class E,F human
 ```
 
-Judges receive the anonymous candidates and the anonymous review feedback. The winner is chosen by a Borda count: a candidate ranked *r* of *N* earns *N − r + 1* points from each judge; ties go to the higher average score. Sources longer than 4,000 characters (up to 100,000) are split losslessly into parts at paragraph and sentence boundaries, and each model processes every part. Details: [workflow and long documents](docs/architecture/workflow.md).
+Judges receive the anonymous candidates and the anonymous review feedback. The winner is chosen by a Borda count: a candidate ranked *r* of *N* earns *N − r + 1* points from each judge; ties go to the higher average score. The average scores shown on the review and judging pages are a summary for people; they do not choose the winner. Details: [workflow and long documents](docs/architecture/workflow.md).
+
+### Long documents, parts, and parallel work
+
+**Why "8 / 8 parts".** A source longer than 4,000 characters (up to 100,000) is split losslessly into parts of at most about 4,000 characters, cut at paragraph and then sentence boundaries ([`LongDocuments::Segmenter`](app/services/long_documents/segmenter.rb)). A 29,000-character sermon becomes 8 parts. Each part is one provider request per model, and the parts are joined back in order afterwards. Splitting keeps every answer well inside the model's output limit: an answer cut off at that limit is still billed, so one huge request is both riskier and more expensive to repeat. If one part fails, only that part is retried. Review, judging, and suggestions follow the same parts. The guidance (glossary, methodology, up to five references) is sent with every part, so references add to each part's input.
+
+**Why 32 job threads.** Every part of every model is enqueued at the same moment, after the launch commits ([`Ai::RunScheduler`](app/services/ai/run_scheduler.rb)). Solid Queue runs `JOB_THREADS` jobs at once, 32 by default in production and development ([`config/queue.yml`](config/queue.yml)). Three models × 8 parts = 24 requests then all start together, and a translation finishes in roughly the time of its slowest part, not the sum of all parts. With 5 threads the same work queued in five rounds. The counter on each card counts *finished* parts, so a fast model climbs 1/8, 2/8, … while a slower one can sit at 0/8 and then jump to 8/8, because its eight parts were running side by side the whole time.
+
+Each thread holds a database connection while it waits for OpenRouter, so the connection pools grow with the thread count (`JOB_THREADS + RAILS_MAX_THREADS + 2` for the primary database, `+ 8` for the queue; [`config/database.yml`](config/database.yml)). At 32 threads one container needs about 88 PostgreSQL connections at peak, within the production server's 100. During a deploy the old and new containers briefly overlap, so deploy while no translation is running. Correctness does not depend on the thread count: every run is claimed under a row lock by job ID and execution number, so more threads only change speed.
 
 ## Data model
 
@@ -182,6 +209,9 @@ stateDiagram-v2
 | Double-submitted launch | Signed single-use submission identity consumed under a row lock | [submission tests](test/integration/translation_workspace_submission_test.rb) |
 | Duplicate or late job execution | Claim by job ID + execution number; late results update only their own attempt | [job lineage tests](test/jobs/ai_job_lineage_test.rb) |
 | Many stuck automatic workflows | Bounded sweeper with a least-recently-reconciled cursor and `SKIP LOCKED` | [reliability doc](docs/architecture/reliability.md#4-automatic-workflows) |
+| A reviewer or judge model cannot do the step (for example no provider with structured output) | Replace it within the round: the failed run keeps its status, error, and cost and points to its replacement; a database check allows this only for failed runs, a same-round foreign key keeps the replacement in the round, and averages, judging, and suggestions read only current runs | [replacement tests](test/services/replace_failed_runs_test.rb), [selection tests](test/integration/role_model_selection_test.rb) |
+| Answer cut off at the output limit | Each part reserves up to 16k output tokens and limits model reasoning (low effort, or a token budget for model families that ignore effort); a cut-off answer is never stored as output but its billed usage is recorded as `incomplete_response` | [client tests](test/services/ai/open_router_client_test.rb) |
+| OpenRouter 402 while many requests are in flight | The in-flight budget 402 is retried; an empty account and a spent key limit get their own error codes and explanations | [client tests](test/services/ai/open_router_client_test.rb) |
 
 Autosave, idempotency, recovery, and cleanup fairness in detail: [reliability design](docs/architecture/reliability.md).
 
@@ -196,7 +226,7 @@ Controls, limits, and residual risks: [security](docs/security.md).
 
 ## Testing and release quality
 
-At the V1.1 release verification (October 2026): **1,209 Rails tests** (unit and integration) and **192 browser system tests** (headless Chrome), all passing in CI. These counts are taken from the dated [V1.1.0 release audit](docs/releases/v1.1.0-audit.md) and its CI runs; they are not from a new test run.
+At the V1.1 release verification (October 2026): **1,209 Rails tests** (unit and integration) and **192 browser system tests** (headless Chrome), all passing in CI. These counts are taken from the dated [V1.1.0 release audit](docs/releases/v1.1.0-audit.md) and its CI runs; they are not from a new test run. On 2026-10-21 the full `bin/ci` gate for the changes described in the status section below passed locally on a throwaway PostgreSQL 17 database: **1,355 Rails tests** and **250 browser tests**. GitHub CI has not run on them yet.
 
 - **Concurrency:** multi-process tests with barriers for upload budgets, launches, and reference creation; draft-save races.
 - **Replay and recovery:** lost responses, Back/Forward navigation, multiple tabs, cancelled uploads, duplicate and stale jobs.
@@ -296,14 +326,14 @@ test/            unit, integration, system, concurrency, migration, and config t
 
 ## Deployment
 
-The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image reached only through a Cloudflare Tunnel (Cloudflare terminates TLS) and an unpublished kamal-proxy, Thruster in front of Puma, Solid Queue supervised inside Puma, four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
+The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image reached only through a Cloudflare Tunnel (Cloudflare terminates TLS) and an unpublished kamal-proxy, Thruster in front of Puma, Solid Queue supervised inside Puma (32 job threads by default), four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
 
 Runbooks: [configuration](docs/operations/configuration.md) · [production deploy and rollback](docs/operations/production-deploy.md) · [backup and restore](docs/operations/backup-and-restore.md) · [disaster recovery](docs/operations/disaster-recovery.md).
 
 ## Status and limitations
 
-- **V1.1.0, integrated into `main`.** [PR #79](https://github.com/XKeviNguyen/three_heavens/pull/79) merged V1.1.0 into `main` as `43b0184db56d499610b0186d71bf54265f3ac6cd`, and the post-merge CI run on `main` passed all five jobs. The `v1.1.0` tag and GitHub Release have not been published yet. Production deployment, uptime, traffic and operation with a real paid AI provider are not verified; this README does not claim any of them.
-- **Next release, not yet released or deployed.** `develop` adds OpenRouter bring-your-own-key billing and the React islands foundation ([PR #90](https://github.com/XKeviNguyen/three_heavens/pull/90)); guided product tours, the reference upload experience, and retry payer labels are in review. Release readiness, open blockers, and the human approval steps are tracked in [the readiness record](docs/releases/v1-final-readiness.md).
+- **In production.** The owner deployed V1.1.0 plus bring-your-own-key billing and guided tours (`a08d31e`) on 2026-10-16, and release `e4099f6` (DOCX pictures linked from the web, React islands after a rejected form) on 2026-10-20. Uptime, traffic, and long-term operation with paid AI calls are not measured here.
+- **Next release, not yet deployed (as of 2026-10-21).** 21 MiB uploads; model choice for reviewers, judges, and suggestions from the whole OpenRouter catalog, limited to models with structured output; replacing a failed reviewer or judge; average score panels; 32 job threads; per-family reasoning settings and a larger output reserve; clearer failure codes (credits exhausted, key limit, structured output unavailable); the admin **AI key** page; and the post-deploy smoke test fix. It includes two migrations (`managed_open_router_keys`, and supersession columns on review and judge runs). Release readiness and the human approval steps are tracked in [the readiness record](docs/releases/v1-final-readiness.md).
 - **One AI provider:** all AI calls go through OpenRouter.
 - **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.

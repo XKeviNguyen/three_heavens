@@ -50,7 +50,8 @@ module ApplicationHelper
       items: [
         { label: "Users", path: :settings_users_path, controllers: %w[settings/users] },
         { label: "Models", path: :settings_models_path, controllers: %w[settings/models open_router_catalog] },
-        { label: "Operations", path: :settings_operations_path, controllers: %w[settings/operations] }
+        { label: "Operations", path: :settings_operations_path, controllers: %w[settings/operations] },
+        { label: "AI key", path: :settings_managed_open_router_key_path, controllers: %w[settings/managed_open_router_keys] }
       ]
     }
   ].freeze
@@ -72,9 +73,9 @@ module ApplicationHelper
   def sidebar_link(item, compact: false)
     active = sidebar_item_active?(item)
     classes = if compact
-      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
     else
-      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
+      "flex items-center rounded-lg px-3 py-2 text-sm font-medium #{active ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'}"
     end
 
     link_to t("navigation.items.#{item[:label].parameterize(separator: "_")}"), public_send(item[:path]), class: classes, aria: (active ? { current: "page" } : {}), data: { tour_target: item[:tour] }.compact
@@ -197,13 +198,30 @@ module ApplicationHelper
     [ experiment.completed? ? t("next_actions.continue_blind_review") : t("next_actions.view_translation_progress"), experiment_path(experiment) ]
   end
 
-  def safe_provider_error(_message)
-    # Historical rows may contain provider bodies from before safe error storage.
-    t("results_ui.provider_failure")
+  SEGMENT_RUN_ASSOCIATIONS = %i[
+    translation_segment_runs review_segment_runs judge_segment_runs finalization_segment_runs
+  ].freeze
+
+  # A segmented run fails as a whole with segment_execution_failed; the reason
+  # worth showing is the first failed part's own code. Only allowlisted codes
+  # are shown: historical rows may hold provider text.
+  def run_failure_code(run)
+    code = run.error_code
+    if code == "segment_execution_failed"
+      name = SEGMENT_RUN_ASSOCIATIONS.find { |candidate| run.respond_to?(candidate) }
+      parts = name && run.public_send(name)
+      failed_part = if parts.respond_to?(:loaded?) && !parts.loaded?
+        parts.failed.order(:id).first
+      else
+        parts&.select(&:failed?)&.min_by(&:id)
+      end
+      code = failed_part.error_code if failed_part&.error_code.present?
+    end
+    Ai::RunResult.safe_error_code(code)
   end
 
-  def safe_provider_error_code(code)
-    Ai::RunResult.safe_error_code(code)
+  def run_failure_explanation(run)
+    t("results_ui.failure_reasons.#{run_failure_code(run)}", default: t("results_ui.provider_failure"))
   end
 
   def analytics_number(value, precision: 2)

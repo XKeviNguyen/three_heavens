@@ -186,9 +186,7 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     direct = create_finalizer(gateway: "direct")
     get final_translation_path(@final_translation)
 
-    assert_select "input[type='checkbox'][value='#{@finalizer.id}']", count: 1
-    assert_select "input[type='checkbox'][value='#{inactive.id}']", count: 0
-    assert_select "input[type='checkbox'][value='#{direct.id}']", count: 0
+    assert_select "[data-controller='model-browser'][data-model-browser-role-value='finalizer'][data-model-browser-name-value='refinement[finalizer_identifiers][]']", count: 1
 
     assert_enqueued_jobs 1, only: FinalizationRunJob do
       post refine_final_translation_path(@final_translation), params: {
