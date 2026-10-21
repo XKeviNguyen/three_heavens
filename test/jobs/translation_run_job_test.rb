@@ -167,6 +167,54 @@ class TranslationRunJobTest < ActiveJob::TestCase
     assert_nil run.translated_text
   end
 
+  test "a billed cut-off answer keeps a known cost, and a retry adds to it in every total" do
+    run = @experiment.translation_runs.create!(llm_model: @llm_model)
+    usage = Ai::OpenRouterClient::Usage.new(prompt_tokens: 900, completion_tokens: 1_000, total_tokens: 1_900,
+                                            cached_tokens: 0, reasoning_tokens: 600, cost: BigDecimal("0.01"))
+    cut_off = Object.new
+    cut_off.define_singleton_method(:chat_completion) do |**|
+      raise Ai::OpenRouterClient::IncompleteResponseError.new("Answer cut off", code: "incomplete_response", usage: usage)
+    end
+
+    with_client(cut_off) { perform_authorized_ai_job(TranslationRunJob, run) }
+    run.reload
+    assert run.failed?
+    assert_equal BigDecimal("0.01"), run.cost
+    assert run.cost_complete, "the billed cost of the cut-off answer is known"
+    assert run.telemetry_complete
+    assert_equal BigDecimal("0.01"), Pipelines::CostSummary.call(experiment: @experiment).known_cost
+
+    TranslationExperiments::RetryFailed.call(@experiment.reload)
+    assert_nil run.reload.cost
+    assert_equal BigDecimal("0.01"), Pipelines::CostSummary.call(experiment: @experiment).known_cost,
+                 "the retried attempt is still counted while the retry runs"
+
+    with_client(successful_client) { perform_authorized_ai_job(TranslationRunJob, run) }
+    assert run.reload.completed?
+    total = BigDecimal("0.01") + BigDecimal("0.0012345678")
+    summary = Pipelines::CostSummary.call(experiment: @experiment)
+    assert_equal total, summary.known_cost
+    assert_equal [ 1, 1 ], [ summary.known_count, summary.record_count ], "counts are of tasks, not attempts"
+    entry = History::ExperimentQuery.new(experiment_scope: users(:normal).experiments).call.entries.find { |item| item.experiment == @experiment }
+    assert_equal total, entry.known_system_cost
+    assert_equal 1, entry.cost_sample_count
+  end
+
+  test "a failure that reports no usage leaves cost and token counts unknown" do
+    run = @experiment.translation_runs.create!(llm_model: @llm_model)
+    failing = Object.new
+    failing.define_singleton_method(:chat_completion) do |**|
+      raise Ai::OpenRouterClient::PermanentError.new("Bad request", code: "invalid_request")
+    end
+
+    with_client(failing) { perform_authorized_ai_job(TranslationRunJob, run) }
+
+    run.reload
+    assert_nil run.cost
+    assert_not run.cost_complete
+    assert_not run.telemetry_complete
+  end
+
   test "retries retryable failures and leaves the run running" do
     run = @experiment.translation_runs.create!(llm_model: @llm_model)
     client = Object.new

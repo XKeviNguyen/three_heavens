@@ -13,21 +13,21 @@ class ManagedOpenRouterKeyTest < ActiveSupport::TestCase
   teardown { ENV["OPENROUTER_API_KEY"] = @original_env_key }
 
   test "a saved key replaces the environment key until it is deleted" do
-    assert_equal "added", ManagedOpenRouterKey.store!(KEY, by: @admin)
+    assert_equal "added", ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil)
     assert_equal KEY, ManagedOpenRouterKey.effective_api_key
 
-    assert_equal "replaced", ManagedOpenRouterKey.store!(OTHER_KEY, by: @admin)
+    assert_equal "replaced", ManagedOpenRouterKey.store!(OTHER_KEY, by: @admin, expected_id: ManagedOpenRouterKey.current.id)
     assert_equal OTHER_KEY, ManagedOpenRouterKey.effective_api_key
     assert_equal 1, ManagedOpenRouterKey.active.count
 
-    assert_equal "deleted", ManagedOpenRouterKey.delete!
-    assert_nil ManagedOpenRouterKey.delete!
+    assert_equal "deleted", ManagedOpenRouterKey.delete!(expected_id: ManagedOpenRouterKey.current.id)
+    assert_nil ManagedOpenRouterKey.delete!(expected_id: nil)
     assert_equal "sk-or-v1-server-environment-key", ManagedOpenRouterKey.effective_api_key
   end
 
   test "revoked versions keep no ciphertext and the stored key is encrypted" do
-    ManagedOpenRouterKey.store!(KEY, by: @admin)
-    ManagedOpenRouterKey.store!(OTHER_KEY, by: @admin)
+    ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil)
+    ManagedOpenRouterKey.store!(OTHER_KEY, by: @admin, expected_id: ManagedOpenRouterKey.current.id)
 
     revoked = ManagedOpenRouterKey.where.not(revoked_at: nil).sole
     assert_equal "replaced", revoked.revocation_reason
@@ -38,14 +38,30 @@ class ManagedOpenRouterKeyTest < ActiveSupport::TestCase
     assert_not_includes ManagedOpenRouterKey.current.inspect, OTHER_KEY.last(8)
   end
 
+  test "a change from a page that showed another key is refused and changes nothing" do
+    shown = ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil) && ManagedOpenRouterKey.current.id
+    ManagedOpenRouterKey.store!(OTHER_KEY, by: @admin, expected_id: shown)
+    newer = ManagedOpenRouterKey.current
+
+    assert_raises(ManagedOpenRouterKey::ConcurrentChange) { ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: shown) }
+    assert_raises(ManagedOpenRouterKey::ConcurrentChange) { ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil) }
+    assert_raises(ManagedOpenRouterKey::ConcurrentChange) { ManagedOpenRouterKey.delete!(expected_id: shown) }
+    assert_equal newer, ManagedOpenRouterKey.current
+    assert_equal OTHER_KEY, ManagedOpenRouterKey.effective_api_key
+
+    ManagedOpenRouterKey.delete!(expected_id: newer.id)
+    assert_raises(ManagedOpenRouterKey::ConcurrentChange) { ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: newer.id) }
+    assert_nil ManagedOpenRouterKey.current
+  end
+
   test "the database allows one active key" do
-    ManagedOpenRouterKey.store!(KEY, by: @admin)
+    ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil)
 
     assert_raises(ActiveRecord::RecordNotUnique) { ManagedOpenRouterKey.create!(api_key: OTHER_KEY) }
   end
 
   test "an undecryptable saved key falls back to the environment key" do
-    ManagedOpenRouterKey.store!(KEY, by: @admin)
+    ManagedOpenRouterKey.store!(KEY, by: @admin, expected_id: nil)
     # Raw SQL: as after a secret_key_base rotation without re-encryption.
     ManagedOpenRouterKey.connection.execute(
       "UPDATE managed_open_router_keys SET api_key = '{\"p\":\"bm90LWNpcGhlcnRleHQ=\",\"h\":{}}' WHERE revoked_at IS NULL"
@@ -55,7 +71,7 @@ class ManagedOpenRouterKeyTest < ActiveSupport::TestCase
   end
 
   test "rejects a malformed key" do
-    assert_raises(ActiveRecord::RecordInvalid) { ManagedOpenRouterKey.store!("not-an-openrouter-key", by: @admin) }
+    assert_raises(ActiveRecord::RecordInvalid) { ManagedOpenRouterKey.store!("not-an-openrouter-key", by: @admin, expected_id: nil) }
     assert_equal 0, ManagedOpenRouterKey.count
   end
 end

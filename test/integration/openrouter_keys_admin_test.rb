@@ -61,13 +61,43 @@ class OpenrouterKeysAdminTest < ActionDispatch::IntegrationTest
     assert_equal KEY, ManagedOpenRouterKey.effective_api_key
     assert_equal users(:admin), ManagedOpenRouterKey.current.created_by
 
-    delete settings_managed_open_router_key_path
+    delete settings_managed_open_router_key_path, params: { expected_key_id: ManagedOpenRouterKey.current.id }
     assert_redirected_to settings_managed_open_router_key_path
     assert_nil ManagedOpenRouterKey.current
   end
 
+  test "a replacement or removal sent from an outdated page is refused" do
+    sign_in_as users(:admin)
+    put settings_managed_open_router_key_path, params: { managed_open_router_key: { api_key: KEY } }
+    get settings_managed_open_router_key_path
+    shown = ManagedOpenRouterKey.current
+    assert_select "input[type=hidden][name=expected_key_id][value='#{shown.id}']", count: 2
+
+    # Another tab replaces the key after this page was rendered.
+    newer_key = "sk-or-v1-#{"7e" * 32}"
+    put settings_managed_open_router_key_path, params: { managed_open_router_key: { api_key: newer_key }, expected_key_id: shown.id }
+    newer = ManagedOpenRouterKey.current
+    assert_not_equal shown, newer
+
+    put settings_managed_open_router_key_path, params: { managed_open_router_key: { api_key: KEY }, expected_key_id: shown.id }
+    assert_redirected_to settings_managed_open_router_key_path
+    assert_equal I18n.t("managed_key.errors.stale"), flash[:alert]
+    delete settings_managed_open_router_key_path, params: { expected_key_id: shown.id }
+    assert_equal I18n.t("managed_key.errors.stale"), flash[:alert]
+    assert_equal newer, ManagedOpenRouterKey.current
+    assert_equal newer_key, ManagedOpenRouterKey.effective_api_key
+
+    checks = 0
+    counting = FixedStatus.new("valid")
+    counting.define_singleton_method(:call) { |_key| checks += 1; status }
+    Settings::ManagedOpenRouterKeysController.key_status = counting
+    put settings_managed_open_router_key_path, params: { managed_open_router_key: { api_key: KEY }, expected_key_id: "1 OR 1=1" }
+    assert_response :bad_request
+    assert_equal 0, checks, "a malformed request is refused before OpenRouter is asked"
+  end
+
   test "a saved key that can no longer be decrypted is reported, not shown as in use" do
-    ManagedOpenRouterKey.store!(KEY, by: users(:admin))
+    ManagedOpenRouterKey.store!(KEY, by: users(:admin), expected_id: nil)
     # Raw SQL: as after a secret_key_base rotation without re-encryption.
     ManagedOpenRouterKey.connection.execute(
       "UPDATE managed_open_router_keys SET api_key = '{\"p\":\"bm90LWNpcGhlcnRleHQ=\",\"h\":{}}' WHERE revoked_at IS NULL"

@@ -87,7 +87,7 @@ module History
 
     def cost_aggregates(experiment_ids)
       totals = Hash.new do |hash, experiment_id|
-        hash[experiment_id] = { known: BigDecimal("0"), samples: 0, complete: 0, records: 0 }
+        hash[experiment_id] = { known: BigDecimal("0"), samples: 0, earlier: 0, complete: 0, records: 0 }
       end
       return totals if experiment_ids.empty?
 
@@ -95,6 +95,12 @@ module History
       merge_cost_rows(totals, review_cost_rows(experiment_ids))
       merge_cost_rows(totals, judge_cost_rows(experiment_ids))
       merge_cost_rows(totals, finalization_cost_rows(experiment_ids))
+      # Retried attempts that were billed are no longer on their runs; they
+      # add to the money, not to the count of tasks with a known cost.
+      Pipelines::EarlierAttemptCosts.call(experiment_ids).each do |experiment_id, (cost, count)|
+        totals[experiment_id][:known] += cost
+        totals[experiment_id][:earlier] += count
+      end
       totals
     end
 
@@ -169,7 +175,7 @@ module History
         experiment: experiment,
         translation_candidate_count: experiment.translation_runs.size,
         execution_segment_count: experiment.document_execution_plan&.segment_count || 1,
-        known_system_cost: cost[:samples].positive? ? cost[:known] : nil,
+        known_system_cost: (cost[:samples] + cost[:earlier]).positive? ? cost[:known] : nil,
         cost_sample_count: cost[:samples],
         cost_complete_count: cost[:complete],
         cost_record_count: cost[:records]

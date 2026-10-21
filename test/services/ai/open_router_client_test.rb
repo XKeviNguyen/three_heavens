@@ -590,10 +590,10 @@ class Ai::OpenRouterClientTest < ActiveSupport::TestCase
 
   test "the managed credential prefers the admin-saved key and falls back to the environment" do
     admin = users(:admin)
-    ManagedOpenRouterKey.store!("sk-or-v1-saved-by-admin-0000", by: admin)
+    ManagedOpenRouterKey.store!("sk-or-v1-saved-by-admin-0000", by: admin, expected_id: nil)
     assert_equal "sk-or-v1-saved-by-admin-0000", Ai::ProviderCredential.managed.api_key
 
-    ManagedOpenRouterKey.delete!
+    ManagedOpenRouterKey.delete!(expected_id: ManagedOpenRouterKey.current.id)
     assert_equal "test-openrouter-key", Ai::ProviderCredential.managed.api_key
   end
 
