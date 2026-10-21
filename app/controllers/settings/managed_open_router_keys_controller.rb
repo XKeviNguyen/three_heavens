@@ -32,11 +32,12 @@ module Settings
         return redirect_back_to_page(alert: t("managed_key.errors.format"))
       end
 
+      expected_id = expected_key_id
       # Checked before any lock is taken: the request may wait on OpenRouter.
       status = key_status.call(api_key)
       return redirect_back_to_page(alert: t("key_status.rejected")) if status.invalid?
 
-      outcome = ManagedOpenRouterKey.store!(api_key, by: current_user)
+      outcome = ManagedOpenRouterKey.store!(api_key, by: current_user, expected_id: expected_id)
       Operations::EventLogger.emit("managed_open_router_key_changed", actor_id: current_user.id, outcome: outcome)
       redirect_back_to_page(notice: t(status.valid? ? "managed_key.flash.saved" : "managed_key.flash.saved_unverified"))
     rescue ManagedOpenRouterKey::ConcurrentChange
@@ -44,12 +45,23 @@ module Settings
     end
 
     def destroy
-      outcome = ManagedOpenRouterKey.delete!
+      outcome = ManagedOpenRouterKey.delete!(expected_id: expected_key_id)
       Operations::EventLogger.emit("managed_open_router_key_changed", actor_id: current_user.id, outcome: outcome) if outcome
       redirect_back_to_page(notice: t("managed_key.flash.deleted"))
+    rescue ManagedOpenRouterKey::ConcurrentChange
+      redirect_back_to_page(alert: t("managed_key.errors.stale"))
     end
 
     private
+
+    # The key the page showed when it was rendered; blank means no saved key.
+    def expected_key_id
+      value = params[:expected_key_id]
+      return nil if value.blank?
+      raise ActionController::BadRequest, "expected_key_id must be a single id" unless value.is_a?(String) && value.match?(/\A[1-9][0-9]{0,18}\z/)
+
+      Integer(value, 10)
+    end
 
     def redirect_back_to_page(**flash)
       redirect_to settings_managed_open_router_key_path, status: :see_other, **flash

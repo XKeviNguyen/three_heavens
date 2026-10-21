@@ -44,9 +44,14 @@ class ManagedOpenRouterKey < ApplicationRecord
     false
   end
 
-  def self.store!(api_key, by:)
+  # expected_id is the active key the admin's page showed (nil for none). A
+  # change sent from a page that no longer shows the current key is refused
+  # under the row lock, so it never replaces a newer key saved meanwhile.
+  def self.store!(api_key, by:, expected_id:)
     transaction do
       previous = active.lock.first
+      raise ConcurrentChange unless previous&.id == expected_id
+
       previous&.revoke!(reason: "replaced")
       create!(api_key: api_key, created_by: by)
       previous ? "replaced" : "added"
@@ -55,9 +60,11 @@ class ManagedOpenRouterKey < ApplicationRecord
     raise ConcurrentChange
   end
 
-  def self.delete!
+  def self.delete!(expected_id:)
     transaction do
       previous = active.lock.first
+      raise ConcurrentChange unless previous&.id == expected_id
+
       previous&.revoke!(reason: "deleted")
       previous ? "deleted" : nil
     end

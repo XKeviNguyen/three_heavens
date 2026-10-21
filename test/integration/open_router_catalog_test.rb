@@ -1,6 +1,9 @@
 require "test_helper"
+require_relative "../support/judging_test_helper"
 
 class OpenRouterCatalogTest < ActionDispatch::IntegrationTest
+  include JudgingTestHelper
+
   setup do
     @user = users(:normal)
     sign_in_as @user
@@ -77,6 +80,27 @@ class OpenRouterCatalogTest < ActionDispatch::IntegrationTest
     assert_equal "fallback", payload["source"]
     assert_includes payload["models"].map { |model| model["identifier"] }, saved.model_identifier
     assert payload["models"].all? { |model| model["source"] == "fallback" }
+  end
+
+  test "without the catalog, structured roles offer saved models that already finished that step" do
+    OpenRouter::Catalog.transport = -> { raise Net::OpenTimeout, "timed out" }
+    review_round = create_completed_review_round # its reviewer finished a review
+    proven = review_round.review_runs.sole.reviewer_llm_model
+    untried = LlmModel.create!(gateway: "openrouter", provider: "vendor", model_identifier: "vendor/untried", display_name: "Untried")
+
+    get open_router_catalog_path(role: "reviewer")
+    payload = response.parsed_body
+    identifiers = payload["models"].map { |model| model["identifier"] }
+    assert_equal "fallback", payload["source"]
+    assert_includes identifiers, proven.model_identifier
+    assert_not_includes identifiers, untried.model_identifier
+    assert payload["models"].all? { |model| model["compatible"] && model["structured"] && model["roles"] == [ "reviewer" ] }
+
+    get open_router_catalog_path(role: "judge")
+    assert_not_includes response.parsed_body["models"].map { |model| model["identifier"] }, proven.model_identifier,
+                        "reviewing is no evidence that a model can judge"
+    get open_router_catalog_path(role: "translator")
+    assert_includes response.parsed_body["models"].map { |model| model["identifier"] }, untried.model_identifier
   end
 
   test "rejects unsupported roles as translator" do

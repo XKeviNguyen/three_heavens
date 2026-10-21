@@ -381,6 +381,9 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     assert failed_child.reload.completed?
     assert_equal [ 4_096 ], client.calls.map { |call| call[2] }
     assert_equal 1_000, failed_child.reserved_output_tokens
+    # The retried part's billed attempt is still in the experiment's total.
+    current = @experiment.translation_runs.reload.sum { |run| run.cost || 0 }
+    assert_equal current + BigDecimal("0.004"), Pipelines::CostSummary.call(experiment: @experiment).known_cost
   end
 
   test "application restores source join boundaries stripped by translation and finalization providers" do

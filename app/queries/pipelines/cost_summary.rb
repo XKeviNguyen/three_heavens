@@ -25,9 +25,13 @@ module Pipelines
         )
       end
 
+      # Retried attempts that were billed are no longer on their runs; they
+      # add to the money, not to the count of tasks with a known cost.
+      earlier_cost, earlier_count = EarlierAttemptCosts.call([ experiment.id ]).fetch(experiment.id, [ BigDecimal("0"), 0 ])
       known_count = rows.sum { |row| row[1] }
+      any_known = known_count.positive? || earlier_count.positive?
       Result.new(
-        known_cost: known_count.positive? ? rows.sum { |row| row[0] ? BigDecimal(row[0].to_s) : BigDecimal("0") } : nil,
+        known_cost: any_known ? rows.sum { |row| row[0] ? BigDecimal(row[0].to_s) : BigDecimal("0") } + earlier_cost : nil,
         known_count: known_count,
         complete_count: rows.sum { |row| row[2] },
         record_count: rows.sum { |row| row[3] }

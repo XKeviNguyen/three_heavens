@@ -96,10 +96,19 @@ class OpenRouterCatalogController < ApplicationController
     }
   end
 
-  def fallback_models(role)
-    return [] unless role == "translator"
+  # Without the catalog, structured roles get the saved models that have
+  # already finished that kind of step, the only evidence that one of their
+  # providers returns structured answers.
+  STRUCTURED_EVIDENCE = {
+    "reviewer" => -> { ReviewRun.completed.select(:reviewer_llm_model_id) },
+    "judge" => -> { JudgeRun.completed.select(:judge_llm_model_id) },
+    "finalizer" => -> { FinalizationRun.completed.select(:finalizer_llm_model_id) }
+  }.freeze
 
-    LlmModel.active_openrouter.order(:display_name, :id).limit(MAX_RESULTS).to_a
+  def fallback_models(role)
+    models = LlmModel.active_openrouter
+    models = models.where(id: STRUCTURED_EVIDENCE.fetch(role).call) unless role == "translator"
+    models.order(:display_name, :id).limit(MAX_RESULTS).to_a
   end
 
   def serialize_fallback(models, role:, query:, provider:, free_only:)
@@ -115,9 +124,9 @@ class OpenRouterCatalogController < ApplicationController
         completion_price: nil,
         free: false,
         translator: true,
-        structured: false,
-        roles: [ "translator" ],
-        compatible: role == "translator",
+        structured: role != "translator",
+        roles: [ role ],
+        compatible: true,
         source: "fallback"
       }
     end
