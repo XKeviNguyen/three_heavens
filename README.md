@@ -226,7 +226,7 @@ Controls, limits, and residual risks: [security](docs/security.md).
 
 ## Testing and release quality
 
-At the V1.1 release verification (October 2026): **1,209 Rails tests** (unit and integration) and **192 browser system tests** (headless Chrome), all passing in CI. These counts are taken from the dated [V1.1.0 release audit](docs/releases/v1.1.0-audit.md) and its CI runs; they are not from a new test run. On 2026-10-21 the full `bin/ci` gate for the changes described in the status section below passed locally on a throwaway PostgreSQL 17 database: **1,355 Rails tests** and **250 browser tests**. GitHub CI has not run on them yet.
+At the V1.1 release verification (October 2026): **1,209 Rails tests** (unit and integration) and **192 browser system tests** (headless Chrome), all passing in CI. These counts are taken from the dated [V1.1.0 release audit](docs/releases/v1.1.0-audit.md) and its CI runs; they are not from a new test run. For release `208a2b1` (2026-10-21) the full `bin/ci` gate passed locally on a throwaway PostgreSQL 17 database (**1,360 Rails tests**, **250 browser tests**) and GitHub CI passed on the deployed commit; see the [release record](docs/releases/2026-10-21-production-208a2b1.md).
 
 - **Concurrency:** multi-process tests with barriers for upload budgets, launches, and reference creation; draft-save races.
 - **Replay and recovery:** lost responses, Back/Forward navigation, multiple tabs, cancelled uploads, duplicate and stale jobs.
@@ -260,6 +260,7 @@ Every change is reviewed along the same dimensions:
 | Auth | `has_secure_password`, database sessions, Google Identity Services |
 | Testing and scanning | Minitest, Capybara, Selenium; RuboCop, Brakeman, bundler-audit |
 | Deployment | Docker, Kamal 2, kamal-proxy, Thruster |
+| Backups | `bin/ops/backup` bundles (pg_dump + storage archive), OpenPGP encryption on the server, AWS S3 with versioning and Object Lock |
 
 ## Run it locally
 
@@ -328,12 +329,14 @@ test/            unit, integration, system, concurrency, migration, and config t
 
 The repository is configured for a single-host [Kamal](https://kamal-deploy.org/) deployment: a non-root Docker image reached only through a Cloudflare Tunnel (Cloudflare terminates TLS) and an unpublished kamal-proxy, Thruster in front of Puma, Solid Queue supervised inside Puma (32 job threads by default), four PostgreSQL databases (primary, queue, cache, cable), and a persistent private volume for uploaded files. Configuration comes only from environment variables and the operator's secret manager, and a contract test proves production refuses to boot without each required variable.
 
+Backups are bundles of the primary database and the file volume, encrypted on the server and copied to AWS S3 as write-once, object-locked objects through an upload-only identity; a separate read-only identity downloads each copy back to verify it ([design](docs/operations/backup-and-restore.md#off-host-copies-on-aws-s3-production)).
+
 Runbooks: [configuration](docs/operations/configuration.md) · [production deploy and rollback](docs/operations/production-deploy.md) · [backup and restore](docs/operations/backup-and-restore.md) · [disaster recovery](docs/operations/disaster-recovery.md).
 
 ## Status and limitations
 
-- **In production.** The owner deployed V1.1.0 plus bring-your-own-key billing and guided tours (`a08d31e`) on 2026-10-16, and release `e4099f6` (DOCX pictures linked from the web, React islands after a rejected form) on 2026-10-20. Uptime, traffic, and long-term operation with paid AI calls are not measured here.
-- **Next release, not yet deployed (as of 2026-10-21).** 21 MiB uploads; model choice for reviewers, judges, and suggestions from the whole OpenRouter catalog, limited to models with structured output; replacing a failed reviewer or judge; average score panels; 32 job threads; per-family reasoning settings and a larger output reserve; clearer failure codes (credits exhausted, key limit, structured output unavailable); the admin **AI key** page; and the post-deploy smoke test fix. It includes two migrations (`managed_open_router_keys`, and supersession columns on review and judge runs). Release readiness and the human approval steps are tracked in [the readiness record](docs/releases/v1-final-readiness.md).
+- **In production.** Release `208a2b1` has run in production since 2026-10-21: 21 MiB uploads; reviewers, judges and AI suggestions chosen from the whole OpenRouter catalog (structured-output models only); replacing a failed reviewer or judge; average score panels; 32 job threads; the Admin **AI key** page; and the Codex review fixes. Its two migrations were applied, and a fresh encrypted backup was copied to AWS S3 beforehand. Details, evidence, and what is still open (the restore drill of that backup, the platform AI key): [release record](docs/releases/2026-10-21-production-208a2b1.md). Earlier releases: `a08d31e` (V1.1.0 with bring-your-own-key billing and guided tours, 2026-10-16) and `e4099f6` (2026-10-20). Uptime, traffic, and long-term operation with paid AI calls are not measured here.
+- **Backups.** Encrypted on the server, then copied to AWS S3 with write-once, versioned, object-locked storage and separate upload and read-only identities ([design](docs/operations/backup-and-restore.md#off-host-copies-on-aws-s3-production)). Daily copies are designed but not installed; backups are taken before each release.
 - **One AI provider:** all AI calls go through OpenRouter.
 - **Retries can cost more than once:** application state is deduplicated, but after a network failure the provider may already have processed (and billed) a request that is then retried.
 - **Text only:** no OCR for scanned PDFs, no legacy `.doc`, no layout-preserving export.
