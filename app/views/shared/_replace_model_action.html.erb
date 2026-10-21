@@ -1,0 +1,31 @@
+<%# locals: (path:, run_param:, run_id:, role:, heading:, intro:, submit:, confirm:) %>
+<%# Replace one failed run's model with another that can do the role. As with
+    Retry, the payer shown is posted back and the change is refused if it no
+    longer matches; only the replacement's work is billed. %>
+<% payer = retry_payer %>
+<% denied = payer.is_a?(Ai::BillingPolicy::Denied) %>
+<details class="mt-4 rounded-lg border border-slate-200 bg-white" data-testid="replace-model" data-tour-target="run-replace">
+  <summary class="cursor-pointer rounded-lg px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-50"><%= heading %></summary>
+  <div class="space-y-3 border-t border-slate-200 px-4 py-4">
+    <p class="text-sm text-slate-700"><%= intro %></p>
+    <div class="rounded-lg border px-4 py-3 text-sm <%= denied ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50" %>">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-600"><%= t("ai_billing.retry_payer.heading") %></p>
+      <% if denied %>
+        <p class="mt-1 font-semibold text-amber-900"><%= t("ai_billing.denied.#{payer.code}") %> <%= link_to t("ai_billing.open_settings"), settings_ai_settings_path, class: "underline underline-offset-2" %></p>
+      <% else %>
+        <p class="mt-1 font-medium text-slate-900"><%= retry_payer_label(payer) %></p>
+      <% end %>
+    </div>
+    <% unless denied %>
+      <%= form_with url: path, method: :post, class: "space-y-3", data: { turbo_confirm: confirm } do %>
+        <%= hidden_field_tag run_param, run_id, id: nil %>
+        <%= hidden_field_tag :billing_source, payer.billing_source, id: nil %>
+        <%= hidden_field_tag :billing_key, payer.open_router_credential_id.to_s, id: nil %>
+        <%= render "shared/model_browser", role: role, name: "replacement[identifiers][]", saved_name: "replacement[ids][]", max: 1,
+              browser_id: "model-browser-replace-#{role}-#{run_id}",
+              label: t("model_selection.replacement_label"), hint: t("model_selection.hints.#{role}"), selected: [] %>
+        <%= submit_tag submit, class: "min-h-11 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("results_ui.queueing_retries") } %>
+      <% end %>
+    <% end %>
+  </div>
+</details>

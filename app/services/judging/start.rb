@@ -50,6 +50,51 @@ module Judging
       raise ContextBudgetError, error.message
     end
 
+    # Adds one judge to a round and returns [judge_run, schedules]. Also used
+    # by Judging::ReplaceFailed, inside its own transaction.
+    def add_judge!(judge_round, judge, candidates, plan)
+      schedules = []
+      judge_run = judge_round.judge_runs.create!(judge_llm_model: judge)
+      randomized_candidates(candidates).each_with_index do |translation_run, index|
+        judge_run.judge_evaluations.create!(
+          translation_run: translation_run,
+          anonymous_label: BlindReviews::CandidateLabel.for(index)
+        )
+      end
+      if plan
+        judge_run.update!(status: :running, started_at: Time.current, **billing.attributes)
+        plan.segments.each do |segment|
+          prompt = Judging::Prompt.build(judge_run, experiment_segment: segment)
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: review_round.experiment,
+            model: judge,
+            stage: :judge,
+            source_character_count: review_round.experiment.document.source_text.length,
+            capability_snapshot: capability_snapshots[judge.id],
+            prompt: prompt
+          ) { Judging::Prompt.build(judge_run, experiment_segment: segment, reference_examples: []) }
+          segment_run = judge_run.judge_segment_runs.create!(
+            experiment_segment: segment,
+            **budget.snapshot_attributes
+          )
+          schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: JudgeSegmentRunJob, billing: billing)
+        end
+      else
+        prompt = Judging::Prompt.build(judge_run)
+        budget = TranslationReferences::ContextBudget.call(
+          experiment: review_round.experiment,
+          model: judge,
+          stage: :judge,
+          source_character_count: review_round.experiment.document.source_text.length,
+          capability_snapshot: capability_snapshots[judge.id],
+          prompt: prompt
+        ) { Judging::Prompt.build(judge_run, reference_examples: []) }
+        judge_run.assign_attributes(**budget.snapshot_attributes)
+        schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob, billing: billing)
+      end
+      [ judge_run, schedules ]
+    end
+
     private
 
     attr_reader :billing, :capability_snapshots, :judge_ids, :randomizer, :review_round
@@ -127,49 +172,7 @@ module Judging
 
     def create_round!(judges, candidates, plan)
       judge_round = review_round.create_judge_round!(status: :running)
-      schedules = []
-
-      judges.each do |judge|
-        judge_run = judge_round.judge_runs.create!(judge_llm_model: judge)
-        randomized_candidates(candidates).each_with_index do |translation_run, index|
-          judge_run.judge_evaluations.create!(
-            translation_run: translation_run,
-            anonymous_label: BlindReviews::CandidateLabel.for(index)
-          )
-        end
-        if plan
-          judge_run.update!(status: :running, started_at: Time.current, **billing.attributes)
-          plan.segments.each do |segment|
-            prompt = Judging::Prompt.build(judge_run, experiment_segment: segment)
-            budget = TranslationReferences::ContextBudget.call(
-              experiment: review_round.experiment,
-              model: judge,
-              stage: :judge,
-              source_character_count: review_round.experiment.document.source_text.length,
-              capability_snapshot: capability_snapshots[judge.id],
-              prompt: prompt
-            ) { Judging::Prompt.build(judge_run, experiment_segment: segment, reference_examples: []) }
-            segment_run = judge_run.judge_segment_runs.create!(
-              experiment_segment: segment,
-              **budget.snapshot_attributes
-            )
-            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: JudgeSegmentRunJob, billing: billing)
-          end
-        else
-          prompt = Judging::Prompt.build(judge_run)
-          budget = TranslationReferences::ContextBudget.call(
-            experiment: review_round.experiment,
-            model: judge,
-            stage: :judge,
-            source_character_count: review_round.experiment.document.source_text.length,
-            capability_snapshot: capability_snapshots[judge.id],
-            prompt: prompt
-          ) { Judging::Prompt.build(judge_run, reference_examples: []) }
-          judge_run.assign_attributes(**budget.snapshot_attributes)
-          schedules << Ai::RunScheduler.prepare(run: judge_run, job_class: JudgeRunJob, billing: billing)
-        end
-      end
-
+      schedules = judges.flat_map { |judge| add_judge!(judge_round, judge, candidates, plan).last }
       [ judge_round, schedules ]
     end
 

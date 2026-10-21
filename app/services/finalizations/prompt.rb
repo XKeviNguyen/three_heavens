@@ -89,7 +89,8 @@ module Finalizations
     end
 
     def blind_review_feedback
-      winner.review_evaluations.includes(:review_run).order(:created_at, :id).map do |evaluation|
+      # Replaced (superseded) reviewers left only empty rows behind.
+      winner.review_evaluations.joins(:review_run).merge(ReviewRun.current).includes(:review_run).order(:created_at, :id).map do |evaluation|
         if experiment_segment
           segment_run = evaluation.review_run.review_segment_runs.find_by!(experiment_segment: experiment_segment)
           segment_evaluation = segment_run.evaluations.find do |item|
@@ -115,7 +116,7 @@ module Finalizations
     end
 
     def judge_feedback
-      winner.judge_evaluations.includes(:judge_run).order(:created_at, :id).map do |evaluation|
+      winner.judge_evaluations.joins(:judge_run).merge(JudgeRun.current).includes(:judge_run).order(:created_at, :id).map do |evaluation|
         if experiment_segment
           segment_run = evaluation.judge_run.judge_segment_runs.find_by!(experiment_segment: experiment_segment)
           ranking = segment_run.judgment.fetch("rankings").find do |item|

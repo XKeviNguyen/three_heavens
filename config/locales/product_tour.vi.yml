@@ -297,6 +297,11 @@ vi:
           - Khóa được lưu ở dạng mã hóa.
           - Sau khi lưu, bạn chỉ thấy vài ký tự cuối.
           - Khi bạn thay hoặc xóa khóa, việc của bạn không bao giờ bị chuyển sang khóa của nền tảng.
+        key_status:
+          title: Kiểm tra khóa
+          points:
+          - Khi lưu, khóa được kiểm tra với OpenRouter.
+          - Tại đây bạn thấy OpenRouter có chấp nhận khóa không, và hạn mức tín dụng của khóa.
         billing:
           title: Cách tính phí
           points:
@@ -326,6 +331,8 @@ vi:
           title: Bước tiếp theo
           points:
           - Khi có hai bản ứng viên hoàn tất, hãy bắt đầu nhận xét ẩn danh.
+          - Chọn mô hình nhận xét từ toàn bộ danh mục OpenRouter, không chỉ các mô hình đã dịch.
+          - Chỉ những mô hình trả được câu trả lời có cấu trúc mới được đưa ra.
       blind_review:
         intro:
           title: Nhận xét ẩn danh
@@ -336,6 +343,11 @@ vi:
           title: Tiến độ
           points:
           - Nhận xét ẩn danh diễn ra sau bước dịch.
+        scores:
+          title: Điểm trung bình
+          points:
+          - Đồng hồ cho thấy điểm trung bình của tất cả bản ứng viên.
+          - Mỗi ô là điểm trung bình của một mô hình và mức chênh so với trung bình chung.
         evaluations:
           title: Nhận xét
           points:
@@ -346,10 +358,15 @@ vi:
           points:
           - Thử lại mô hình nhận xét bị lỗi khi bạn muốn.
           - Khung này cho biết ai trả tiền cho lần thử lại.
+        replace:
+          title: Thay mô hình nhận xét bị lỗi
+          points:
+          - Đổi mô hình nhận xét bị lỗi sang mô hình khác, trước khi bắt đầu chấm điểm.
+          - Chỉ tính phí phần việc của mô hình mới. Mô hình lỗi giữ nguyên chi phí của nó.
         next:
           title: Sang bước chấm điểm
           points:
-          - Khi nhận xét xong, hãy chọn mô hình chấm điểm để xếp hạng các bản ứng viên.
+          - Khi nhận xét xong, hãy chọn mô hình chấm điểm từ danh mục OpenRouter để xếp hạng các bản ứng viên.
       judging:
         intro:
           title: Chấm điểm
@@ -361,6 +378,11 @@ vi:
           points:
           - Chấm điểm diễn ra sau nhận xét ẩn danh.
           - Tiếp theo là bước biên tập.
+        scores:
+          title: Điểm trung bình
+          points:
+          - Đồng hồ cho thấy điểm trung bình các mô hình chấm điểm cho tất cả bản ứng viên.
+          - Mỗi ô là điểm trung bình của một mô hình; bản thắng còn tùy vào thứ hạng.
         winner:
           title: Bản thắng
           points:
@@ -375,6 +397,11 @@ vi:
           points:
           - Thử lại mô hình chấm điểm bị lỗi khi bạn muốn.
           - Khung này cho biết ai trả tiền cho lần thử lại.
+        replace:
+          title: Thay mô hình chấm điểm bị lỗi
+          points:
+          - Đổi mô hình chấm điểm bị lỗi sang mô hình khác, trước khi mở trình biên tập.
+          - Chỉ tính phí phần việc của mô hình mới. Mô hình lỗi giữ nguyên chi phí của nó.
       final_editor:
         intro:
           title: Trình biên tập bản dịch cuối
@@ -393,7 +420,7 @@ vi:
         refine:
           title: Đề xuất của AI
           points:
-          - Nhờ mô hình AI gợi ý cách cải thiện phiên bản này.
+          - Chọn mô hình AI từ danh mục OpenRouter để gợi ý cách cải thiện phiên bản này.
           - Chỉ áp dụng đề xuất khi bạn muốn.
         revisions:
           title: Lịch sử phiên bản

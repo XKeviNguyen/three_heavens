@@ -47,6 +47,51 @@ module BlindReviews
       raise ContextBudgetError, error.message
     end
 
+    # Adds one reviewer to a round and returns [review_run, schedules]. Also
+    # used by BlindReviews::ReplaceFailed, inside its own transaction.
+    def add_reviewer!(review_round, reviewer, candidates, plan)
+      schedules = []
+      review_run = review_round.review_runs.create!(reviewer_llm_model: reviewer)
+      randomized_candidates(candidates).each_with_index do |translation_run, index|
+        review_run.review_evaluations.create!(
+          translation_run: translation_run,
+          anonymous_label: CandidateLabel.for(index)
+        )
+      end
+      if plan
+        review_run.update!(status: :running, started_at: Time.current, **billing.attributes)
+        plan.segments.each do |segment|
+          prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment)
+          budget = TranslationReferences::ContextBudget.call(
+            experiment: experiment,
+            model: reviewer,
+            stage: :review,
+            source_character_count: experiment.document.source_text.length,
+            capability_snapshot: capability_snapshots[reviewer.id],
+            prompt: prompt
+          ) { BlindReviews::Prompt.build(review_run, experiment_segment: segment, reference_examples: []) }
+          segment_run = review_run.review_segment_runs.create!(
+            experiment_segment: segment,
+            **budget.snapshot_attributes
+          )
+          schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: ReviewSegmentRunJob, billing: billing)
+        end
+      else
+        prompt = BlindReviews::Prompt.build(review_run)
+        budget = TranslationReferences::ContextBudget.call(
+          experiment: experiment,
+          model: reviewer,
+          stage: :review,
+          source_character_count: experiment.document.source_text.length,
+          capability_snapshot: capability_snapshots[reviewer.id],
+          prompt: prompt
+        ) { BlindReviews::Prompt.build(review_run, reference_examples: []) }
+        review_run.assign_attributes(**budget.snapshot_attributes)
+        schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob, billing: billing)
+      end
+      [ review_run, schedules ]
+    end
+
     private
 
     attr_reader :billing, :capability_snapshots, :experiment, :reviewer_ids, :randomizer
@@ -105,49 +150,7 @@ module BlindReviews
 
     def create_round!(reviewers, candidates, plan)
       review_round = experiment.create_review_round!(status: :running)
-      schedules = []
-
-      reviewers.each do |reviewer|
-        review_run = review_round.review_runs.create!(reviewer_llm_model: reviewer)
-        randomized_candidates(candidates).each_with_index do |translation_run, index|
-          review_run.review_evaluations.create!(
-            translation_run: translation_run,
-            anonymous_label: CandidateLabel.for(index)
-          )
-        end
-        if plan
-          review_run.update!(status: :running, started_at: Time.current, **billing.attributes)
-          plan.segments.each do |segment|
-            prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment)
-            budget = TranslationReferences::ContextBudget.call(
-              experiment: experiment,
-              model: reviewer,
-              stage: :review,
-              source_character_count: experiment.document.source_text.length,
-              capability_snapshot: capability_snapshots[reviewer.id],
-              prompt: prompt
-            ) { BlindReviews::Prompt.build(review_run, experiment_segment: segment, reference_examples: []) }
-            segment_run = review_run.review_segment_runs.create!(
-              experiment_segment: segment,
-              **budget.snapshot_attributes
-            )
-            schedules << Ai::RunScheduler.prepare(run: segment_run, job_class: ReviewSegmentRunJob, billing: billing)
-          end
-        else
-          prompt = BlindReviews::Prompt.build(review_run)
-          budget = TranslationReferences::ContextBudget.call(
-            experiment: experiment,
-            model: reviewer,
-            stage: :review,
-            source_character_count: experiment.document.source_text.length,
-            capability_snapshot: capability_snapshots[reviewer.id],
-            prompt: prompt
-          ) { BlindReviews::Prompt.build(review_run, reference_examples: []) }
-          review_run.assign_attributes(**budget.snapshot_attributes)
-          schedules << Ai::RunScheduler.prepare(run: review_run, job_class: ReviewRunJob, billing: billing)
-        end
-      end
-
+      schedules = reviewers.flat_map { |reviewer| add_reviewer!(review_round, reviewer, candidates, plan).last }
       [ review_round, schedules ]
     end
 

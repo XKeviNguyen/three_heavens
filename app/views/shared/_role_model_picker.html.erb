@@ -1,0 +1,12 @@
+<%# locals: (scope:, role:, max:, label:, hint:, selected: [], ids_key: "#{role}_ids", identifiers_key: "#{role}_identifiers") %>
+<%# Any OpenRouter model that can do the role, searched in the live catalog
+    (shared/_model_browser filters by role; the server resolves each pick
+    again, CatalogModelSelection). Models chosen before an error stay chosen. %>
+<%= render "shared/model_browser",
+      role: role,
+      name: "#{scope}[#{identifiers_key}][]",
+      saved_name: "#{scope}[#{ids_key}][]",
+      max: max,
+      label: label,
+      hint: hint,
+      selected: selected.map { |model| { identifier: model.model_identifier, name: model.display_name, input_name: "#{scope}[#{ids_key}][]", input_value: model.id } } %>

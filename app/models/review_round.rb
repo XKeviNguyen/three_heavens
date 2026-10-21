@@ -3,7 +3,11 @@ class ReviewRound < ApplicationRecord
 
   belongs_to :experiment
 
-  has_many :review_runs, dependent: :restrict_with_error
+  # The reviewers that count: a failed reviewer replaced by another model
+  # (BlindReviews::ReplaceFailed) stays in all_review_runs with its own attempts
+  # and cost, but no longer decides the round's status or feeds judging.
+  has_many :review_runs, -> { where(superseded_at: nil) }, dependent: :restrict_with_error
+  has_many :all_review_runs, class_name: "ReviewRun", dependent: :restrict_with_error
   has_one :judge_round, dependent: :restrict_with_error
 
   enum :status, {

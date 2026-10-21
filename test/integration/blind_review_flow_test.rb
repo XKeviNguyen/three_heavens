@@ -54,10 +54,9 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", "Start blind review"
     assert_select "form[action='#{experiment_review_rounds_path(@experiment)}']"
-    assert_select "input[type='checkbox'][value='#{@first_model.id}']", count: 1
-    assert_select "input[type='checkbox'][value='#{@second_model.id}']", count: 1
-    assert_select "input[type='checkbox'][value='#{inactive.id}']", count: 0
-    assert_select "input[type='checkbox'][value='#{direct.id}']", count: 0
+    # Reviewers are searched in the OpenRouter catalog (any structured-capable
+    # model); inactive and direct models are refused by the server below.
+    assert_select "[data-controller='model-browser'][data-model-browser-role-value='reviewer'][data-model-browser-name-value='review_round[reviewer_identifiers][]']", count: 1
 
     assert_enqueued_jobs 2, only: ReviewRunJob do
       post experiment_review_rounds_path(@experiment),

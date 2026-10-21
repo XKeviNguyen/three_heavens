@@ -149,7 +149,7 @@ export default class extends Controller {
     details.className = "min-w-0"
 
     const title = document.createElement("p")
-    title.className = "flex items-center gap-2 text-sm font-semibold text-slate-900"
+    title.className = "flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-900"
     title.appendChild(document.createTextNode(model.name))
     if (model.free) title.appendChild(this.badge(this.copy("free"), "bg-emerald-100 text-emerald-800"))
     details.appendChild(title)
@@ -170,7 +170,7 @@ export default class extends Controller {
 
     const action = document.createElement("button")
     action.type = "button"
-    action.className = "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold " +
+    action.className = "min-h-9 shrink-0 rounded-lg px-4 py-1.5 text-sm font-semibold " +
       (selected
         ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
         : atMax
@@ -229,7 +229,7 @@ export default class extends Controller {
     const remove = document.createElement("button")
     remove.type = "button"
     remove.dataset.action = "model-browser#remove"
-    remove.className = "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+    remove.className = "min-h-9 shrink-0 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
     remove.textContent = this.copy("remove")
     remove.setAttribute("aria-label", this.copy("remove_model", { name: model.name }))
     card.appendChild(remove)
@@ -324,7 +324,7 @@ export default class extends Controller {
 
   badge(text, classes) {
     const span = document.createElement("span")
-    span.className = `rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${classes}`
+    span.className = `shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${classes}`
     span.textContent = text
     return span
   }

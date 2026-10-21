@@ -2,7 +2,7 @@ module SourceImports
   module Limits
     FORMATS = %w[txt md docx pdf].freeze
     EXTENSIONS = FORMATS.to_h { |format| [ ".#{format}", format ] }.freeze
-    MAX_UPLOAD_BYTES = 10.megabytes
+    MAX_UPLOAD_BYTES = 21.megabytes
     MAX_ORIGINAL_FILENAME_CHARACTERS = 255
     MAX_EXTRACTED_CHARACTERS = Ai::UsageLimits::MAX_SOURCE_CHARACTERS
     MAX_PDF_PAGES = 100
@@ -16,7 +16,7 @@ module SourceImports
     UPLOADS_PER_WINDOW = 10
     UPLOAD_WINDOW = 5.minutes
     MAX_DOCX_ENTRIES = 500
-    MAX_DOCX_UNCOMPRESSED_BYTES = 50.megabytes
+    MAX_DOCX_UNCOMPRESSED_BYTES = 100.megabytes
     MAX_DOCUMENT_XML_BYTES = 8.megabytes
     MAX_SECONDARY_XML_BYTES = 2.megabytes
     MAX_RELATIONSHIPS_XML_BYTES = 1.megabyte

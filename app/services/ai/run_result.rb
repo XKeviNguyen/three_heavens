@@ -10,7 +10,8 @@ module Ai
           status: :failed,
           completed_at: Time.current,
           error_code: error.code.to_s.first(255),
-          error_message: ErrorSanitizer.call(error.message)
+          error_message: ErrorSanitizer.call(error.message),
+          **failure_usage(error)
         )
       end
       OperationalEvents.emit(
@@ -21,6 +22,15 @@ module Ai
       ) if persisted
       true
     end
+
+    # Tokens and cost of this attempt only: a billed but incomplete response
+    # keeps its usage, and any other failure clears what an earlier attempt
+    # left, so the attempt ledger never counts one request twice.
+    def self.failure_usage(error)
+      usage = error.respond_to?(:usage) ? error.usage : nil
+      Ai::OpenRouterClient::Usage.members.index_with { |field| usage&.public_send(field) }
+    end
+    private_class_method :failure_usage
 
     def self.current_execution?(run, attempt)
       run.running? && run.execution_attempt == attempt

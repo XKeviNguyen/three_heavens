@@ -63,5 +63,5 @@
           paired_text_prefilled: !!@translation_reference&.persisted? && @translation_reference.prefilled_text?(values["expected_version"], "approved_translation", values["approved_translation"]) %>
   </section>
 
-  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "text-sm font-semibold text-slate-600 hover:text-slate-950" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("references_ui.saving") } %></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><%= link_to t("common.cancel"), @translation_reference&.persisted? ? translation_reference_path(@translation_reference) : translation_references_path, class: "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" %><%= form.submit submit_label, class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800", data: { turbo_submits_with: t("references_ui.saving") } %></div>
 <% end %>

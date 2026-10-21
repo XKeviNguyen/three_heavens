@@ -189,7 +189,7 @@ ja:
       already_consumed: このファイルはすでに翻訳に使用されています。別の翻訳を始めるには、もう一度アップロードしてください。
       expired_import: このアップロードは有効期限が切れました。ファイルをもう一度アップロードしてください。
       unavailable_import: このアップロードは利用できなくなりました。ファイルをもう一度アップロードしてください。
-      file_too_large: 原文ファイルが10 MiBの上限を超えています。
+      file_too_large: 原文ファイルが21 MiBの上限を超えています。
       invalid_utf8: 原文ファイルには有効なUTF-8テキストが必要です。
       binary_source: 読み取れるテキストが含まれていません。
       docx_too_many_entries: DOCXファイルの構成要素が多すぎます。
@@ -241,6 +241,7 @@ ja:
       users: ユーザー
       models: モデル
       operations: 運用
+      ai_key: AIキー
   managed_ai:
     unavailable: "このアカウントではAI翻訳がまだ有効になっていません。資料や翻訳方針は今から準備できます。翻訳を始めるには、管理者がAI利用を有効にする必要があります。"
   admin_users:

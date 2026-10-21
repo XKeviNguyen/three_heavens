@@ -18,7 +18,8 @@ module Operations
       context_budget_exceeded enqueue_failed invalid_response malformed_json missing_api_key
       model_capability_unconfigured model_unavailable network_error provider_failure
       response_too_large segment_execution_failed stale_execution stale_pending
-      translated_document_too_large translated_segment_too_large
+      translated_document_too_large translated_segment_too_large incomplete_response
+      openrouter_credits_exhausted openrouter_key_limit_reached structured_output_unavailable
     ].freeze
     HTTP_FAILURE_CODE = /\A(?:http_)?([45]\d{2})\z/
 

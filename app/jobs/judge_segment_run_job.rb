@@ -30,7 +30,9 @@ class JudgeSegmentRunJob < ApplicationJob
     @claimed_credential = claim.credential
     judge_run = segment_run.judge_run
     prompt = Judging::Prompt.build(judge_run, experiment_segment: segment_run.experiment_segment)
-    Ai::RunContextBudget.call(
+    # The reserve sent is the current policy's; the run's snapshot keeps
+    # what was planned at launch, as the whole-document jobs do.
+    budget = Ai::RunContextBudget.call(
       run: segment_run,
       model: judge_run.judge_llm_model,
       prompt: prompt,
@@ -40,7 +42,7 @@ class JudgeSegmentRunJob < ApplicationJob
     result = client_for(judge_run.judge_llm_model).judge_completion(
       model_identifier: judge_run.judge_llm_model.model_identifier,
       **prompt,
-      max_tokens: segment_run.reserved_output_tokens
+      max_tokens: budget.reserved_output_tokens
     )
     judgment = Judging::ResponseValidator.call(
       content: result.content,

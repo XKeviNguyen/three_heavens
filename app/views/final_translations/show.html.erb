@@ -172,8 +172,8 @@
       <% end %>
 
       <div class="mt-5 flex flex-wrap gap-3 border-t border-slate-200 pt-5">
-        <%= link_to t("final_ui.download_txt"), download_final_translation_path(@final_translation, format: :txt), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
-        <%= link_to t("final_ui.download_docx"), download_final_translation_path(@final_translation, format: :docx), class: "inline-flex rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" %>
+        <%= link_to t("final_ui.download_txt"), download_final_translation_path(@final_translation, format: :txt), class: "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" %>
+        <%= link_to t("final_ui.download_docx"), download_final_translation_path(@final_translation, format: :docx), class: "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" %>
       </div>
     </section>
   </div>
@@ -187,22 +187,8 @@
 
     <% if @final_translation.draft? %>
       <%= form_with url: refine_final_translation_path(@final_translation), method: :post, scope: :refinement, class: "mt-5 space-y-4" do |form| %>
-        <% if @finalizer_models.any? %>
-          <fieldset>
-            <legend class="text-sm font-semibold text-slate-800"><%= t("final_ui.active_finalizers", maximum: Ai::UsageLimits::MAX_FINALIZERS) %></legend>
-            <div class="mt-3 grid gap-3 md:grid-cols-2">
-              <% @finalizer_models.each do |model| %>
-                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40">
-                  <%= check_box_tag "refinement[finalizer_ids][]", model.id, false, id: "refinement_finalizer_ids_#{model.id}", class: "mt-1 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
-                  <span><span class="block font-medium text-slate-900"><%= model.display_name %></span><span class="mt-1 block text-xs text-slate-500"><%= model.provider %> · <%= model.model_identifier %></span></span>
-                </label>
-              <% end %>
-            </div>
-          </fieldset>
-        <% else %>
-          <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800"><%= t("final_ui.no_finalizers") %></p>
-        <% end %>
-        <%= form.submit t("final_ui.start_refinement"), disabled: @finalizer_models.empty? || running_refinement || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: t("final_ui.start_refinement_confirm"), turbo_submits_with: t("final_ui.starting_refinement") } %>
+        <%= render "shared/role_model_picker", scope: "refinement", role: "finalizer", max: Ai::UsageLimits::MAX_FINALIZERS, label: t("final_ui.active_finalizers", maximum: Ai::UsageLimits::MAX_FINALIZERS), hint: t("model_selection.hints.finalizer") %>
+        <%= form.submit t("final_ui.start_refinement"), disabled: running_refinement || (execution_plan && !current.segment_alignment_valid?), class: "rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400", data: { turbo_confirm: t("final_ui.start_refinement_confirm"), turbo_submits_with: t("final_ui.starting_refinement") } %>
       <% end %>
     <% end %>
 
@@ -274,7 +260,7 @@
                     <p class="mt-4 text-sm font-medium text-slate-600"><%= t("final_ui.reopen_before_apply") %></p>
                   <% end %>
                 <% elsif run.failed? %>
-                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-semibold"><%= t("final_ui.refinement_failed") %><% if run.error_code.present? %> · <%= safe_provider_error_code(run.error_code) %><% end %></p><% if run.error_message.present? %><p class="mt-1 break-words"><%= safe_provider_error(run.error_message) %></p><% end %></div>
+                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-semibold"><%= t("final_ui.refinement_failed") %><% if run.error_code.present? %> · <%= run_failure_code(run) %><% end %></p><% if run.error_message.present? %><p class="mt-1 break-words"><%= run_failure_explanation(run) %></p><% end %></div>
                 <% else %>
                   <p class="mt-4 text-sm text-slate-600"><%= run.running? ? t("final_ui.proposal_running") : t("final_ui.proposal_queued") %></p>
                 <% end %>

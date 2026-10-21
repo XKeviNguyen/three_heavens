@@ -30,7 +30,9 @@ class ReviewSegmentRunJob < ApplicationJob
     @claimed_credential = claim.credential
     review_run = segment_run.review_run
     prompt = BlindReviews::Prompt.build(review_run, experiment_segment: segment_run.experiment_segment)
-    Ai::RunContextBudget.call(
+    # The reserve sent is the current policy's; the run's snapshot keeps
+    # what was planned at launch, as the whole-document jobs do.
+    budget = Ai::RunContextBudget.call(
       run: segment_run,
       model: review_run.reviewer_llm_model,
       prompt: prompt,
@@ -40,7 +42,7 @@ class ReviewSegmentRunJob < ApplicationJob
     result = client_for(review_run.reviewer_llm_model).review_completion(
       model_identifier: review_run.reviewer_llm_model.model_identifier,
       **prompt,
-      max_tokens: segment_run.reserved_output_tokens
+      max_tokens: budget.reserved_output_tokens
     )
     evaluations = BlindReviews::ResponseValidator.call(
       content: result.content,

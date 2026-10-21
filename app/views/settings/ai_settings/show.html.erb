@@ -80,4 +80,12 @@
       </ul>
     </section>
   <% end %>
+
+  <%# Outside the island, which replaces its own contents. %>
+  <% if @key_status %>
+    <section data-tour-target="ai-key-status" class="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="ai-settings-key-status-heading">
+      <h2 id="ai-settings-key-status-heading" class="text-lg font-semibold text-slate-950"><%= t("ai_settings.key.status_heading") %></h2>
+      <%= render "settings/open_router_key_status", status: @key_status %>
+    </section>
+  <% end %>
 </section>

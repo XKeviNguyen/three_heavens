@@ -55,7 +55,7 @@
     <h2 class="text-xl font-semibold text-slate-950"><%= t("benchmarks_ui.resolved_history") %></h2>
     <p class="mt-2 text-sm leading-6 text-slate-600"><%= t("benchmarks_ui.resolved_intro") %></p>
     <div class="mt-5 overflow-x-auto">
-      <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+      <table class="w-full min-w-[760px] divide-y divide-slate-200 text-left text-sm">
         <thead class="text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.resolved_identifier") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.runs") %></th><th scope="col" class="px-3 py-3"><%= localized_status(:completed) %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.wins") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.judge_score") %></th><th scope="col" class="px-3 py-3"><%= t("benchmarks_ui.known_cost") %></th></tr></thead>
         <tbody class="divide-y divide-slate-100">
           <% @history.resolved_models.each do |resolved| %>

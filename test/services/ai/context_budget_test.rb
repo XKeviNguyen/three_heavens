@@ -81,7 +81,8 @@ class Ai::ContextBudgetTest < ActiveSupport::TestCase
     serialized = Ai::OpenRouterClient.serialize_request(
       model_identifier: @model.model_identifier,
       messages: [ { role: "system", content: "S" }, { role: "user", content: "U" } ],
-      max_tokens: 4_096
+      max_tokens: 4_096,
+      reasoning: Ai::OpenRouterClient::REASONING
     )
     base = Ai::ContextBudget.estimate_tokens(serialized)
     @model.context_window_tokens = base + 4_096 + Ai::ContextBudget::SAFETY_MARGIN_TOKENS
@@ -130,6 +131,26 @@ class Ai::ContextBudgetTest < ActiveSupport::TestCase
       )
     end
     assert_equal "model_output_capability_insufficient", error.code
+  end
+
+  # Reasoning models think inside max_tokens, so each request asks for the
+  # target reserve as far as the model's output limit and the context allow.
+  test "reserves up to the target output, bounded by the model and the remaining context" do
+    call = -> { Ai::ContextBudget.call(model: @model, system_prompt: "S", user_prompt: "U", stage: :translation, source_character_count: 1) }
+
+    @model.context_window_tokens = 200_000
+    @model.max_output_tokens = 64_000
+    assert_equal Ai::ContextBudget::TARGET_OUTPUT_TOKENS, call.call.reserved_output_tokens
+
+    @model.max_output_tokens = 8_192
+    assert_equal 8_192, call.call.reserved_output_tokens
+
+    @model.max_output_tokens = 64_000
+    estimated = call.call.estimated_input_tokens
+    @model.context_window_tokens = estimated + 6_000 + Ai::ContextBudget::SAFETY_MARGIN_TOKENS
+    result = call.call
+    assert_equal 6_000, result.reserved_output_tokens
+    assert_equal @model.context_window_tokens, result.estimated_input_tokens + result.reserved_output_tokens + result.safety_margin_tokens
   end
 
   test "fails a low-context model" do

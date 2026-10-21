@@ -54,6 +54,30 @@ ja:
       start_review_button: ブラインドレビューを開始
       start_review_confirm: "選択したモデルでブラインドレビューを開始しますか？AIリクエストが送信され、費用が発生する場合があります。"
       starting_review: レビューを開始中…
+    scores:
+      heading:
+        review: レビューの平均点
+        judge: 判定の平均点
+      all_models: 全モデル
+      partial: "実行が終わるたびに更新されます（%{done}/%{total} 完了）。"
+      scale: "%{min}〜%{max}点"
+      out_of: "（%{max}点満点）"
+      based_on:
+        review:
+          one: レビュー担当1モデル
+          other: "レビュー担当%{count}モデル"
+        judge:
+          one: 判定担当1モデル
+          other: "判定担当%{count}モデル"
+      above: 全モデルの平均より上
+      below: 全モデルの平均より下
+      even: 平均と同じ
+      bands:
+        poor: 不十分
+        weak: やや弱い
+        fair: 普通
+        good: 良い
+        excellent: 優秀
     review:
       title: ブラインドレビュー · Three Heavens
       heading: ブラインドレビュー
@@ -107,3 +131,27 @@ ja:
       judge_winner: "この判定モデルの選択"
       confidence: 確信度
     provider_failure: "AIリクエストに失敗しました。エラーコードを確認し、必要に応じて再試行してください。"
+    failure_reasons:
+      http_401: "OpenRouterがAPIキーを拒否しました。AI設定でキーを確認してください。"
+      http_402: "この処理の料金を支払うキーのOpenRouterアカウントでは、このリクエストを賄えません。OpenRouterは各リクエストの前に最大費用を確保します。どのキーが支払うか（ご自身かアプリか）はAI設定で確認できます。そのOpenRouterアカウントにクレジットを追加してから再試行してください。"
+      openrouter_credits_exhausted: "支払いキーのOpenRouterアカウントの残高がこのリクエストに足りません（OpenRouterは最大費用を先に確保します）。openrouter.ai/settings/credits でクレジットを追加してから再試行してください。どのキーが支払うかはAI設定で確認できます。"
+      openrouter_key_limit_reached: "支払いに使うOpenRouterキーが、キー自体の利用上限に達しました。openrouter.ai/settings/keys で上限を引き上げるかリセットするか、別のキーを保存してから再試行してください。"
+      http_403: "OpenRouterがこのリクエストを拒否しました。モデル提供元が内容を検出した可能性があります。"
+      http_404: "OpenRouterはこのモデルIDを提供していません。管理者がモデル画面で確認するか無効にしてください。"
+      structured_output_unavailable: "このモデルのOpenRouter提供元はいずれも、この工程に必要な構造化された回答を返せません。翻訳はできますが、レビュー・判定・推敲には使えません。この工程には別のモデル（一覧でStructuredと表示されたもの）を選んでください。"
+      http_408: "モデル提供元の応答に時間がかかりすぎました。後で再試行してください。"
+      http_429: "OpenRouterまたはモデル提供元が現在リクエストを制限しています（無料モデルでよく起こります）。しばらく待ってから再試行してください。"
+      http_500: "モデル提供元で一時的な問題が発生しました。後で再試行してください。"
+      http_502: "モデル提供元で一時的な問題が発生しました。後で再試行してください。"
+      http_503: "モデルが一時的に利用できません。後で再試行してください。"
+      incomplete_response: "モデルが回答を終える前に停止しました。多くの場合、出力トークンの上限に達したためです。生成されたトークンは課金されます。"
+      context_budget_exceeded: "本文と指示・参考訳を合わせると、このモデルのコンテキスト長を超えます。"
+      model_output_capability_insufficient: "このモデルはこの工程に必要な長さの回答を生成できません。別のモデルを選んでください。"
+      model_capability_unconfigured: "このモデルのコンテキスト長が設定されていません。管理者がモデル画面で更新してください。"
+      model_unavailable: "このモデルは無効になっているか、サポートされていません。"
+      network_error: "OpenRouterへの接続に失敗しました。後で再試行してください。"
+      translated_segment_too_large: "一部分に対するモデルの回答が上限を超えました。"
+      translated_document_too_large: "結合した翻訳が上限を超えました。"
+      missing_api_key: "このリクエストに使うOpenRouterキーが設定されていません。"
+      personal_key_unavailable: "ご自身のOpenRouterキーがないか削除されています。AI設定で再度追加してください。"
+      managed_ai_access_revoked: "このアカウントではアプリのAIキーの利用権限が取り消されました。"

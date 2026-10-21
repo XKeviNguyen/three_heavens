@@ -1,0 +1,40 @@
+ja:
+  managed_key:
+    title: AIキー
+    description: "アプリのOpenRouterキーは、アプリのAI利用権限を使うアカウントのAI処理の料金を支払います。ここに保存したキーはサーバーのOPENROUTER_API_KEYの代わりに使われ、削除するとサーバーのキーに戻ります。"
+    current_heading: 使用中のキー
+    source:
+      saved: "ここに保存済み（%{hint}、%{date}）。"
+      environment: "サーバーのOPENROUTER_API_KEY（%{hint}）。ここには保存されていません。"
+      missing: "ここにキーが保存されておらず、サーバーにもOPENROUTER_API_KEYがないため、アプリのAI利用は実行できません。"
+      unreadable: "保存済みのキーを復号できない（サーバーの秘密鍵が変更された）ため、サーバーのOPENROUTER_API_KEY（%{hint}）を使っています。キーを保存し直してください。"
+      no_hint: "なし"
+    save_heading: キーを保存
+    replace_heading: キーを置き換える
+    key_label: OpenRouter APIキー
+    key_hint: "sk-or- で始まります。OpenRouterで確認され、暗号化して保存され、再表示されません。"
+    save: キーを保存
+    replace: キーを置き換える
+    replace_confirm: "保存済みのキー %{hint} を置き換えますか？これ以降に開始する処理は新しいキーを使います。"
+    delete: 保存済みのキーを削除
+    delete_confirm: "保存済みのキーを削除しますか？アプリはサーバーのOPENROUTER_API_KEYに戻ります。"
+    flash:
+      saved: "キーを保存しました。OpenRouterはこのキーを受け付けました。"
+      saved_unverified: "キーを保存しましたが、OpenRouterに接続できず確認できませんでした。下の状態を確認してください。"
+      deleted: "保存済みのキーを削除しました。サーバーのキーがあればそれを使います。"
+    errors:
+      format: "sk-or- で始まるOpenRouter APIキーを入力してください。"
+      stale: "別の管理者が同時にキーを変更しました。ページを再読み込みしてやり直してください。"
+      rate_limited: "短時間に変更が多すぎます。1分待ってからやり直してください。"
+  key_status:
+    valid: OpenRouterはこのキーを受け付けています。
+    invalid: "OpenRouterがこのキーを拒否しました。使えるキーに置き換えてください。"
+    unavailable: "OpenRouterに接続できず、このキーを確認できません。後でもう一度お試しください。"
+    rejected: "OpenRouterがこのキーを拒否したため、保存しませんでした。キー全体をコピーしたか確認してください。"
+    label: OpenRouter上の名前
+    limit: キーのクレジット上限
+    limit_value: "%{limit} のうち残り %{remaining}"
+    no_limit: このキーには上限が設定されていません
+    usage_monthly: 今月の使用額
+    free_requests: 本日の無料モデル残り回数
+    balance_note_html: "このキーではアカウントのクレジット残高を確認できません。AIリクエストが http_402 で失敗する場合は %{link} でクレジットを追加してください。"

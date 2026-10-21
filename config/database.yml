@@ -21,10 +21,18 @@
     end
   end
 %>
+<%
+  # A job thread holds its connections for the whole job, including the
+  # OpenRouter call, so each pool covers every job thread (config/queue.yml)
+  # and every Puma thread (config/puma.rb) at once. Connections open only
+  # when used.
+  job_threads = Integer(ENV.fetch("JOB_THREADS", 32))
+  web_threads = Integer(ENV.fetch("RAILS_MAX_THREADS", 3))
+%>
 default: &default
   adapter: postgresql
   encoding: unicode
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  pool: <%= job_threads + web_threads + 2 %>
   schema_format: sql
 
 local: &local
@@ -120,6 +128,8 @@ production:
     schema_format: ruby
   queue:
     <<: *default
+    # Also Solid Queue's own pollers, heartbeats, dispatcher and supervisor.
+    pool: <%= job_threads + web_threads + 8 %>
     url: <%= production_database_url.call("QUEUE_DATABASE_URL") %>
     migrations_paths: db/queue_migrate
     schema_format: ruby

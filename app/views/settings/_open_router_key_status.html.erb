@@ -1,0 +1,24 @@
+<%# What OpenRouter reports for one key (OpenRouter::KeyStatus). Never shows the key. %>
+<% if status %>
+  <div class="mt-4 rounded-lg border p-4 text-sm <%= status.valid? ? "border-emerald-200 bg-emerald-50 text-emerald-950" : status.invalid? ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-950" %>" role="status">
+    <p class="font-semibold"><%= t("key_status.#{status.state}") %></p>
+    <% if status.valid? %>
+      <dl class="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        <% if status.label.present? %>
+          <div><dt class="inline text-emerald-800"><%= t("key_status.label") %>:</dt> <dd class="inline font-medium"><%= status.label %></dd></div>
+        <% end %>
+        <div>
+          <dt class="inline text-emerald-800"><%= t("key_status.limit") %>:</dt>
+          <dd class="inline font-medium"><%= status.limit ? t("key_status.limit_value", remaining: number_to_currency(status.limit_remaining || 0), limit: number_to_currency(status.limit)) : t("key_status.no_limit") %></dd>
+        </div>
+        <% unless status.usage_monthly.nil? %>
+          <div><dt class="inline text-emerald-800"><%= t("key_status.usage_monthly") %>:</dt> <dd class="inline font-medium"><%= number_to_currency(status.usage_monthly, precision: 3) %></dd></div>
+        <% end %>
+        <% if status.free_requests_limit %>
+          <div><dt class="inline text-emerald-800"><%= t("key_status.free_requests") %>:</dt> <dd class="inline font-medium"><%= status.free_requests_remaining || 0 %> / <%= status.free_requests_limit %></dd></div>
+        <% end %>
+      </dl>
+      <p class="mt-2 text-xs text-emerald-900"><%= t("key_status.balance_note_html", link: link_to("openrouter.ai/settings/credits", "https://openrouter.ai/settings/credits", target: "_blank", rel: "noopener noreferrer", class: "underline")) %></p>
+    <% end %>
+  </div>
+<% end %>

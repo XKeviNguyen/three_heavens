@@ -30,7 +30,7 @@
       <p class="mt-1 text-sm text-slate-600"><%= t("operations_ui.stale_help", minutes: @health.stale_threshold_minutes) %></p>
     </div>
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <table class="w-full min-w-[640px] divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
           <tr><th scope="col" class="px-6 py-3"><%= t("operations_ui.workflow") %></th><th scope="col" class="px-6 py-3"><%= localized_status(:pending) %></th><th scope="col" class="px-6 py-3"><%= localized_status(:running) %></th><th scope="col" class="px-6 py-3"><%= localized_status(:failed) %></th><th scope="col" class="px-6 py-3"><%= t("operations_ui.stale_pending") %></th><th scope="col" class="px-6 py-3"><%= t("operations_ui.stale_running") %></th><th scope="col" class="px-6 py-3"><%= t("operations_ui.oldest_active") %></th></tr>
         </thead>

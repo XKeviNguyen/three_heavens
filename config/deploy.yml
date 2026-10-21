@@ -44,7 +44,7 @@ proxy:
   forward_headers: true
   host: <%= app_host %>
   buffering:
-    max_request_body: 22_020_096
+    max_request_body: 45_088_768
   healthcheck:
     path: /up
   run:

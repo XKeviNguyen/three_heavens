@@ -4,7 +4,7 @@ module WorkflowProfiles
 
     def self.call(revision:, role:)
       selections = revision.selections_for(role)
-      models_by_id = LlmModel.lock.where(id: selections.map(&:llm_model_id)).index_by(&:id)
+      models_by_id = LlmModel.lock.where(id: selections.map(&:llm_model_id)).order(:id).index_by(&:id)
       models = selections.map do |selection|
         model = models_by_id[selection.llm_model_id]
         unless model&.active? &&

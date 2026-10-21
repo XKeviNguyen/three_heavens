@@ -101,13 +101,14 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     def chat_completion(**arguments)
       if @fail_next_translation
         @fail_next_translation = false
-        raise Ai::OpenRouterClient::PermanentError.new(
-          "Injected segment failure",
-          code: "invalid_request"
-        )
+        raise failure
       end
 
       super
+    end
+
+    def failure
+      Ai::OpenRouterClient::PermanentError.new("Injected segment failure", code: "invalid_request")
     end
   end
 
@@ -341,6 +342,45 @@ class LongDocuments::SegmentedWorkflowTest < ActiveSupport::TestCase
     completed_children.each do |child|
       assert_equal original_completed_attempts.fetch(child.id), child.reload.execution_attempt
     end
+  end
+
+  # A response cut off at max_tokens is billed, so its spend is recorded on
+  # the failed part and its attempt; the retry sends the current policy's
+  # reserve, not the one planned at launch.
+  test "an incomplete segment records its spend and its retry uses the current reserve" do
+    client = OneFailureClient.new
+    client.define_singleton_method(:failure) do
+      Ai::OpenRouterClient::IncompleteResponseError.new(
+        "The AI response was incomplete",
+        code: "incomplete_response",
+        usage: Ai::OpenRouterClient::Usage.new(
+          prompt_tokens: 700, completion_tokens: 4_096, total_tokens: 4_796, cached_tokens: 0,
+          reasoning_tokens: 4_096, cost: BigDecimal("0.004")
+        )
+      )
+    end
+    TranslationSegmentRunJob.client_factory = ->(_credential) { client }
+
+    perform_enqueued_jobs(only: TranslationSegmentRunJob) do
+      TranslationExperiments::Start.call(experiment: @experiment, llm_models: @models)
+    end
+
+    failed_child = @experiment.reload.translation_runs.failed.sole.translation_segment_runs.failed.sole
+    assert_equal "incomplete_response", failed_child.error_code
+    assert_equal BigDecimal("0.004"), failed_child.cost
+    assert_equal 4_096, failed_child.reasoning_tokens
+    attempt = AiProviderAttempt.find_by!(provider_run: failed_child, attempt_number: failed_child.execution_attempt)
+    assert_equal BigDecimal("0.004"), attempt.cost
+
+    # As if planned at launch under an older, smaller reserve.
+    failed_child.update_columns(reserved_output_tokens: 1_000)
+    client.calls.clear
+    TranslationExperiments::RetryFailed.call(@experiment)
+    perform_enqueued_jobs(only: TranslationSegmentRunJob)
+
+    assert failed_child.reload.completed?
+    assert_equal [ 4_096 ], client.calls.map { |call| call[2] }
+    assert_equal 1_000, failed_child.reserved_output_tokens
   end
 
   test "application restores source join boundaries stripped by translation and finalization providers" do
