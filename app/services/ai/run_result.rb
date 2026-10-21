@@ -11,7 +11,7 @@ module Ai
           completed_at: Time.current,
           error_code: error.code.to_s.first(255),
           error_message: ErrorSanitizer.call(error.message),
-          **failure_usage(error)
+          **failure_usage(run, error)
         )
       end
       OperationalEvents.emit(
@@ -25,10 +25,17 @@ module Ai
 
     # Tokens and cost of this attempt only: a billed but incomplete response
     # keeps its usage, and any other failure clears what an earlier attempt
-    # left, so the attempt ledger never counts one request twice.
-    def self.failure_usage(error)
+    # left, so the attempt ledger never counts one request twice. Whole-
+    # document runs also say whether that cost and those counts are known
+    # (a segmented parent derives both from its parts).
+    def self.failure_usage(run, error)
       usage = error.respond_to?(:usage) ? error.usage : nil
-      Ai::OpenRouterClient::Usage.members.index_with { |field| usage&.public_send(field) }
+      attributes = Ai::OpenRouterClient::Usage.members.index_with { |field| usage&.public_send(field) }
+      attributes[:cost_complete] = !attributes[:cost].nil? if run.has_attribute?(:cost_complete)
+      if run.has_attribute?(:telemetry_complete)
+        attributes[:telemetry_complete] = Ai::SegmentAggregation::TOKEN_TELEMETRY_FIELDS.none? { |field| attributes[field].nil? }
+      end
+      attributes
     end
     private_class_method :failure_usage
 
