@@ -6,6 +6,9 @@ class User < ApplicationRecord
   SUPPORTED_LOCALES = %w[en vi ja].freeze
   APPEARANCES = %w[system light dark].freeze
   AI_PAYMENT_SOURCES = %w[managed personal].freeze
+  # The least time between two confirmation emails for one account, whether
+  # resent or sent by registering the unconfirmed address again.
+  CONFIRMATION_EMAIL_INTERVAL = 3.minutes
 
   generates_token_for :email_confirmation, expires_in: 24.hours do
     [ email, email_verified_at, confirmation_sent_at ].join(":")

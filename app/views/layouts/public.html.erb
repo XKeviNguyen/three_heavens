@@ -10,7 +10,9 @@
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
-  <body class="min-h-screen min-w-0 bg-white text-slate-900 antialiased">
+  <%# Tells the product tour (app/frontend/islands/product_tour) that this
+      page, though it has no tour island, is still signed in. %>
+  <body class="min-h-screen min-w-0 bg-white text-slate-900 antialiased"<%= " data-signed-in" if authenticated? %>>
     <a href="#main-content" class="fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-slate-950 px-4 py-2 text-white focus:translate-y-0"><%= t("common.skip_to_content") %></a>
     <% if controller_name == "landing" %>
       <% if notice.present? %><div class="mx-auto max-w-6xl px-5 pt-3" role="status"><%= notice %></div><% end %>

@@ -18,6 +18,12 @@ module FinalTranslations
         if final_translation.current_version&.content.blank?
           raise InvalidStateError, "A nonblank current version is required"
         end
+        # Refinement starts and applies only on a draft (Finalizations::Start
+        # takes this same lock), so finalizing now would leave a round
+        # spending on a translation that no longer accepts its proposals.
+        if final_translation.finalization_rounds.running.exists?
+          raise ActiveRoundError, "Wait for the running refinement round to finish before finalizing"
+        end
 
         final_translation.update!(status: :finalized, finalized_at: Time.current)
       end

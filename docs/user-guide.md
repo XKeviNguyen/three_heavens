@@ -19,7 +19,7 @@ A walkthrough of Three Heavens from sign-in to an approved translation. Screensh
 
 ## 1. Sign in
 
-Create an account with your email and a password of at least 12 characters, then confirm your email from the message you receive. If the server has Google sign-in configured you can also continue with Google, or connect Google later under **Account**.
+Create an account with your email and a password of at least 12 characters, then confirm your email from the message you receive by entering the same password; confirming signs you in. If the server has Google sign-in configured you can also continue with Google, or connect Google later under **Account**.
 
 Translation itself needs a way to pay for AI work; see [AI settings and who pays](#ai-settings-and-who-pays). Without one you can still prepare documents, glossaries, references, methodologies, and workflow setups.
 

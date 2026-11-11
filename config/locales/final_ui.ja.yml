@@ -94,6 +94,7 @@ ja:
     approve_heading: 最終訳を承認
     approve_intro: 確定すると現在の版が承認済みの最終訳となり、閲覧専用になります。履歴を残したまま再編集できます。
     finalize: 現在の版を確定
+    finalize_after_refinement: 実行中の改善ラウンドが終わると確定できます。
     finalize_confirm: 第%{number}版を承認済みの最終訳として確定しますか？再編集可能にするまで編集と修正案の作成はできません。
     finalizing: 確定中…
     finalized_heading: 翻訳を確定しました

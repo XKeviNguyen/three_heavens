@@ -20,6 +20,7 @@ module JudgingTestHelper
       experiment.translation_runs.create!(
         llm_model: candidate_models.fetch(index),
         status: :completed,
+        completed_at: Time.current,
         translated_text: text
       )
     end

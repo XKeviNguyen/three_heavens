@@ -5,6 +5,10 @@ module GoogleIdentity
   #   and email verification. Google never overrides a disabled account.
   # - An unknown identity whose email already belongs to an account is never
   #   linked automatically; the owner must sign in and connect Google explicitly.
+  #   The exception is a registration that was never confirmed: it proved
+  #   nothing about the mailbox and cannot sign in, so when Google is
+  #   authoritative for the email it takes that account over and drops the
+  #   password chosen before anyone proved ownership of the address.
   # - Otherwise a normal user is created with server-controlled defaults (no
   #   admin role, no managed AI access), but only when Google is authoritative
   #   for the email. For any other address Google cannot prove current mailbox
@@ -25,7 +29,11 @@ module GoogleIdentity
     def call
       identity = FederatedIdentity.find_by(provider: PROVIDER, provider_uid: @claims.subject)
       return result_for(identity.user) if identity
-      return Result.new(status: :email_taken, user: nil) if User.exists?(email: @claims.email)
+
+      existing = User.find_by(email: @claims.email)
+      adopted = existing && adopt_unconfirmed_registration(existing)
+      return result_for(adopted) if adopted
+      return Result.new(status: :email_taken, user: nil) if existing
       return Result.new(status: :email_not_authoritative, user: nil) unless @claims.google_authoritative_email?
 
       result_for(create_user)
@@ -42,6 +50,20 @@ module GoogleIdentity
       return Result.new(status: :confirmation_required, user: nil) unless user.email_verified?
 
       Result.new(status: :signed_in, user: user)
+    end
+
+    def adopt_unconfirmed_registration(user)
+      return unless @claims.google_authoritative_email?
+
+      user.with_lock do
+        next unless user.active? && !user.email_verified? && user.federated_identities.none?
+
+        user.password = nil
+        user.email_verified_at = Time.current
+        user.federated_identities.build(provider: PROVIDER, provider_uid: @claims.subject)
+        user.save!
+        user
+      end
     end
 
     def create_user

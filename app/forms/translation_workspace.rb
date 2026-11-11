@@ -61,6 +61,7 @@ class TranslationWorkspace
       next false unless lock_existing_project
       next false unless valid?
       next false unless lock_methodology_selection
+      next false unless lock_glossary_selection
       next false unless lock_reference_selections
 
       @llm_models = @llm_models.map { |model| OpenRouter::ModelResolver.materialize!(model) } unless automatic_mode?
@@ -533,6 +534,19 @@ class TranslationWorkspace
     end
 
     errors.add(:methodology_profile_revision_id, :stale_selection)
+    false
+  end
+
+  def lock_glossary_selection
+    return true unless @glossary_revision
+
+    glossary = Glossary.lock.find_by(id: @glossary_revision.glossary_id, user_id: user.id)
+    if glossary&.active? && glossary.current_revision_id == @glossary_revision.id
+      @glossary_revision.association(:glossary).target = glossary
+      return true
+    end
+
+    errors.add(:glossary_revision_id, :stale_selection)
     false
   end
 

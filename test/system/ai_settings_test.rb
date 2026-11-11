@@ -185,6 +185,26 @@ class AiSettingsSystemTest < ApplicationSystemTestCase
     assert_includes find("[data-testid='ai-settings-status']").text, "Save a new key below"
   end
 
+  test "asking to replace the key closes an open delete confirmation instead of hiding it" do
+    @user.update!(managed_ai_access: false)
+    sign_in_in_browser
+    visit settings_ai_settings_path
+    assert_island_mounted
+    fill_in "OpenRouter API key", with: KEY
+    click_button "Save key"
+    assert_text "OpenRouter key saved."
+
+    click_button "Delete key"
+    assert_selector "[role='group']", text: "Delete the key ending …#{KEY.last(4)}?"
+    fill_in "OpenRouter API key", with: "sk-or-v1-#{"5e" * 32}"
+    click_button "Replace key"
+    within("[role='group']") { click_button "Cancel" }
+
+    assert_no_selector "[role='group']"
+    assert_button "Delete key"
+    assert_equal 1, @user.open_router_credentials.active.count
+  end
+
   test "a refused replacement closes its confirmation, and a platform-ready account sees no own-key to-do" do
     sign_in_in_browser
     visit settings_ai_settings_path

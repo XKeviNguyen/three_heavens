@@ -18,11 +18,13 @@ class BlindReviews::StartTest < ActiveSupport::TestCase
     @first_candidate = @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_claude),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "First translation"
     )
     @second_candidate = @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_gpt),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Second translation"
     )
     @reviewers = [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ]

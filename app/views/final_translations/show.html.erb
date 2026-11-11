@@ -308,7 +308,12 @@
     <% if @final_translation.draft? %>
       <h2 class="text-xl font-semibold text-slate-950"><%= t("final_ui.approve_heading") %></h2>
       <p class="mt-2 text-sm text-slate-700"><%= t("final_ui.approve_intro") %></p>
-      <%= button_to t("final_ui.finalize"), finalize_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: t("final_ui.finalize_confirm", number: current.version_number), turbo_submits_with: t("final_ui.finalizing") }, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
+      <% if running_refinement %>
+        <p class="mt-3 text-sm font-medium text-amber-900"><%= t("final_ui.finalize_after_refinement") %></p>
+        <button type="button" disabled class="mt-4 cursor-not-allowed rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white opacity-60"><%= t("final_ui.finalize") %></button>
+      <% else %>
+        <%= button_to t("final_ui.finalize"), finalize_final_translation_path(@final_translation), method: :patch, data: { turbo_confirm: t("final_ui.finalize_confirm", number: current.version_number), turbo_submits_with: t("final_ui.finalizing") }, class: "mt-4 rounded-lg bg-amber-700 px-5 py-3 font-semibold text-white hover:bg-amber-800" %>
+      <% end %>
     <% else %>
       <h2 class="text-xl font-semibold text-slate-950"><%= t("final_ui.finalized_heading") %></h2>
       <p class="mt-2 text-sm text-slate-700"><%= t("final_ui.finalized_intro", number: current.version_number) %></p>

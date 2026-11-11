@@ -96,6 +96,24 @@ class GlossariesTest < ActionDispatch::IntegrationTest
 
   private
 
+  test "launch rechecks the selected glossary while holding its lock" do
+    glossary = Glossaries::Create.call(user: users(:normal), attributes: glossary_params)
+    workspace = TranslationWorkspace.new(
+      workspace_params.merge(user: users(:normal), glossary_revision_id: glossary.current_revision_id.to_s)
+    )
+    # The archive commits after this launch validated its selection and
+    # before the launch locks the glossary.
+    workspace.define_singleton_method(:lock_methodology_selection) do
+      Glossaries::ChangeStatus.deactivate(glossary:)
+      super()
+    end
+
+    assert_no_difference -> { Experiment.count } do
+      assert_not workspace.submit
+    end
+    assert workspace.errors.added?(:glossary_revision_id, :stale_selection)
+  end
+
   def glossary_params
     {
       name: "Bible terminology",
