@@ -122,7 +122,7 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert_nil User.find_by_token_for(:email_confirmation, old_token)
     new_token = user.reload.generate_token_for(:email_confirmation)
     travel 25.hours do
-      post email_confirmation_path, params: { token: new_token }
+      post email_confirmation_path, params: { token: new_token, password: "a long secure password" }
       assert_redirected_to new_confirmation_resend_path
       assert_not user.reload.email_verified?
     end
@@ -173,13 +173,91 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert_equal "no-referrer", response.headers["Referrer-Policy"]
     assert_equal "no-store", response.headers["Cache-Control"]
 
-    post email_confirmation_path, params: { token: token }
-    assert_redirected_to login_path
+    post email_confirmation_path, params: { token: token, password: "a long secure password" }
+    assert_redirected_to new_translation_workspace_path
+    assert_equal "メールアドレスを確認しました。ログインしています。", flash[:notice]
     assert user.reload.email_verified?
+    assert_equal user.id, signed_in_user_id
     assert_nil User.find_by_token_for(:email_confirmation, token)
 
-    post email_confirmation_path, params: { token: token }
+    post email_confirmation_path, params: { token: token, password: "a long secure password" }
     assert_redirected_to new_confirmation_resend_path
+  end
+
+  test "confirming requires the password chosen at registration" do
+    user = User.create!(email: "pending@example.test", password: "a long secure password",
+                        confirmation_sent_at: Time.current)
+    token = user.generate_token_for(:email_confirmation)
+
+    [ nil, "", "a different password", [ "a long secure password" ] ].each do |password|
+      post email_confirmation_path, params: { token: token, password: password }.compact
+      assert_response :unprocessable_content
+      assert_select "[role='alert']", text: /does not match this registration/
+      assert_select "input[type=hidden][name=token][value=?]", token
+    end
+    assert_not user.reload.email_verified?
+    assert_nil signed_in_user_id
+  end
+
+  test "an unconfirmed registration does not keep the address from the person who controls the mailbox" do
+    # Someone else registers the address first, with a password they chose.
+    post registration_path, params: { user: { email: "owner@example.test", password: "the squatter's password",
+                                              password_confirmation: "the squatter's password" } }
+    squatted = User.find_by!(email: "owner@example.test")
+    squatter_link = squatted.generate_token_for(:email_confirmation)
+
+    # The mailbox owner cannot be made to confirm the squatter's registration.
+    post email_confirmation_path, params: { token: squatter_link, password: "the owner's own password" }
+    assert_response :unprocessable_content
+    assert_not squatted.reload.email_verified?
+
+    # Registering again replaces the pending registration and its link.
+    travel 1.second do
+      assert_no_difference "User.count" do
+        assert_enqueued_emails 1 do
+          post registration_path, params: { user: { email: "owner@example.test", password: "the owner's own password",
+                                                    password_confirmation: "the owner's own password" } }
+        end
+      end
+      assert_redirected_to new_confirmation_resend_path
+      assert_nil User.find_by_token_for(:email_confirmation, squatter_link)
+
+      owner_link = squatted.reload.generate_token_for(:email_confirmation)
+      post email_confirmation_path, params: { token: owner_link, password: "the owner's own password" }
+      assert_redirected_to new_translation_workspace_path
+    end
+
+    assert squatted.reload.email_verified?
+    assert_nil User.authenticate_by_email(email: "owner@example.test", password: "the squatter's password")
+    assert_equal squatted, User.authenticate_by_email(email: "owner@example.test", password: "the owner's own password")
+  end
+
+  test "a confirmed or disabled account keeps its address and its password" do
+    disabled = User.create!(email: "disabled@example.test", password: "a long secure password",
+                            status: :disabled, confirmation_sent_at: Time.current)
+    [ users(:normal).email, disabled.email ].each do |email|
+      assert_no_enqueued_emails do
+        post registration_path, params: { user: { email: email, password: "another long password",
+                                                  password_confirmation: "another long password" } }
+      end
+      assert_response :unprocessable_content
+      assert_select "[role='alert']", text: /already been taken/
+      assert_select "form[action=?][method=post] input[name=_method]", registration_path, count: 0
+    end
+    assert_nil User.authenticate_by_email(email: disabled.email, password: "another long password")
+  end
+
+  test "re-registering an unconfirmed address with an invalid password keeps the pending registration" do
+    pending = User.create!(email: "pending@example.test", password: "a long secure password",
+                           confirmation_sent_at: 1.hour.ago)
+    link = pending.generate_token_for(:email_confirmation)
+
+    post registration_path, params: { user: { email: pending.email, password: "short", password_confirmation: "short" } }
+
+    assert_response :unprocessable_content
+    assert_select "form[action=?][method=post] input[name=_method]", registration_path, count: 0
+    assert_select "#user_email[value=?]", pending.email
+    assert_equal pending, User.find_by_token_for(:email_confirmation, link)
   end
 
   test "unverified account cannot start a session" do

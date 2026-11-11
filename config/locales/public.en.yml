@@ -138,9 +138,10 @@ en:
   email_confirmation:
     title: Confirm your email
     subject: Confirm your Three Heavens email
-    ready: Confirm your email to finish creating your account.
+    ready: Enter the password you chose when you registered to confirm your email and sign in.
     confirm: Confirm email
-    confirmed: Email confirmed. You can now sign in.
+    confirmed: Email confirmed. You are signed in.
+    password_incorrect: That password does not match this registration. If you did not register this account, register again with this email to replace it.
     invalid: This confirmation link is invalid or has expired.
     resend: Resend confirmation email
     resend_sent: If an unverified account exists for that email, a new confirmation email has been sent.
