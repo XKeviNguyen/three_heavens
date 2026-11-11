@@ -224,6 +224,23 @@ class Finalizations::StartAndApplyTest < ActiveSupport::TestCase
     end
   end
 
+  test "finalizing waits for a running refinement round" do
+    round = start_round
+
+    assert_raises FinalTranslations::ActiveRoundError do
+      FinalTranslations::ChangeStatus.finalize(final_translation: @final_translation)
+    end
+    assert @final_translation.reload.draft?
+
+    round.finalization_runs.each do |run|
+      run.update!(status: :failed, completed_at: Time.current, error_code: "provider_failure", error_message: "Failed")
+    end
+    Finalizations::ReconcileRound.call(round)
+    assert round.reload.failed?
+    FinalTranslations::ChangeStatus.finalize(final_translation: @final_translation)
+    assert @final_translation.reload.finalized?
+  end
+
   private
 
   def start_round

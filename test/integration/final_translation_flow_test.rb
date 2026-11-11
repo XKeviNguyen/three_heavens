@@ -321,6 +321,14 @@ class FinalTranslationFlowTest < ActionDispatch::IntegrationTest
     assert_select "[role='status']", text: /AI suggestions are still being written/
     assert_select "form[action='#{refine_final_translation_path(@final_translation)}'] input[type='submit'][disabled]", count: 1
     assert_select "article", text: /#{Regexp.escape(old_finalizer.display_name)}/, count: 0
+    assert_select "form[action='#{finalize_final_translation_path(@final_translation)}']", count: 0
+    assert_select "button[disabled]", text: "Finalize current version", count: 1
+    assert_select "p", text: "Finalizing is available once the running refinement round finishes."
+
+    patch finalize_final_translation_path(@final_translation)
+    assert_response :unprocessable_content
+    assert_select "[role='alert']", text: /Wait for the running refinement round to finish before finalizing/
+    assert @final_translation.reload.draft?
   end
 
   test "finalize disables every mutation control and reopen preserves history" do
