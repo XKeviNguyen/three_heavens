@@ -1,6 +1,6 @@
 # Three Heavens — Engineering Case Studies
 
-Sixteen engineering cases, mostly defects plus some design hardening, from building [Three Heavens](https://github.com/XKeviNguyen/three_heavens), a Rails 8.1 and PostgreSQL 17 translation workspace. Each case traces one failure from symptom to root cause, fix and regression test, with links to the exact code before and after the change.
+Seventeen engineering cases, mostly defects plus some design hardening, from building [Three Heavens](https://github.com/XKeviNguyen/three_heavens), a Rails 8.1 and PostgreSQL 17 translation workspace. Each case traces one failure from symptom to root cause, fix and regression test, with links to the exact code before and after the change.
 
 **Evidence standard**
 
@@ -44,12 +44,13 @@ Just before its sources, each case gives a 60-second **interview explanation**: 
 | 14 | [Sweeps that kept retrying the same broken rows](14-bounded-sweeps-that-starve-their-tail.md) | Oldest-first batches never reached rows behind permanent failures | Claim + retry deadline / fairness cursor | [#72](https://github.com/XKeviNguyen/three_heavens/pull/72), [#21](https://github.com/XKeviNguyen/three_heavens/pull/21) |
 | 15 | [A `rescue` inside a transaction committed half-built work](15-rescue-inside-a-transaction-commits-partial-state.md) | A rescued stage error committed orphan rows | Savepoint per stage | [#43](https://github.com/XKeviNguyen/three_heavens/pull/43) |
 | 16 | [A linked picture rejected a whole DOCX, and the error page lost its file fields](16-linked-docx-picture-and-unmounted-error-page.md) | An external *image* relationship was refused like a remote template; islands mounted only on `turbo:load`, which a 422 never fires | Allow-list external hyperlinks + images; also mount on `turbo:render` | [#106](https://github.com/XKeviNguyen/three_heavens/pull/106) |
+| 17 | [An unconfirmed registration held the address forever](17-unconfirmed-registration-held-the-address.md) | A squatter's unconfirmed registration blocked Google sign-up, and confirming it kept the squatter's password | Confirming needs the password; re-registering or Google replaces an unconfirmed registration | [#119](https://github.com/XKeviNguyen/three_heavens/pull/119) |
 
 ## Cases by engineering topic
 
 | If you're interested in… | Start with | Then |
 | --- | --- | --- |
-| **Security** | [06](06-server-side-session-invalidation.md) revocation | [13](13-single-use-tokens-and-non-atomic-cache-writes.md) atomic single use, [03](03-concurrent-request-memory.md) resource exhaustion |
+| **Security** | [06](06-server-side-session-invalidation.md) revocation | [17](17-unconfirmed-registration-held-the-address.md) implicit account states, [13](13-single-use-tokens-and-non-atomic-cache-writes.md) atomic single use, [03](03-concurrent-request-memory.md) resource exhaustion |
 | **Data consistency** | [11](11-two-tab-first-save-uniqueness-race.md) validation vs constraint | [15](15-rescue-inside-a-transaction-commits-partial-state.md) savepoints, [10](10-retry-after-discard-and-rejected-editor.md) negative knowledge, [01](01-postgresql-restore-and-binary-fidelity.md) restore |
 | **Concurrency** | [02](02-autosave-lost-response.md) lost acknowledgements | [08](08-double-submit-exactly-once-launch.md), [12](12-upload-response-loss-and-atomic-quota.md), [13](13-single-use-tokens-and-non-atomic-cache-writes.md) |
 | **Performance and resources** | [03](03-concurrent-request-memory.md) aggregate memory | [14](14-bounded-sweeps-that-starve-their-tail.md) batch fairness |
