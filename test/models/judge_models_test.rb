@@ -96,6 +96,7 @@ class JudgeModelsTest < ActiveSupport::TestCase
     unranked = @review_round.experiment.translation_runs.create!(
       llm_model: model,
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Unranked late translation"
     )
     complete_judge_run(@judge_run)

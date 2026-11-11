@@ -25,11 +25,13 @@ class BlindReviewFlowTest < ActionDispatch::IntegrationTest
     @experiment.translation_runs.create!(
       llm_model: @first_model,
       status: :completed,
+      completed_at: Time.current,
       translated_text: "First candidate"
     )
     @experiment.translation_runs.create!(
       llm_model: @second_model,
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Second candidate"
     )
   end

@@ -70,7 +70,7 @@ class Benchmarking::ModelLeaderboardTest < ActiveSupport::TestCase
     missing_experiment, = create_analytics_experiment(
       name: "Missing telemetry",
       models: [ @candidate ],
-      run_attributes: { @candidate => { cost: nil, total_tokens: nil, started_at: nil, completed_at: nil } }
+      run_attributes: { @candidate => { cost: nil, total_tokens: nil, started_at: nil } }
     )
     bad_experiment, bad_runs = create_analytics_experiment(
       name: "Bad duration",

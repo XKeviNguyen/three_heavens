@@ -80,8 +80,8 @@ class RoleModelSelectionSystemTest < ApplicationSystemTestCase
                               source_language: "Vietnamese", target_language: "Japanese")
     document = project.documents.create!(title: "Source", source_text: "Private source")
     document.experiments.create!(instruction_prompt: "Translate faithfully.", status: :completed).tap do |experiment|
-      experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude), status: :completed, translated_text: "First")
-      experiment.translation_runs.create!(llm_model: llm_models(:openrouter_gpt), status: :completed, translated_text: "Second")
+      experiment.translation_runs.create!(llm_model: llm_models(:openrouter_claude), status: :completed, completed_at: Time.current, translated_text: "First")
+      experiment.translation_runs.create!(llm_model: llm_models(:openrouter_gpt), status: :completed, completed_at: Time.current, translated_text: "Second")
     end
   end
 end

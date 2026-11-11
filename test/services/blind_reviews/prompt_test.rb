@@ -40,11 +40,13 @@ class BlindReviews::PromptTest < ActiveSupport::TestCase
     @experiment.translation_runs.create!(
       llm_model: @first_model,
       status: :completed,
+      completed_at: Time.current,
       translated_text: "First translation"
     )
     @experiment.translation_runs.create!(
       llm_model: @second_model,
       status: :completed,
+      completed_at: Time.current,
       translated_text: @injection
     )
     @round = BlindReviews::Start.call(

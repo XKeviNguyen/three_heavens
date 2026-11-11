@@ -1747,7 +1747,8 @@ CREATE TABLE public.experiments (
     glossary_revision_id bigint,
     methodology_profile_revision_id bigint,
     guidance_preference character varying DEFAULT 'reference_examples'::character varying NOT NULL,
-    CONSTRAINT experiments_guidance_preference_check CHECK (((guidance_preference)::text = ANY (ARRAY[('reference_examples'::character varying)::text, ('glossary'::character varying)::text, ('experiment_instruction'::character varying)::text])))
+    CONSTRAINT experiments_guidance_preference_check CHECK (((guidance_preference)::text = ANY (ARRAY[('reference_examples'::character varying)::text, ('glossary'::character varying)::text, ('experiment_instruction'::character varying)::text]))),
+    CONSTRAINT experiments_status_check CHECK ((((status)::text = 'pending'::text) OR ((status)::text = 'running'::text) OR ((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)))
 );
 
 
@@ -2005,6 +2006,7 @@ CREATE TABLE public.finalization_runs (
     CONSTRAINT finalization_runs_change_summary_array_check CHECK ((jsonb_typeof(change_summary) = 'array'::text)),
     CONSTRAINT finalization_runs_claimed_job_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT finalization_runs_complete_cost_present_check CHECK (((NOT cost_complete) OR (cost IS NOT NULL))),
+    CONSTRAINT finalization_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT finalization_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT finalization_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot IS NULL) OR ((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000)))),
     CONSTRAINT finalization_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -2085,6 +2087,7 @@ CREATE TABLE public.finalization_segment_runs (
     CONSTRAINT finalization_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_change_summary_check CHECK (((jsonb_typeof(change_summary) = 'array'::text) AND (octet_length((change_summary)::text) <= 50000))),
     CONSTRAINT finalization_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
+    CONSTRAINT finalization_segment_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT finalization_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT finalization_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT finalization_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -2363,6 +2366,7 @@ CREATE TABLE public.judge_runs (
     CONSTRAINT judge_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT judge_runs_claimed_job_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT judge_runs_complete_cost_present_check CHECK (((NOT cost_complete) OR (cost IS NOT NULL))),
+    CONSTRAINT judge_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT judge_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT judge_runs_confidence_score_check CHECK (((confidence_score IS NULL) OR ((confidence_score >= 1) AND (confidence_score <= 100)))),
     CONSTRAINT judge_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot IS NULL) OR ((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000)))),
@@ -2439,6 +2443,7 @@ CREATE TABLE public.judge_segment_runs (
     CONSTRAINT judge_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT judge_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT judge_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
+    CONSTRAINT judge_segment_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT judge_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT judge_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT judge_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -2977,6 +2982,7 @@ CREATE TABLE public.review_runs (
     CONSTRAINT review_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT review_runs_claimed_job_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT review_runs_complete_cost_present_check CHECK (((NOT cost_complete) OR (cost IS NOT NULL))),
+    CONSTRAINT review_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT review_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT review_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot IS NULL) OR ((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000)))),
     CONSTRAINT review_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -3051,6 +3057,7 @@ CREATE TABLE public.review_segment_runs (
     CONSTRAINT review_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT review_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT review_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
+    CONSTRAINT review_segment_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT review_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT review_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT review_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -3372,10 +3379,12 @@ CREATE TABLE public.translation_runs (
     CONSTRAINT translation_runs_budget_snapshot_integrity_check CHECK ((((context_window_tokens_snapshot IS NULL) AND (max_output_tokens_snapshot IS NULL) AND (estimated_input_tokens IS NULL) AND (reserved_output_tokens IS NULL) AND (context_safety_margin_tokens IS NULL) AND (budget_policy_version IS NULL)) OR ((context_window_tokens_snapshot IS NOT NULL) AND (max_output_tokens_snapshot IS NOT NULL) AND (estimated_input_tokens IS NOT NULL) AND (reserved_output_tokens IS NOT NULL) AND (context_safety_margin_tokens IS NOT NULL) AND (budget_policy_version IS NOT NULL) AND ((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100)) AND (max_output_tokens_snapshot < context_window_tokens_snapshot) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot)))),
     CONSTRAINT translation_runs_claimed_job_execution_check CHECK ((claimed_job_execution >= 0)),
     CONSTRAINT translation_runs_complete_cost_present_check CHECK (((NOT cost_complete) OR (cost IS NOT NULL))),
+    CONSTRAINT translation_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT translation_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot IS NULL) OR ((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000)))),
     CONSTRAINT translation_runs_execution_attempt_check CHECK ((execution_attempt >= 0)),
     CONSTRAINT translation_runs_output_length_check CHECK (((translated_text IS NULL) OR (char_length(translated_text) <= 100000))),
-    CONSTRAINT translation_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot IS NULL) OR ((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000))))
+    CONSTRAINT translation_runs_output_snapshot_check CHECK (((max_output_tokens_snapshot IS NULL) OR ((max_output_tokens_snapshot >= 256) AND (max_output_tokens_snapshot <= 200000)))),
+    CONSTRAINT translation_runs_status_check CHECK ((((status)::text = 'pending'::text) OR ((status)::text = 'running'::text) OR ((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)))
 );
 
 
@@ -3440,6 +3449,7 @@ CREATE TABLE public.translation_segment_runs (
     CONSTRAINT translation_segment_runs_budget_snapshot_integrity_check CHECK (((char_length((budget_policy_version)::text) >= 1) AND (char_length((budget_policy_version)::text) <= 100) AND (reserved_output_tokens <= max_output_tokens_snapshot) AND (((estimated_input_tokens + reserved_output_tokens) + context_safety_margin_tokens) <= context_window_tokens_snapshot))),
     CONSTRAINT translation_segment_runs_cached_tokens_check CHECK (((cached_tokens IS NULL) OR (cached_tokens >= 0))),
     CONSTRAINT translation_segment_runs_claimed_execution_check CHECK ((claimed_job_execution >= 0)),
+    CONSTRAINT translation_segment_runs_completion_check CHECK (((((status)::text = 'completed'::text) OR ((status)::text = 'failed'::text)) = (completed_at IS NOT NULL))),
     CONSTRAINT translation_segment_runs_completion_tokens_check CHECK (((completion_tokens IS NULL) OR (completion_tokens >= 0))),
     CONSTRAINT translation_segment_runs_context_snapshot_check CHECK (((context_window_tokens_snapshot >= 1024) AND (context_window_tokens_snapshot <= 2000000))),
     CONSTRAINT translation_segment_runs_cost_check CHECK (((cost IS NULL) OR (cost >= (0)::numeric))),
@@ -7210,6 +7220,8 @@ ALTER TABLE ONLY public.translation_reference_creations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261111090100'),
+('20261111090000'),
 ('20261021090000'),
 ('20261020090000'),
 ('20261012100000'),
