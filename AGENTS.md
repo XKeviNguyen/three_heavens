@@ -282,25 +282,27 @@ failures, disable jobs, remove legitimate tests, skip system tests, add
 ## Validation and quality gate
 
 Before declaring a normal coding mega-task complete, run the complete local
-quality gate from the repository root:
+quality gate from the repository root with `bin/ci`. It runs RuboCop,
+whitespace, `npm ci --ignore-scripts`, `npm run typecheck`, `npm run build`,
+bundler-audit, `npm audit`, importmap audit, Brakeman, Zeitwerk, the
+migration-status and pending-migration checks, `bin/rails test`, and
+`bin/rails test:system`. GitHub CI runs the same checks as its five jobs, and
+`test/config/ci_gate_test.rb` fails if `bin/ci` gains a step CI does not run.
+
+While iterating, run focused checks:
 
 ```sh
-bin/rails test
-bin/rails test:system
-bin/rubocop
-bin/brakeman --no-pager
-bin/bundler-audit
-bin/importmap audit
-git diff --check
-bin/rails zeitwerk:check
+bin/rails test test/path/to/file_test.rb:LINE
+bin/rails test test/system/some_flow_test.rb
+npm run typecheck            # after any change under app/frontend
 ```
 
-If the task creates one or more migrations, also run:
-
-```sh
-bin/rails db:migrate
-bin/rails db:migrate:status
-```
+Run `bin/ci` and any new migrations against a throwaway PostgreSQL 17 database
+in a separate checkout without `.env` (for example a `postgres:17` container
+and a `git worktree`, configured through `DB_HOST`, `POSTGRES_PORT`,
+`POSTGRES_USER`, and `POSTGRES_PASSWORD`), never against the shared
+development database. Migrating the development database needs the owner's
+explicit approval.
 
 - Record the exact outcome of every required command, including failures.
 - Never describe a check as passing if it was not run, did not finish, or failed.
