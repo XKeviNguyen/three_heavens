@@ -23,9 +23,10 @@ type Anchor = "sidebar" | "header"
 // Turbo restoration visit can render a cached page whose props still say
 // "offer"; this keeps it from inviting again. It is set only after the server
 // answers 2xx, so a failed request lets the next page offer the tour again.
-// Signed-out pages have no tour island, so signing out (the only way to switch
-// accounts) forgets it, and a response for the previous account (a different
-// session) is ignored.
+// A signed-out page (no tour island, no data-signed-in on a public page such
+// as the home page) means the account signed out, the only way to switch
+// accounts, so this is forgotten and a response for the previous account (a
+// different session) is ignored.
 // sendingVersion covers the time the request is in flight, so a page reached
 // right away (or prefetched before the write committed) does not invite again;
 // it is cleared if the request fails.
@@ -89,8 +90,11 @@ function renderedFromCache(): boolean {
 }
 // Help's border plays its short animation on the first page of a visit only.
 let helpIntroPlayed = false
+function signedInPage(): boolean {
+  return document.querySelector("[data-react-island='product-tour']") !== null || document.body.hasAttribute("data-signed-in")
+}
 document.addEventListener("turbo:load", () => {
-  if (!document.querySelector("[data-react-island='product-tour']")) {
+  if (!signedInPage()) {
     resolvedVersion = 0
     sendingVersion = 0
     seenPages.clear()

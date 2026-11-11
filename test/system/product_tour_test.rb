@@ -77,6 +77,21 @@ class ProductTourSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-testid='product-tour-invite']"
   end
 
+  test "visiting the home page while signed in does not forget a dismissed invitation" do
+    @user.update_columns(product_tour_version: nil, product_tour_outcome: nil)
+    sign_in_in_browser
+    visit projects_path
+
+    within("[data-testid='product-tour-invite']") { click_button "Not now" }
+    assert_until { @user.reload.product_tour_outcome == "dismissed" }
+    # The home page has no tour island but is still a signed-in page.
+    first("a[href='#{root_path}']", visible: true).click
+    assert_current_path root_path
+    page.go_back
+    assert_selector "h1", text: "Projects"
+    assert_no_selector "[data-testid='product-tour-invite']"
+  end
+
   # The invitation hides at once, but the next page offers it again until the
   # server has actually recorded the answer.
   test "a dismissal the server never received is offered again on the next page" do
