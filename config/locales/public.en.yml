@@ -142,7 +142,8 @@ en:
     confirm: Confirm email
     confirmed: Email confirmed. You are signed in.
     password_incorrect: That password does not match this registration. If you did not register this account, register again with this email to replace it.
-    invalid: This confirmation link is invalid or has expired.
+    invalid: This confirmation link is invalid, has expired, or was already used. If you already confirmed your email, sign in.
+    rate_limited: Too many confirmation attempts. Please wait a few minutes and try again.
     resend: Resend confirmation email
     resend_sent: If an unverified account exists for that email, a new confirmation email has been sent.
     check_inbox: Check your inbox

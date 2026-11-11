@@ -211,8 +211,9 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
     assert_not squatted.reload.email_verified?
 
-    # Registering again replaces the pending registration and its link.
-    travel 1.second do
+    # Registering again, once the previous email is old enough to resend,
+    # replaces the pending registration and its link.
+    travel User::CONFIRMATION_EMAIL_INTERVAL + 1.second do
       assert_no_difference "User.count" do
         assert_enqueued_emails 1 do
           post registration_path, params: { user: { email: "owner@example.test", password: "the owner's own password",
@@ -230,6 +231,36 @@ class PublicAccountsTest < ActionDispatch::IntegrationTest
     assert squatted.reload.email_verified?
     assert_nil User.authenticate_by_email(email: "owner@example.test", password: "the squatter's password")
     assert_equal squatted, User.authenticate_by_email(email: "owner@example.test", password: "the owner's own password")
+  end
+
+  test "registering an unconfirmed address again is spaced like a resend" do
+    pending = User.create!(email: "pending@example.test", password: "a long secure password",
+                           confirmation_sent_at: 1.minute.ago)
+    link = pending.generate_token_for(:email_confirmation)
+
+    assert_no_enqueued_emails do
+      post registration_path, params: { user: { email: pending.email, password: "another long password",
+                                                password_confirmation: "another long password" } }
+    end
+    assert_redirected_to new_confirmation_resend_path
+    assert_equal pending, User.find_by_token_for(:email_confirmation, link)
+    assert_equal pending, User.authenticate_by_email(email: pending.email, password: "a long secure password")
+
+    post registration_path, params: { user: { email: pending.email, password: "short", password_confirmation: "short" } }
+    assert_response :unprocessable_content
+  end
+
+  test "confirmation attempts are rate limited with their own message" do
+    user = User.create!(email: "pending@example.test", password: "a long secure password",
+                        confirmation_sent_at: Time.current)
+    token = user.generate_token_for(:email_confirmation)
+    10.times { post email_confirmation_path, params: { token: token, password: "a wrong password" } }
+
+    post email_confirmation_path, params: { token: token, password: "a long secure password" }
+    assert_response :too_many_requests
+    assert_select "[role='alert']", text: /Too many confirmation attempts/
+    assert_select "input[type=hidden][name=token][value=?]", token
+    assert_not user.reload.email_verified?
   end
 
   test "a confirmed or disabled account keeps its address and its password" do

@@ -10,7 +10,7 @@ class ConfirmationResendsController < ApplicationController
     email = params[:email]
     raise ActionController::BadRequest unless email.is_a?(String) && email.length <= User::MAXIMUM_EMAIL_LENGTH
     user = User.active.find_by(email: User.normalize_value_for(:email, email))
-    if user && !user.email_verified? && (user.confirmation_sent_at.nil? || user.confirmation_sent_at < 3.minutes.ago)
+    if user && !user.email_verified? && (user.confirmation_sent_at.nil? || user.confirmation_sent_at < User::CONFIRMATION_EMAIL_INTERVAL.ago)
       user.update!(confirmation_sent_at: Time.current)
       AccountMailer.confirm_email(user).deliver_later
     end

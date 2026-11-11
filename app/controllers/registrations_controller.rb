@@ -25,7 +25,7 @@ class RegistrationsController < ApplicationController
     saved = registration.save
     @user = registration.user
     if saved
-      AccountMailer.confirm_email(@user).deliver_later
+      AccountMailer.confirm_email(@user).deliver_later if registration.confirmation_due?
       redirect_to new_confirmation_resend_path, notice: t("registration.check_email")
     else
       @user.password = @user.password_confirmation = nil

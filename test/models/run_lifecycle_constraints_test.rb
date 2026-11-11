@@ -1,4 +1,5 @@
 require "test_helper"
+require Rails.root.join("db/migrate/20261111090000_add_run_lifecycle_constraints")
 
 # The database, not only the services that write runs, ties a run's status to
 # its completion time and keeps experiment and translation run statuses to
@@ -33,6 +34,19 @@ class RunLifecycleConstraintsTest < ActiveSupport::TestCase
   test "translation run and experiment statuses are limited to the known set" do
     assert_violates { translation_runs(:one).update_columns(status: "cancelled") }
     assert_violates { experiments(:one).update_columns(status: "cancelled") }
+  end
+
+  test "the migration refuses to add the constraints over existing rows that violate them" do
+    connection = ActiveRecord::Base.connection
+    # Rolled back with the test's transaction.
+    connection.execute("ALTER TABLE translation_runs DROP CONSTRAINT translation_runs_completion_check")
+    translation_runs(:one).update_columns(status: "failed", completed_at: nil)
+
+    error = assert_raises(ActiveRecord::MigrationError) do
+      AddRunLifecycleConstraints.new.send(:verify_existing_rows!)
+    end
+    assert_includes error.message, "translation_runs: 1 rows whose completed_at does not match their status"
+    assert translation_runs(:one).reload.failed?
   end
 
   private

@@ -142,7 +142,8 @@ vi:
     confirm: Xác nhận email
     confirmed: Đã xác nhận email. Bạn đã đăng nhập.
     password_incorrect: Mật khẩu không khớp với lần đăng ký này. Nếu bạn không đăng ký tài khoản này, hãy đăng ký lại bằng email này để thay thế.
-    invalid: Liên kết xác nhận không hợp lệ hoặc đã hết hạn.
+    invalid: Liên kết xác nhận không hợp lệ, đã hết hạn hoặc đã được dùng. Nếu bạn đã xác nhận email, hãy đăng nhập.
+    rate_limited: Bạn đã thử xác nhận quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.
     resend: Gửi lại email xác nhận
     resend_sent: Nếu có tài khoản chưa xác nhận với email này, chúng tôi đã gửi email xác nhận mới.
     check_inbox: Kiểm tra hộp thư

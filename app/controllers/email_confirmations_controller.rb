@@ -2,7 +2,7 @@ class EmailConfirmationsController < ApplicationController
   layout "public"
   skip_before_action :require_authentication
   before_action :private_confirmation_response
-  rate_limit to: 10, within: 15.minutes, by: :client_network, only: :create, with: :redirect_invalid
+  rate_limit to: 10, within: 15.minutes, by: :client_network, only: :create, with: :render_rate_limited
 
   def show
     @token = params[:token].to_s
@@ -47,6 +47,14 @@ class EmailConfirmationsController < ApplicationController
 
     redirect_to destination.presence || new_translation_workspace_path,
                 notice: I18n.with_locale(@user.locale) { t("email_confirmation.confirmed") }
+  end
+
+  def render_rate_limited
+    response.set_header("Retry-After", 15.minutes.to_i.to_s)
+    @token = params[:token].to_s
+    @user = User.find_by_token_for(:email_confirmation, @token)
+    flash.now[:alert] = t("email_confirmation.rate_limited")
+    render :show, status: :too_many_requests
   end
 
   def redirect_invalid

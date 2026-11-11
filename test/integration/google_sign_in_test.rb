@@ -112,6 +112,30 @@ class GoogleSignInTest < ActionDispatch::IntegrationTest
     assert pending.password_sign_in?
   end
 
+  test "Google does not take over a disabled unconfirmed registration" do
+    disabled = User.create!(email: "google.person@gmail.com", password: "a long secure password",
+                            status: :disabled, confirmation_sent_at: Time.current)
+
+    with_google_verifier(FakeVerifier.new(claims: claims_for(sign_in_ceremony))) do
+      assert_no_difference("FederatedIdentity.count") { post_callback }
+    end
+
+    assert_rejected("An account already exists for this email. Sign in first, then connect Google.")
+    assert_not disabled.reload.email_verified?
+  end
+
+  test "a person who registers and then uses Google before confirming keeps Google sign-in only" do
+    # The password was chosen before anyone proved the mailbox, so it cannot
+    # be told apart from a squatter's and is dropped (docs/security.md).
+    post registration_path, params: { user: { email: "google.person@gmail.com", password: "a long secure password",
+                                              password_confirmation: "a long secure password" } }
+    with_google_verifier(FakeVerifier.new(claims: claims_for(sign_in_ceremony))) { post_callback }
+
+    user = User.find_by!(email: "google.person@gmail.com")
+    assert_equal user.id, signed_in_user_id
+    assert_nil User.authenticate_by_email(email: user.email, password: "a long secure password")
+  end
+
   test "repeat sign-in with the same Google subject reuses the account" do
     with_google_verifier(FakeVerifier.new(claims: claims_for(sign_in_ceremony))) { post_callback }
     delete session_path
