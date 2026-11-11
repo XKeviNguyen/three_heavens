@@ -140,8 +140,15 @@ export default class extends Controller {
     if (this.discarding || this.allowVisit) return false
     window.clearTimeout(this.saveTimer)
     // One save at a time, so sequence numbers reach the server in order.
+    // A failure that may pass has its own retry, which sends the newest
+    // content; content the server refused must not keep this newer edit
+    // unsaved. A conflict stops autosave until the user resolves it.
     while (this.saving) {
-      try { await this.saving } catch { return false }
+      try {
+        await this.saving
+      } catch (error) {
+        if (!error?.final || error.conflict) return false
+      }
     }
 
     if (this.discarding) return false

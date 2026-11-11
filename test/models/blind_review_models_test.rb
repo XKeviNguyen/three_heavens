@@ -16,11 +16,13 @@ class BlindReviewModelsTest < ActiveSupport::TestCase
     @first_translation = @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_claude),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "First translation"
     )
     @second_translation = @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_gpt),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Second translation"
     )
     @review_round = @experiment.create_review_round!(status: :running)
@@ -87,6 +89,7 @@ class BlindReviewModelsTest < ActiveSupport::TestCase
     assert_not @review_run.valid?
 
     @review_run.status = :failed
+    @review_run.completed_at = Time.current
     @review_run.save!
     @review_round.status = :completed
     assert_not @review_round.valid?

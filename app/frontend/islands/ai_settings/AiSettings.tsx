@@ -83,12 +83,15 @@ function interpolate(template: string, values: Record<string, string>): string {
 const primaryButton =
   "min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:bg-slate-400"
 
+type Confirmation = "delete" | "replace" | null
+
 export function AiSettings({ state: initialState, locale, urls, messages, denials }: AiSettingsProps) {
   const [state, setState] = useState(initialState)
   const [selected, setSelected] = useState<PaymentSource>(initialState.payment_source)
   const [apiKey, setApiKey] = useState("")
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [confirmingReplace, setConfirmingReplace] = useState(false)
+  // At most one confirmation is open: asking to replace the key closes a
+  // delete confirmation instead of hiding it behind the replace one.
+  const [confirming, setConfirming] = useState<Confirmation>(null)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const inFlight = useRef(false)
@@ -110,12 +113,12 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
 
   function startDelete() {
     pendingFocus.current = () => cancelButton.current
-    setConfirmingDelete(true)
+    setConfirming("delete")
   }
 
   function cancelDelete() {
     pendingFocus.current = () => deleteButton.current
-    setConfirmingDelete(false)
+    setConfirming(null)
   }
 
   async function mutate(method: "PATCH" | "PUT" | "DELETE", url: string, body: Record<string, unknown>) {
@@ -125,8 +128,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
     inFlight.current = true
     // Only a confirmation open when this request started belongs to it; one
     // opened while an unrelated request runs is left alone.
-    const confirmedReplace = confirmingReplace
-    const confirmedDelete = confirmingDelete
+    const confirmed = confirming
     setBusy(true)
     setFeedback(null)
     try {
@@ -151,20 +153,19 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
       }
       if (response.ok) {
         setApiKey("")
-        if (confirmedDelete) pendingFocus.current = () => keyHeading.current
-        else if (confirmedReplace) pendingFocus.current = () => keySubmit.current
-        if (confirmedDelete) setConfirmingDelete(false)
-        if (confirmedReplace) setConfirmingReplace(false)
+        if (confirmed === "delete") pendingFocus.current = () => keyHeading.current
+        else if (confirmed === "replace") pendingFocus.current = () => keySubmit.current
+        closeConfirmation(confirmed)
         setFeedback({ kind: "notice", text: payload.notice ?? "", field: null })
       } else {
         // A refused replace or delete (stale page, invalid key) closes its
         // confirmation: the state may now show another key, which the user
         // has not confirmed.
-        closeConfirmations(confirmedReplace, confirmedDelete)
+        refuseConfirmation(confirmed)
         setFeedback({ kind: "error", text: payload.error ?? messages.errors.unexpected, field: payload.field ?? null })
       }
     } catch {
-      closeConfirmations(confirmedReplace, confirmedDelete)
+      refuseConfirmation(confirmed)
       setFeedback({ kind: "error", text: messages.errors.network, field: null })
     } finally {
       inFlight.current = false
@@ -172,15 +173,15 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
     }
   }
 
-  function closeConfirmations(replace: boolean, remove: boolean) {
-    if (replace) {
-      pendingFocus.current = () => keySubmit.current
-      setConfirmingReplace(false)
-    }
-    if (remove) {
-      pendingFocus.current = () => deleteButton.current ?? keyHeading.current
-      setConfirmingDelete(false)
-    }
+  // Closes the confirmation a request was sent from, if it is still open.
+  function closeConfirmation(confirmed: Confirmation) {
+    if (confirmed) setConfirming((current) => (current === confirmed ? null : current))
+  }
+
+  function refuseConfirmation(confirmed: Confirmation) {
+    if (confirmed === "replace") pendingFocus.current = () => keySubmit.current
+    if (confirmed === "delete") pendingFocus.current = () => deleteButton.current ?? keyHeading.current
+    closeConfirmation(confirmed)
   }
 
   function submitSource(event: FormEvent) {
@@ -193,9 +194,9 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
   // deleting. An empty field goes straight to the server, which explains it.
   function submitKey(event: FormEvent) {
     event.preventDefault()
-    if (state.personal_key.configured && apiKey.trim() !== "" && !confirmingReplace) {
+    if (state.personal_key.configured && apiKey.trim() !== "" && confirming !== "replace") {
       pendingFocus.current = () => replaceCancel.current
-      setConfirmingReplace(true)
+      setConfirming("replace")
       return
     }
     sendKey()
@@ -207,7 +208,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
 
   function cancelReplace() {
     pendingFocus.current = () => keySubmit.current
-    setConfirmingReplace(false)
+    setConfirming(null)
   }
 
   function deleteKey() {
@@ -396,7 +397,7 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
               {keyError}
             </p>
           ) : null}
-          {confirmingReplace ? (
+          {confirming === "replace" ? (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="group" aria-labelledby={`${ids}-replace-prompt`}>
               <p id={`${ids}-replace-prompt`} className="text-sm text-amber-950">
                 {interpolate(messages.key.replace_confirm, { hint })}
@@ -422,9 +423,9 @@ export function AiSettings({ state: initialState, locale, urls, messages, denial
             </button>
           )}
         </form>
-        {key.configured && !confirmingReplace ? (
+        {key.configured && confirming !== "replace" ? (
           <div className="mt-3">
-            {confirmingDelete ? (
+            {confirming === "delete" ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3" role="group" aria-labelledby={`${ids}-delete-prompt`}>
                 <p id={`${ids}-delete-prompt`} className="text-sm text-red-900">
                   {interpolate(messages.key.delete_confirm, { hint })}

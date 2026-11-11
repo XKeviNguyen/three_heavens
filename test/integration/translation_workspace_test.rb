@@ -380,6 +380,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     run = translation_runs(:one)
     run.update!(
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Translated result\nSecond line",
       resolved_model_identifier: "openai/gpt-resolved",
       prompt_tokens: 120,
@@ -408,6 +409,7 @@ class TranslationWorkspaceTest < ActionDispatch::IntegrationTest
     run = translation_runs(:one)
     run.update!(
       status: :failed,
+      completed_at: Time.current,
       error_code: "PRIVATE_PROVIDER_ERROR_CODE",
       error_message: "Bearer provider-secret <script>alert('unsafe')</script>"
     )

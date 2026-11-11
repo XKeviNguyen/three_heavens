@@ -494,7 +494,7 @@ class Pipelines::AdvanceTest < ActiveSupport::TestCase
     )
     snapshot_reference(experiment: experiment, revision: reference_revision) if reference_revision
     [ llm_models(:openrouter_claude), llm_models(:openrouter_gpt) ].each_with_index do |model, index|
-      experiment.translation_runs.create!(llm_model: model, status: :completed, translated_text: "Translation #{index}")
+      experiment.translation_runs.create!(llm_model: model, status: :completed, completed_at: Time.current, translated_text: "Translation #{index}")
     end
     experiment
   end

@@ -94,6 +94,7 @@ vi:
     approve_heading: Duyệt bản dịch cuối
     approve_intro: Hoàn tất sẽ đánh dấu bản hiện tại là bản dịch cuối đã duyệt và chuyển sang chỉ xem. Bạn có thể mở lại để sửa mà không mất lịch sử.
     finalize: Hoàn tất bản hiện tại
+    finalize_after_refinement: Bạn có thể hoàn tất khi vòng tinh chỉnh đang chạy kết thúc.
     finalize_confirm: Hoàn tất phiên bản %{number} thành bản dịch cuối đã duyệt? Việc sửa và tạo đề xuất sẽ bị tắt cho đến khi bạn mở lại.
     finalizing: Đang hoàn tất…
     finalized_heading: Bản dịch đã hoàn tất

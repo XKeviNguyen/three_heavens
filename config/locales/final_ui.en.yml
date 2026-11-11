@@ -94,6 +94,7 @@ en:
     approve_heading: Approve the final translation
     approve_intro: Finalizing marks the current version as the approved final translation and makes it read-only. You can reopen it later without losing history.
     finalize: Finalize current version
+    finalize_after_refinement: Finalizing is available once the running refinement round finishes.
     finalize_confirm: Finalize version %{number} as the approved final translation? Editing and AI suggestions are turned off until you reopen it.
     finalizing: Finalizing…
     finalized_heading: Translation finalized

@@ -22,11 +22,13 @@ class ReviewRunJobTest < ActiveJob::TestCase
     @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_claude),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "First translation"
     )
     @experiment.translation_runs.create!(
       llm_model: llm_models(:openrouter_gpt),
       status: :completed,
+      completed_at: Time.current,
       translated_text: "Second translation"
     )
     @review_round = BlindReviews::Start.call(

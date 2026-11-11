@@ -302,6 +302,39 @@ class TranslationWorkspaceDraftTest < ApplicationSystemTestCase
     assert_field "Project name", with: "Acknowledged A"
   end
 
+  test "an edit made while a save is being refused is saved once the refusal arrives" do
+    visit new_translation_workspace_path
+    page.execute_script(<<~JS)
+      const deliver = window.fetch.bind(window)
+      window.__releaseRefusedSave = null
+      window.fetch = async (url, options = {}) => {
+        const draft = new URL(url, location.origin).pathname === "/translation_workspace_draft"
+        if (draft && options.method === "POST" && !window.__refusedSaveSent) {
+          window.__refusedSaveSent = true
+          await new Promise(resolve => { window.__releaseRefusedSave = resolve })
+          return new Response("", { status: 422 })
+        }
+        return deliver(url, options)
+      }
+      const element = document.querySelector("[data-controller='workspace-guard']")
+      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "workspace-guard")
+      const save = controller.save.bind(controller)
+      window.__saveCalls = 0
+      controller.save = (...args) => { window.__saveCalls += 1; return save(...args) }
+    JS
+    fill_in "Project name", with: "Refused name"
+    assert_until { page.evaluate_script("window.__releaseRefusedSave !== null") }
+    fill_in "Project name", with: "Corrected name"
+    # The correction's save is waiting for the refused one.
+    assert_until { page.evaluate_script("window.__saveCalls") >= 2 }
+    page.execute_script("window.__releaseRefusedSave()")
+
+    assert_until(timeout: 10) do
+      users(:normal).translation_workspace_drafts.first&.payload&.fetch("project_name", nil) == "Corrected name"
+    end
+    assert_selector "[data-workspace-guard-target='status']", text: "Saved", wait: 10
+  end
+
   test "discarding while a save is unresolved never recreates the draft" do
     visit new_translation_workspace_path
     page.execute_script(<<~JS)

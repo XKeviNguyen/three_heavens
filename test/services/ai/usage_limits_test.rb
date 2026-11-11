@@ -168,6 +168,7 @@ class Ai::UsageLimitsTest < ActiveSupport::TestCase
       experiment.translation_runs.create!(
         llm_model: model,
         status: :completed,
+        completed_at: Time.current,
         translated_text: "Candidate #{model.id}"
       )
     end

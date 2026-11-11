@@ -34,6 +34,7 @@ module AnalyticsTestHelper
         {
           llm_model: model,
           status: :completed,
+          completed_at: Time.current,
           translated_text: "Translation by #{model.display_name}"
         }.merge(attributes)
       )

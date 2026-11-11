@@ -10,4 +10,5 @@ two:
   llm_model: openrouter_gpt
   billing_source: managed
   status: completed
+  completed_at: 2026-09-01 00:00:00
   translated_text: Test translation
